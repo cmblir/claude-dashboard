@@ -145,6 +145,9 @@
     <button id="btn-reindex" class="btn w-full justify-center text-[12px]">
       <span>🔄</span><span>세션 재인덱스</span>
     </button>
+    <button id="btn-latest-features" class="btn w-full justify-center text-[12px]" title="Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가">
+      <span>📡</span><span>최신 정보 로딩</span>
+    </button>
   </div>
 </aside>
 
@@ -178,11 +181,20 @@ const state = { view: 'overview', data: {}, loading: {} };
 
 const DOCS_BASE = 'https://docs.claude.com/en/docs/claude-code/';
 const NAV = [
+  // 🆕 신기능 — 최신 Anthropic 발표 (메인 위)
+  { id: 'design',        icon: '🎨', label: 'Claude Design',       group: 'new', desc: 'claude.ai/design · 비주얼 디자인 + 로컬 export', docUrl: 'https://www.anthropic.com/news/claude-design-anthropic-labs', released: '2026-04-17' },
+  { id: 'feat_opus47',   icon: '🧠', label: 'Opus 4.7',           group: 'new', desc: '최신 플래그십 모델 · 에이전틱 코딩 + 고해상도 비전', docUrl: 'https://www.anthropic.com/news/claude-opus-4-7', released: '2026-04-16', featureKey: 'opus47' },
+  { id: 'feat_routines', icon: '🔁', label: 'Code Routines',      group: 'new', desc: 'Claude Code 반복 작업. Mac offline 이어도 웹에서 실행', docUrl: 'https://docs.claude.com/en/docs/claude-code/routines', released: '2026-04-14', featureKey: 'codeRoutines' },
+  { id: 'feat_advisor',  icon: '🧭', label: 'Advisor Tool',       group: 'new', desc: 'executor + advisor 이중 모델로 장기 에이전트 품질↑ 비용↓', docUrl: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool', released: '2026-04-09', featureKey: 'advisorTool' },
+  { id: 'feat_managed',  icon: '🤖', label: 'Managed Agents',     group: 'new', desc: '완전 관리형 Claude 에이전트 하네스 (샌드박스 + 스트리밍)', docUrl: 'https://platform.claude.com/docs/en/managed-agents/overview', released: '2026-04-08', featureKey: 'managedAgents' },
+  { id: 'feat_antcli',   icon: '⌨️', label: 'ant CLI',           group: 'new', desc: 'Claude API 커맨드라인 클라이언트 · YAML 리소스', docUrl: 'https://platform.claude.com/docs/en/api/sdks/cli', released: '2026-04-08', featureKey: 'antCli' },
+  { id: 'feat_mythos',   icon: '🛡', label: 'Claude Mythos',      group: 'new', desc: '방어 보안 특화 research preview (초대제)', docUrl: 'https://red.anthropic.com/2026/mythos-preview/', released: '2026-04-07', featureKey: 'mythos' },
+  { id: 'feat_skills',   icon: '🎯', label: 'Agent Skills',       group: 'new', desc: '지시+스크립트+리소스 묶음을 Claude 가 동적 로드', docUrl: 'https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills', released: '2025-10-16', featureKey: 'agentSkills' },
+
   { id: 'overview',    icon: '✦',  label: '개요',            group: 'main', docUrl: DOCS_BASE+'overview' },
   { id: 'projects',    icon: '📁', label: '프로젝트',          group: 'main', desc: '프로젝트별 Claude 세팅 + AI 추천', docUrl: DOCS_BASE+'memory' },
   { id: 'analytics',   icon: '📊', label: '통계 & 스코어',      group: 'main', docUrl: DOCS_BASE+'costs' },
   { id: 'aiEval',      icon: '🤖', label: 'AI 종합 평가',       group: 'main', desc: 'Claude 가 전체 셋업을 보고 우선순위 진단' },
-  { id: 'design',      icon: '🎨', label: 'Claude Design',      group: 'main', desc: 'claude.ai/design 사용 가이드 + 내 디자인', docUrl: 'https://www.anthropic.com/news/claude-design-anthropic-labs' },
   { id: 'sessions',    icon: '🗂️', label: '세션 히스토리',      group: 'main', docUrl: DOCS_BASE+'interactive-mode' },
   { id: 'agents',      icon: '🤝', label: '에이전트 & 그래프',  group: 'work', docUrl: DOCS_BASE+'sub-agents' },
   { id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'work',
@@ -238,6 +250,7 @@ const NAV = [
   { id: 'system',      icon: '🖥️', label: '시스템 상태',       group: 'system', docUrl: DOCS_BASE+'troubleshooting' },
 ];
 const GROUPS = [
+  { id: 'new',      label: '🆕 신기능' },
   { id: 'main',     label: '메인' },
   { id: 'work',     label: '작업 자원' },
   { id: 'config',   label: '설정 & 구성' },
@@ -342,26 +355,49 @@ function scoreColor(n) {
 function renderNav() {
   const nav = document.getElementById('nav');
   nav.innerHTML = '';
+  // 동적 발견 항목 병합
+  const dynamicFeatures = (window.__dynamicFeatures || []).map(f => ({
+    id: 'feat_dyn_' + f.id,
+    icon: f.icon || '✨',
+    label: f.label,
+    group: 'new',
+    desc: (f.summary || '') + (f.released ? ' · ' + f.released : ''),
+    docUrl: f.docUrl || f.launchUrl || '',
+    dynamicFeature: f,
+  }));
+  const allNav = NAV.concat(dynamicFeatures);
+
   GROUPS.forEach(g => {
+    const items = allNav.filter(n => n.group === g.id);
+    if (!items.length && g.id !== 'new') return; // 'new' 는 비어도 헤더는 남김
     const label = document.createElement('div');
     label.className = 'group-label text-[10px] uppercase tracking-widest text-[var(--text-dim)] px-3 mt-3 mb-1';
     label.textContent = g.label;
     nav.appendChild(label);
-    NAV.filter(n => n.group === g.id).forEach(n => {
+    items.forEach(n => {
       const el = document.createElement('div');
       el.className = 'nav-item' + (state.view === n.id ? ' active' : '');
       el.title = n.label + (n.desc ? ' — ' + n.desc : '');
+      const isNew = g.id === 'new';
       const descHtml = n.desc ? `<div class="nav-desc text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">${escapeHtml(n.desc)}</div>` : '';
       el.innerHTML = `
         <span class="w-5 text-center self-start mt-0.5 flex-shrink-0">${n.icon}</span>
         <div class="nav-label flex-1 min-w-0">
-          <div>${n.label}</div>
+          <div class="flex items-center gap-1">${n.label} ${n.dynamicFeature?'<span class="chip text-[8px]" style="background:rgba(167,139,250,0.2);color:#c4b5fd;">AI 발견</span>':''}</div>
           ${descHtml}
         </div>`;
       el.onclick = () => go(n.id);
       nav.appendChild(el);
     });
   });
+}
+
+async function loadDynamicFeatures() {
+  try {
+    const r = await api('/api/features/list');
+    window.__dynamicFeatures = r.dynamic || [];
+    renderNav();
+  } catch (e) { /* no-op */ }
 }
 function go(id) {
   state.view = id;
@@ -384,7 +420,12 @@ async function renderView() {
   const v = document.getElementById('view');
   v.innerHTML = `<div class="tab-enter"><div class="shimmer h-32 mb-4"></div><div class="shimmer h-64"></div></div>`;
   try {
-    const fn = VIEWS[state.view] || VIEWS.overview;
+    let fn = VIEWS[state.view];
+    // 신기능 탭 (feat_*) — 공통 렌더러로 처리
+    if (!fn && state.view.startsWith('feat_')) {
+      fn = () => renderFeatureDoc(state.view);
+    }
+    fn = fn || VIEWS.overview;
     const html = await fn();
     v.innerHTML = `<div class="tab-enter">${html}</div>`;
     const after = AFTER[state.view];
@@ -393,6 +434,68 @@ async function renderView() {
     console.error(e);
     v.innerHTML = `<div class="card p-8 empty">뷰 렌더 실패: ${escapeHtml(e.message)}</div>`;
   }
+}
+
+// 신기능 공통 뷰 — NAV 정보 + /api/features/list 조합
+async function renderFeatureDoc(viewId) {
+  const navItem = NAV.find(n => n.id === viewId);
+  let feat = null;
+  // 동적 발견 항목
+  if (viewId.startsWith('feat_dyn_')) {
+    const list = await api('/api/features/list');
+    const key = viewId.replace('feat_dyn_', '');
+    feat = (list.dynamic || []).find(f => f.id === key);
+  } else if (navItem && navItem.featureKey) {
+    const list = await api('/api/features/list');
+    feat = (list.builtin || []).find(f => f.id === navItem.featureKey);
+  }
+  if (!feat && navItem) {
+    // 최소 정보로 대체
+    feat = { id: viewId, icon: navItem.icon, label: navItem.label,
+             summary: navItem.desc || '', docUrl: navItem.docUrl,
+             launchUrl: navItem.docUrl, released: navItem.released || '' };
+  }
+  if (!feat) return `<div class="card empty">신기능 정보를 찾을 수 없습니다.</div>`;
+
+  return `
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">${feat.icon||'✨'} ${escapeHtml(feat.label)}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">
+          ${feat.released ? `출시일 ${escapeHtml(feat.released)} · ` : ''}${escapeHtml(feat.summary||'')}
+        </p>
+      </div>
+      <div class="flex gap-2">
+        ${feat.launchUrl && feat.launchUrl !== feat.docUrl ? `<a class="btn-primary btn text-xs" href="${escapeHtml(feat.launchUrl)}" target="_blank" rel="noopener">🚀 사용하기</a>` : ''}
+        ${feat.docUrl ? `<a class="btn text-xs" href="${escapeHtml(feat.docUrl)}" target="_blank" rel="noopener">📖 공식 문서 ↗</a>` : ''}
+      </div>
+    </div>
+
+    <div class="card p-5 mb-4">
+      <h3 class="font-semibold text-sm mb-2">📌 한 줄 요약</h3>
+      <p class="text-sm">${escapeHtml(feat.summary||'')}</p>
+    </div>
+
+    <div class="card p-5 mb-4">
+      <h3 class="font-semibold text-sm mb-3">🔗 링크</h3>
+      <div class="space-y-2 text-xs">
+        ${feat.launchUrl ? `<a class="block text-[var(--accent)] hover:underline" href="${escapeHtml(feat.launchUrl)}" target="_blank" rel="noopener">→ 시작/사용 URL: ${escapeHtml(feat.launchUrl)}</a>` : ''}
+        ${feat.docUrl ? `<a class="block text-[var(--accent)] hover:underline" href="${escapeHtml(feat.docUrl)}" target="_blank" rel="noopener">→ 공식 문서: ${escapeHtml(feat.docUrl)}</a>` : ''}
+      </div>
+    </div>
+
+    ${feat.isDynamic ? `
+      <div class="card p-4" style="background:rgba(167,139,250,0.06);">
+        <div class="text-xs">
+          <b>🤖 AI 발견 항목</b> — '최신 정보 로딩' 으로 Claude 가 자동 발견.
+          잘못됐거나 오래된 정보일 수 있으니 공식 문서 링크로 확인하세요.
+        </div>
+      </div>` : ''}
+
+    <div class="mt-4 card p-3 text-[11px] text-[var(--text-mute)]">
+      💡 이 기능에 대한 상세 UI 가 필요하면 대시보드 상단에 공식 docs 버튼 클릭 · 또는 '🚀 사용하기' 로 바로 이동.
+    </div>
+  `;
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -5074,6 +5177,22 @@ async function saveClaimedPlan() {
 }
 
 document.getElementById('btn-reindex').onclick = () => reindex(false);
+document.getElementById('btn-latest-features').onclick = async () => {
+  const btn = document.getElementById('btn-latest-features');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span><span>Claude 에게 조사 중… (~1분)</span>';
+  try {
+    const r = await api('/api/features/refresh', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}),
+    });
+    if (r.error) { toast(r.error, 'err'); return; }
+    const n = (r.features||[]).length;
+    toast(n ? `✨ 신기능 ${n}개 발견! 좌측 🆕 신기능 그룹 확인` : '새로운 기능 없음 (이미 최신)', n?'ok':'info');
+    await loadDynamicFeatures();
+  } catch (e) { toast(e.message, 'err'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
+};
 document.getElementById('btn-refresh').onclick = () => { toast('새로고침', 'info'); renderView(); };
 function _syncNavToggleVisibility() {
   const isMobile = window.matchMedia('(max-width: 900px)').matches;
@@ -5107,8 +5226,12 @@ document.getElementById('globalSearch').addEventListener('keydown', e => {
 
 (async function boot() {
   state.view = (location.hash.replace(/^#\//, '') || 'overview');
-  if (!NAV.find(n => n.id === state.view)) state.view = 'overview';
+  // feat_* / 동적 feat_dyn_* 는 아직 NAV 에 없어도 허용
+  if (!state.view.startsWith('feat_') && !NAV.find(n => n.id === state.view)) {
+    state.view = 'overview';
+  }
   renderNav();
+  loadDynamicFeatures().catch(()=>{}); // 백그라운드로 동적 항목 추가
   await loadCliFoot();
   renderView();
 })();
