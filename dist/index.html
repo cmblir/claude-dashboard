@@ -1890,7 +1890,7 @@ VIEWS.mcp = async () => {
     !q || (x.name+' '+x.description+' '+x.id+' '+(x.category||'')).toLowerCase().includes(q)
   );
   return `
-    ${viewHeader('MCP 커넥터', `로컬 ${(conn.local||[]).length} · 플랫폼 ${(conn.platform||[]).length} · 플러그인 ${(conn.plugin||[]).length} · 카탈로그 ${cat.catalog.length}개`, 'mcp')}
+    ${viewHeader('MCP 커넥터', `Code 로컬 ${(conn.local||[]).length} · 플랫폼 ${(conn.platform||[]).length} · 플러그인 ${(conn.plugin||[]).length} · Desktop 앱 ${(conn.desktop||[]).length} · 카탈로그 ${cat.catalog.length}개`, 'mcp')}
 
     <div class="card p-5 mb-4">
       <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -1916,9 +1916,10 @@ VIEWS.mcp = async () => {
       </div>
     </div>
 
-    ${renderConnectorGroup('🖥 설치된 로컬 MCP (~/.claude.json)', conn.local || [], true)}
+    ${renderConnectorGroup('🖥 Claude Code 로컬 MCP (~/.claude.json)', conn.local || [], true)}
     ${renderConnectorGroup('🌐 플랫폼 MCP (claude.ai 연결)', conn.platform || [], false)}
     ${renderConnectorGroup('🔌 플러그인 제공 MCP', conn.plugin || [], false)}
+    ${renderConnectorGroup('💻 Claude Desktop 앱 MCP (claude_desktop_config.json)', conn.desktop || [], false)}
   `;
 };
 AFTER.mcp = () => {

@@ -44,6 +44,7 @@ TASKS_DIR = CLAUDE_HOME / "tasks"
 SCHEDULED_TASKS_DIR = CLAUDE_HOME / "scheduled-tasks"
 HISTORY_JSONL = CLAUDE_HOME / "history.jsonl"
 CLAUDE_JSON = Path.home() / ".claude.json"
+CLAUDE_DESKTOP_CONFIG = Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
 MEMORY_DIR = CLAUDE_HOME / "projects" / "-Users-yoo-claude-dashboard" / "memory"
 
 DB_PATH = Path.home() / ".claude-dashboard.db"
@@ -1918,13 +1919,15 @@ def _claude_mcp_list_cached() -> tuple[dict, dict]:
 
 def list_connectors() -> dict:
     """MCP 커넥터 분류:
-      - platform: claude.ai 플랫폼 연결 (예: 'claude.ai Google Drive')
-      - local:    ~/.claude.json mcpServers (사용자 설치)
+      - platform: claude.ai 플랫폼 연결
+      - local:    ~/.claude.json mcpServers (Claude Code CLI)
       - plugin:   활성 플러그인이 제공하는 MCP ('plugin:' 접두사)
+      - desktop:  Claude Desktop 앱의 claude_desktop_config.json
     """
     platform_list: list = []
     local: list = []
     plugin_list: list = []
+    desktop_list: list = []
 
     local_cfg: dict = {}
     if CLAUDE_JSON.exists():
@@ -1935,6 +1938,30 @@ def list_connectors() -> dict:
         mcp = data.get("mcpServers", {}) if isinstance(data, dict) else {}
         if isinstance(mcp, dict):
             local_cfg = mcp
+
+    # Claude Desktop 앱 MCP (별개 파일, CLI 와 공유 안 됨)
+    if CLAUDE_DESKTOP_CONFIG.exists():
+        try:
+            d_data = json.loads(_safe_read(CLAUDE_DESKTOP_CONFIG))
+        except Exception:
+            d_data = {}
+        d_mcp = d_data.get("mcpServers", {}) if isinstance(d_data, dict) else {}
+        if isinstance(d_mcp, dict):
+            for name, cfg in d_mcp.items():
+                if not isinstance(cfg, dict):
+                    cfg = {}
+                desktop_list.append({
+                    "id": name, "name": name, "scope": "desktop",
+                    "type": cfg.get("type", "stdio"),
+                    "command": cfg.get("command", ""),
+                    "args": cfg.get("args", []),
+                    "env": {k: ("***" if any(s in k.lower() for s in ("key","token","secret","password")) else v)
+                            for k, v in (cfg.get("env") or {}).items()},
+                    "endpoint": cfg.get("command", "") + (" " + " ".join(cfg.get("args") or []) if cfg.get("args") else ""),
+                    "enabled": True, "tools": [],
+                    "connected": None, "needsAuth": False,
+                    "configPath": str(CLAUDE_DESKTOP_CONFIG),
+                })
 
     cli_status, cli_url = _claude_mcp_list_cached()
 
@@ -2006,7 +2033,7 @@ def list_connectors() -> dict:
                 "connected": False, "needsAuth": True, "enabled": True, "tools": [],
             })
 
-    return {"platform": platform_list, "local": local, "plugin": plugin_list}
+    return {"platform": platform_list, "local": local, "plugin": plugin_list, "desktop": desktop_list}
 
 
 # ───────────────── API: projects ─────────────────
