@@ -5573,6 +5573,99 @@ _AI_EVAL_CACHE_FILE = _env_path(
 )
 
 
+def api_design_exports(query: dict) -> dict:
+    """Claude Design export 의심 파일을 스캔 (~/Downloads + 사용자 지정 경로).
+    공식 API 가 아직 없어서 로컬 파일시스템 휴리스틱.
+    """
+    cfg = _load_dash_config()
+    extra_dirs = cfg.get("designExportDirs") or []
+    default_dirs = [
+        str(Path.home() / "Downloads"),
+        str(Path.home() / "Documents" / "Claude Design"),
+        str(Path.home() / "Desktop"),
+    ]
+    search_dirs = list(dict.fromkeys(default_dirs + extra_dirs))
+
+    # Claude Design export 파일 패턴:
+    # - .pdf, .pptx, .html, .canva 확장자
+    # - 파일명에 'claude-design' 또는 'design-handoff' 포함 가능
+    out = []
+    seen = set()
+    now = time.time()
+    for d in search_dirs:
+        p = Path(d)
+        if not p.exists() or not p.is_dir():
+            continue
+        try:
+            # 최근 180일 이내만
+            for item in p.iterdir():
+                if not item.is_file():
+                    continue
+                try:
+                    mtime = item.stat().st_mtime
+                except Exception:
+                    continue
+                if now - mtime > 180 * 86400:
+                    continue
+                name_lower = item.name.lower()
+                ext = item.suffix.lower()
+                # 명시적 keyword 우선, 그 외 design-typical 확장자도 수집
+                is_design_keyword = any(k in name_lower for k in
+                    ("claude-design", "claude_design", "design-handoff", "handoff-bundle"))
+                is_design_ext = ext in (".pdf", ".pptx", ".html")
+                if not (is_design_keyword or is_design_ext):
+                    continue
+                key = str(item)
+                if key in seen:
+                    continue
+                seen.add(key)
+                try:
+                    size = item.stat().st_size
+                except Exception:
+                    size = 0
+                out.append({
+                    "path": key,
+                    "name": item.name,
+                    "dir": str(p),
+                    "ext": ext.lstrip("."),
+                    "size": size,
+                    "mtime": int(mtime * 1000),
+                    "matchedByKeyword": is_design_keyword,
+                })
+        except Exception:
+            continue
+    out.sort(key=lambda x: x["mtime"], reverse=True)
+    return {
+        "searchedDirs": search_dirs,
+        "files": out[:60],
+        "hint": "Claude Design 공식 API 는 아직 미공개. claude.ai/design 에서 PDF/PPTX/HTML 로 export 한 파일을 기본 경로에서 스캔합니다.",
+    }
+
+
+def api_design_add_dir(body: dict) -> dict:
+    """Claude Design export 를 저장하는 추가 디렉토리 등록."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    dir_path = (body.get("dir") or "").strip()
+    if not dir_path:
+        return {"ok": False, "error": "dir required"}
+    p = Path(os.path.expanduser(dir_path)).resolve()
+    home = Path.home().resolve()
+    try:
+        p.relative_to(home)
+    except ValueError:
+        return {"ok": False, "error": "홈 디렉토리 밖 경로 거부"}
+    if not p.is_dir():
+        return {"ok": False, "error": "디렉토리가 아님 또는 존재하지 않음"}
+    cfg = _load_dash_config()
+    arr = cfg.get("designExportDirs") or []
+    if str(p) not in arr:
+        arr.append(str(p))
+    cfg["designExportDirs"] = arr
+    _save_dash_config(cfg)
+    return {"ok": True, "dirs": arr}
+
+
 def api_ai_evaluation(body: dict) -> dict:
     """전체 셋업을 Claude 에게 평가받음. 비싸므로 force=true 시에만 새로 호출."""
     if not isinstance(body, dict):
@@ -6200,6 +6293,7 @@ ROUTES_GET = {
     "/api/optimization/score": lambda q: api_optimization_score(),
     "/api/permissions/diagnose": lambda q: {"issues": validate_permissions(get_settings().get("permissions") or {})},
     "/api/evaluation/ai": lambda q: api_ai_evaluation({"force": False}),
+    "/api/design/exports": api_design_exports,
     "/api/auth/status": lambda q: api_auth_status(),
     "/api/project/detail": api_project_detail,
     "/api/project/score-detail": api_project_score_detail,
@@ -6375,6 +6469,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(api_feature_recommend(self._read_body())); return
         if path == "/api/evaluation/ai":
             self._send_json(api_ai_evaluation(self._read_body())); return
+        if path == "/api/design/add-dir":
+            self._send_json(api_design_add_dir(self._read_body())); return
         if path == "/api/commands/translate":
             self._send_json(api_commands_translate(self._read_body())); return
         if path == "/api/translate/batch":
