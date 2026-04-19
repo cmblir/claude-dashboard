@@ -1881,8 +1881,17 @@ def list_marketplaces() -> list:
 # ───────────────── API: connectors / MCP ─────────────────
 
 def list_connectors() -> dict:
+    """MCP 커넥터 분류:
+      - platform: claude.ai 플랫폼 연결 (예: 'claude.ai Google Drive') — claude CLI / mcp-needs-auth-cache 로 감지
+      - local:    ~/.claude.json mcpServers (사용자 설치)
+      - plugin:   활성 플러그인이 제공하는 MCP (claude mcp list 의 'plugin:' 접두사)
+    """
     platform_list: list = []
     local: list = []
+    plugin_list: list = []
+
+    # 1) claude.json 의 mcpServers — 사용자 직접 설치
+    local_cfg: dict = {}
     if CLAUDE_JSON.exists():
         try:
             data = json.loads(_safe_read(CLAUDE_JSON))
@@ -1890,22 +1899,101 @@ def list_connectors() -> dict:
             data = {}
         mcp = data.get("mcpServers", {}) if isinstance(data, dict) else {}
         if isinstance(mcp, dict):
-            for name, cfg in mcp.items():
-                if not isinstance(cfg, dict):
-                    cfg = {}
-                entry = {
-                    "id": name, "name": name,
-                    "type": cfg.get("type", "stdio"),
-                    "command": cfg.get("command", ""),
-                    "args": cfg.get("args", []),
-                    "env": cfg.get("env", {}),
-                    "scope": "user", "enabled": True, "tools": [],
-                }
-                if any(s in name.lower() for s in ("claude_ai_", "anthropic_", "claude.ai")):
-                    platform_list.append(entry)
-                else:
-                    local.append(entry)
-    return {"platform": platform_list, "local": local}
+            local_cfg = mcp
+
+    # 2) `claude mcp list` 로 정확한 분류 + 연결 상태 가져오기 (있으면)
+    cli_status: dict = {}  # name → status string
+    cli_url: dict = {}     # name → endpoint
+    claude_bin = shutil.which("claude")
+    if claude_bin:
+        try:
+            proc = subprocess.run(
+                [claude_bin, "mcp", "list"],
+                capture_output=True, text=True, timeout=12,
+            )
+            for line in (proc.stdout or "").splitlines():
+                line = line.strip()
+                if not line or ":" not in line:
+                    continue
+                # 형식: "<name>: <endpoint> - <status>"
+                m = re.match(r"^(.+?):\s+(.+?)\s+-\s+(.+)$", line)
+                if not m:
+                    continue
+                name, endpoint, status = m.group(1).strip(), m.group(2).strip(), m.group(3).strip()
+                cli_status[name] = status
+                cli_url[name] = endpoint
+        except Exception:
+            pass
+
+    # 3) needs-auth 캐시 (플랫폼 MCP fallback)
+    auth_cache_path = CLAUDE_HOME / "mcp-needs-auth-cache.json"
+    needs_auth: dict = {}
+    if auth_cache_path.exists():
+        try:
+            needs_auth = json.loads(_safe_read(auth_cache_path)) or {}
+        except Exception:
+            needs_auth = {}
+
+    seen = set()
+
+    # cli 결과 우선
+    for name, status in cli_status.items():
+        seen.add(name)
+        endpoint = cli_url.get(name, "")
+        connected = "Connected" in status or "✓" in status
+        needs_auth_flag = "auth" in status.lower() or "✗" in status or name in needs_auth
+        entry = {
+            "id": name, "name": name,
+            "endpoint": endpoint,
+            "status": status,
+            "connected": connected,
+            "needsAuth": needs_auth_flag,
+            "enabled": True,
+            "tools": [],
+        }
+        if name.startswith("claude.ai ") or name.startswith("claude_ai_") or name.startswith("anthropic_"):
+            entry["scope"] = "platform"
+            platform_list.append(entry)
+        elif name.startswith("plugin:"):
+            entry["scope"] = "plugin"
+            plugin_list.append(entry)
+        else:
+            cfg = local_cfg.get(name, {}) if isinstance(local_cfg, dict) else {}
+            entry["scope"] = "user"
+            entry["type"] = cfg.get("type", "stdio")
+            entry["command"] = cfg.get("command", "")
+            entry["args"] = cfg.get("args", [])
+            entry["env"] = cfg.get("env", {})
+            local.append(entry)
+
+    # cli 가 없거나 누락된 항목 보강
+    for name, cfg in (local_cfg or {}).items():
+        if name in seen:
+            continue
+        if not isinstance(cfg, dict):
+            cfg = {}
+        local.append({
+            "id": name, "name": name,
+            "type": cfg.get("type", "stdio"),
+            "command": cfg.get("command", ""),
+            "args": cfg.get("args", []),
+            "env": cfg.get("env", {}),
+            "scope": "user", "enabled": True, "tools": [],
+            "connected": None, "needsAuth": False, "endpoint": "",
+        })
+
+    # needs-auth 캐시에서만 확인되는 platform 항목 보강 (claude CLI 미설치 fallback)
+    for name in needs_auth.keys():
+        if name in seen:
+            continue
+        if name.startswith("claude.ai ") or name.startswith("claude_ai_"):
+            platform_list.append({
+                "id": name, "name": name, "scope": "platform",
+                "endpoint": "", "status": "Needs authentication",
+                "connected": False, "needsAuth": True, "enabled": True, "tools": [],
+            })
+
+    return {"platform": platform_list, "local": local, "plugin": plugin_list}
 
 
 # ───────────────── API: projects ─────────────────
@@ -2416,11 +2504,12 @@ def api_optimization_score() -> dict:
     connectors = list_connectors()
     mcp_local = len(connectors.get("local", []))
     mcp_platform = len(connectors.get("platform", []))
-    mcp_n = mcp_local + mcp_platform
+    mcp_plugin = len(connectors.get("plugin", []))
+    mcp_n = mcp_local + mcp_platform  # 사용자 설정 기준 (플러그인 제공은 plugins 축에서 평가)
     mcp_raw = mcp_n * 8
     score["mcp"] = {
         "value": min(100, mcp_raw), "max": 100,
-        "note": f"MCP 서버 {mcp_n}개 (로컬 {mcp_local} + 플랫폼 {mcp_platform})",
+        "note": f"MCP 서버 {mcp_n}개 (로컬 {mcp_local} + 플랫폼 {mcp_platform}) · 플러그인 제공 {mcp_plugin}개는 별도",
         "formula": f"min(100, MCP수×8) = min(100, {mcp_n}×8) = min(100, {mcp_raw})",
         "suggest": "MCP 탭의 카탈로그에서 Context7, GitHub, Memory 등 원클릭 설치.",
         "target": "mcp",
