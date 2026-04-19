@@ -3671,50 +3671,75 @@ def api_plans_list() -> dict:
 
 
 def api_metrics_summary() -> dict:
-    """metrics/costs.jsonl 를 파싱해 일자별 토큰/비용 요약."""
+    """토큰 메트릭 — 세션 DB 가 진실 (costs.jsonl 은 Claude Code 훅 버그로 0만 기록됨).
+    costs.jsonl 의 추정 비용 데이터가 있으면 보조로 사용.
+    """
     from collections import defaultdict
-    if not METRICS_COSTS_JSONL.exists():
-        return {"exists": False}
-    daily: dict = defaultdict(lambda: {"in": 0, "out": 0, "cost": 0.0, "n": 0})
-    by_model: dict = defaultdict(lambda: {"in": 0, "out": 0, "cost": 0.0, "n": 0})
-    total = {"in": 0, "out": 0, "cost": 0.0, "n": 0}
-    try:
-        for line in METRICS_COSTS_JSONL.read_text(encoding="utf-8", errors="replace").splitlines():
-            line = line.strip()
-            if not line:
+    _db_init()
+
+    # --- DB 기반 토큰 집계 (진실 source) ---
+    with _db() as c:
+        rows = c.execute(
+            "SELECT started_at, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, total_tokens, model "
+            "FROM sessions WHERE total_tokens > 0"
+        ).fetchall()
+
+    daily: dict = defaultdict(lambda: {"in": 0, "out": 0, "cacheRead": 0, "cacheCreate": 0, "total": 0, "cost": 0.0, "n": 0})
+    by_model: dict = defaultdict(lambda: {"in": 0, "out": 0, "cacheRead": 0, "cacheCreate": 0, "total": 0, "cost": 0.0, "n": 0})
+    total = {"in": 0, "out": 0, "cacheRead": 0, "cacheCreate": 0, "total": 0, "cost": 0.0, "n": 0}
+
+    # Claude 모델 대략 요금 (USD per 1M tokens) — 2025 기준, 자주 바뀌니 참고값
+    PRICING = {
+        "claude-opus-4": {"in": 15.0, "out": 75.0, "cacheRead": 1.5, "cacheCreate": 18.75},
+        "claude-sonnet-4": {"in": 3.0, "out": 15.0, "cacheRead": 0.3, "cacheCreate": 3.75},
+        "claude-haiku-4": {"in": 0.8, "out": 4.0, "cacheRead": 0.08, "cacheCreate": 1.0},
+    }
+    def _estimate_cost(model: str, ti: int, to: int, cr: int, cc: int) -> float:
+        m = (model or "").lower()
+        p = None
+        for prefix, v in PRICING.items():
+            if prefix in m:
+                p = v; break
+        if not p:
+            # 모델 모르면 Sonnet 로 추정
+            p = PRICING["claude-sonnet-4"]
+        return (ti * p["in"] + to * p["out"] + cr * p["cacheRead"] + cc * p["cacheCreate"]) / 1_000_000
+
+    for r in rows:
+        ts = r["started_at"] or 0
+        day = datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d") if ts else ""
+        model = r["model"] or "unknown"
+        ti = r["input_tokens"] or 0
+        to = r["output_tokens"] or 0
+        cr = r["cache_read_tokens"] or 0
+        cc = r["cache_creation_tokens"] or 0
+        tot = r["total_tokens"] or 0
+        cost = _estimate_cost(model, ti, to, cr, cc)
+        for bucket in (daily[day] if day else None, by_model[model], total):
+            if bucket is None:
                 continue
-            try:
-                e = json.loads(line)
-            except Exception:
-                continue
-            ts = e.get("timestamp", "")
-            day = ts[:10] if ts else ""
-            model = e.get("model", "unknown")
-            ti = int(e.get("input_tokens") or 0)
-            to = int(e.get("output_tokens") or 0)
-            cost = float(e.get("estimated_cost_usd") or 0)
-            if day:
-                daily[day]["in"] += ti
-                daily[day]["out"] += to
-                daily[day]["cost"] += cost
-                daily[day]["n"] += 1
-            by_model[model]["in"] += ti
-            by_model[model]["out"] += to
-            by_model[model]["cost"] += cost
-            by_model[model]["n"] += 1
-            total["in"] += ti
-            total["out"] += to
-            total["cost"] += cost
-            total["n"] += 1
-    except Exception as e:
-        return {"exists": True, "error": str(e)}
+            bucket["in"] += ti
+            bucket["out"] += to
+            bucket["cacheRead"] += cr
+            bucket["cacheCreate"] += cc
+            bucket["total"] += tot
+            bucket["cost"] += cost
+            bucket["n"] += 1
 
     timeline = [{"date": d, **v} for d, v in sorted(daily.items())][-60:]
     models = sorted(
         [{"model": m, **v} for m, v in by_model.items()],
-        key=lambda x: x["cost"], reverse=True,
+        key=lambda x: x["total"], reverse=True,
     )[:20]
-    return {"exists": True, "total": total, "timeline": timeline, "models": models}
+
+    return {
+        "exists": True,
+        "source": "sessions_db",
+        "total": total,
+        "timeline": timeline,
+        "models": models,
+        "note": "토큰은 세션 DB (~/.claude/projects/*/*.jsonl 에서 파싱) 기반. 비용은 2025 공식 요금표 기반 추정.",
+    }
 
 
 def api_backups_list() -> dict:
