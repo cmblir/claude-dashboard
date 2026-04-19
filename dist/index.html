@@ -614,11 +614,12 @@ AFTER.overview = () => {
   drawTimeline(stats.timeline || []);
 };
 
-function statCard(label, value, color) {
+function statCard(label, value, color, hint) {
   return `
     <div class="card p-4 hover-lift">
       <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${label}</div>
       <div class="text-3xl font-bold mono mt-1" style="${color?`color:${color}`:''}">${value ?? '—'}</div>
+      ${hint ? `<div class="text-[10px] text-[var(--text-mute)] mt-1">${escapeHtml(hint)}</div>` : ''}
     </div>`;
 }
 
@@ -661,7 +662,7 @@ VIEWS.analytics = async () => {
     <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">통계 & 스코어</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">SQLite에 인덱스된 세션 데이터 기반 분석.</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">SQLite에 인덱스된 세션 데이터 기반 분석. <span class="text-[var(--text-dim)]">평균 점수는 도구 호출 ≥${stats.minToolsForScore||11}회 세션 (${stats.scoredSessions}/${stats.totalSessions}) 만 집계 — 짧은 세션 노이즈 제거</span></p>
       </div>
       <div class="flex gap-2">
         <button class="btn" onclick="reindex(true)">🔄 전체 재인덱스</button>
@@ -670,8 +671,8 @@ VIEWS.analytics = async () => {
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-      ${statCard('총 세션', stats.totalSessions)}
-      ${statCard('평균 스코어', stats.avgScore, scoreColor(stats.avgScore))}
+      ${statCard('총 세션', stats.totalSessions, '', `점수 집계 ${stats.scoredSessions} · 짧은 세션 ${stats.totalSessions-stats.scoredSessions} 제외`)}
+      ${statCard('평균 스코어', stats.avgScore, scoreColor(stats.avgScore), `도구≥${stats.minToolsForScore||11}회 세션 평균`)}
       ${statCard('도구 총 호출', stats.totalTools)}
       ${statCard('오류', stats.totalErrors, '#f87171')}
     </div>
