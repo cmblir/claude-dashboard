@@ -27,7 +27,28 @@ from urllib.parse import urlparse, parse_qs, unquote
 
 ROOT = Path(__file__).parent
 DIST = ROOT / "dist"
-CLAUDE_HOME = Path.home() / ".claude"
+
+# .env 자동 로드 (있으면) — 표준 라이브러리만 사용
+def _load_dotenv(p: Path) -> None:
+    if not p.exists():
+        return
+    for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k, v = k.strip(), v.strip().strip('"').strip("'")
+        if k and k not in os.environ:
+            os.environ[k] = v
+
+_load_dotenv(ROOT / ".env")
+
+# 모든 경로는 환경변수로 오버라이드 가능 (개인정보·시스템 차이 흡수)
+def _env_path(key: str, default: Path) -> Path:
+    v = os.environ.get(key)
+    return Path(os.path.expanduser(v)).resolve() if v else default
+
+CLAUDE_HOME = _env_path("CLAUDE_HOME", Path.home() / ".claude")
 CLAUDE_MD = CLAUDE_HOME / "CLAUDE.md"
 SETTINGS_JSON = CLAUDE_HOME / "settings.json"
 SKILLS_DIR = CLAUDE_HOME / "skills"
@@ -43,11 +64,25 @@ TODOS_DIR = CLAUDE_HOME / "todos"
 TASKS_DIR = CLAUDE_HOME / "tasks"
 SCHEDULED_TASKS_DIR = CLAUDE_HOME / "scheduled-tasks"
 HISTORY_JSONL = CLAUDE_HOME / "history.jsonl"
-CLAUDE_JSON = Path.home() / ".claude.json"
-CLAUDE_DESKTOP_CONFIG = Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
-MEMORY_DIR = CLAUDE_HOME / "projects" / "-Users-yoo-claude-dashboard" / "memory"
+CLAUDE_JSON = _env_path("CLAUDE_JSON", Path.home() / ".claude.json")
+CLAUDE_DESKTOP_CONFIG = _env_path(
+    "CLAUDE_DESKTOP_CONFIG",
+    Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json",
+)
 
-DB_PATH = Path.home() / ".claude-dashboard.db"
+# 메모리 디렉토리 — 현재 프로젝트의 cwd 를 기반으로 동적 산출
+# Claude Code 가 cwd 를 슬러그화: '/' → '-' 치환, 선두에 '-' 추가
+def _cwd_to_slug(cwd: Path) -> str:
+    return "-" + str(cwd).strip("/").replace("/", "-")
+
+MEMORY_DIR = _env_path(
+    "CLAUDE_DASHBOARD_MEMORY_DIR",
+    CLAUDE_HOME / "projects" / _cwd_to_slug(ROOT) / "memory",
+)
+
+DB_PATH = _env_path("CLAUDE_DASHBOARD_DB", Path.home() / ".claude-dashboard.db")
+TRANSLATIONS_PATH = _env_path("CLAUDE_DASHBOARD_TRANSLATIONS", Path.home() / ".claude-dashboard-translations.json")
+DASHBOARD_CONFIG_PATH = _env_path("CLAUDE_DASHBOARD_CONFIG", Path.home() / ".claude-dashboard-config.json")
 
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
@@ -373,7 +408,14 @@ def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
     duration = max(0, ended - started)
     first_prompt = _first_user_prompt(lines)
     model = _extract_model(lines)
-    project_name = project_dir.replace("-Users-yoo-", "").replace("-", "/") if project_dir else ""
+    # 프로젝트 슬러그(`-Users-<user>-foo-bar`) 에서 홈 prefix 를 제거 → 사람이 읽을 수 있는 이름으로
+    home_slug = _cwd_to_slug(Path.home())  # 예: "-Users-<username>"
+    project_name = ""
+    if project_dir:
+        if project_dir.startswith(home_slug + "-"):
+            project_name = project_dir[len(home_slug) + 1 :].replace("-", "/")
+        else:
+            project_name = project_dir.lstrip("-").replace("-", "/")
 
     # 세션의 실제 cwd는 JSONL 메시지에 기록되어 있음 (첫 번째 찾은 값)
     cwd = ""
@@ -1043,7 +1085,7 @@ def api_agent_delete(body: dict) -> dict:
 
 # ───────────────── API: commands ─────────────────
 
-DASHBOARD_CONFIG = Path.home() / ".claude-dashboard-config.json"
+DASHBOARD_CONFIG = DASHBOARD_CONFIG_PATH
 
 def _load_dash_config() -> dict:
     if not DASHBOARD_CONFIG.exists():
@@ -1068,7 +1110,7 @@ CLAUDE_PLANS = [
 ]
 
 
-TRANSLATION_CACHE = Path.home() / ".claude-dashboard-translations.json"
+TRANSLATION_CACHE = TRANSLATIONS_PATH
 
 def _load_translation_cache() -> dict:
     if not TRANSLATION_CACHE.exists():

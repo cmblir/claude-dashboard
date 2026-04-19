@@ -1,16 +1,51 @@
+# 시스템
 .DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 로컬 데이터
 *.log
 /tmp/
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
+
+# 환경 변수 / 비밀
 .env
 .env.*
-!.env.example
+!.env.example          # 템플릿은 허용 (writeable 일 때)
+*.pem
+*.key
+secrets/
+credentials.json
+.netrc
+
+# 에디터 / IDE
 .vscode/
 .idea/
+*.code-workspace
+
+# Claude Code 로컬 설정 (머신별)
 .claude/settings.local.json
+
+# 사용자 데이터 (혹시 폴더로 떨궈진 경우)
+*-translations.json
+*-dashboard-config.json
+private/
+local/
+
+# OS / 빌드
+build/
+dist-build/
+node_modules/
