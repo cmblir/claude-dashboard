@@ -4142,34 +4142,68 @@ async function viewPlan(id) {
 // ────────────────────────────────────────────────────────────────
 VIEWS.metrics = async () => {
   const d = await api('/api/metrics/summary');
-  if (!d.exists) return `${viewHeader('토큰 메트릭', null, 'metrics')}<div class="card empty">metrics/costs.jsonl 없음</div>`;
+  if (!d.exists) return `${viewHeader('토큰 메트릭', null, 'metrics')}<div class="card empty">데이터 없음</div>`;
   state.data.metrics = d;
   const t = d.total || {};
   return `
-    ${viewHeader('토큰 메트릭', `metrics/costs.jsonl 분석 · 이벤트 ${t.n}건`, 'metrics')}
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-      ${statCard('입력 토큰', t.in?.toLocaleString?.() || t.in)}
-      ${statCard('출력 토큰', t.out?.toLocaleString?.() || t.out)}
-      ${statCard('추정 비용 ($)', t.cost?.toFixed?.(4) || t.cost, '#4ade80')}
-      ${statCard('이벤트', t.n)}
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">토큰 메트릭 <span class="text-xs text-[var(--text-dim)]">(DB 기반)</span></h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(d.note||'')} · 세션 ${t.n}개</p>
+      </div>
+      <a class="btn text-xs" href="${DOCS_BASE}monitoring-usage" target="_blank" rel="noopener">📖</a>
     </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+      ${[
+        ['전체 토큰', fmtTokens(t.total||0), '#d97757'],
+        ['입력', fmtTokens(t.in||0), '#86efac'],
+        ['출력', fmtTokens(t.out||0), '#7dd3fc'],
+        ['캐시 read', fmtTokens(t.cacheRead||0), '#a78bfa'],
+        ['캐시 create', fmtTokens(t.cacheCreate||0), '#fcd34d'],
+      ].map(([l,v,c]) => `
+        <div class="card p-3">
+          <div class="text-[10px] uppercase text-[var(--text-dim)]">${l}</div>
+          <div class="text-2xl font-bold mono mt-1" style="color:${c}">${v}</div>
+        </div>`).join('')}
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+      ${statCard('추정 비용 ($)', (t.cost||0).toFixed(2), '#4ade80', '2025 공식 요금표 기준 추정')}
+      ${statCard('세션 수', t.n, '', '토큰 있는 세션만')}
+      ${statCard('평균 세션 토큰', fmtTokens(Math.round((t.total||0)/Math.max(1,t.n||1))), '#d97757')}
+    </div>
+
     <div class="card p-5 mb-4">
-      <h3 class="font-semibold text-sm mb-3">📈 일자별 토큰</h3>
-      <div style="position:relative; height:280px;"><canvas id="metricsDaily"></canvas></div>
+      <h3 class="font-semibold text-sm mb-3">📈 일자별 토큰 (최근 60일)</h3>
+      ${(d.timeline||[]).length
+        ? `<div style="position:relative; height:300px;"><canvas id="metricsDaily"></canvas></div>`
+        : '<div class="empty text-xs">데이터 없음</div>'}
     </div>
+
     <div class="card p-5">
       <h3 class="font-semibold text-sm mb-3">🧠 모델별 사용량</h3>
       <table class="data">
-        <thead><tr><th>모델</th><th class="text-right">입력</th><th class="text-right">출력</th><th class="text-right">비용 ($)</th><th class="text-right">호출</th></tr></thead>
+        <thead><tr>
+          <th>모델</th>
+          <th class="text-right">세션</th>
+          <th class="text-right">입력</th>
+          <th class="text-right">출력</th>
+          <th class="text-right">캐시 read</th>
+          <th class="text-right">전체</th>
+          <th class="text-right">비용 ($, 추정)</th>
+        </tr></thead>
         <tbody>
           ${(d.models||[]).map(m => `
             <tr>
-              <td class="mono text-xs">${escapeHtml(m.model)}</td>
-              <td class="text-right">${m.in?.toLocaleString?.() || m.in}</td>
-              <td class="text-right">${m.out?.toLocaleString?.() || m.out}</td>
-              <td class="text-right mono">${(m.cost||0).toFixed(4)}</td>
-              <td class="text-right">${m.n}</td>
-            </tr>`).join('')}
+              <td class="mono text-xs">${escapeHtml(m.model || 'unknown')}</td>
+              <td class="text-right mono text-xs">${m.n}</td>
+              <td class="text-right mono text-xs">${fmtTokens(m.in)}</td>
+              <td class="text-right mono text-xs">${fmtTokens(m.out)}</td>
+              <td class="text-right mono text-xs">${fmtTokens(m.cacheRead)}</td>
+              <td class="text-right mono" style="color:#d97757">${fmtTokens(m.total)}</td>
+              <td class="text-right mono" style="color:#4ade80">${(m.cost||0).toFixed(2)}</td>
+            </tr>`).join('') || `<tr><td colspan="7" class="empty">데이터 없음</td></tr>`}
         </tbody>
       </table>
     </div>`;
@@ -4183,16 +4217,25 @@ AFTER.metrics = () => {
     data: {
       labels: d.timeline.map(x => x.date.slice(5)),
       datasets: [
-        { label: '입력', data: d.timeline.map(x=>x.in), borderColor: '#d97757', backgroundColor: 'rgba(217,119,87,0.15)', fill: true, tension: 0.4, yAxisID: 'y' },
+        { label: '입력', data: d.timeline.map(x=>x.in), borderColor: '#86efac', backgroundColor: 'rgba(134,239,172,0.1)', fill: true, tension: 0.4, yAxisID: 'y' },
         { label: '출력', data: d.timeline.map(x=>x.out), borderColor: '#7dd3fc', backgroundColor: 'rgba(125,211,252,0.1)', fill: true, tension: 0.4, yAxisID: 'y' },
+        { label: '캐시 read', data: d.timeline.map(x=>x.cacheRead||0), borderColor: '#a78bfa', tension: 0.4, yAxisID: 'y' },
+        { label: '전체', data: d.timeline.map(x=>x.total||0), borderColor: '#d97757', tension: 0.4, yAxisID: 'y', borderWidth: 2 },
         { label: '비용 ($)', data: d.timeline.map(x=>x.cost), borderColor: '#4ade80', tension: 0.4, yAxisID: 'y1', borderDash: [4,3] },
       ],
     },
     options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: '#e7e7ea' } } },
+      plugins: {
+        legend: { labels: { color: '#e7e7ea' } },
+        tooltip: { callbacks: { label: c => {
+          const l = c.dataset.label;
+          if (l === '비용 ($)') return `${l}: $${c.parsed.y.toFixed(2)}`;
+          return `${l}: ${fmtTokens(c.parsed.y)}`;
+        }}},
+      },
       scales: {
         x: { ticks: { color: '#9aa0aa' }, grid: { color: 'rgba(255,255,255,0.03)' } },
-        y: { position: 'left', ticks: { color: '#9aa0aa' }, grid: { color: 'rgba(255,255,255,0.03)' }, beginAtZero: true },
+        y: { position: 'left', ticks: { color: '#9aa0aa', callback: v => fmtTokens(v) }, grid: { color: 'rgba(255,255,255,0.03)' }, beginAtZero: true },
         y1: { position: 'right', ticks: { color: '#9aa0aa' }, grid: { display: false }, beginAtZero: true },
       },
     },
