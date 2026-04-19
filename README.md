@@ -40,6 +40,7 @@ vis-network 기반 force-directed 그래프로 **Claude Core ↔ 서브에이전
 ## 🚀 시작하기
 
 ```bash
+cp env.example .env       # (선택) 환경 변수 커스터마이징
 ./start.sh
 ```
 
@@ -47,6 +48,22 @@ vis-network 기반 force-directed 그래프로 **Claude Core ↔ 서브에이전
 
 - macOS 기본 Python 3.9+ 만 있으면 OK (의존성 0개)
 - 프론트는 Tailwind · Chart.js · vis-network · marked CDN 사용
+
+### 환경 변수 (모두 선택)
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `HOST` | `127.0.0.1` | 바인드 주소 |
+| `PORT` | `8080` | 포트 |
+| `CLAUDE_HOME` | `~/.claude` | Claude Code CLI 설정 디렉토리 |
+| `CLAUDE_JSON` | `~/.claude.json` | Claude Code 전역 설정 |
+| `CLAUDE_DESKTOP_CONFIG` | `~/Library/Application Support/Claude/claude_desktop_config.json` | Desktop 앱 MCP (macOS 기준) |
+| `CLAUDE_DASHBOARD_DB` | `~/.claude-dashboard.db` | 세션 SQLite |
+| `CLAUDE_DASHBOARD_TRANSLATIONS` | `~/.claude-dashboard-translations.json` | AI 번역 캐시 |
+| `CLAUDE_DASHBOARD_CONFIG` | `~/.claude-dashboard-config.json` | 사용자 플랜 등 |
+| `CLAUDE_DASHBOARD_MEMORY_DIR` | (자동 산출) | 프로젝트 메모리 디렉토리 |
+
+`.env` 는 자동 로드되며 `.gitignore` 로 제외됩니다.
 
 ---
 
