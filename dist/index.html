@@ -256,6 +256,22 @@ function viewHeader(title, subtitle, viewId) {
     </div>`;
 }
 
+// 변경(POST/PUT/DELETE) 후 자동 페이지 리로드 — 디바운스로 연속 호출 합치기
+let __autoReloadTimer = null;
+function _scheduleAutoReload() {
+  if (__autoReloadTimer) clearTimeout(__autoReloadTimer);
+  __autoReloadTimer = setTimeout(() => {
+    __autoReloadTimer = null;
+    try { renderView && renderView(); } catch (e) { console.warn('autoReload renderView failed', e); }
+  }, 250);
+}
+// 데이터 갱신과 무관한 엔드포인트는 자동 리로드 제외 (LLM 호출, 단순 미리보기, 외부 IO 등)
+const __noReloadPaths = [
+  '/api/feature/recommend', '/api/file/recommend', '/api/recommend',
+  '/api/translate/batch', '/api/translate', '/api/settings/preview',
+  '/api/open-folder', '/api/open-session', '/api/sessions/reindex',
+  '/api/login', '/api/auth',
+];
 async function api(path, opts = {}) {
   const r = await fetch(path, opts);
   if (!r.ok && r.status !== 200) {
@@ -263,7 +279,14 @@ async function api(path, opts = {}) {
     try { const j = await r.json(); if (j.error) msg = j.error; } catch {}
     throw new Error(msg);
   }
-  return await r.json();
+  const data = await r.json();
+  const method = ((opts && opts.method) || 'GET').toUpperCase();
+  if (method !== 'GET') {
+    const ok = data && (data.ok === true || data.ok === undefined && !data.error);
+    const skip = __noReloadPaths.some(p => path.startsWith(p));
+    if (ok && !skip) _scheduleAutoReload();
+  }
+  return data;
 }
 
 function toast(msg, kind='info') {
@@ -2742,7 +2765,7 @@ function openDiffApplyModal({ title, relpath, reason, cwd, currentRaw, proposedR
     try {
       const r = await saveFn(raw);
       toast(r.ok ? `저장됨 (${which==='left'?'현재 값 유지':'제안 적용'})` : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
-      if (r.ok) closeModal();
+      if (r.ok) { closeModal(); renderView(); }
     } catch (e) { toast('실패: '+e.message, 'err'); }
   };
   document.getElementById('diffUseLeftBtn').onclick = () => commit('left');
@@ -3013,7 +3036,7 @@ async function setSubagentModel(scope, agentId, model, cwd) {
     const r = await api('/api/subagent/set-model', {
       method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
     });
-    if (r.ok) toast(`모델을 '${model}' 로 변경`, 'ok');
+    if (r.ok) { toast(`모델을 '${model}' 로 변경`, 'ok'); renderView(); }
     else toast(r.error || '실패', 'err');
   } catch (e) { toast('실패: '+e.message, 'err'); }
 }
