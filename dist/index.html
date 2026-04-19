@@ -2533,21 +2533,35 @@ function renderProjectAgentsSection(tb, cwd) {
   if (!slot) return;
   const subs = tb.subagents || [];
   const total = subs.reduce((a,b)=>a+b.n,0);
+  // 프로젝트에 정의된 에이전트 (.claude/agents/*.md) — 별도로 가져옴
+  const definedAgents = (window.__projectDetailData && window.__projectDetailData.repo && window.__projectDetailData.repo.agents) || [];
+  const definedHtml = definedAgents.length ? `
+    <div class="mb-3">
+      <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] mb-2">📂 프로젝트에 정의된 에이전트 (${definedAgents.length})</div>
+      <div class="flex flex-wrap gap-1">
+        ${definedAgents.map(a => {
+          const cnt = (subs.find(s => s.name === a.name) || {}).n || 0;
+          return `<span class="chip ${cnt>0?'chip-accent':''}" title="${escapeHtml(a.description||a.id||'')}">${escapeHtml(a.name)} ${cnt?`<span class="ml-1">×${cnt}</span>`:'<span class="ml-1 text-[var(--text-dim)]">미사용</span>'}</span>`;
+        }).join('')}
+      </div>
+    </div>` : '';
   if (!subs.length) {
     slot.innerHTML = `
       <div class="card p-4 mb-4" style="background: rgba(217,119,87,0.03);">
+        ${definedHtml}
         <div class="flex items-center justify-between mb-1">
-          <div class="font-semibold text-sm">🤝 이 프로젝트에서 사용된 서브에이전트</div>
-          <span class="chip">0</span>
+          <div class="font-semibold text-sm">🤝 세션에서 위임된 서브에이전트 (Agent 도구 호출)</div>
+          <span class="chip">0회</span>
         </div>
-        <div class="text-xs text-[var(--text-mute)]">이 프로젝트 세션들에서는 서브에이전트 위임이 없었습니다. 위의 🤖 AI 추천으로 프로젝트 전용 에이전트를 만들면 delegation 점수가 오릅니다.</div>
+        <div class="text-xs text-[var(--text-mute)]">${definedAgents.length ? `정의된 에이전트 ${definedAgents.length}개가 있지만 세션에서 한 번도 위임되지 않았습니다. AI 추천으로 활용 시나리오를 받아보세요.` : '이 프로젝트 세션들에서는 서브에이전트 위임이 없었습니다. 위의 🤖 AI 추천으로 프로젝트 전용 에이전트를 만들면 delegation 점수가 오릅니다.'}</div>
       </div>`;
     return;
   }
   slot.innerHTML = `
     <div class="card p-4 mb-4">
+      ${definedHtml}
       <div class="flex items-center justify-between mb-3">
-        <div class="font-semibold text-sm">🤝 이 프로젝트에서 사용된 서브에이전트</div>
+        <div class="font-semibold text-sm">🤝 세션에서 위임된 서브에이전트 (Agent 도구 호출)</div>
         <span class="text-xs text-[var(--text-dim)]">총 ${total}회 위임 · ${subs.length}종</span>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -2641,7 +2655,8 @@ function renderProjectDetail(d) {
           <button class="chip cursor-pointer hover:brightness-125" style="background:${scoreColor(st.avgScore)}22; color:${scoreColor(st.avgScore)}" onclick="openScoreDetail({cwd: ${JSON.stringify(d.cwd)}})" title="점수 계산식 상세">★ 평균 ${st.avgScore}</button>
           <button class="chip cursor-pointer hover:brightness-125" onclick="scrollToSessions()" title="세션 리스트로 스크롤">📊 세션 ${st.sessionCount}</button>
           <button class="chip cursor-pointer hover:brightness-125" onclick='openToolBreakdown(${JSON.stringify(d.cwd)})' title="도구 사용 드릴다운">🛠 도구 ${st.totalTools}</button>
-          <button class="chip chip-accent cursor-pointer hover:brightness-125" onclick='openAgentBreakdown(${JSON.stringify(d.cwd)})' title="서브에이전트 위임 내역">🤝 에이전트 ${st.totalAgents}</button>
+          <span class="chip" title="프로젝트에 정의된 .claude/agents/*.md 파일 수">📂 정의 에이전트 ${(r.agents||[]).length}</span>
+          <button class="chip chip-accent cursor-pointer hover:brightness-125" onclick='openAgentBreakdown(${JSON.stringify(d.cwd)})' title="세션에서 Agent 도구로 위임된 총 횟수 (통계 탭 참고)">🤝 위임 호출 ${st.totalAgents}</button>
           ${st.totalErrors ? `<span class="chip chip-err">❌ ${st.totalErrors}</span>`:''}
           ${r.exists ? '<span class="chip chip-ok">.claude 존재</span>' : '<span class="chip">.claude 없음</span>'}
         </div>
