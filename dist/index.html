@@ -85,7 +85,9 @@
   textarea.input { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.8rem; line-height: 1.55; }
   .kbd { display: inline-block; padding: 0.1rem 0.45rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; background: rgba(255,255,255,0.05); font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; }
   .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(4px); z-index: 50; display: grid; place-items: center; padding: 24px; }
-  .modal { background: #0f0f16; border: 1px solid var(--border-hi); border-radius: 18px; max-width: 1100px; width: 100%; max-height: 88vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  .modal { background: #0f0f16; border: 1px solid var(--border-hi); border-radius: 18px; max-width: 1100px; width: 100%; max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  .modal-wide { max-width: 1440px; height: 90vh; max-height: 90vh; }
+  .modal-wide textarea { font-size: 13px; line-height: 1.55; }
   .prose-claude { color: var(--text); font-size: 0.9rem; line-height: 1.6; }
   .prose-claude h1, .prose-claude h2, .prose-claude h3 { color: #fff; margin-top: 1em; }
   .prose-claude code { background: rgba(255,255,255,0.08); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.85em; }
@@ -2697,11 +2699,11 @@ function openDiffApplyModal({ title, relpath, reason, cwd, currentRaw, proposedR
   const isEmpty = !currentRaw || !currentRaw.trim();
   const hintEmpty = isEmpty ? '<span class="chip chip-warn">파일 없음 / 빈값</span>' : '';
   showModal(`
-    <div class="p-5 border-b border-[var(--border)] flex items-start justify-between gap-3">
+    <div class="p-5 border-b border-[var(--border)] flex items-start justify-between gap-3 flex-shrink-0">
       <div class="min-w-0 flex-1">
         <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${badge || '추천 비교 & 적용'}</div>
         <h2 class="text-lg font-bold truncate">${escapeHtml(title||'')}</h2>
-        <div class="flex items-center gap-2 mt-1">
+        <div class="flex items-center gap-2 mt-1 flex-wrap">
           <span class="text-[11px] mono text-[var(--text-mute)] truncate">${escapeHtml(relpath||'')}</span>
           ${hintEmpty}
         </div>
@@ -2713,27 +2715,27 @@ function openDiffApplyModal({ title, relpath, reason, cwd, currentRaw, proposedR
         <button class="btn-primary btn" id="diffUseRightBtn">우측(제안) 적용 ▶</button>
       </div>
     </div>
-    <div class="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2" style="min-height: 0;">
-      <div class="flex flex-col border-r border-[var(--border)] overflow-hidden">
-        <div class="px-4 py-2 border-b border-[var(--border)] flex items-center justify-between">
+    <div class="grid grid-cols-1 lg:grid-cols-2" style="flex:1 1 0; min-height:0; overflow:hidden;">
+      <div class="flex flex-col border-r border-[var(--border)]" style="min-height:0; overflow:hidden;">
+        <div class="px-4 py-2 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
           <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">현재 (왼쪽)</div>
           <span class="chip text-[10px]">${isEmpty ? '비어있음' : (currentRaw.length + '자')}</span>
         </div>
-        <textarea id="diffLeftText" class="input" style="flex:1; border-radius:0; border:none; background:transparent; resize:none;">${escapeHtml(currentRaw||'')}</textarea>
+        <textarea id="diffLeftText" spellcheck="false" class="mono" style="flex:1 1 0; min-height:0; width:100%; padding:16px; border-radius:0; border:none; background:transparent; resize:none; color:var(--text); font-size:13px; line-height:1.55; outline:none;">${escapeHtml(currentRaw||'')}</textarea>
       </div>
-      <div class="flex flex-col overflow-hidden" style="background: rgba(217,119,87,0.04);">
-        <div class="px-4 py-2 border-b border-[var(--border)] flex items-center justify-between">
+      <div class="flex flex-col" style="background: rgba(217,119,87,0.04); min-height:0; overflow:hidden;">
+        <div class="px-4 py-2 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
           <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">제안 (오른쪽) · AI</div>
           <span class="chip chip-accent text-[10px]">${(proposedRaw||'').length}자</span>
         </div>
-        <textarea id="diffRightText" class="input" style="flex:1; border-radius:0; border:none; background:transparent; resize:none;">${escapeHtml(proposedRaw||'')}</textarea>
+        <textarea id="diffRightText" spellcheck="false" class="mono" style="flex:1 1 0; min-height:0; width:100%; padding:16px; border-radius:0; border:none; background:transparent; resize:none; color:var(--text); font-size:13px; line-height:1.55; outline:none;">${escapeHtml(proposedRaw||'')}</textarea>
       </div>
     </div>
-    <div class="p-3 border-t border-[var(--border)] flex items-center justify-between text-[11px] text-[var(--text-dim)]">
+    <div class="p-3 border-t border-[var(--border)] flex items-center justify-between text-[11px] text-[var(--text-dim)] flex-shrink-0 flex-wrap gap-2">
       <div>저장 위치: <span class="mono">${relpath==='~/.claude/settings.json' ? relpath : escapeHtml((cwd||'')+'/'+(relpath||''))}</span></div>
-      <div>양쪽 값을 자유롭게 편집한 뒤 어느 쪽을 저장할지 고르세요.</div>
+      <div>양쪽 값을 자유롭게 편집한 뒤 어느 쪽을 저장할지 고르세요. · <kbd class="chip text-[9px]">Esc</kbd> 닫기</div>
     </div>
-  `);
+  `, { wide: true });
 
   const commit = async (which) => {
     const raw = (which === 'left' ? document.getElementById('diffLeftText') : document.getElementById('diffRightText')).value;
@@ -4097,9 +4099,10 @@ VIEWS.system = async () => {
 // ────────────────────────────────────────────────────────────────
 // MODALS
 // ────────────────────────────────────────────────────────────────
-function showModal(html) {
+function showModal(html, opts) {
   const root = document.getElementById('modal-root');
-  root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`;
+  const wide = opts && opts.wide ? ' modal-wide' : '';
+  root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="modal${wide}">${html}</div></div>`;
 }
 function showModalLoading(msg) {
   showModal(`<div class="p-10 empty"><div class="shimmer h-4 w-48 mx-auto mb-2"></div><div>${escapeHtml(msg)}</div></div>`);
