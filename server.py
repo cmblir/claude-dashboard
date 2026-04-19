@@ -260,7 +260,8 @@ def _db_init() -> None:
           tool TEXT,
           subagent_type TEXT,
           input_summary TEXT,
-          had_error INTEGER DEFAULT 0
+          had_error INTEGER DEFAULT 0,
+          turn_tokens INTEGER DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_tool_session ON tool_uses(session_id);
         CREATE INDEX IF NOT EXISTS idx_tool_name ON tool_uses(tool);
@@ -280,11 +281,22 @@ def _db_init() -> None:
           breakdown TEXT
         );
         """)
-        # 기존 DB에 cwd 컬럼이 없으면 추가 (호환성)
+        # 마이그레이션: 누락 컬럼 추가 (기존 DB 호환)
         try:
             cols = {r["name"] for r in c.execute("PRAGMA table_info(sessions)").fetchall()}
-            if "cwd" not in cols:
-                c.execute("ALTER TABLE sessions ADD COLUMN cwd TEXT")
+            for col, typ in [
+                ("cwd", "TEXT"),
+                ("input_tokens", "INTEGER DEFAULT 0"),
+                ("output_tokens", "INTEGER DEFAULT 0"),
+                ("cache_read_tokens", "INTEGER DEFAULT 0"),
+                ("cache_creation_tokens", "INTEGER DEFAULT 0"),
+                ("total_tokens", "INTEGER DEFAULT 0"),
+            ]:
+                if col not in cols:
+                    c.execute(f"ALTER TABLE sessions ADD COLUMN {col} {typ}")
+            tcols = {r["name"] for r in c.execute("PRAGMA table_info(tool_uses)").fetchall()}
+            if "turn_tokens" not in tcols:
+                c.execute("ALTER TABLE tool_uses ADD COLUMN turn_tokens INTEGER DEFAULT 0")
         except Exception:
             pass
 
@@ -363,6 +375,7 @@ def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
 
     timestamps = []
     msg_count = user_cnt = asst_cnt = tool_cnt = err_cnt = agent_cnt = 0
+    tok_in = tok_out = tok_cache_read = tok_cache_create = 0
     tool_counter: Counter = Counter()
     subagent_counter: Counter = Counter()
     tool_rows: list[tuple] = []
@@ -379,7 +392,10 @@ def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
         elif t == "assistant":
             asst_cnt += 1
             msg_count += 1
-            content = (m.get("message") or {}).get("content")
+            msg_obj = m.get("message") or {}
+            content = msg_obj.get("content")
+            # 이 턴에서 생긴 tool_use 들을 수집해 둔 뒤, turn_tokens 를 split
+            turn_tools: list[tuple] = []
             if isinstance(content, list):
                 for b in content:
                     if isinstance(b, dict) and b.get("type") == "tool_use":
@@ -399,7 +415,22 @@ def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
                                 if v:
                                     input_summary = str(v)[:200]
                                     break
-                        tool_rows.append((session_id, ts or 0, tool_name, subagent or "", input_summary, 0))
+                        turn_tools.append((tool_name, subagent or "", input_summary))
+            # usage 파싱 — 이 턴의 토큰
+            usage = msg_obj.get("usage") or {}
+            u_in = int(usage.get("input_tokens") or 0)
+            u_out = int(usage.get("output_tokens") or 0)
+            u_cr = int(usage.get("cache_read_input_tokens") or 0)
+            u_cc = int(usage.get("cache_creation_input_tokens") or 0)
+            tok_in += u_in
+            tok_out += u_out
+            tok_cache_read += u_cr
+            tok_cache_create += u_cc
+            # 턴 전체 토큰 (입력 + 출력) 을 이 턴의 tool 개수로 분배 — 0개면 무시
+            turn_total = u_in + u_out + u_cr + u_cc
+            per_tool = (turn_total // len(turn_tools)) if turn_tools else 0
+            for (tn, sa, inp_sum) in turn_tools:
+                tool_rows.append((session_id, ts or 0, tn, sa, inp_sum, 0, per_tool))
         elif t == "tool_result":
             content = (m.get("message") or {}).get("content")
             if isinstance(content, list):
@@ -439,11 +470,15 @@ def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
     }
     score, breakdown = _compute_score(stats)
 
+    tok_total = tok_in + tok_out + tok_cache_read + tok_cache_create
     with _db() as c:
         c.execute("DELETE FROM tool_uses WHERE session_id=?", (session_id,))
         c.execute("DELETE FROM agent_edges WHERE session_id=?", (session_id,))
         if tool_rows:
-            c.executemany("INSERT INTO tool_uses (session_id,ts,tool,subagent_type,input_summary,had_error) VALUES (?,?,?,?,?,?)", tool_rows)
+            c.executemany(
+                "INSERT INTO tool_uses (session_id,ts,tool,subagent_type,input_summary,had_error,turn_tokens) VALUES (?,?,?,?,?,?,?)",
+                tool_rows,
+            )
         if edges:
             c.executemany("INSERT INTO agent_edges (session_id,src,dst,ts) VALUES (?,?,?,?)", edges)
         c.execute("""
@@ -451,14 +486,16 @@ def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
         (session_id,project,project_dir,cwd,jsonl_path,started_at,ended_at,duration_ms,
          message_count,user_msg_count,assistant_msg_count,tool_use_count,error_count,
          agent_call_count,subagent_types,model,first_user_prompt,last_summary,
-         score,score_breakdown,indexed_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         score,score_breakdown,indexed_at,
+         input_tokens,output_tokens,cache_read_tokens,cache_creation_tokens,total_tokens)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             session_id, project_name, project_dir, cwd, str(jsonl),
             started, ended, duration,
             msg_count, user_cnt, asst_cnt, tool_cnt, err_cnt, agent_cnt,
             json.dumps(dict(subagent_counter)), model, first_prompt, "",
             score, json.dumps(breakdown), int(time.time() * 1000),
+            tok_in, tok_out, tok_cache_read, tok_cache_create, tok_total,
         ))
         c.execute("INSERT INTO scores_history (session_id,ts,score,breakdown) VALUES (?,?,?,?)",
                   (session_id, int(time.time() * 1000), score, json.dumps(breakdown)))
@@ -2310,6 +2347,7 @@ def api_sessions_list(query: dict) -> dict:
         "recent": "started_at DESC",
         "score": "score DESC",
         "tools": "tool_use_count DESC",
+        "tokens": "total_tokens DESC",
         "duration": "duration_ms DESC",
     }.get(sort, "started_at DESC")
     sql += f" ORDER BY {order_col} LIMIT ? OFFSET ?"
@@ -2332,6 +2370,237 @@ def api_sessions_list(query: dict) -> dict:
         r["project"] = Path(cwd).name if cwd else (r.get("project") or "")
         r["projectPath"] = cwd
     return {"sessions": rows, "total": total}
+
+
+def api_session_tokens(session_id: str) -> dict:
+    """세션의 토큰 사용량 분해 — 도구별 / 서브에이전트별 / 시간순."""
+    _db_init()
+    with _db() as c:
+        s = c.execute(
+            "SELECT input_tokens,output_tokens,cache_read_tokens,cache_creation_tokens,total_tokens "
+            "FROM sessions WHERE session_id=?", (session_id,)
+        ).fetchone()
+        if not s:
+            return {"error": "not found"}
+        by_tool = [dict(r) for r in c.execute(
+            "SELECT tool, COUNT(*) AS calls, SUM(turn_tokens) AS tokens "
+            "FROM tool_uses WHERE session_id=? GROUP BY tool ORDER BY tokens DESC",
+            (session_id,)
+        ).fetchall()]
+        by_agent = [dict(r) for r in c.execute(
+            "SELECT subagent_type AS agent, COUNT(*) AS calls, SUM(turn_tokens) AS tokens "
+            "FROM tool_uses WHERE session_id=? AND subagent_type != '' "
+            "GROUP BY subagent_type ORDER BY tokens DESC",
+            (session_id,)
+        ).fetchall()]
+    return {
+        "session_id": session_id,
+        "totals": {
+            "input": s["input_tokens"], "output": s["output_tokens"],
+            "cacheRead": s["cache_read_tokens"], "cacheCreate": s["cache_creation_tokens"],
+            "total": s["total_tokens"],
+        },
+        "byTool": by_tool,
+        "byAgent": by_agent,
+    }
+
+
+def api_session_timeline(session_id: str) -> dict:
+    """세션 처음→끝 진행 타임라인. user 프롬프트 / Agent 위임 / 큰 도구 호출만 추려서 그래프 노드/엣지 형태로."""
+    _db_init()
+    with _db() as c:
+        s = c.execute(
+            "SELECT cwd, jsonl_path, started_at, ended_at, model, first_user_prompt FROM sessions WHERE session_id=?",
+            (session_id,)
+        ).fetchone()
+        if not s:
+            return {"error": "not found"}
+        tools = [dict(r) for r in c.execute(
+            "SELECT ts, tool, subagent_type, input_summary, turn_tokens "
+            "FROM tool_uses WHERE session_id=? ORDER BY ts ASC",
+            (session_id,)
+        ).fetchall()]
+
+    # JSONL 에서 user 프롬프트만 추출 (텍스트 / 시각)
+    user_prompts: list = []
+    jp = s["jsonl_path"]
+    if jp and Path(jp).exists():
+        for line in Path(jp).read_text(encoding="utf-8", errors="replace").splitlines():
+            try:
+                m = json.loads(line)
+            except Exception:
+                continue
+            if m.get("type") != "user":
+                continue
+            ts = _iso_ms(m.get("timestamp", "") or "")
+            content = (m.get("message") or {}).get("content")
+            text = ""
+            if isinstance(content, str):
+                text = content
+            elif isinstance(content, list):
+                for b in content:
+                    if isinstance(b, dict) and b.get("type") == "text":
+                        text = b.get("text") or ""
+                        break
+            if not text or not ts:
+                continue
+            text = text.strip()
+            # tool_result 같은 시스템 메시지 제외
+            if text.startswith("[") and text.endswith("]"):
+                continue
+            user_prompts.append({"ts": ts, "text": text[:500]})
+
+    # 그래프 노드: user prompt → 후속 도구/에이전트 호출들로 묶음
+    nodes: list = []
+    edges: list = []
+    nid = 0
+    def _add_node(kind: str, label: str, ts: int, meta: dict = None) -> int:
+        nonlocal nid
+        nid += 1
+        nodes.append({"id": nid, "kind": kind, "label": label, "ts": ts, "meta": meta or {}})
+        return nid
+
+    # 첫 user prompt 가 없으면 그냥 'session start' 노드부터
+    if not user_prompts:
+        prev = _add_node("session", "세션 시작", s["started_at"], {"model": s["model"]})
+    else:
+        prev = _add_node("session", "세션 시작", s["started_at"], {"model": s["model"]})
+
+    # 시간순 통합 이벤트 스트림 — Agent/Task 와 user prompt 우선, 일반 도구는 연속 묶기
+    events: list = []
+    for u in user_prompts:
+        events.append({"ts": u["ts"], "kind": "prompt", "data": u})
+    for t in tools:
+        if t["tool"] == "Agent":
+            events.append({"ts": t["ts"], "kind": "agent", "data": t})
+        else:
+            events.append({"ts": t["ts"], "kind": "tool", "data": t})
+    events.sort(key=lambda e: e["ts"] or 0)
+
+    # 연속된 일반 tool 들을 묶기 (prompt/agent 사이의 같은 tool 그룹)
+    grouped: list = []
+    bucket: dict = None
+    for ev in events:
+        if ev["kind"] in ("prompt", "agent"):
+            if bucket:
+                grouped.append(bucket); bucket = None
+            grouped.append(ev)
+        else:
+            t = ev["data"]
+            tool_name = t.get("tool")
+            if bucket and bucket.get("toolName") == tool_name:
+                bucket["count"] += 1
+                bucket["tokens"] += t.get("turn_tokens") or 0
+                bucket["lastTs"] = ev["ts"]
+            else:
+                if bucket:
+                    grouped.append(bucket)
+                bucket = {
+                    "kind": "toolGroup", "toolName": tool_name,
+                    "count": 1, "tokens": t.get("turn_tokens") or 0,
+                    "ts": ev["ts"], "lastTs": ev["ts"],
+                }
+    if bucket:
+        grouped.append(bucket)
+
+    # 최대 200 이벤트로 cap (안전망)
+    if len(grouped) > 200:
+        # prompt/agent 는 모두 유지, toolGroup 은 토큰 기준 상위만
+        prompts_agents = [g for g in grouped if g.get("kind") in ("prompt", "agent")]
+        tool_groups = sorted(
+            [g for g in grouped if g.get("kind") == "toolGroup"],
+            key=lambda x: x["tokens"], reverse=True,
+        )
+        keep_set = set(id(g) for g in prompts_agents)
+        for g in tool_groups[: max(0, 200 - len(prompts_agents))]:
+            keep_set.add(id(g))
+        grouped = [g for g in grouped if id(g) in keep_set]
+        grouped.sort(key=lambda g: g.get("ts") or 0)
+
+    for ev in grouped:
+        kind = ev.get("kind")
+        if kind == "prompt":
+            n = _add_node("prompt", ev["data"]["text"][:80], ev["ts"],
+                          {"full": ev["data"]["text"]})
+            edges.append({"src": prev, "dst": n})
+            prev = n
+        elif kind == "agent":
+            t = ev["data"]
+            label = (t.get("subagent_type") or "agent")[:50]
+            n = _add_node("agent", label, ev["ts"],
+                          {"summary": t.get("input_summary", ""),
+                           "tokens": t.get("turn_tokens") or 0,
+                           "tool": "Agent"})
+            edges.append({"src": prev, "dst": n})
+        elif kind == "toolGroup":
+            label = f"{ev['toolName']} ×{ev['count']}" if ev['count'] > 1 else ev['toolName']
+            n = _add_node("tool", label, ev["ts"],
+                          {"tokens": ev["tokens"], "tool": ev["toolName"], "count": ev["count"]})
+            edges.append({"src": prev, "dst": n})
+
+    # 마지막 노드 → 세션 끝
+    end_n = _add_node("session", "세션 종료", s["ended_at"], {})
+    edges.append({"src": prev, "dst": end_n})
+
+    return {
+        "session_id": session_id,
+        "model": s["model"],
+        "startedAt": s["started_at"],
+        "endedAt": s["ended_at"],
+        "firstPrompt": s["first_user_prompt"],
+        "nodes": nodes,
+        "edges": edges,
+    }
+
+
+def api_project_timeline(query: dict) -> dict:
+    """프로젝트의 모든 세션을 시간순으로 묶어 그래프 데이터로. 세션 단위 노드 + 도구·에이전트 요약."""
+    cwd = (query.get("cwd", [""])[0] or "").strip()
+    if not cwd:
+        return {"error": "cwd required"}
+    _db_init()
+    with _db() as c:
+        sessions = [dict(r) for r in c.execute(
+            "SELECT session_id, started_at, ended_at, score, tool_use_count, agent_call_count, "
+            "       total_tokens, first_user_prompt, model, subagent_types "
+            "FROM sessions WHERE cwd=? AND started_at IS NOT NULL "
+            "ORDER BY started_at ASC",
+            (cwd,)
+        ).fetchall()]
+    nodes: list = []
+    edges: list = []
+    nid = 0
+    prev = None
+    project_name = Path(cwd).name
+    pid = nid + 1
+    nid += 1
+    nodes.append({"id": pid, "kind": "project", "label": project_name, "ts": sessions[0]["started_at"] if sessions else 0, "meta": {"cwd": cwd}})
+    prev = pid
+    for s in sessions:
+        try:
+            sub_map = json.loads(s.get("subagent_types") or "{}")
+        except Exception:
+            sub_map = {}
+        nid += 1
+        sn = nid
+        nodes.append({
+            "id": sn, "kind": "session",
+            "label": (s.get("first_user_prompt") or "(요청 없음)")[:60],
+            "ts": s["started_at"],
+            "meta": {
+                "sessionId": s["session_id"],
+                "score": s["score"],
+                "tools": s["tool_use_count"],
+                "agents": s["agent_call_count"],
+                "tokens": s["total_tokens"],
+                "model": s["model"],
+                "subagents": sub_map,
+                "endedAt": s["ended_at"],
+            },
+        })
+        edges.append({"src": prev, "dst": sn})
+        prev = sn
+    return {"cwd": cwd, "name": project_name, "nodes": nodes, "edges": edges, "sessionCount": len(sessions)}
 
 
 def api_session_detail(session_id: str) -> dict:
@@ -5350,6 +5619,7 @@ ROUTES_GET = {
     "/api/project/detail": api_project_detail,
     "/api/project/score-detail": api_project_score_detail,
     "/api/project/tool-breakdown": api_project_tool_breakdown,
+    "/api/project/timeline": api_project_timeline,
     "/api/mcp/catalog": lambda q: api_mcp_catalog(),
     "/api/plugins/browse": lambda q: api_plugins_browse(),
     "/api/project-agents/roles": lambda q: api_agent_roles(),
@@ -5445,6 +5715,20 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             try:
                 self._send_json(api_session_detail(m.group(1)))
+            except Exception as e:
+                self._send_json({"error": str(e)}, 500)
+            return
+        m = re.match(r"^/api/sessions/tokens/([0-9a-f-]+)$", path)
+        if m:
+            try:
+                self._send_json(api_session_tokens(m.group(1)))
+            except Exception as e:
+                self._send_json({"error": str(e)}, 500)
+            return
+        m = re.match(r"^/api/sessions/timeline/([0-9a-f-]+)$", path)
+        if m:
+            try:
+                self._send_json(api_session_timeline(m.group(1)))
             except Exception as e:
                 self._send_json({"error": str(e)}, 500)
             return

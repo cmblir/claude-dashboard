@@ -763,6 +763,7 @@ VIEWS.sessions = async () => {
           <option value="recent" ${q.sort==='recent'?'selected':''}>최신순</option>
           <option value="score" ${q.sort==='score'?'selected':''}>스코어순</option>
           <option value="tools" ${q.sort==='tools'?'selected':''}>도구 사용순</option>
+          <option value="tokens" ${q.sort==='tokens'?'selected':''}>토큰 사용순</option>
           <option value="duration" ${q.sort==='duration'?'selected':''}>지속시간순</option>
         </select>
       </div>
@@ -777,6 +778,7 @@ VIEWS.sessions = async () => {
           <th class="text-right">메시지</th>
           <th class="text-right">도구</th>
           <th class="text-right">에이전트</th>
+          <th class="text-right">토큰</th>
           <th class="text-right">오류</th>
           <th class="text-right">지속</th>
           <th class="text-right">시작</th>
@@ -798,11 +800,12 @@ VIEWS.sessions = async () => {
             <td class="text-right">${s.message_count}</td>
             <td class="text-right">${s.tool_use_count}</td>
             <td class="text-right">${s.agent_call_count ? `<span class="chip chip-accent">${s.agent_call_count}</span>` : '0'}</td>
+            <td class="text-right mono text-xs" style="color:#d97757">${fmtTokens(s.total_tokens||0)}</td>
             <td class="text-right">${s.error_count ? `<span class="chip chip-err">${s.error_count}</span>` : '0'}</td>
             <td class="text-right mono text-xs">${fmtDur(s.duration_ms)}</td>
             <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(s.started_at)}</td>
           </tr>
-        `).join('') || `<tr><td colspan="9" class="empty">세션이 없습니다. 재인덱스 버튼을 눌러보세요.</td></tr>`}
+        `).join('') || `<tr><td colspan="10" class="empty">세션이 없습니다. 재인덱스 버튼을 눌러보세요.</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -828,18 +831,32 @@ AFTER.sessions = () => {
 async function openSessionDetail(sessionId) {
   showModalLoading('세션 불러오는 중…');
   try {
-    const d = await api('/api/sessions/detail/' + sessionId);
+    const [d, tok, tl] = await Promise.all([
+      api('/api/sessions/detail/' + sessionId),
+      api('/api/sessions/tokens/' + sessionId),
+      api('/api/sessions/timeline/' + sessionId),
+    ]);
     if (d.error) { closeModal(); toast(d.error, 'err'); return; }
-    renderSessionDetail(d);
+    renderSessionDetail(d, tok, tl);
   } catch (e) {
     closeModal();
     toast(e.message, 'err');
   }
 }
-function renderSessionDetail(d) {
+
+function fmtTokens(n) {
+  if (!n) return '0';
+  if (n >= 1e9) return (n/1e9).toFixed(2)+'B';
+  if (n >= 1e6) return (n/1e6).toFixed(2)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+  return String(n);
+}
+function renderSessionDetail(d, tok, tl) {
   const s = d.session;
   const tools = d.tools || [];
   const msgs = d.messages || [];
+  tok = tok || { totals:{}, byTool:[], byAgent:[] };
+  tl = tl || { nodes:[], edges:[] };
   const toolCounts = {};
   tools.forEach(t => { toolCounts[t.tool] = (toolCounts[t.tool]||0) + 1; });
   const breakdown = s.score_breakdown || {};
@@ -885,41 +902,121 @@ function renderSessionDetail(d) {
       </div>
       <button class="btn-ghost btn" onclick="closeModal()">✕</button>
     </div>
-    <div class="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-3 gap-4 p-6">
-      <div class="lg:col-span-1 space-y-4">
-        <div>
-          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">스코어 브레이크다운</div>
-          <div class="card p-3">${breakdownHtml}</div>
-        </div>
-        <div>
-          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">도구 카운트</div>
+    <div class="flex-1 overflow-y-auto p-6 space-y-5">
+
+      <!-- 1행: 토큰 요약 + 5축 점수 -->
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
+        ${[
+          ['전체 토큰', fmtTokens(tok.totals.total), '#d97757'],
+          ['입력', fmtTokens(tok.totals.input), '#86efac'],
+          ['출력', fmtTokens(tok.totals.output), '#7dd3fc'],
+          ['캐시 read', fmtTokens(tok.totals.cacheRead), '#a78bfa'],
+          ['캐시 create', fmtTokens(tok.totals.cacheCreate), '#fcd34d'],
+        ].map(([l,v,c]) => `
           <div class="card p-3">
-            ${Object.entries(toolCounts).sort((a,b)=>b[1]-a[1]).map(([k,v]) =>
-              `<div class="flex justify-between py-1 text-xs"><span>${escapeHtml(k)}</span><span class="mono">${v}</span></div>`
-            ).join('') || '<div class="text-xs text-[var(--text-dim)]">—</div>'}
+            <div class="text-[10px] uppercase text-[var(--text-dim)]">${l}</div>
+            <div class="text-2xl font-bold mono mt-1" style="color:${c}">${v}</div>
+          </div>`).join('')}
+      </div>
+
+      <!-- 2행: 토큰 분해 (도구별 / 에이전트별) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div>
+          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">🛠 도구별 토큰 (turn 기준 분배)</div>
+          <div class="card p-3 max-h-[260px] overflow-y-auto">
+            ${(tok.byTool||[]).map(r => {
+              const max = (tok.byTool[0]||{}).tokens || 1;
+              const pct = Math.max(2, Math.round((r.tokens||0)/max*100));
+              return `
+              <div class="mb-2">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="mono">${escapeHtml(r.tool)} <span class="text-[var(--text-dim)]">×${r.calls}</span></span>
+                  <span class="mono font-bold" style="color:#d97757">${fmtTokens(r.tokens||0)}</span>
+                </div>
+                <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:#d97757;"></div></div>
+              </div>`;
+            }).join('') || '<div class="empty text-xs">데이터 없음</div>'}
           </div>
         </div>
         <div>
-          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">서브에이전트</div>
+          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">🤝 서브에이전트별 토큰</div>
+          <div class="card p-3 max-h-[260px] overflow-y-auto">
+            ${(tok.byAgent||[]).map(r => {
+              const max = (tok.byAgent[0]||{}).tokens || 1;
+              const pct = Math.max(2, Math.round((r.tokens||0)/max*100));
+              return `
+              <div class="mb-2">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="mono">${escapeHtml(r.agent)} <span class="text-[var(--text-dim)]">×${r.calls}</span></span>
+                  <span class="mono font-bold" style="color:#a78bfa">${fmtTokens(r.tokens||0)}</span>
+                </div>
+                <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:#a78bfa;"></div></div>
+              </div>`;
+            }).join('') || '<div class="empty text-xs">서브에이전트 위임 없음</div>'}
+          </div>
+        </div>
+      </div>
+
+      <!-- 3행: 진행 그래프 (Obsidian 스타일) -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-[11px] uppercase text-[var(--text-dim)]">📈 진행 그래프 (시작 → 종료)</div>
+          <span class="text-[10px] text-[var(--text-dim)]">${tl.nodes.length} 노드 · ⬛ 세션 / ◆ user 프롬프트 / ⬢ 에이전트 / ● 도구</span>
+        </div>
+        <div class="card p-2" style="height:420px; position:relative;">
+          <div id="sessionTimelineGraph" style="width:100%; height:100%;"></div>
+        </div>
+      </div>
+
+      <!-- 4행: 점수 + 카운트 + 메시지 -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div>
+          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">스코어 브레이크다운</div>
+          <div class="card p-3">${breakdownHtml}</div>
+          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2 mt-3">서브에이전트</div>
           <div class="card p-3 text-xs">
             ${Object.entries(s.subagent_types || {}).map(([k,v]) =>
               `<span class="chip chip-accent mr-1 mb-1">${escapeHtml(k)} ×${v}</span>`
             ).join('') || '<span class="text-[var(--text-dim)]">호출 없음</span>'}
           </div>
         </div>
-      </div>
-      <div class="lg:col-span-2 space-y-4">
-        <div>
-          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">도구 타임라인 (최대 120)</div>
-          <div class="card max-h-[280px] overflow-y-auto p-1">${toolsHtml || '<div class="empty text-xs">도구 호출 없음</div>'}</div>
-        </div>
-        <div>
+        <div class="lg:col-span-2">
           <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">메시지 (최근 40)</div>
-          <div class="card max-h-[280px] overflow-y-auto p-3">${msgsHtml || '<div class="empty text-xs">메시지 없음</div>'}</div>
+          <div class="card max-h-[320px] overflow-y-auto p-3">${msgsHtml || '<div class="empty text-xs">메시지 없음</div>'}</div>
         </div>
       </div>
     </div>
   `);
+  // 그래프 렌더 — vis-network
+  setTimeout(() => drawSessionTimeline(tl), 50);
+}
+
+function drawSessionTimeline(tl) {
+  const el = document.getElementById('sessionTimelineGraph');
+  if (!el || typeof vis === 'undefined') return;
+  const colorByKind = {
+    session: { background:'#d97757', border:'#fb923c', font:'#fff' },
+    prompt:  { background:'#7dd3fc', border:'#38bdf8', font:'#0c4a6e' },
+    agent:   { background:'#a78bfa', border:'#8b5cf6', font:'#fff' },
+    tool:    { background:'#27272a', border:'#52525b', font:'#d4d4d8' },
+  };
+  const shapeByKind = { session:'square', prompt:'diamond', agent:'hexagon', tool:'dot' };
+  const nodes = tl.nodes.map(n => ({
+    id: n.id,
+    label: n.label,
+    shape: shapeByKind[n.kind] || 'dot',
+    color: colorByKind[n.kind] || colorByKind.tool,
+    font: { color:(colorByKind[n.kind]||colorByKind.tool).font, size: n.kind==='session'?13:11 },
+    title: `${n.kind}\n${n.label}\n${n.meta && n.meta.tokens ? 'tokens: '+fmtTokens(n.meta.tokens) : ''}`,
+    size: n.kind === 'session' ? 22 : (n.kind === 'agent' ? 18 : (n.kind === 'prompt' ? 16 : 8)),
+  }));
+  const edges = tl.edges.map(e => ({ from: e.src, to: e.dst, arrows:'to', color:{color:'#3f3f46'} }));
+  const network = new vis.Network(el, { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) }, {
+    layout: { hierarchical: { direction:'LR', sortMethod:'directed', nodeSpacing: 70, levelSeparation: 110 } },
+    physics: false,
+    interaction: { hover:true, zoomView:false, dragView:true, dragNodes:false },
+    edges: { smooth: { type:'cubicBezier', forceDirection:'horizontal', roundness:0.4 } },
+  });
 }
 
 // ────────────────────────────────────────────────────────────────
