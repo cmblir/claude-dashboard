@@ -81,6 +81,10 @@ MEMORY_DIR = _env_path(
 )
 
 DB_PATH = _env_path("CLAUDE_DASHBOARD_DB", Path.home() / ".claude-dashboard.db")
+
+# 점수 평균 계산에서 도구 사용이 적은(=짧은/시범) 세션 제외 — UX 노이즈 차단.
+# 환경변수 SCORE_MIN_TOOLS 로 조정 가능. 기본 11 → 도구 호출 11회 이상 세션만 점수 평균에 포함.
+SCORE_MIN_TOOLS = int(os.environ.get("SCORE_MIN_TOOLS", "11"))
 TRANSLATIONS_PATH = _env_path("CLAUDE_DASHBOARD_TRANSLATIONS", Path.home() / ".claude-dashboard-translations.json")
 DASHBOARD_CONFIG_PATH = _env_path("CLAUDE_DASHBOARD_CONFIG", Path.home() / ".claude-dashboard-config.json")
 
@@ -2401,7 +2405,15 @@ def api_sessions_stats() -> dict:
     _db_init()
     with _db() as c:
         total = c.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
-        avg = c.execute("SELECT COALESCE(AVG(score), 0) AS s FROM sessions").fetchone()["s"]
+        # 점수 평균은 도구 호출 ≥ SCORE_MIN_TOOLS 인 세션만 포함
+        avg = c.execute(
+            "SELECT COALESCE(AVG(score), 0) AS s FROM sessions WHERE tool_use_count >= ?",
+            (SCORE_MIN_TOOLS,),
+        ).fetchone()["s"]
+        scored_n = c.execute(
+            "SELECT COUNT(*) AS n FROM sessions WHERE tool_use_count >= ?",
+            (SCORE_MIN_TOOLS,),
+        ).fetchone()["n"]
         total_tools = c.execute("SELECT COALESCE(SUM(tool_use_count),0) AS n FROM sessions").fetchone()["n"]
         total_agents = c.execute("SELECT COALESCE(SUM(agent_call_count),0) AS n FROM sessions").fetchone()["n"]
         total_errors = c.execute("SELECT COALESCE(SUM(error_count),0) AS n FROM sessions").fetchone()["n"]
@@ -2412,20 +2424,26 @@ def api_sessions_stats() -> dict:
         subagent_rows = [dict(r) for r in c.execute(
             "SELECT subagent_type AS name, COUNT(*) AS n FROM tool_uses WHERE subagent_type != '' GROUP BY subagent_type ORDER BY n DESC"
         ).fetchall()]
+        # Top sessions 도 도구≥기준 만 (짧은 세션이 우연히 100점 받아 dominate 하는 것 방지)
         top_sessions = [dict(r) for r in c.execute(
-            "SELECT session_id, project, score, started_at, first_user_prompt FROM sessions ORDER BY score DESC LIMIT 10"
+            "SELECT session_id, project, score, started_at, first_user_prompt, tool_use_count "
+            "FROM sessions WHERE tool_use_count >= ? ORDER BY score DESC LIMIT 10",
+            (SCORE_MIN_TOOLS,),
         ).fetchall()]
+        # 프로젝트별 평균: 짧은 세션 제외한 평균 + 짧은 세션 수도 함께
         proj_rows = [dict(r) for r in c.execute(
             """SELECT
                 COALESCE(NULLIF(cwd,''), project_dir) AS key,
                 MAX(cwd) AS cwd,
                 MAX(project_dir) AS project_dir,
                 COUNT(*) AS sessions,
-                AVG(score) AS avg_score,
+                SUM(CASE WHEN tool_use_count >= ? THEN 1 ELSE 0 END) AS scored_sessions,
+                AVG(CASE WHEN tool_use_count >= ? THEN score END) AS avg_score,
                 SUM(tool_use_count) AS tools
                FROM sessions
                GROUP BY COALESCE(NULLIF(cwd,''), project_dir)
-               ORDER BY sessions DESC"""
+               ORDER BY sessions DESC""",
+            (SCORE_MIN_TOOLS, SCORE_MIN_TOOLS),
         ).fetchall()]
     # name = cwd 의 basename (없으면 슬러그)
     for r in proj_rows:
@@ -2439,8 +2457,8 @@ def api_sessions_stats() -> dict:
             (thirty_days_ago,)
         ).fetchall()
 
-    # bucket by day
-    buckets: dict = defaultdict(lambda: {"sessions": 0, "tools": 0, "errors": 0, "score_sum": 0})
+    # bucket by day — 점수 평균은 도구≥기준 세션만 포함
+    buckets: dict = defaultdict(lambda: {"sessions": 0, "tools": 0, "errors": 0, "score_sum": 0, "scored": 0})
     for r in daily_rows:
         if not r["started_at"]:
             continue
@@ -2449,7 +2467,9 @@ def api_sessions_stats() -> dict:
         b["sessions"] += 1
         b["tools"] += r["tool_use_count"] or 0
         b["errors"] += r["error_count"] or 0
-        b["score_sum"] += r["score"] or 0
+        if (r["tool_use_count"] or 0) >= SCORE_MIN_TOOLS:
+            b["score_sum"] += r["score"] or 0
+            b["scored"] += 1
     timeline = []
     for d in sorted(buckets.keys()):
         b = buckets[d]
@@ -2458,11 +2478,13 @@ def api_sessions_stats() -> dict:
             "sessions": b["sessions"],
             "tools": b["tools"],
             "errors": b["errors"],
-            "avg_score": round(b["score_sum"] / max(1, b["sessions"]), 1),
+            "avg_score": round(b["score_sum"] / max(1, b["scored"]), 1) if b["scored"] else None,
         })
 
     return {
         "totalSessions": total,
+        "scoredSessions": scored_n,
+        "minToolsForScore": SCORE_MIN_TOOLS,
         "avgScore": round(avg, 1),
         "totalTools": total_tools,
         "totalAgentCalls": total_agents,
@@ -2665,13 +2687,18 @@ def api_optimization_score() -> dict:
     }
 
     with _db() as c:
-        row = c.execute("SELECT AVG(score) AS s, COUNT(*) AS n FROM sessions").fetchone()
+        row = c.execute(
+            "SELECT AVG(score) AS s, COUNT(*) AS n FROM sessions WHERE tool_use_count >= ?",
+            (SCORE_MIN_TOOLS,),
+        ).fetchone()
+        total_sess = c.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
     avg = int(row["s"] or 0)
     sess_n = row["n"] or 0
+    excluded = (total_sess or 0) - sess_n
     score["sessionQuality"] = {
         "value": avg, "max": 100,
-        "note": f"평균 세션 스코어 ({sess_n}개 세션 기준)",
-        "formula": f"AVG(세션별 100점 만점 스코어) = {avg} · 각 세션: engagement+productivity+delegation+diversity+reliability",
+        "note": f"평균 세션 스코어 ({sess_n}개 / 도구≥{SCORE_MIN_TOOLS}회 세션 기준 · 짧은 {excluded}개 제외)",
+        "formula": f"AVG(score WHERE tool_use_count ≥ {SCORE_MIN_TOOLS}) = {avg} · 각 세션: engagement+productivity+delegation+diversity+reliability",
         "suggest": "통계 탭의 프로젝트 행 클릭 → 5축별 계산식 상세 확인.",
         "target": "analytics",
     }
@@ -3904,12 +3931,14 @@ SCORE_FORMULA = {
 
 
 def _project_avg_breakdown(rows: list) -> dict:
-    """세션 행 리스트 → 평균 5축 점수."""
+    """세션 행 리스트 → 평균 5축 점수. 짧은 세션(도구<기준) 제외."""
     if not rows:
         return {k: 0 for k in SCORE_FORMULA}
     sums = {k: 0 for k in SCORE_FORMULA}
     cnt = 0
     for r in rows:
+        if (r.get("tool_use_count") or 0) < SCORE_MIN_TOOLS:
+            continue
         try:
             b = json.loads(r.get("score_breakdown") or "{}")
         except Exception:
