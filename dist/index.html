@@ -171,10 +171,78 @@
   body.sb-collapsed #sidebar-foot #cliStatus .flex { justify-content: center !important; margin: 0 !important; }
   #sidebar { transition: width 0.18s ease; }
   #content { transition: margin-left 0.18s ease; }
+
+  /* ─── 모바일 반응형 ─── */
   @media (max-width: 900px) {
-    #sidebar { position: fixed; left: 0; top: 0; height: 100vh; z-index: 40; transform: translateX(-100%); transition: transform 0.2s; }
-    #sidebar.open { transform: translateX(0); }
+    #sidebar { position: fixed; left: 0; top: 0; height: 100vh; z-index: 40; transform: translateX(-100%); transition: transform 0.2s; width: min(300px, 85vw) !important; }
+    #sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,0.6); }
     #content { margin-left: 0 !important; }
+    /* 사이드바 열렸을 때 배경 오버레이 */
+    body.sidebar-open::after {
+      content: ''; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 35; transition: opacity 0.2s;
+    }
+
+    /* 헤더 / 본문 패딩 축소 */
+    #content header { padding: 0.5rem 0.75rem !important; }
+    #content #view { padding: 0.75rem !important; }
+
+    /* 큰 타이포 축소 */
+    h1.text-2xl { font-size: 1.25rem !important; }
+    h2.text-lg, h2.text-xl { font-size: 1rem !important; }
+
+    /* 카드 padding 축소 */
+    .card.p-5, .card.p-6 { padding: 0.75rem !important; }
+    .card.p-4 { padding: 0.625rem !important; }
+
+    /* 테이블 가로 스크롤 */
+    table.data { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; max-width: 100%; }
+    table.data thead, table.data tbody { display: table; min-width: 100%; }
+
+    /* 그리드 강제 1 컬럼 (md/lg breakpoint 무시) */
+    .grid.grid-cols-2 { grid-template-columns: 1fr 1fr !important; }
+    .grid.md\:grid-cols-2, .grid.md\:grid-cols-3, .grid.md\:grid-cols-4, .grid.md\:grid-cols-5,
+    .grid.lg\:grid-cols-2, .grid.lg\:grid-cols-3, .grid.lg\:grid-cols-4, .grid.lg\:grid-cols-5 {
+      grid-template-columns: 1fr !important;
+    }
+    .grid-list { grid-template-columns: 1fr !important; }
+
+    /* 입력 필드 풀폭 */
+    .input { font-size: 16px !important; } /* iOS 자동 줌 방지 */
+    .max-w-\[260px\], .max-w-\[280px\], .max-w-\[300px\], .max-w-\[340px\], .max-w-\[420px\] { max-width: 100% !important; }
+    #globalSearch { font-size: 14px !important; }
+
+    /* 모달 */
+    .modal-backdrop { padding: 8px !important; }
+    .modal { max-height: 96vh !important; border-radius: 12px !important; }
+    .modal-wide { height: 96vh !important; max-height: 96vh !important; }
+
+    /* 신기능 창 — 화면 거의 전체 */
+    .feat-win {
+      width: calc(100vw - 16px) !important;
+      max-width: calc(100vw - 16px) !important;
+      left: 8px !important;
+      top: 8px !important;
+      max-height: calc(100vh - 16px) !important;
+      resize: none !important;
+    }
+
+    /* Chip / 버튼 터치 타겟 */
+    .btn, .btn-primary, .btn-ghost { min-height: 36px; }
+    .chip { min-height: 22px; }
+
+    /* 사이드바 네비 항목 터치 타겟 */
+    .nav-item { min-height: 44px; padding-top: 10px !important; padding-bottom: 10px !important; }
+
+    /* 이미지/ pre 넘침 */
+    pre { max-width: 100%; overflow-x: auto; }
+  }
+
+  /* 아주 좁은 화면 — iPhone SE 등 */
+  @media (max-width: 420px) {
+    .grid.grid-cols-2 { grid-template-columns: 1fr !important; }
+    #content header { gap: 0.5rem !important; }
+    #content #view { padding: 0.5rem !important; }
   }
 </style>
 </head>
@@ -423,11 +491,31 @@ function renderNav() {
           <div>${n.label}</div>
           ${descHtml}
         </div>`;
-      el.onclick = () => go(n.id);
+      el.onclick = () => {
+        go(n.id);
+        // 모바일에서 nav 항목 클릭 시 사이드바 자동 닫기
+        if (window.matchMedia('(max-width: 900px)').matches) {
+          document.getElementById('sidebar').classList.remove('open');
+          document.body.classList.remove('sidebar-open');
+          _syncNavToggleVisibility();
+        }
+      };
       nav.appendChild(el);
     });
   });
 }
+
+// 모바일 오버레이 클릭 → 사이드바 닫기
+document.addEventListener('click', (e) => {
+  if (!window.matchMedia('(max-width: 900px)').matches) return;
+  const sb = document.getElementById('sidebar');
+  if (!sb || !sb.classList.contains('open')) return;
+  // 클릭이 사이드바 내부가 아니고 토글 버튼도 아니면 닫기
+  if (sb.contains(e.target)) return;
+  if (e.target.closest('#navToggle, #sbToggle')) return;
+  sb.classList.remove('open');
+  document.body.classList.remove('sidebar-open');
+});
 function go(id) {
   state.view = id;
   location.hash = '#/' + id;
@@ -609,18 +697,22 @@ function maximizeFeatureWindow(winId) {
   }
 }
 function _autoSizeWindow(w) {
-  // body 의 scrollHeight 로 컨텐츠 실제 높이 측정 → 창 높이 맞춤
+  const isMobile = window.matchMedia('(max-width: 900px)').matches;
+  if (isMobile) {
+    // 모바일: CSS 가 이미 100vw 로 덮어쓰므로 높이만 설정
+    w.style.height = 'calc(100vh - 16px)';
+    return;
+  }
   const body = w.querySelector('.feat-win-body');
   const title = w.querySelector('.feat-win-title');
   if (!body || !title) return;
   const titleH = title.offsetHeight;
   const contentH = body.scrollHeight;
-  const desired = titleH + contentH + 8; // padding 여유
+  const desired = titleH + contentH + 8;
   const maxH = window.innerHeight - 80;
   const minH = 180;
   const finalH = Math.max(minH, Math.min(maxH, desired));
   w.style.height = finalH + 'px';
-  // 화면 밖으로 나가지 않도록 위치 보정
   const rect = w.getBoundingClientRect();
   if (rect.bottom > window.innerHeight - 20) {
     w.style.top = Math.max(20, window.innerHeight - finalH - 20) + 'px';
@@ -5359,7 +5451,9 @@ function _syncNavToggleVisibility() {
 function _toggleSidebar() {
   const isMobile = window.matchMedia('(max-width: 900px)').matches;
   if (isMobile) {
-    document.getElementById('sidebar').classList.toggle('open');
+    const sb = document.getElementById('sidebar');
+    sb.classList.toggle('open');
+    document.body.classList.toggle('sidebar-open', sb.classList.contains('open'));
   } else {
     document.body.classList.toggle('sb-collapsed');
     try { localStorage.setItem('sb-collapsed', document.body.classList.contains('sb-collapsed') ? '1' : '0'); } catch {}
