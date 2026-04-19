@@ -2264,7 +2264,7 @@ VIEWS.mcp = async () => {
     <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">MCP 커넥터</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">Code 로컬 ${(conn.local||[]).length} · 플랫폼 ${(conn.platform||[]).length} · 플러그인 ${(conn.plugin||[]).length} · Desktop 앱 ${(conn.desktop||[]).length} · 카탈로그 ${cat.catalog.length}개</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">Code 로컬 ${(conn.local||[]).length} · 플랫폼 ${(conn.platform||[]).length} · 플러그인 ${(conn.plugin||[]).length} · Desktop 앱 ${(conn.desktop||[]).length} · 프로젝트 ${(conn.project||[]).length} · 카탈로그 ${cat.catalog.length}개</p>
       </div>
       <div class="flex gap-2">
         <button class="btn-primary btn text-xs" onclick="aiRecommendList('mcp')">🤖 AI 추천</button>
@@ -2297,6 +2297,7 @@ VIEWS.mcp = async () => {
     </div>
 
     ${renderConnectorGroup('🖥 Claude Code 로컬 MCP (~/.claude.json)', conn.local || [], true)}
+    ${renderConnectorGroup('📁 프로젝트 MCP (.mcp.json)', conn.project || [], false)}
     ${renderConnectorGroup('🌐 플랫폼 MCP (claude.ai 연결)', conn.platform || [], false)}
     ${renderConnectorGroup('🔌 플러그인 제공 MCP', conn.plugin || [], false)}
     ${renderConnectorGroup('💻 Claude Desktop 앱 MCP (claude_desktop_config.json)', conn.desktop || [], false)}
@@ -2313,21 +2314,86 @@ AFTER.mcp = () => {
 };
 
 async function installMcp(id) {
-  const asName = prompt(`'${id}' MCP 를 어떤 이름으로 등록할까요? (보통 기본값 OK)`, id);
-  if (asName === null) return;
-  const r = await api('/api/mcp/install', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, as: asName || id }) });
-  if (r.ok) {
-    toast(`'${r.name}' 설치됨 — ${r.note||'Claude Code 재시작 필요'}`, 'ok');
-    renderView();
-  } else {
-    toast(r.error || '실패', 'err');
-  }
+  // 1) prepare — 필요한 env/값 조회
+  const prep = await api('/api/mcp/install/prepare', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id })
+  });
+  if (prep.error) { toast(prep.error, 'err'); return; }
+  const placeholders = prep.placeholders || [];
+
+  // 2) 모달로 이름 + 각 env 값 입력
+  const fieldHtml = placeholders.map(p => {
+    const hint = p.hint || '';
+    const example = {
+      GITHUB_TOKEN: 'ghp_xxxxxxxxxxxxxxxxxxxx',
+      GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_xxxxxxxxxxxxxxxxxxxx',
+      PATH: '/Users/yoo/projects',
+      PROJECT_ROOT: '/Users/yoo/my-project',
+    }[p.key] || '';
+    const isSecret = /TOKEN|KEY|SECRET|PASSWORD/i.test(p.key);
+    return `
+      <div>
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">${escapeHtml(p.key)} ${isSecret?'<span class="chip chip-warn text-[9px]">secret</span>':''}</div>
+        <input class="input mcp-ph-input" data-key="${escapeHtml(p.key)}" type="${isSecret?'password':'text'}" placeholder="${escapeHtml(example)}" />
+        ${hint ? `<div class="text-[10px] text-[var(--text-dim)] mt-1">${escapeHtml(hint)}</div>` : ''}
+        <div class="text-[10px] text-[var(--text-mute)] mt-1 mono truncate">where: ${escapeHtml(p.where)} · 원본: ${escapeHtml(p.raw||'')}</div>
+      </div>`;
+  }).join('');
+
+  showModal(`
+    <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+      <div>
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">＋ MCP 설치</div>
+        <h2 class="text-lg font-bold">${escapeHtml(prep.name || id)}</h2>
+      </div>
+      <button class="btn-ghost btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="p-5 space-y-3">
+      <div>
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">등록할 이름</div>
+        <input id="mcpAsName" class="input" value="${escapeHtml(id)}" />
+      </div>
+      ${placeholders.length ? `
+        <div class="card p-3" style="background:rgba(251,191,36,0.08);">
+          <div class="text-sm font-semibold mb-2">⚠️ 필수 값 ${placeholders.length}개 입력</div>
+          <div class="space-y-3">${fieldHtml}</div>
+        </div>` : '<div class="text-xs text-[var(--text-dim)]">추가 설정 없이 바로 설치 가능합니다.</div>'}
+      <details class="text-[11px]">
+        <summary class="cursor-pointer text-[var(--text-dim)]">📋 설치 spec 미리보기</summary>
+        <pre class="mono text-[10px] whitespace-pre-wrap bg-black/30 p-2 rounded mt-2">${escapeHtml(JSON.stringify(prep.preview, null, 2))}</pre>
+      </details>
+    </div>
+    <div class="p-4 border-t border-[var(--border)] flex justify-end gap-2">
+      <button class="btn" onclick="closeModal()">취소</button>
+      <button class="btn-primary btn" id="mcpInstallBtn">설치</button>
+    </div>
+  `);
+  document.getElementById('mcpInstallBtn').onclick = async () => {
+    const asName = document.getElementById('mcpAsName').value.trim() || id;
+    const values = {};
+    document.querySelectorAll('.mcp-ph-input').forEach(el => {
+      const k = el.dataset.key; const v = el.value.trim();
+      if (v) values[k] = v;
+    });
+    const missing = placeholders.filter(p => !values[p.key]).map(p => p.key);
+    if (missing.length) { toast('필수 값 누락: ' + missing.join(', '), 'warn'); return; }
+    const r = await api('/api/mcp/install', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id, as: asName, values }),
+    });
+    if (r.ok) {
+      toast(`'${r.name}' 설치됨`, 'ok');
+      closeModal();
+    } else {
+      toast(r.error || '실패', 'err');
+    }
+  };
 }
 
 async function removeMcp(name) {
   if (!confirm(`MCP 서버 '${name}' 을 제거할까요? (~/.claude.json 에서 삭제)`)) return;
   const r = await api('/api/mcp/remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
-  if (r.ok) { toast('제거됨', 'ok'); renderView(); }
+  if (r.ok) toast(`'${name}' 제거됨`, 'ok');
   else toast(r.error||'실패', 'err');
 }
 
@@ -2357,6 +2423,9 @@ function renderConnectorGroup(title, list, allowRemove) {
             ${m.endpoint ? `<div class="text-[10px] mono text-[var(--text-dim)] truncate" title="${escapeHtml(m.endpoint)}">${escapeHtml(m.endpoint)}</div>` : ''}
             ${(m.type || m.command) ? `<div class="text-[10px] mono text-[var(--text-dim)] truncate">${escapeHtml(m.type||'')} · ${escapeHtml(m.command||'')}</div>`:''}
             ${m.args && m.args.length ? `<div class="text-[10px] mono text-[var(--text-mute)] truncate mt-1">${escapeHtml(m.args.join(' '))}</div>`: ''}
+            ${m.missingEnv && m.missingEnv.length ? `<div class="text-[10px] mt-2 p-1.5 rounded" style="background:rgba(248,113,113,0.1); color:#fca5a5;">⚠️ 환경변수 누락: ${m.missingEnv.map(k=>`<code class="mono">${escapeHtml(k)}</code>`).join(', ')}</div>` : ''}
+            ${m.projectCwd ? `<div class="text-[10px] text-[var(--text-dim)] mt-1 truncate">📁 ${escapeHtml(m.projectCwd)}</div>` : ''}
+            ${m.description ? `<div class="text-[10px] text-[var(--text-mute)] mt-1 line-clamp-2">${escapeHtml(m.description)}</div>` : ''}
           </div>
         `).join('') || `<div class="empty text-xs" style="grid-column:1/-1;">없음</div>`}
       </div>
