@@ -103,7 +103,57 @@
   .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   .line-clamp-6 { display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden; }
+  /* 햄버거 토글 중복 방지: sb-collapsed 상태면 sbToggle 숨기고 navToggle 만, 평상시엔 반대 */
+  body.sb-collapsed #sbToggle { display: none; }
   body.sb-collapsed #sidebar { width: 58px; }
+
+  /* 🪟 macOS 스타일 플로팅 창 (신기능 전용) */
+  .feat-win {
+    position: fixed;
+    width: 480px;
+    min-width: 320px;
+    min-height: 120px;
+    max-height: 80vh;
+    background: #12121a;
+    border: 1px solid var(--border-hi);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.02);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    resize: both;
+    transition: box-shadow 0.15s;
+  }
+  .feat-win:hover { box-shadow: 0 24px 72px rgba(0,0,0,0.7), 0 0 0 1px rgba(217,119,87,0.15); }
+  .feat-win-title {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid var(--border);
+    cursor: move;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .feat-win-lights { display: flex; gap: 7px; }
+  .feat-light {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: none; padding: 0; cursor: pointer;
+    transition: filter 0.1s;
+  }
+  .feat-light:hover { filter: brightness(1.25); }
+  .feat-light-close { background: #ff5f57; }
+  .feat-light-min   { background: #febc2e; }
+  .feat-light-max   { background: #28c840; }
+  .feat-win-title-text { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; truncate: overflow; }
+  .feat-win-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  .feat-win-minimized { height: 40px !important; min-height: 40px !important; overflow: hidden; }
+  .feat-win-minimized .feat-win-body { display: none; }
+  .feat-win-maxed { border-radius: 8px; resize: none; }
   body.sb-collapsed #sidebar .nav-label,
   body.sb-collapsed #sidebar .nav-desc,
   body.sb-collapsed #sidebar .brand-text,
@@ -181,15 +231,9 @@ const state = { view: 'overview', data: {}, loading: {} };
 
 const DOCS_BASE = 'https://docs.claude.com/en/docs/claude-code/';
 const NAV = [
-  // 🆕 신기능 — 최신 Anthropic 발표 (메인 위)
-  { id: 'design',        icon: '🎨', label: 'Claude Design',       group: 'new', desc: 'claude.ai/design · 비주얼 디자인 + 로컬 export', docUrl: 'https://www.anthropic.com/news/claude-design-anthropic-labs', released: '2026-04-17' },
-  { id: 'feat_opus47',   icon: '🧠', label: 'Opus 4.7',           group: 'new', desc: '최신 플래그십 모델 · 에이전틱 코딩 + 고해상도 비전', docUrl: 'https://www.anthropic.com/news/claude-opus-4-7', released: '2026-04-16', featureKey: 'opus47' },
-  { id: 'feat_routines', icon: '🔁', label: 'Code Routines',      group: 'new', desc: 'Claude Code 반복 작업. Mac offline 이어도 웹에서 실행', docUrl: 'https://docs.claude.com/en/docs/claude-code/routines', released: '2026-04-14', featureKey: 'codeRoutines' },
-  { id: 'feat_advisor',  icon: '🧭', label: 'Advisor Tool',       group: 'new', desc: 'executor + advisor 이중 모델로 장기 에이전트 품질↑ 비용↓', docUrl: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool', released: '2026-04-09', featureKey: 'advisorTool' },
-  { id: 'feat_managed',  icon: '🤖', label: 'Managed Agents',     group: 'new', desc: '완전 관리형 Claude 에이전트 하네스 (샌드박스 + 스트리밍)', docUrl: 'https://platform.claude.com/docs/en/managed-agents/overview', released: '2026-04-08', featureKey: 'managedAgents' },
-  { id: 'feat_antcli',   icon: '⌨️', label: 'ant CLI',           group: 'new', desc: 'Claude API 커맨드라인 클라이언트 · YAML 리소스', docUrl: 'https://platform.claude.com/docs/en/api/sdks/cli', released: '2026-04-08', featureKey: 'antCli' },
-  { id: 'feat_mythos',   icon: '🛡', label: 'Claude Mythos',      group: 'new', desc: '방어 보안 특화 research preview (초대제)', docUrl: 'https://red.anthropic.com/2026/mythos-preview/', released: '2026-04-07', featureKey: 'mythos' },
-  { id: 'feat_skills',   icon: '🎯', label: 'Agent Skills',       group: 'new', desc: '지시+스크립트+리소스 묶음을 Claude 가 동적 로드', docUrl: 'https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills', released: '2025-10-16', featureKey: 'agentSkills' },
+  // 🆕 신기능 — 단일 탭 (카드 클릭 시 macOS 스타일 플로팅 창)
+  { id: 'features', icon: '🆕', label: '신기능', group: 'new',
+    desc: 'Anthropic 최신 발표 · 카드 클릭 → 창으로 열림 (여러 개 동시 가능)' },
 
   { id: 'overview',    icon: '✦',  label: '개요',            group: 'main', docUrl: DOCS_BASE+'overview' },
   { id: 'projects',    icon: '📁', label: '프로젝트',          group: 'main', desc: '프로젝트별 Claude 세팅 + AI 추천', docUrl: DOCS_BASE+'memory' },
@@ -355,21 +399,9 @@ function scoreColor(n) {
 function renderNav() {
   const nav = document.getElementById('nav');
   nav.innerHTML = '';
-  // 동적 발견 항목 병합
-  const dynamicFeatures = (window.__dynamicFeatures || []).map(f => ({
-    id: 'feat_dyn_' + f.id,
-    icon: f.icon || '✨',
-    label: f.label,
-    group: 'new',
-    desc: (f.summary || '') + (f.released ? ' · ' + f.released : ''),
-    docUrl: f.docUrl || f.launchUrl || '',
-    dynamicFeature: f,
-  }));
-  const allNav = NAV.concat(dynamicFeatures);
-
   GROUPS.forEach(g => {
-    const items = allNav.filter(n => n.group === g.id);
-    if (!items.length && g.id !== 'new') return; // 'new' 는 비어도 헤더는 남김
+    const items = NAV.filter(n => n.group === g.id);
+    if (!items.length) return;
     const label = document.createElement('div');
     label.className = 'group-label text-[10px] uppercase tracking-widest text-[var(--text-dim)] px-3 mt-3 mb-1';
     label.textContent = g.label;
@@ -378,26 +410,17 @@ function renderNav() {
       const el = document.createElement('div');
       el.className = 'nav-item' + (state.view === n.id ? ' active' : '');
       el.title = n.label + (n.desc ? ' — ' + n.desc : '');
-      const isNew = g.id === 'new';
       const descHtml = n.desc ? `<div class="nav-desc text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">${escapeHtml(n.desc)}</div>` : '';
       el.innerHTML = `
         <span class="w-5 text-center self-start mt-0.5 flex-shrink-0">${n.icon}</span>
         <div class="nav-label flex-1 min-w-0">
-          <div class="flex items-center gap-1">${n.label} ${n.dynamicFeature?'<span class="chip text-[8px]" style="background:rgba(167,139,250,0.2);color:#c4b5fd;">AI 발견</span>':''}</div>
+          <div>${n.label}</div>
           ${descHtml}
         </div>`;
       el.onclick = () => go(n.id);
       nav.appendChild(el);
     });
   });
-}
-
-async function loadDynamicFeatures() {
-  try {
-    const r = await api('/api/features/list');
-    window.__dynamicFeatures = r.dynamic || [];
-    renderNav();
-  } catch (e) { /* no-op */ }
 }
 function go(id) {
   state.view = id;
@@ -420,12 +443,7 @@ async function renderView() {
   const v = document.getElementById('view');
   v.innerHTML = `<div class="tab-enter"><div class="shimmer h-32 mb-4"></div><div class="shimmer h-64"></div></div>`;
   try {
-    let fn = VIEWS[state.view];
-    // 신기능 탭 (feat_*) — 공통 렌더러로 처리
-    if (!fn && state.view.startsWith('feat_')) {
-      fn = () => renderFeatureDoc(state.view);
-    }
-    fn = fn || VIEWS.overview;
+    const fn = VIEWS[state.view] || VIEWS.overview;
     const html = await fn();
     v.innerHTML = `<div class="tab-enter">${html}</div>`;
     const after = AFTER[state.view];
@@ -436,66 +454,173 @@ async function renderView() {
   }
 }
 
-// 신기능 공통 뷰 — NAV 정보 + /api/features/list 조합
-async function renderFeatureDoc(viewId) {
-  const navItem = NAV.find(n => n.id === viewId);
-  let feat = null;
-  // 동적 발견 항목
-  if (viewId.startsWith('feat_dyn_')) {
-    const list = await api('/api/features/list');
-    const key = viewId.replace('feat_dyn_', '');
-    feat = (list.dynamic || []).find(f => f.id === key);
-  } else if (navItem && navItem.featureKey) {
-    const list = await api('/api/features/list');
-    feat = (list.builtin || []).find(f => f.id === navItem.featureKey);
-  }
-  if (!feat && navItem) {
-    // 최소 정보로 대체
-    feat = { id: viewId, icon: navItem.icon, label: navItem.label,
-             summary: navItem.desc || '', docUrl: navItem.docUrl,
-             launchUrl: navItem.docUrl, released: navItem.released || '' };
-  }
-  if (!feat) return `<div class="card empty">신기능 정보를 찾을 수 없습니다.</div>`;
-
+// ────────────────────────────────────────────────────────────────
+// 🆕 신기능 탭 + macOS 스타일 플로팅 창 관리자
+// ────────────────────────────────────────────────────────────────
+VIEWS.features = async () => {
+  const r = await api('/api/features/list');
+  state.data.features = r;
+  const all = [...(r.builtin || []), ...(r.dynamic || []).map(f => ({ ...f, isDynamic: true }))];
+  // 최신순
+  all.sort((a, b) => (b.released || '').localeCompare(a.released || ''));
   return `
     <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
       <div>
-        <h1 class="text-2xl font-bold">${feat.icon||'✨'} ${escapeHtml(feat.label)}</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">
-          ${feat.released ? `출시일 ${escapeHtml(feat.released)} · ` : ''}${escapeHtml(feat.summary||'')}
-        </p>
+        <h1 class="text-2xl font-bold">🆕 신기능</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">Anthropic 최신 발표 · 카드 클릭 → 창으로 열림 · 여러 개 동시 · 🔴닫기 🟡내리기 🟢펼치기</p>
       </div>
       <div class="flex gap-2">
-        ${feat.launchUrl && feat.launchUrl !== feat.docUrl ? `<a class="btn-primary btn text-xs" href="${escapeHtml(feat.launchUrl)}" target="_blank" rel="noopener">🚀 사용하기</a>` : ''}
-        ${feat.docUrl ? `<a class="btn text-xs" href="${escapeHtml(feat.docUrl)}" target="_blank" rel="noopener">📖 공식 문서 ↗</a>` : ''}
+        <button class="btn text-xs" onclick="refreshFeatures()">📡 최신 정보 로딩</button>
+        <a class="btn text-xs" href="https://platform.claude.com/docs/en/release-notes/overview" target="_blank" rel="noopener">📖 전체 릴리즈 노트</a>
       </div>
     </div>
-
-    <div class="card p-5 mb-4">
-      <h3 class="font-semibold text-sm mb-2">📌 한 줄 요약</h3>
-      <p class="text-sm">${escapeHtml(feat.summary||'')}</p>
-    </div>
-
-    <div class="card p-5 mb-4">
-      <h3 class="font-semibold text-sm mb-3">🔗 링크</h3>
-      <div class="space-y-2 text-xs">
-        ${feat.launchUrl ? `<a class="block text-[var(--accent)] hover:underline" href="${escapeHtml(feat.launchUrl)}" target="_blank" rel="noopener">→ 시작/사용 URL: ${escapeHtml(feat.launchUrl)}</a>` : ''}
-        ${feat.docUrl ? `<a class="block text-[var(--accent)] hover:underline" href="${escapeHtml(feat.docUrl)}" target="_blank" rel="noopener">→ 공식 문서: ${escapeHtml(feat.docUrl)}</a>` : ''}
-      </div>
-    </div>
-
-    ${feat.isDynamic ? `
-      <div class="card p-4" style="background:rgba(167,139,250,0.06);">
-        <div class="text-xs">
-          <b>🤖 AI 발견 항목</b> — '최신 정보 로딩' 으로 Claude 가 자동 발견.
-          잘못됐거나 오래된 정보일 수 있으니 공식 문서 링크로 확인하세요.
-        </div>
-      </div>` : ''}
-
-    <div class="mt-4 card p-3 text-[11px] text-[var(--text-mute)]">
-      💡 이 기능에 대한 상세 UI 가 필요하면 대시보드 상단에 공식 docs 버튼 클릭 · 또는 '🚀 사용하기' 로 바로 이동.
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      ${all.map(f => `
+        <div class="card p-4 hover-lift cursor-pointer" onclick="openFeatureWindow(JSON.parse(this.dataset.f))" data-f="${jsonAttr(f)}">
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="text-2xl">${f.icon||'✨'}</div>
+              <div class="min-w-0">
+                <div class="font-semibold text-sm truncate">${escapeHtml(f.label)}</div>
+                ${f.released ? `<div class="text-[10px] text-[var(--text-dim)]">${escapeHtml(f.released)}</div>` : ''}
+              </div>
+            </div>
+            ${f.isDynamic ? '<span class="chip text-[9px]" style="background:rgba(167,139,250,0.18);color:#c4b5fd;">AI</span>' : ''}
+          </div>
+          <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(f.summary||'')}</div>
+        </div>`).join('') || '<div class="empty card" style="grid-column:1/-1;">데이터 없음</div>'}
     </div>
   `;
+};
+
+async function refreshFeatures() {
+  showModalLoading('Claude 에게 최신 발표 조회 중 (~1분)…');
+  try {
+    const r = await api('/api/features/refresh', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}),
+    });
+    closeModal();
+    if (r.error) { toast(r.error, 'err'); return; }
+    const n = (r.features||[]).length;
+    toast(n ? `✨ 신기능 ${n}개 발견` : '새로운 기능 없음 (이미 최신)', n?'ok':'info');
+    renderView();
+  } catch (e) { closeModal(); toast(e.message, 'err'); }
+}
+
+// 창 관리자
+const _winMgr = { zIndex: 1000, openIds: new Set() };
+function openFeatureWindow(feat) {
+  const winId = 'feat-win-' + feat.id;
+  // 이미 열려 있으면 foreground 로
+  const existing = document.getElementById(winId);
+  if (existing) {
+    existing.style.zIndex = ++_winMgr.zIndex;
+    existing.classList.remove('feat-win-minimized');
+    return;
+  }
+  const w = document.createElement('div');
+  w.id = winId;
+  w.className = 'feat-win';
+  w.style.zIndex = ++_winMgr.zIndex;
+  // 초기 위치: 화면 중앙에서 오프셋 (여러 창 띄우면 살짝 계단식)
+  const offset = _winMgr.openIds.size * 30;
+  w.style.left = (80 + offset) + 'px';
+  w.style.top = (60 + offset) + 'px';
+  w.innerHTML = `
+    <div class="feat-win-title" data-winid="${winId}">
+      <div class="feat-win-lights">
+        <button class="feat-light feat-light-close" title="닫기" onclick="closeFeatureWindow('${winId}')"></button>
+        <button class="feat-light feat-light-min" title="내리기" onclick="minimizeFeatureWindow('${winId}')"></button>
+        <button class="feat-light feat-light-max" title="펼치기" onclick="maximizeFeatureWindow('${winId}')"></button>
+      </div>
+      <div class="feat-win-title-text">${feat.icon||'✨'} ${escapeHtml(feat.label)}</div>
+    </div>
+    <div class="feat-win-body">
+      <div class="mb-3">
+        <div class="text-[10px] uppercase tracking-widest text-[var(--text-dim)] mb-1">${feat.released?'출시일 '+escapeHtml(feat.released):''} ${feat.isDynamic?'· 🤖 AI 발견':''}</div>
+        <div class="text-sm">${escapeHtml(feat.summary||'')}</div>
+      </div>
+      <div class="flex gap-2 mb-4 flex-wrap">
+        ${feat.launchUrl ? `<a class="btn-primary btn text-xs" href="${escapeHtml(feat.launchUrl)}" target="_blank" rel="noopener">🚀 사용하기</a>` : ''}
+        ${feat.docUrl ? `<a class="btn text-xs" href="${escapeHtml(feat.docUrl)}" target="_blank" rel="noopener">📖 공식 문서 ↗</a>` : ''}
+      </div>
+      ${feat.id === 'design' ? '<div id="feat-win-design-extras" class="mt-3 pt-3 border-t border-[var(--border)]"><div class="text-xs text-[var(--text-mute)]">로딩 중…</div></div>' : ''}
+      ${feat.isDynamic ? '<div class="card p-3 text-[10px] mt-3" style="background:rgba(167,139,250,0.08);">🤖 AI 가 자동 발견한 항목 — 공식 문서 링크로 확인 권장</div>' : ''}
+      <details class="mt-3 text-[10px]">
+        <summary class="cursor-pointer text-[var(--text-dim)]">📋 원본 JSON</summary>
+        <pre class="mono whitespace-pre-wrap bg-black/30 p-2 rounded mt-2">${escapeHtml(JSON.stringify(feat, null, 2))}</pre>
+      </details>
+    </div>
+  `;
+  document.body.appendChild(w);
+  _winMgr.openIds.add(winId);
+  // 제목바로 드래그
+  _makeDraggable(w);
+  // 포커스 — 클릭 시 z-index 상승
+  w.addEventListener('mousedown', () => { w.style.zIndex = ++_winMgr.zIndex; });
+
+  // Design 창은 로컬 export 목록 추가 로드
+  if (feat.id === 'design') {
+    api('/api/design/exports').then(r => {
+      const slot = document.getElementById('feat-win-design-extras');
+      if (!slot) return;
+      const files = r.files || [];
+      slot.innerHTML = `
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] mb-2">📁 로컬 export (${files.length})</div>
+        ${files.length ? files.slice(0, 10).map(f => `
+          <div class="flex justify-between py-1 text-xs">
+            <span class="truncate">${escapeHtml(f.name)}</span>
+            <span class="text-[var(--text-dim)] ml-2">${fmtRel(f.mtime)}</span>
+          </div>`).join('') : '<div class="text-xs text-[var(--text-dim)]">Export 된 파일 없음. claude.ai/design → Export PDF/PPTX/HTML</div>'}
+      `;
+    });
+  }
+}
+
+function closeFeatureWindow(winId) {
+  const w = document.getElementById(winId); if (!w) return;
+  w.remove(); _winMgr.openIds.delete(winId);
+}
+function minimizeFeatureWindow(winId) {
+  const w = document.getElementById(winId); if (!w) return;
+  w.classList.toggle('feat-win-minimized');
+}
+function maximizeFeatureWindow(winId) {
+  const w = document.getElementById(winId); if (!w) return;
+  w.classList.toggle('feat-win-maxed');
+  if (w.classList.contains('feat-win-maxed')) {
+    w.dataset.prevLeft = w.style.left; w.dataset.prevTop = w.style.top;
+    w.dataset.prevW = w.style.width; w.dataset.prevH = w.style.height;
+    w.style.left = '24px'; w.style.top = '24px';
+    w.style.width = 'calc(100vw - 48px)'; w.style.height = 'calc(100vh - 48px)';
+  } else {
+    w.style.left = w.dataset.prevLeft || '80px';
+    w.style.top = w.dataset.prevTop || '60px';
+    w.style.width = w.dataset.prevW || '';
+    w.style.height = w.dataset.prevH || '';
+  }
+}
+function _makeDraggable(w) {
+  const title = w.querySelector('.feat-win-title');
+  if (!title) return;
+  let startX, startY, origLeft, origTop, dragging = false;
+  title.addEventListener('mousedown', e => {
+    // 트래픽라이트 클릭은 드래그 시작 X
+    if (e.target.classList.contains('feat-light')) return;
+    if (w.classList.contains('feat-win-maxed')) return;
+    dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    origLeft = parseInt(w.style.left) || 0;
+    origTop = parseInt(w.style.top) || 0;
+    w.style.zIndex = ++_winMgr.zIndex;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    w.style.left = (origLeft + (e.clientX - startX)) + 'px';
+    w.style.top = Math.max(0, origTop + (e.clientY - startY)) + 'px';
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -5188,8 +5313,9 @@ document.getElementById('btn-latest-features').onclick = async () => {
     });
     if (r.error) { toast(r.error, 'err'); return; }
     const n = (r.features||[]).length;
-    toast(n ? `✨ 신기능 ${n}개 발견! 좌측 🆕 신기능 그룹 확인` : '새로운 기능 없음 (이미 최신)', n?'ok':'info');
-    await loadDynamicFeatures();
+    toast(n ? `✨ 신기능 ${n}개 발견! 좌측 '🆕 신기능' 탭 확인` : '새로운 기능 없음 (이미 최신)', n?'ok':'info');
+    if (state.view === 'features') renderView();
+    else go('features');
   } catch (e) { toast(e.message, 'err'); }
   finally { btn.disabled = false; btn.innerHTML = orig; }
 };
@@ -5226,12 +5352,8 @@ document.getElementById('globalSearch').addEventListener('keydown', e => {
 
 (async function boot() {
   state.view = (location.hash.replace(/^#\//, '') || 'overview');
-  // feat_* / 동적 feat_dyn_* 는 아직 NAV 에 없어도 허용
-  if (!state.view.startsWith('feat_') && !NAV.find(n => n.id === state.view)) {
-    state.view = 'overview';
-  }
+  if (!NAV.find(n => n.id === state.view)) state.view = 'overview';
   renderNav();
-  loadDynamicFeatures().catch(()=>{}); // 백그라운드로 동적 항목 추가
   await loadCliFoot();
   renderView();
 })();
