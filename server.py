@@ -3352,40 +3352,108 @@ COST_LOG = CLAUDE_HOME / "cost-tracker.log"
 BASH_LOG = CLAUDE_HOME / "bash-commands.log"
 
 def api_usage_summary() -> dict:
-    """cost-tracker.log 에서 지난 30일 사용량 집계 (파일 크기, 라인 수, 도구별, 날짜별)."""
+    """cost-tracker.log 의 도구 사용 + sessions DB 의 토큰 사용량 종합."""
     from collections import defaultdict
-    if not COST_LOG.exists():
-        return {"exists": False}
-    try:
-        text = COST_LOG.read_text(encoding="utf-8", errors="replace")
-    except Exception as e:
-        return {"exists": True, "error": str(e)}
-    lines = text.splitlines()
-    tool_count: dict = defaultdict(int)
-    daily: dict = defaultdict(int)
-    parsed = 0
-    for line in lines:
-        m = re.match(r"^\[(\d{4}-\d{2}-\d{2})T[^\]]+\]\s+tool=(\S+)", line)
-        if not m:
+
+    # --- 1) cost-tracker.log (있으면) ---
+    log_data = {"exists": False}
+    if COST_LOG.exists():
+        try:
+            text = COST_LOG.read_text(encoding="utf-8", errors="replace")
+            lines = text.splitlines()
+            tool_count: dict = defaultdict(int)
+            daily: dict = defaultdict(int)
+            parsed = 0
+            for line in lines:
+                m = re.match(r"^\[(\d{4}-\d{2}-\d{2})T[^\]]+\]\s+tool=(\S+)", line)
+                if not m:
+                    continue
+                parsed += 1
+                tool_count[m.group(2)] += 1
+                daily[m.group(1)] += 1
+            sorted_days = sorted(daily.keys())[-30:]
+            log_data = {
+                "exists": True,
+                "totalLines": len(lines),
+                "parsedEvents": parsed,
+                "firstLine": lines[0][:120] if lines else "",
+                "lastLine": lines[-1][:120] if lines else "",
+                "timeline": [{"date": d, "count": daily[d]} for d in sorted_days],
+                "topTools": [{"tool": t, "n": n} for t, n in sorted(tool_count.items(), key=lambda x: -x[1])[:20]],
+                "fileSize": COST_LOG.stat().st_size,
+            }
+        except Exception as e:
+            log_data = {"exists": True, "error": str(e)}
+
+    # --- 2) sessions DB 의 토큰 집계 ---
+    _db_init()
+    thirty = int((time.time() - 30 * 86400) * 1000)
+    with _db() as c:
+        totals_all = c.execute(
+            "SELECT COALESCE(SUM(total_tokens),0) AS tot, COALESCE(SUM(input_tokens),0) AS ti, "
+            "       COALESCE(SUM(output_tokens),0) AS to_, COALESCE(SUM(cache_read_tokens),0) AS cr, "
+            "       COALESCE(SUM(cache_creation_tokens),0) AS cc, COUNT(*) AS n "
+            "FROM sessions"
+        ).fetchone()
+        totals_30d = c.execute(
+            "SELECT COALESCE(SUM(total_tokens),0) AS tot, COALESCE(SUM(input_tokens),0) AS ti, "
+            "       COALESCE(SUM(output_tokens),0) AS to_, COALESCE(SUM(cache_read_tokens),0) AS cr, "
+            "       COALESCE(SUM(cache_creation_tokens),0) AS cc, COUNT(*) AS n "
+            "FROM sessions WHERE started_at >= ?", (thirty,)
+        ).fetchone()
+        daily_tok = c.execute(
+            "SELECT started_at, total_tokens FROM sessions WHERE started_at >= ? AND total_tokens > 0",
+            (thirty,)
+        ).fetchall()
+        proj_tok = [dict(r) for r in c.execute(
+            "SELECT COALESCE(NULLIF(cwd,''), project_dir) AS key, MAX(cwd) AS cwd, "
+            "       COUNT(*) AS sessions, SUM(total_tokens) AS tokens "
+            "FROM sessions WHERE total_tokens > 0 "
+            "GROUP BY COALESCE(NULLIF(cwd,''), project_dir) "
+            "ORDER BY tokens DESC LIMIT 20"
+        ).fetchall()]
+        # 도구별 토큰 (turn_tokens)
+        tool_tok = [dict(r) for r in c.execute(
+            "SELECT tool, COUNT(*) AS calls, SUM(turn_tokens) AS tokens "
+            "FROM tool_uses GROUP BY tool ORDER BY tokens DESC LIMIT 20"
+        ).fetchall()]
+        # 에이전트별 토큰
+        agent_tok = [dict(r) for r in c.execute(
+            "SELECT subagent_type AS name, COUNT(*) AS calls, SUM(turn_tokens) AS tokens "
+            "FROM tool_uses WHERE subagent_type != '' GROUP BY subagent_type ORDER BY tokens DESC LIMIT 20"
+        ).fetchall()]
+        top_sessions = [dict(r) for r in c.execute(
+            "SELECT session_id, project, first_user_prompt, total_tokens, started_at "
+            "FROM sessions WHERE total_tokens > 0 ORDER BY total_tokens DESC LIMIT 10"
+        ).fetchall()]
+
+    # 일자별 토큰 bucket
+    token_daily: dict = defaultdict(int)
+    for r in daily_tok:
+        if not r["started_at"]:
             continue
-        parsed += 1
-        day = m.group(1)
-        tool = m.group(2)
-        tool_count[tool] += 1
-        daily[day] += 1
-    # 최근 30일만
-    sorted_days = sorted(daily.keys())[-30:]
-    timeline = [{"date": d, "count": daily[d]} for d in sorted_days]
-    top_tools = sorted(tool_count.items(), key=lambda x: -x[1])[:20]
+        d = datetime.fromtimestamp(r["started_at"] / 1000).strftime("%Y-%m-%d")
+        token_daily[d] += r["total_tokens"] or 0
+    token_timeline = [{"date": d, "tokens": token_daily[d]} for d in sorted(token_daily.keys())[-30:]]
+
+    # project 이름 정리
+    for p in proj_tok:
+        cwd = p.get("cwd") or ""
+        p["name"] = Path(cwd).name if cwd else (p.get("key") or "")
+
     return {
-        "exists": True,
-        "totalLines": len(lines),
-        "parsedEvents": parsed,
-        "firstLine": lines[0][:120] if lines else "",
-        "lastLine": lines[-1][:120] if lines else "",
-        "timeline": timeline,
-        "topTools": [{"tool": t, "n": n} for t, n in top_tools],
-        "fileSize": COST_LOG.stat().st_size,
+        **log_data,  # cost-tracker.log 관련 필드 포함 (exists, totalLines, parsedEvents, timeline, topTools, fileSize)
+        "tokens": {
+            "all": {"total": totals_all["tot"], "input": totals_all["ti"], "output": totals_all["to_"],
+                     "cacheRead": totals_all["cr"], "cacheCreate": totals_all["cc"], "sessions": totals_all["n"]},
+            "last30d": {"total": totals_30d["tot"], "input": totals_30d["ti"], "output": totals_30d["to_"],
+                         "cacheRead": totals_30d["cr"], "cacheCreate": totals_30d["cc"], "sessions": totals_30d["n"]},
+            "dailyTimeline": token_timeline,
+            "byProject": proj_tok,
+            "byTool": tool_tok,
+            "byAgent": agent_tok,
+            "topSessions": top_sessions,
+        },
     }
 
 

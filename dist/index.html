@@ -4246,22 +4246,125 @@ function formatBytes(n) {
 VIEWS.usage = async () => {
   const d = await api('/api/usage/summary');
   state.data.usage = d;
-  if (!d.exists) return `<div class="card empty">~/.claude/cost-tracker.log 없음</div>`;
-  const fileMb = (d.fileSize / (1024*1024)).toFixed(2);
+  const tk = d.tokens || {};
+  const all = tk.all || {}, last30 = tk.last30d || {};
+  const fileMb = d.fileSize ? (d.fileSize / (1024*1024)).toFixed(2) : 0;
+
   return `
-    ${viewHeader('사용량 / 비용', `~/.claude/cost-tracker.log 파싱 · ${d.parsedEvents}개 도구 호출 이벤트 (파일 ${fileMb}MB)`, 'usage')}
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">사용량 / 비용 (토큰 중심)</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">
+          DB 세션 토큰 + ${d.exists ? `cost-tracker.log ${d.parsedEvents}개 이벤트 (${fileMb}MB)` : 'cost-tracker.log 없음'}
+        </p>
+      </div>
+      <a class="btn text-xs" href="${DOCS_BASE}costs" target="_blank" rel="noopener">📖</a>
+    </div>
+
+    <!-- 토큰 요약 -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+      ${[
+        ['전체 토큰', fmtTokens(all.total||0), '#d97757'],
+        ['입력', fmtTokens(all.input||0), '#86efac'],
+        ['출력', fmtTokens(all.output||0), '#7dd3fc'],
+        ['캐시 read', fmtTokens(all.cacheRead||0), '#a78bfa'],
+        ['캐시 create', fmtTokens(all.cacheCreate||0), '#fcd34d'],
+      ].map(([l,v,c]) => `
+        <div class="card p-3">
+          <div class="text-[10px] uppercase text-[var(--text-dim)]">${l}</div>
+          <div class="text-2xl font-bold mono mt-1" style="color:${c}">${v}</div>
+        </div>`).join('')}
+    </div>
+
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-      ${statCard('파싱된 호출', d.parsedEvents)}
-      ${statCard('로그 라인', d.totalLines)}
-      ${statCard('최근 30일', (d.timeline||[]).reduce((a,b)=>a+b.count,0))}
-      ${statCard('도구 종류', (d.topTools||[]).length, '#67e8f9')}
+      ${statCard('전체 세션', all.sessions||0)}
+      ${statCard('최근 30일', `${fmtTokens(last30.total||0)} (${last30.sessions||0}세션)`, '#d97757')}
+      ${statCard('도구 호출 (전체)', (tk.byTool||[]).reduce((a,b)=>a+(b.calls||0),0))}
+      ${statCard('에이전트 위임', (tk.byAgent||[]).reduce((a,b)=>a+(b.calls||0),0), '#a78bfa')}
     </div>
+
+    <!-- 일자별 토큰 -->
     <div class="card p-5 mb-4">
-      <h3 class="font-semibold text-sm mb-3">📈 일자별 도구 호출 (최근 30일)</h3>
-      <div style="position:relative; height:260px;"><canvas id="usageDaily"></canvas></div>
+      <h3 class="font-semibold text-sm mb-3">🕒 일자별 토큰 사용 (최근 30일)</h3>
+      ${(tk.dailyTimeline||[]).length
+        ? `<div style="position:relative; height:260px;"><canvas id="usageTokenDaily"></canvas></div>`
+        : `<div class="empty text-xs">데이터 없음 (세션 재인덱스 필요할 수 있음)</div>`}
     </div>
+
+    <!-- 도구별 · 에이전트별 토큰 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+      <div class="card p-5">
+        <h3 class="font-semibold text-sm mb-3">🛠 도구별 토큰</h3>
+        <div class="max-h-[360px] overflow-y-auto">
+          ${(tk.byTool||[]).map(r => {
+            const max = (tk.byTool[0]||{}).tokens || 1;
+            const pct = Math.max(2, Math.round((r.tokens||0)/max*100));
+            return `
+              <div class="mb-2">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="mono">${escapeHtml(r.tool)} <span class="text-[var(--text-dim)]">×${r.calls}</span></span>
+                  <span class="mono font-bold" style="color:#d97757">${fmtTokens(r.tokens||0)}</span>
+                </div>
+                <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:#d97757;"></div></div>
+              </div>`;
+          }).join('') || '<div class="empty text-xs">데이터 없음</div>'}
+        </div>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-semibold text-sm mb-3">🤝 에이전트별 토큰</h3>
+        <div class="max-h-[360px] overflow-y-auto">
+          ${(tk.byAgent||[]).map(r => {
+            const max = (tk.byAgent[0]||{}).tokens || 1;
+            const pct = Math.max(2, Math.round((r.tokens||0)/max*100));
+            return `
+              <div class="mb-2">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="mono">${escapeHtml(r.name)} <span class="text-[var(--text-dim)]">×${r.calls}</span></span>
+                  <span class="mono font-bold" style="color:#a78bfa">${fmtTokens(r.tokens||0)}</span>
+                </div>
+                <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:#a78bfa;"></div></div>
+              </div>`;
+          }).join('') || '<div class="empty text-xs">에이전트 위임 기록 없음</div>'}
+        </div>
+      </div>
+    </div>
+
+    <!-- 프로젝트별 토큰 -->
+    <div class="card p-5 mb-4">
+      <h3 class="font-semibold text-sm mb-3">📁 프로젝트별 토큰 TOP 20</h3>
+      <table class="data">
+        <thead><tr><th>프로젝트</th><th class="text-right">세션</th><th class="text-right">토큰</th></tr></thead>
+        <tbody>
+          ${(tk.byProject||[]).map(p => `
+            <tr>
+              <td class="text-xs">${escapeHtml(p.name||'—')}</td>
+              <td class="text-right mono text-xs">${p.sessions}</td>
+              <td class="text-right mono" style="color:#d97757">${fmtTokens(p.tokens||0)}</td>
+            </tr>`).join('') || `<tr><td colspan="3" class="empty">데이터 없음</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 토큰 많이 쓴 세션 -->
+    <div class="card p-5 mb-4">
+      <h3 class="font-semibold text-sm mb-3">🏆 토큰 사용 TOP 10 세션</h3>
+      <table class="data">
+        <thead><tr><th>첫 요청</th><th>프로젝트</th><th class="text-right">토큰</th><th class="text-right">시작</th></tr></thead>
+        <tbody>
+          ${(tk.topSessions||[]).map(s => `
+            <tr class="link-row" onclick="openSessionDetail('${s.session_id}')">
+              <td class="text-xs max-w-[340px] truncate">${escapeHtml((s.first_user_prompt||'(요청 없음)').slice(0,120))}</td>
+              <td class="text-xs">${escapeHtml(s.project||'—')}</td>
+              <td class="text-right mono" style="color:#d97757">${fmtTokens(s.total_tokens||0)}</td>
+              <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(s.started_at)}</td>
+            </tr>`).join('') || `<tr><td colspan="4" class="empty">데이터 없음</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+
+    ${d.exists ? `
     <div class="card p-5">
-      <h3 class="font-semibold text-sm mb-3">🛠 도구 랭킹</h3>
+      <h3 class="font-semibold text-sm mb-3">🛠 cost-tracker.log 도구 랭킹 (참고)</h3>
       <table class="data">
         <thead><tr><th>도구</th><th class="text-right">호출</th><th>분포</th></tr></thead>
         <tbody>
@@ -4275,29 +4378,31 @@ VIEWS.usage = async () => {
           }).join('')}
         </tbody>
       </table>
-    </div>
+    </div>` : ''}
   `;
 };
 AFTER.usage = () => {
   const d = state.data.usage;
-  const ctx = document.getElementById('usageDaily');
-  if (!ctx || !d?.timeline) return;
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: d.timeline.map(x => x.date.slice(5)),
-      datasets: [{ label: '도구 호출', data: d.timeline.map(x => x.count),
-        backgroundColor: 'rgba(217,119,87,0.55)', borderColor: '#d97757', borderWidth: 1, borderRadius: 4 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: '#9aa0aa' }, grid: { color: 'rgba(255,255,255,0.03)' } },
-        y: { ticks: { color: '#9aa0aa' }, grid: { color: 'rgba(255,255,255,0.03)' }, beginAtZero: true },
+  const tl = (d && d.tokens && d.tokens.dailyTimeline) || [];
+  const ctx = document.getElementById('usageTokenDaily');
+  if (ctx && tl.length) {
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: tl.map(x => x.date.slice(5)),
+        datasets: [{ label: '토큰', data: tl.map(x => x.tokens),
+          backgroundColor: 'rgba(217,119,87,0.55)', borderColor: '#d97757', borderWidth: 1, borderRadius: 4 }]
       },
-    },
-  });
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmtTokens(c.parsed.y) } } },
+        scales: {
+          x: { ticks: { color: '#9aa0aa' }, grid: { color: 'rgba(255,255,255,0.03)' } },
+          y: { ticks: { color: '#9aa0aa', callback: v => fmtTokens(v) }, grid: { color: 'rgba(255,255,255,0.03)' }, beginAtZero: true },
+        },
+      },
+    });
+  }
 };
 
 // ────────────────────────────────────────────────────────────────
