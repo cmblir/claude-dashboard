@@ -1890,7 +1890,7 @@ VIEWS.mcp = async () => {
     !q || (x.name+' '+x.description+' '+x.id+' '+(x.category||'')).toLowerCase().includes(q)
   );
   return `
-    ${viewHeader('MCP 커넥터', `설치 ${conn.platform.length + conn.local.length}개 · 카탈로그 ${cat.catalog.length}개에서 원클릭 설치`, 'mcp')}
+    ${viewHeader('MCP 커넥터', `로컬 ${(conn.local||[]).length} · 플랫폼 ${(conn.platform||[]).length} · 플러그인 ${(conn.plugin||[]).length} · 카탈로그 ${cat.catalog.length}개`, 'mcp')}
 
     <div class="card p-5 mb-4">
       <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -1916,8 +1916,9 @@ VIEWS.mcp = async () => {
       </div>
     </div>
 
-    ${renderConnectorGroup('🖥 설치된 로컬 MCP', conn.local, true)}
-    ${renderConnectorGroup('🌐 플랫폼 MCP (claude.ai 연결)', conn.platform, false)}
+    ${renderConnectorGroup('🖥 설치된 로컬 MCP (~/.claude.json)', conn.local || [], true)}
+    ${renderConnectorGroup('🌐 플랫폼 MCP (claude.ai 연결)', conn.platform || [], false)}
+    ${renderConnectorGroup('🔌 플러그인 제공 MCP', conn.plugin || [], false)}
   `;
 };
 AFTER.mcp = () => {
@@ -1950,20 +1951,30 @@ async function removeMcp(name) {
 }
 
 function renderConnectorGroup(title, list, allowRemove) {
+  const statusBadge = (m) => {
+    if (m.connected === true) return '<span class="chip chip-ok text-[9px]" style="white-space:nowrap;">✓ 연결됨</span>';
+    if (m.needsAuth) return '<span class="chip chip-warn text-[9px]" style="white-space:nowrap;">🔐 인증 필요</span>';
+    if (m.connected === false) return '<span class="chip chip-err text-[9px]" style="white-space:nowrap;">✗ 실패</span>';
+    return '';
+  };
   return `
     <div class="card p-5 mb-4">
       <h3 class="font-semibold text-sm mb-3">${title} · ${list.length}</h3>
       <div class="grid-list">
         ${list.map(m => `
-          <div class="card p-3 hover-lift">
-            <div class="flex items-center justify-between mb-2">
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="pulse-dot ${m.enabled?'':'off'}"></span>
-                <div class="font-semibold text-sm truncate">${escapeHtml(m.name)}</div>
+          <div class="card p-3 hover-lift" style="overflow:hidden;">
+            <div class="flex items-center justify-between mb-2 gap-2">
+              <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="pulse-dot ${m.connected===false?'off':''}"></span>
+                <div class="font-semibold text-sm truncate" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</div>
               </div>
-              ${allowRemove ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick='removeMcp(${JSON.stringify(m.name)})'>제거</button>` : ''}
+              <div class="flex items-center gap-1 flex-shrink-0">
+                ${statusBadge(m)}
+                ${allowRemove ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick="removeMcp(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr(m.name)}">제거</button>` : ''}
+              </div>
             </div>
-            <div class="text-[10px] mono text-[var(--text-dim)] truncate">${escapeHtml(m.type)} · ${escapeHtml(m.command||'')}</div>
+            ${m.endpoint ? `<div class="text-[10px] mono text-[var(--text-dim)] truncate" title="${escapeHtml(m.endpoint)}">${escapeHtml(m.endpoint)}</div>` : ''}
+            ${(m.type || m.command) ? `<div class="text-[10px] mono text-[var(--text-dim)] truncate">${escapeHtml(m.type||'')} · ${escapeHtml(m.command||'')}</div>`:''}
             ${m.args && m.args.length ? `<div class="text-[10px] mono text-[var(--text-mute)] truncate mt-1">${escapeHtml(m.args.join(' '))}</div>`: ''}
           </div>
         `).join('') || `<div class="empty text-xs" style="grid-column:1/-1;">없음</div>`}
