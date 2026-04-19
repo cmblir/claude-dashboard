@@ -1579,8 +1579,28 @@ def api_plugin_toggle(body: dict) -> dict:
 
 # ───────────────── API: hooks ─────────────────
 
+def _plugin_hooks_file(plugin_key: str) -> Optional[Path]:
+    """pluginKey ('<plugin>@<market>') → hooks.json 경로 (없으면 None)."""
+    if "@" not in (plugin_key or ""):
+        return None
+    plugin, market = plugin_key.split("@", 1)
+    if not all(re.match(r"^[a-zA-Z0-9_.-]+$", x or "") for x in (plugin, market)):
+        return None
+    markets_dir = PLUGINS_DIR / "marketplaces"
+    candidates = [
+        markets_dir / market / "plugins" / plugin / "hooks" / "hooks.json",
+        markets_dir / market / "hooks" / "hooks.json" if plugin == market else None,
+    ]
+    for c in candidates:
+        if c and c.exists():
+            return c
+    return None
+
+
 def _scan_plugin_hooks() -> list:
-    """플러그인 마켓플레이스의 hooks/hooks.json 파싱 → 평탄화된 훅 리스트."""
+    """플러그인 마켓플레이스의 hooks/hooks.json 파싱 → 평탄화된 훅 리스트.
+    각 항목에 (pluginKey, event, groupIdx, subIdx) 인덱스 포함 → 수정/삭제 가능.
+    """
     out = []
     if not PLUGINS_DIR.exists():
         return out
@@ -1597,20 +1617,21 @@ def _scan_plugin_hooks() -> list:
         for event, items in hooks_obj.items():
             if not isinstance(items, list):
                 continue
-            for item in items:
+            for gi, item in enumerate(items):
                 if not isinstance(item, dict):
                     continue
                 sub = item.get("hooks")
                 matcher = item.get("matcher")
                 if isinstance(sub, list) and sub:
-                    for sh in sub:
+                    for si, sh in enumerate(sub):
                         entry = {
                             "event": event,
                             "scope": "plugin",
                             "source": source_label,
                             "pluginKey": plugin_key,
                             "pluginEnabled": enabled,
-                            "readOnly": True,
+                            "groupIdx": gi,
+                            "subIdx": si,
                         }
                         if matcher:
                             entry["matcher"] = matcher
@@ -1626,7 +1647,8 @@ def _scan_plugin_hooks() -> list:
                         "source": source_label,
                         "pluginKey": plugin_key,
                         "pluginEnabled": enabled,
-                        "readOnly": True,
+                        "groupIdx": gi,
+                        "subIdx": -1,
                     }
                     entry.update({k: v for k, v in item.items() if k != "hooks"})
                     out.append(entry)
@@ -1665,6 +1687,97 @@ def _scan_plugin_hooks() -> list:
                 f"{market.name}@{market.name}",
             )
     return out
+
+
+def api_plugin_hook_update(body: dict) -> dict:
+    """플러그인 훅 수정/삭제. body: { pluginKey, event, groupIdx, subIdx, op:'update'|'delete', payload? }
+    payload(update 시): { matcher, type, command, timeout, event(이동) }
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    pk = body.get("pluginKey", "")
+    event = body.get("event", "")
+    gi = body.get("groupIdx")
+    si = body.get("subIdx")
+    op = body.get("op", "update")
+    payload = body.get("payload") or {}
+    hf = _plugin_hooks_file(pk)
+    if not hf:
+        return {"ok": False, "error": "플러그인 훅 파일을 찾을 수 없음"}
+    try:
+        raw = _safe_read(hf)
+        data = json.loads(raw) if raw else {}
+    except Exception as e:
+        return {"ok": False, "error": f"hooks.json 파싱 실패: {e}"}
+    if not isinstance(data, dict):
+        data = {}
+    hooks_obj = data.setdefault("hooks", {})
+    items = hooks_obj.get(event)
+    if not isinstance(items, list) or not (0 <= int(gi) < len(items)):
+        return {"ok": False, "error": "groupIdx 범위 오류"}
+    group = items[int(gi)]
+    si = int(si) if si is not None else -1
+
+    if op == "delete":
+        if si >= 0 and isinstance(group, dict) and isinstance(group.get("hooks"), list):
+            sub = group["hooks"]
+            if si >= len(sub):
+                return {"ok": False, "error": "subIdx 범위 오류"}
+            sub.pop(si)
+            if not sub:
+                items.pop(int(gi))
+        else:
+            items.pop(int(gi))
+        if not items:
+            hooks_obj.pop(event, None)
+    elif op == "update":
+        new_event = payload.get("event") or event
+        new_sub = {
+            "type": payload.get("type", "command"),
+            "command": payload.get("command", ""),
+        }
+        if payload.get("timeout"):
+            try: new_sub["timeout"] = int(payload["timeout"])
+            except Exception: pass
+        # 기존 항목의 id / description 등 보존
+        if si >= 0 and isinstance(group, dict) and isinstance(group.get("hooks"), list) and si < len(group["hooks"]):
+            old = group["hooks"][si]
+            if isinstance(old, dict):
+                for k in ("id", "description"):
+                    if k in old and k not in new_sub:
+                        new_sub[k] = old[k]
+        new_matcher = payload.get("matcher")
+        # 동일 이벤트 내 수정
+        if new_event == event:
+            if si >= 0 and isinstance(group, dict) and isinstance(group.get("hooks"), list):
+                if si >= len(group["hooks"]):
+                    return {"ok": False, "error": "subIdx 범위 오류"}
+                if new_matcher is not None:
+                    group["matcher"] = new_matcher
+                group["hooks"][si] = new_sub
+            else:
+                items[int(gi)] = ({"matcher": new_matcher, "hooks": [new_sub]} if new_matcher else {**new_sub, "hooks": [new_sub]})
+        else:
+            # 이벤트 이동: 기존에서 빼고 새 이벤트에 추가
+            if si >= 0 and isinstance(group, dict) and isinstance(group.get("hooks"), list):
+                group["hooks"].pop(si)
+                if not group["hooks"]:
+                    items.pop(int(gi))
+            else:
+                items.pop(int(gi))
+            if not items:
+                hooks_obj.pop(event, None)
+            target = hooks_obj.setdefault(new_event, [])
+            new_group = {"matcher": new_matcher, "hooks": [new_sub]} if new_matcher else {"hooks": [new_sub]}
+            target.append(new_group)
+    else:
+        return {"ok": False, "error": f"unknown op: {op}"}
+
+    try:
+        _safe_write(hf, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+    except Exception as e:
+        return {"ok": False, "error": f"저장 실패: {e}"}
+    return {"ok": True}
 
 
 def get_hooks() -> dict:
@@ -5133,6 +5246,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(api_mcp_remove(self._read_body())); return
         if path == "/api/plugins/toggle":
             self._send_json(api_plugin_toggle(self._read_body())); return
+        if path == "/api/hooks/plugin/update":
+            self._send_json(api_plugin_hook_update(self._read_body())); return
         if path == "/api/auth/claimed-plan":
             self._send_json(api_set_claimed_plan(self._read_body())); return
         if path == "/api/project-agents/add":
