@@ -1,0 +1,16 @@
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+*.log
+/tmp/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+.claude/settings.local.json
