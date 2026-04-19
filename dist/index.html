@@ -110,10 +110,11 @@
   /* 🪟 macOS 스타일 플로팅 창 (신기능 전용) */
   .feat-win {
     position: fixed;
-    width: 480px;
-    min-width: 320px;
-    min-height: 120px;
-    max-height: 80vh;
+    width: min(640px, calc(100vw - 80px));
+    min-width: 360px;
+    max-width: calc(100vw - 40px);
+    min-height: 180px;
+    max-height: calc(100vh - 80px);
     background: #12121a;
     border: 1px solid var(--border-hi);
     border-radius: 12px;
@@ -554,6 +555,8 @@ function openFeatureWindow(feat) {
   `;
   document.body.appendChild(w);
   _winMgr.openIds.add(winId);
+  // 콘텐츠 크기에 맞춰 자동 조정 (DOM 붙인 뒤 한 프레임 후)
+  requestAnimationFrame(() => _autoSizeWindow(w));
   // 제목바로 드래그
   _makeDraggable(w);
   // 포커스 — 클릭 시 z-index 상승
@@ -600,6 +603,28 @@ function maximizeFeatureWindow(winId) {
     w.style.height = w.dataset.prevH || '';
   }
 }
+function _autoSizeWindow(w) {
+  // body 의 scrollHeight 로 컨텐츠 실제 높이 측정 → 창 높이 맞춤
+  const body = w.querySelector('.feat-win-body');
+  const title = w.querySelector('.feat-win-title');
+  if (!body || !title) return;
+  const titleH = title.offsetHeight;
+  const contentH = body.scrollHeight;
+  const desired = titleH + contentH + 8; // padding 여유
+  const maxH = window.innerHeight - 80;
+  const minH = 180;
+  const finalH = Math.max(minH, Math.min(maxH, desired));
+  w.style.height = finalH + 'px';
+  // 화면 밖으로 나가지 않도록 위치 보정
+  const rect = w.getBoundingClientRect();
+  if (rect.bottom > window.innerHeight - 20) {
+    w.style.top = Math.max(20, window.innerHeight - finalH - 20) + 'px';
+  }
+  if (rect.right > window.innerWidth - 20) {
+    w.style.left = Math.max(20, window.innerWidth - rect.width - 20) + 'px';
+  }
+}
+
 function _makeDraggable(w) {
   const title = w.querySelector('.feat-win-title');
   if (!title) return;
