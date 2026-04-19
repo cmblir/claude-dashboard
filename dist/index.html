@@ -182,6 +182,7 @@ const NAV = [
   { id: 'projects',    icon: '📁', label: '프로젝트',          group: 'main', desc: '프로젝트별 Claude 세팅 + AI 추천', docUrl: DOCS_BASE+'memory' },
   { id: 'analytics',   icon: '📊', label: '통계 & 스코어',      group: 'main', docUrl: DOCS_BASE+'costs' },
   { id: 'aiEval',      icon: '🤖', label: 'AI 종합 평가',       group: 'main', desc: 'Claude 가 전체 셋업을 보고 우선순위 진단' },
+  { id: 'design',      icon: '🎨', label: 'Claude Design',      group: 'main', desc: 'claude.ai/design 사용 가이드 + 내 디자인', docUrl: 'https://www.anthropic.com/news/claude-design-anthropic-labs' },
   { id: 'sessions',    icon: '🗂️', label: '세션 히스토리',      group: 'main', docUrl: DOCS_BASE+'interactive-mode' },
   { id: 'agents',      icon: '🤝', label: '에이전트 & 그래프',  group: 'work', docUrl: DOCS_BASE+'sub-agents' },
   { id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'work',
@@ -564,6 +565,130 @@ async function quickRecommend(kind) {
   if (kind === 'mcp') return go('mcp');
   if (kind === 'analytics') return go('analytics');
   if (['hooks','permissions','output-styles','statusline'].includes(kind)) return startFeatureRecommend(kind);
+}
+
+// ────────────────────────────────────────────────────────────────
+// CLAUDE DESIGN (claude.ai/design)
+// ────────────────────────────────────────────────────────────────
+VIEWS.design = async () => {
+  const r = await api('/api/design/exports');
+  state.data.design = r;
+  const files = r.files || [];
+  const fmtSize = (b) => b < 1024 ? b+'B' : b < 1048576 ? (b/1024).toFixed(1)+'KB' : (b/1048576).toFixed(2)+'MB';
+  const extIcon = { pdf:'📄', pptx:'📊', html:'🌐', canva:'🎨' };
+
+  return `
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">🎨 Claude Design <span class="chip chip-accent text-[10px]">Anthropic Labs · Research Preview</span></h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">claude.ai/design 바로가기 + 공식 가이드 + 로컬 export 파일 모음</p>
+      </div>
+      <div class="flex gap-2">
+        <a class="btn-primary btn text-xs" href="https://claude.ai/design" target="_blank" rel="noopener">🚀 claude.ai/design 열기</a>
+        <a class="btn text-xs" href="https://www.anthropic.com/news/claude-design-anthropic-labs" target="_blank" rel="noopener">📖 공식 발표</a>
+      </div>
+    </div>
+
+    <!-- 빠른 사용 가이드 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+      <div class="card p-5">
+        <div class="text-3xl mb-2">✨</div>
+        <div class="font-semibold text-sm mb-2">1. 프롬프트 입력</div>
+        <div class="text-xs text-[var(--text-mute)]">원하는 디자인을 말로 설명 — 슬라이드, 원페이저, 프로토타입, 목업 등. 예: "SaaS 랜딩 페이지, 다크 테마, hero+features+pricing".</div>
+      </div>
+      <div class="card p-5">
+        <div class="text-3xl mb-2">🎛</div>
+        <div class="font-semibold text-sm mb-2">2. 인라인 편집</div>
+        <div class="text-xs text-[var(--text-mute)]">특정 요소에 코멘트, 텍스트 직접 수정, 조절 손잡이로 간격·색·레이아웃 실시간 변경. Claude 에게 "전체에 적용" 요청 가능.</div>
+      </div>
+      <div class="card p-5">
+        <div class="text-3xl mb-2">📦</div>
+        <div class="font-semibold text-sm mb-2">3. 내보내기 / 핸드오프</div>
+        <div class="text-xs text-[var(--text-mute)]">PDF, PPTX, HTML, Canva 로 export. 또는 <b>handoff bundle</b> 을 Claude Code 로 넘겨 실제 코드 구현까지 한 번에.</div>
+      </div>
+    </div>
+
+    <!-- 주요 기능 요약 -->
+    <div class="card p-5 mb-5">
+      <h3 class="font-semibold text-sm mb-3">📋 주요 기능</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+        <div class="flex gap-2"><span>🧠</span><div><b>Opus 4.7 기반</b> · 이미지 픽셀 처리 용량 3.3× 증가 (4.6 대비), 2576px 해상도 전체 지원</div></div>
+        <div class="flex gap-2"><span>🏷</span><div><b>디자인 시스템 통합</b> · 팀 코드베이스 + 디자인 파일 읽어 브랜드 일관성 유지</div></div>
+        <div class="flex gap-2"><span>🔒</span><div><b>조직 범위 공유</b> · private / view-only link / edit 세 단계</div></div>
+        <div class="flex gap-2"><span>📤</span><div><b>Export</b> · Canva · PDF · PPTX · 독립 HTML 파일</div></div>
+        <div class="flex gap-2"><span>🔧</span><div><b>Claude Code 핸드오프</b> · 디자인 → 코드 한 번의 지시</div></div>
+        <div class="flex gap-2"><span>💰</span><div><b>플랜</b> · Pro / Max / Team / Enterprise 에서 이용. Enterprise 는 관리자가 조직 설정에서 활성화</div></div>
+      </div>
+    </div>
+
+    <!-- API 부재 안내 -->
+    <div class="card p-4 mb-5" style="background:rgba(251,191,36,0.06);">
+      <div class="text-xs">
+        <b>⚠️ 공식 프로그래밍 API 는 아직 미공개</b> — Anthropic 에서 "빠른 시일 내 통합 빌드 지원 확대" 예정.
+        지금은 claude.ai/design 웹에서 만든 디자인을 로컬로 <b>export</b> 한 뒤 이 대시보드에서 스캔합니다.
+      </div>
+    </div>
+
+    <!-- 로컬 export 스캔 -->
+    <div class="card p-5 mb-5">
+      <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+        <h3 class="font-semibold text-sm">📁 로컬에서 찾은 Claude Design export 후보</h3>
+        <button class="btn text-xs" onclick="addDesignDir()">＋ 검색 경로 추가</button>
+      </div>
+      <div class="text-[11px] text-[var(--text-dim)] mb-3">
+        검색 경로: ${(r.searchedDirs||[]).map(d => `<code class="mono">${escapeHtml(d)}</code>`).join(' · ')}
+      </div>
+      ${files.length ? `
+        <table class="data">
+          <thead><tr>
+            <th></th>
+            <th>파일</th>
+            <th class="text-right">크기</th>
+            <th class="text-right">수정</th>
+            <th>위치</th>
+          </tr></thead>
+          <tbody>
+            ${files.map(f => `
+              <tr class="link-row" onclick="window.open('file://${encodeURI(f.path)}','_blank')">
+                <td class="text-lg">${extIcon[f.ext]||'📎'}</td>
+                <td class="text-sm">
+                  ${f.matchedByKeyword ? '<span class="chip chip-accent text-[9px] mr-1">design</span>' : ''}
+                  ${escapeHtml(f.name)}
+                </td>
+                <td class="text-right mono text-xs">${fmtSize(f.size)}</td>
+                <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(f.mtime)}</td>
+                <td class="text-[10px] mono text-[var(--text-dim)] truncate" style="max-width:320px;">${escapeHtml(f.dir)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>` : `
+        <div class="empty text-xs">
+          Claude Design export 파일이 없습니다.<br>
+          claude.ai/design → 디자인 열기 → Export 메뉴 → PDF/PPTX/HTML 로 저장 후 다시 보세요.
+        </div>`}
+    </div>
+
+    <!-- 공식 문서 링크 -->
+    <div class="card p-5">
+      <h3 class="font-semibold text-sm mb-3">🔗 관련 링크</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+        <a class="text-[var(--accent)] hover:underline" href="https://claude.ai/design" target="_blank" rel="noopener">→ claude.ai/design (디자인 작성)</a>
+        <a class="text-[var(--accent)] hover:underline" href="https://www.anthropic.com/news/claude-design-anthropic-labs" target="_blank" rel="noopener">→ Anthropic Labs 공식 발표</a>
+        <a class="text-[var(--accent)] hover:underline" href="https://support.anthropic.com" target="_blank" rel="noopener">→ Anthropic Support (FAQ)</a>
+        <a class="text-[var(--accent)] hover:underline" href="https://www.anthropic.com/pricing" target="_blank" rel="noopener">→ 플랜별 Claude Design 이용 범위</a>
+      </div>
+    </div>
+  `;
+};
+
+async function addDesignDir() {
+  const p = prompt('추가로 스캔할 디렉토리 절대경로 (홈 디렉토리 내):');
+  if (!p) return;
+  const r = await api('/api/design/add-dir', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ dir: p }),
+  });
+  if (r.ok) toast('검색 경로 추가됨', 'ok');
+  else toast(r.error||'실패', 'err');
 }
 
 // AI 종합 평가 탭
