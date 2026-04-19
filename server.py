@@ -1579,17 +1579,94 @@ def api_mcp_catalog() -> dict:
     return {"catalog": out, "installedCount": len(installed_names)}
 
 
+_PLACEHOLDER_RE = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}|<([A-Za-z_][A-Za-z0-9_-]*)>|YOUR_([A-Z_]+)")
+
+
+def _extract_placeholders(spec: dict) -> list:
+    """install spec 에서 미설정 환경변수/플레이스홀더 추출.
+    반환: [{key: 'GITHUB_TOKEN', where: 'args[2]'|'env.KEY', example: '...' }]
+    """
+    out = []
+    seen = set()
+    def _scan(val, where: str):
+        if isinstance(val, str):
+            for m in _PLACEHOLDER_RE.finditer(val):
+                key = m.group(1) or m.group(2) or m.group(3) or ""
+                if key and key not in seen:
+                    seen.add(key)
+                    out.append({"key": key, "where": where, "raw": val})
+            # /Users/YOU 같은 고전 placeholder
+            if "/Users/YOU" in val or "/Users/YOUR" in val:
+                if "PATH" not in seen:
+                    seen.add("PATH")
+                    out.append({"key": "PATH", "where": where, "raw": val, "hint": "허용할 디렉토리 절대경로 (예: /Users/yoo/projects)"})
+        elif isinstance(val, list):
+            for i, v in enumerate(val):
+                _scan(v, f"{where}[{i}]")
+        elif isinstance(val, dict):
+            for k, v in val.items():
+                _scan(v, f"{where}.{k}")
+    _scan(spec.get("command", ""), "command")
+    _scan(spec.get("args", []), "args")
+    _scan(spec.get("env", {}), "env")
+    return out
+
+
+def _substitute_placeholders(spec: dict, values: dict) -> dict:
+    """values = {placeholder_key: user_input} 로 spec 치환."""
+    def _sub(val):
+        if isinstance(val, str):
+            r = val
+            for k, v in (values or {}).items():
+                r = r.replace(f"${{{k}}}", str(v))
+                r = r.replace(f"<{k}>", str(v))
+                r = r.replace(f"YOUR_{k}", str(v))
+            if "PATH" in (values or {}):
+                r = r.replace("/Users/YOU/allowed-path", str(values["PATH"]))
+                r = r.replace("/Users/YOUR/allowed-path", str(values["PATH"]))
+                r = r.replace("/Users/YOU", str(values["PATH"]).rstrip("/"))
+            return r
+        if isinstance(val, list):
+            return [_sub(v) for v in val]
+        if isinstance(val, dict):
+            return {k: _sub(v) for k, v in val.items()}
+        return val
+    return _sub(spec)
+
+
+def api_mcp_install_prepare(body: dict) -> dict:
+    """설치 전 플레이스홀더 목록을 돌려줌 → 프런트가 값을 받아 install 호출."""
+    if not isinstance(body, dict):
+        return {"error": "bad body"}
+    entry_id = body.get("id") or ""
+    spec = next((x for x in MCP_CATALOG if x["id"] == entry_id), None)
+    if not spec:
+        return {"error": "unknown mcp id"}
+    placeholders = _extract_placeholders(spec.get("install", {}))
+    return {"id": entry_id, "name": spec.get("name"), "placeholders": placeholders,
+            "preview": spec.get("install", {})}
+
+
 def api_mcp_install(body: dict) -> dict:
     """~/.claude.json 의 mcpServers 에 엔트리 병합 저장.
-    body: { "id": "context7", "as": "my-context7" (선택) }
+    body: { "id": "context7", "as": "my-context7" (선택), "values": {PATH:"..." , GITHUB_TOKEN:"..."} }
     """
     if not isinstance(body, dict):
         return {"ok": False, "error": "bad body"}
     entry_id = body.get("id") or ""
     as_name = (body.get("as") or entry_id).strip()
+    values = body.get("values") or {}
     spec = next((x for x in MCP_CATALOG if x["id"] == entry_id), None)
     if not spec:
         return {"ok": False, "error": "unknown mcp id"}
+    # 플레이스홀더 검증 — 필수 값 누락이면 거부
+    install_spec = dict(spec["install"])
+    placeholders = _extract_placeholders(install_spec)
+    missing = [p["key"] for p in placeholders if not values.get(p["key"])]
+    if missing:
+        return {"ok": False, "error": f"필수 값 누락: {', '.join(missing)}", "placeholders": placeholders}
+    install_spec = _substitute_placeholders(install_spec, values)
+
     if not CLAUDE_JSON.exists():
         return {"ok": False, "error": "~/.claude.json 없음. `claude login` 먼저 실행."}
     try:
@@ -1602,11 +1679,14 @@ def api_mcp_install(body: dict) -> dict:
         data["mcpServers"] = mcp_servers
     if as_name in mcp_servers:
         return {"ok": False, "error": f"이미 '{as_name}' 이름으로 등록됨 — 다른 이름으로 시도하세요."}
-    mcp_servers[as_name] = dict(spec["install"])
-    # 안전한 쓰기
+    mcp_servers[as_name] = install_spec
     text = json.dumps(data, indent=2, ensure_ascii=False)
     ok = _safe_write(CLAUDE_JSON, text)
-    return {"ok": ok, "name": as_name, "note": "Claude Code 를 재시작하면 활성화됩니다."}
+    # MCP list 캐시 무효화 → 즉시 새 MCP 반영
+    if ok:
+        _MCP_LIST_CACHE["ts"] = 0
+    return {"ok": ok, "name": as_name, "installed": install_spec,
+            "note": "Claude Code 를 새 세션에서 이 MCP 호출 시 활성화. 필요 시 재시작."}
 
 
 def api_mcp_remove(body: dict) -> dict:
@@ -1621,10 +1701,63 @@ def api_mcp_remove(body: dict) -> dict:
         return {"ok": False, "error": str(e)}
     servers = data.get("mcpServers") if isinstance(data, dict) else None
     if not isinstance(servers, dict) or name not in servers:
-        return {"ok": False, "error": "등록된 MCP 서버가 아닙니다"}
-    del servers[name]
+        return {"ok": False, "error": f"등록된 MCP 서버가 아닙니다: {name}"}
+    removed = servers.pop(name)
     ok = _safe_write(CLAUDE_JSON, json.dumps(data, indent=2, ensure_ascii=False))
-    return {"ok": ok}
+    if ok:
+        _MCP_LIST_CACHE["ts"] = 0  # 캐시 무효화
+    return {"ok": ok, "removed": removed}
+
+
+def _scan_project_mcp() -> list:
+    """사용자 home 안의 .mcp.json 파일들 → 프로젝트 범위 MCP 리스트."""
+    out = []
+    home = Path.home()
+    seen_paths = set()
+    # DB 의 모든 프로젝트 cwd + 대표적인 경로에서 탐색
+    candidates: set = set()
+    try:
+        _db_init()
+        with _db() as c:
+            for r in c.execute("SELECT DISTINCT cwd FROM sessions WHERE cwd != ''").fetchall():
+                if r["cwd"]:
+                    candidates.add(r["cwd"])
+    except Exception:
+        pass
+    for cwd in candidates:
+        p = Path(cwd) / ".mcp.json"
+        if not p.exists() or str(p) in seen_paths:
+            continue
+        seen_paths.add(str(p))
+        try:
+            data = json.loads(_safe_read(p))
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        mcp_servers = data.get("mcpServers", {}) or {}
+        for name, cfg in mcp_servers.items():
+            if not isinstance(cfg, dict):
+                continue
+            placeholders = _extract_placeholders(cfg)
+            unresolved = [p for p in placeholders if not os.environ.get(p["key"])]
+            out.append({
+                "id": name, "name": name,
+                "scope": "project",
+                "projectCwd": cwd,
+                "configPath": str(p),
+                "command": cfg.get("command", ""),
+                "args": cfg.get("args", []),
+                "env": cfg.get("env", {}),
+                "description": cfg.get("description", ""),
+                "missingEnv": [p["key"] for p in unresolved],
+                "connected": None,
+                "needsAuth": bool(unresolved),
+                "endpoint": cfg.get("command", "") + (" " + " ".join(cfg.get("args") or []) if cfg.get("args") else ""),
+                "enabled": True,
+                "tools": [],
+            })
+    return out
 
 
 # ───────────────── Plugin browsing ─────────────────
@@ -2234,7 +2367,9 @@ def list_connectors() -> dict:
                 "connected": False, "needsAuth": True, "enabled": True, "tools": [],
             })
 
-    return {"platform": platform_list, "local": local, "plugin": plugin_list, "desktop": desktop_list}
+    project_list = _scan_project_mcp()
+    return {"platform": platform_list, "local": local, "plugin": plugin_list,
+            "desktop": desktop_list, "project": project_list}
 
 
 # ───────────────── API: projects ─────────────────
@@ -6213,6 +6348,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(api_translate_batch(self._read_body())); return
         if path == "/api/mcp/install":
             self._send_json(api_mcp_install(self._read_body())); return
+        if path == "/api/mcp/install/prepare":
+            self._send_json(api_mcp_install_prepare(self._read_body())); return
         if path == "/api/mcp/remove":
             self._send_json(api_mcp_remove(self._read_body())); return
         if path == "/api/plugins/toggle":
