@@ -1705,8 +1705,43 @@ def api_mcp_remove(body: dict) -> dict:
     removed = servers.pop(name)
     ok = _safe_write(CLAUDE_JSON, json.dumps(data, indent=2, ensure_ascii=False))
     if ok:
-        _MCP_LIST_CACHE["ts"] = 0  # 캐시 무효화
+        _MCP_LIST_CACHE["ts"] = 0
     return {"ok": ok, "removed": removed}
+
+
+def api_mcp_project_remove(body: dict) -> dict:
+    """프로젝트 .mcp.json 에서 엔트리 삭제. body: { cwd, name }"""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    cwd = (body.get("cwd") or "").strip()
+    name = (body.get("name") or "").strip()
+    if not cwd or not name:
+        return {"ok": False, "error": "cwd 와 name 필수"}
+    # cwd 가 홈 디렉토리 하위인지 검증 (traversal 방지)
+    abs_cwd = Path(os.path.abspath(os.path.expanduser(cwd)))
+    home = Path.home().resolve()
+    try:
+        abs_cwd.relative_to(home)
+    except ValueError:
+        return {"ok": False, "error": "홈 디렉토리 밖 경로 거부"}
+    mcp_file = abs_cwd / ".mcp.json"
+    if not mcp_file.exists():
+        return {"ok": False, "error": f"{mcp_file} 없음"}
+    try:
+        data = json.loads(_safe_read(mcp_file, 500000))
+    except Exception as e:
+        return {"ok": False, "error": f".mcp.json 파싱 실패: {e}"}
+    servers = data.get("mcpServers") if isinstance(data, dict) else None
+    if not isinstance(servers, dict) or name not in servers:
+        return {"ok": False, "error": f"'{name}' 가 {mcp_file} 에 없음"}
+    removed = servers.pop(name)
+    # 빈 mcpServers 면 키 자체 제거 (깔끔하게)
+    if not servers:
+        data.pop("mcpServers", None)
+    ok = _safe_write(mcp_file, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    if ok:
+        _MCP_LIST_CACHE["ts"] = 0
+    return {"ok": ok, "removed": removed, "configPath": str(mcp_file)}
 
 
 def _scan_project_mcp() -> list:
@@ -6352,6 +6387,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(api_mcp_install_prepare(self._read_body())); return
         if path == "/api/mcp/remove":
             self._send_json(api_mcp_remove(self._read_body())); return
+        if path == "/api/mcp/project/remove":
+            self._send_json(api_mcp_project_remove(self._read_body())); return
         if path == "/api/plugins/toggle":
             self._send_json(api_plugin_toggle(self._read_body())); return
         if path == "/api/hooks/plugin/update":
