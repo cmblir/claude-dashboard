@@ -162,8 +162,13 @@
   body.sb-collapsed #sidebar .cli-body { display: none; }
   body.sb-collapsed #sidebar .nav-item { justify-content: center; padding: 0.55rem 0.4rem; }
   body.sb-collapsed #content { margin-left: 58px; }
-  body.sb-collapsed #sidebar-foot { padding: 0.5rem; }
-  body.sb-collapsed #btn-reindex span:last-child { display: none; }
+  body.sb-collapsed #sidebar-foot { padding: 0.5rem; gap: 0.35rem; }
+  body.sb-collapsed #sidebar-foot .btn { padding: 0.4rem 0.5rem; min-height: 36px; justify-content: center; font-size: 14px; }
+  body.sb-collapsed #sidebar-foot .btn > span:not(:first-child) { display: none; }  /* 아이콘 제외 모든 span 숨김 */
+  body.sb-collapsed #sidebar-foot #cliStatus > .card { padding: 0.35rem !important; }
+  body.sb-collapsed #sidebar-foot #cliStatus .cli-body,
+  body.sb-collapsed #sidebar-foot #cliStatus .flex.items-center.justify-between > span:first-child { display: none; }
+  body.sb-collapsed #sidebar-foot #cliStatus .flex { justify-content: center !important; margin: 0 !important; }
   #sidebar { transition: width 0.18s ease; }
   #content { transition: margin-left 0.18s ease; }
   @media (max-width: 900px) {
