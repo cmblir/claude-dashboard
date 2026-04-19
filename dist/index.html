@@ -45,7 +45,7 @@
   ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
   ::-webkit-scrollbar-track { background: transparent; }
   .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); min-width: 0; max-width: 100%; }
   .card-hi { background: var(--card-hi); border-color: var(--border-hi); }
   .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.85rem; border-radius: 10px; font-size: 0.82rem; font-weight: 500; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text); cursor: pointer; transition: all 0.15s; }
   .btn:hover { background: rgba(255,255,255,0.12); border-color: var(--border-hi); }
@@ -1582,17 +1582,17 @@ VIEWS.hooks = async () => {
   const orderedEvents = HOOK_EVENTS.filter(ev => allEvents.includes(ev)).concat(allEvents.filter(ev => !HOOK_EVENTS.includes(ev)));
 
   const renderUserCard = (x) => `
-    <div class="rounded-lg bg-white/5 p-3 text-xs border border-[var(--border)] flex items-start gap-3" style="min-width:0;">
-      <div class="flex-1" style="min-width:0; overflow:hidden;">
+    <div class="rounded-lg bg-white/5 p-3 text-xs border border-[var(--border)]" style="display:flex; align-items:flex-start; gap:0.75rem; min-width:0; max-width:100%; overflow:hidden;">
+      <div style="flex:1 1 0; min-width:0; max-width:100%; overflow:hidden;">
         <div class="flex items-center gap-2 mb-1 flex-wrap"><span class="chip chip-ok text-[9px]" style="white-space:nowrap;">✓ 사용자 설정</span></div>
-        ${x.matcher ? `<div class="mb-1"><span class="text-[var(--text-dim)]">matcher:</span> <span class="mono">${escapeHtml(x.matcher)}</span></div>`:''}
+        ${x.matcher ? `<div class="mb-1" style="overflow-wrap:anywhere;"><span class="text-[var(--text-dim)]">matcher:</span> <span class="mono">${escapeHtml(x.matcher)}</span></div>`:''}
         ${x.type ? `<div class="mb-1"><span class="text-[var(--text-dim)]">type:</span> <span class="mono">${escapeHtml(x.type)}</span></div>`:''}
-        ${x.command ? `<div class="mb-1"><div class="text-[var(--text-dim)] mb-1">cmd:</div><pre class="mono" style="margin:0; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; max-height:160px; overflow-y:auto; background:rgba(0,0,0,0.3); padding:6px 8px; border-radius:6px; font-size:11px;">${escapeHtml(x.command)}</pre></div>`:''}
+        ${x.command ? `<div class="mb-1"><div class="text-[var(--text-dim)] mb-1">cmd:</div><pre class="mono" style="display:block; box-sizing:border-box; width:100%; max-width:100%; margin:0; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; max-height:200px; overflow-y:auto; overflow-x:hidden; background:rgba(0,0,0,0.3); padding:6px 8px; border-radius:6px; font-size:11px;">${escapeHtml(x.command)}</pre></div>`:''}
         ${x.timeout ? `<div><span class="text-[var(--text-dim)]">timeout:</span> ${x.timeout}ms</div>`:''}
       </div>
-      <div class="flex gap-1 flex-shrink-0">
-        <button class="btn text-[10px]" onclick='openHookEditor(${JSON.stringify({event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx, matcher:x.matcher, type:x.type||"command", command:x.command||"", timeout:x.timeout})})'>수정</button>
-        <button class="btn text-[10px]" style="color:#fca5a5" onclick='deleteHook(${JSON.stringify({event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx})})'>삭제</button>
+      <div class="flex flex-col gap-1 flex-shrink-0">
+        <button class="btn text-[10px]" onclick='openHookEditor(${JSON.stringify({scope:"user", event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx, matcher:x.matcher, type:x.type||"command", command:x.command||"", timeout:x.timeout})})'>수정</button>
+        <button class="btn text-[10px]" style="color:#fca5a5" onclick='deleteHook(${JSON.stringify({scope:"user", event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx})})'>삭제</button>
       </div>
     </div>`;
 
@@ -1600,22 +1600,25 @@ VIEWS.hooks = async () => {
     const badge = x.pluginEnabled
       ? '<span class="chip text-[9px]" style="background:rgba(217,119,87,0.12); white-space:nowrap;">🔌 플러그인 제공</span>'
       : `<button class="chip chip-warn text-[9px]" style="white-space:nowrap;" onclick="togglePluginFromAgent('${escapeHtml(x.pluginKey||'')}', true)">비활성 플러그인 ▶ 활성화</button>`;
+    const editPayload = JSON.stringify({scope:"plugin", pluginKey:x.pluginKey, event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx, matcher:x.matcher||"", type:x.type||"command", command:x.command||"", timeout:x.timeout});
+    const delPayload = JSON.stringify({scope:"plugin", pluginKey:x.pluginKey, event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx});
     return `
-    <div class="rounded-lg p-3 text-xs border border-[var(--border)] flex items-start gap-3" style="background:rgba(217,119,87,0.06); min-width:0;">
-      <div class="flex-1" style="min-width:0; overflow:hidden;">
+    <div class="rounded-lg p-3 text-xs border border-[var(--border)]" style="display:flex; align-items:flex-start; gap:0.75rem; background:rgba(217,119,87,0.06); min-width:0; max-width:100%; overflow:hidden;">
+      <div style="flex:1 1 0; min-width:0; max-width:100%; overflow:hidden;">
         <div class="flex items-center gap-2 mb-1 flex-wrap">
           ${badge}
           <span class="text-[10px] mono text-[var(--text-dim)] truncate" style="max-width:200px;">${escapeHtml(x.source||'')}</span>
           ${x.id ? `<span class="text-[10px] mono text-[var(--text-mute)] truncate" style="max-width:200px;" title="hook id">${escapeHtml(x.id)}</span>`:''}
         </div>
-        ${x.description ? `<div class="text-[var(--text)] mb-1">${escapeHtml(x.description)}</div>`:''}
-        ${x.matcher ? `<div class="mb-1"><span class="text-[var(--text-dim)]">matcher:</span> <span class="mono">${escapeHtml(x.matcher)}</span></div>`:''}
+        ${x.description ? `<div class="text-[var(--text)] mb-1" style="overflow-wrap:anywhere;">${escapeHtml(x.description)}</div>`:''}
+        ${x.matcher ? `<div class="mb-1" style="overflow-wrap:anywhere;"><span class="text-[var(--text-dim)]">matcher:</span> <span class="mono">${escapeHtml(x.matcher)}</span></div>`:''}
         ${x.type ? `<div class="mb-1"><span class="text-[var(--text-dim)]">type:</span> <span class="mono">${escapeHtml(x.type)}</span></div>`:''}
-        ${x.command ? `<div class="mb-1"><div class="text-[var(--text-dim)] mb-1">cmd:</div><pre class="mono" style="margin:0; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; max-height:160px; overflow-y:auto; background:rgba(0,0,0,0.3); padding:6px 8px; border-radius:6px; font-size:11px;">${escapeHtml(x.command)}</pre></div>`:''}
+        ${x.command ? `<div class="mb-1"><div class="text-[var(--text-dim)] mb-1">cmd:</div><pre class="mono" style="display:block; box-sizing:border-box; width:100%; max-width:100%; margin:0; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; max-height:200px; overflow-y:auto; overflow-x:hidden; background:rgba(0,0,0,0.3); padding:6px 8px; border-radius:6px; font-size:11px;">${escapeHtml(x.command)}</pre></div>`:''}
         ${x.timeout ? `<div><span class="text-[var(--text-dim)]">timeout:</span> ${x.timeout}ms</div>`:''}
       </div>
-      <div class="flex gap-1 flex-shrink-0">
-        <span class="chip text-[9px]" title="플러그인 훅은 hooks.json 으로 정의 — 대시보드에서 편집 불가">🔒 read-only</span>
+      <div class="flex flex-col gap-1 flex-shrink-0">
+        <button class="btn text-[10px]" title="플러그인 hooks.json 직접 수정" onclick='openHookEditor(${editPayload})'>수정</button>
+        <button class="btn text-[10px]" style="color:#fca5a5" onclick='deleteHook(${delPayload})'>삭제</button>
       </div>
     </div>`;
   };
@@ -1655,13 +1658,16 @@ VIEWS.hooks = async () => {
 
 function openHookEditor(existing) {
   const isEdit = !!existing;
-  const e = existing || { event: 'SessionStart', matcher: '', type: 'command', command: '', timeout: 5000 };
+  const isPlugin = isEdit && existing.scope === 'plugin';
+  const e = existing || { scope:'user', event: 'SessionStart', matcher: '', type: 'command', command: '', timeout: 5000 };
+  const titlePrefix = isEdit ? (isPlugin ? '🔌 플러그인 훅 수정 — ' : '훅 수정 — ') : '새 훅 추가';
   showModal(`
     <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
-      <h2 class="font-semibold">${isEdit ? '훅 수정' : '새 훅 추가'}</h2>
+      <h2 class="font-semibold">${titlePrefix}${isPlugin ? escapeHtml(existing.pluginKey||'') : ''}</h2>
       <button class="btn-ghost btn" onclick="closeModal()">✕</button>
     </div>
     <div class="p-5 space-y-3">
+      ${isPlugin ? `<div class="text-[11px] text-[var(--warn)] bg-[rgba(251,191,36,0.08)] border border-[rgba(251,191,36,0.25)] rounded p-2">⚠️ 플러그인의 hooks.json 을 직접 수정합니다. 플러그인 업데이트 시 변경이 덮어써질 수 있습니다.</div>`:''}
       <div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">이벤트</div>
         <select id="hookEvent" class="input">
@@ -1680,11 +1686,11 @@ function openHookEditor(existing) {
       </div>
       <div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">command</div>
-        <textarea id="hookCommand" class="input" style="min-height:120px;" placeholder="echo 'hook fired'">${escapeHtml(e.command||'')}</textarea>
+        <textarea id="hookCommand" class="input mono" style="min-height:200px; font-size:12px;" placeholder="echo 'hook fired'">${escapeHtml(e.command||'')}</textarea>
       </div>
       <div>
-        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">timeout (ms)</div>
-        <input id="hookTimeout" type="number" class="input" value="${e.timeout||5000}" />
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">timeout (ms, 선택)</div>
+        <input id="hookTimeout" type="number" class="input" value="${e.timeout||''}" placeholder="예: 5000" />
       </div>
     </div>
     <div class="p-4 border-t border-[var(--border)] flex justify-end gap-2">
@@ -1698,10 +1704,23 @@ function openHookEditor(existing) {
       matcher: document.getElementById('hookMatcher').value.trim(),
       type: document.getElementById('hookType').value,
       command: document.getElementById('hookCommand').value,
-      timeout: parseInt(document.getElementById('hookTimeout').value) || 5000,
+      timeout: parseInt(document.getElementById('hookTimeout').value) || undefined,
     };
     if (!payload.command.trim()) { toast('command 를 입력하세요', 'warn'); return; }
-    await upsertHook(payload, existing);
+    if (isPlugin) {
+      const r = await api('/api/hooks/plugin/update', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          pluginKey: existing.pluginKey, event: existing.event,
+          groupIdx: existing.groupIdx, subIdx: existing.subIdx,
+          op: 'update', payload,
+        }),
+      });
+      toast(r.ok ? '플러그인 훅 저장됨' : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
+      if (r.ok) closeModal();
+    } else {
+      await upsertHook(payload, existing);
+    }
   };
 }
 
@@ -1756,7 +1775,17 @@ function addHookEntry(s, payload, newSubEntry) {
   }
 }
 
-async function deleteHook({event, groupIdx, subIdx}) {
+async function deleteHook(payload) {
+  const {scope, event, groupIdx, subIdx, pluginKey} = payload || {};
+  if (scope === 'plugin') {
+    if (!confirm(`플러그인 훅을 삭제하시겠습니까? (${pluginKey} → ${event}[${groupIdx}/${subIdx}])\n플러그인 업데이트 시 복원될 수 있습니다.`)) return;
+    const r = await api('/api/hooks/plugin/update', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ pluginKey, event, groupIdx, subIdx, op:'delete' }),
+    });
+    toast(r.ok ? '플러그인 훅 삭제됨' : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
+    return;
+  }
   if (!confirm('이 훅을 삭제할까요?')) return;
   const s = await api('/api/settings');
   if (!s.hooks || !s.hooks[event]) return;
@@ -1771,7 +1800,6 @@ async function deleteHook({event, groupIdx, subIdx}) {
   if (!s.hooks[event].length) delete s.hooks[event];
   const r = await api('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(s) });
   toast(r.ok ? '삭제됨' : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
-  if (r.ok) renderView();
 }
 
 VIEWS.permissions = async () => {
