@@ -181,6 +181,7 @@ const NAV = [
   { id: 'overview',    icon: '✦',  label: '개요',            group: 'main', docUrl: DOCS_BASE+'overview' },
   { id: 'projects',    icon: '📁', label: '프로젝트',          group: 'main', desc: '프로젝트별 Claude 세팅 + AI 추천', docUrl: DOCS_BASE+'memory' },
   { id: 'analytics',   icon: '📊', label: '통계 & 스코어',      group: 'main', docUrl: DOCS_BASE+'costs' },
+  { id: 'aiEval',      icon: '🤖', label: 'AI 종합 평가',       group: 'main', desc: 'Claude 가 전체 셋업을 보고 우선순위 진단' },
   { id: 'sessions',    icon: '🗂️', label: '세션 히스토리',      group: 'main', docUrl: DOCS_BASE+'interactive-mode' },
   { id: 'agents',      icon: '🤝', label: '에이전트 & 그래프',  group: 'work', docUrl: DOCS_BASE+'sub-agents' },
   { id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'work',
@@ -414,11 +415,23 @@ VIEWS.overview = async () => {
     const color = scoreColor(pct);
     const label = { permissions:'권한 정책', hooks:'훅 자동화', agents:'에이전트', skills:'스킬', plugins:'플러그인', mcp:'MCP', sessionQuality:'세션 품질' }[k] || k;
     const target = v.target || axisToTab[k] || '';
+    const hasQ = v.quality !== undefined && v.quality !== null;
+    const qPct = hasQ ? Math.round(v.quality * 100) : null;
+    const qBadge = hasQ ? (
+      qPct >= 70 ? `<span class="chip chip-ok text-[9px]">활용도 ${qPct}%</span>`
+      : qPct >= 30 ? `<span class="chip chip-warn text-[9px]">활용도 ${qPct}%</span>`
+      : `<span class="chip chip-err text-[9px]">활용도 ${qPct}%</span>`
+    ) : '';
+    const rawHint = (v.rawValue !== undefined && v.rawValue !== v.value)
+      ? `<span class="text-[10px] text-[var(--text-dim)] ml-1" title="단순 카운트 점수">(raw ${v.rawValue})</span>` : '';
     return `
       <div class="p-3 card hover-lift cursor-pointer" onclick="${target ? `go('${target}')` : ''}" title="${escapeHtml((v.formula||'')+'\n'+(v.suggest||''))}">
-        <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <span class="text-sm font-medium">${label} <span class="text-[10px] text-[var(--text-dim)]">→</span></span>
-          <span class="text-lg font-bold mono" style="color:${color}">${v.value}</span>
+          <div class="flex items-center gap-1">
+            ${qBadge}
+            <span class="text-lg font-bold mono" style="color:${color}">${v.value}</span>${rawHint}
+          </div>
         </div>
         <div class="h-2 rounded-full bg-white/5 overflow-hidden">
           <div style="width:${pct}%; background:${color}; height:100%; transition: width 0.6s ease;"></div>
@@ -551,6 +564,122 @@ async function quickRecommend(kind) {
   if (kind === 'mcp') return go('mcp');
   if (kind === 'analytics') return go('analytics');
   if (['hooks','permissions','output-styles','statusline'].includes(kind)) return startFeatureRecommend(kind);
+}
+
+// AI 종합 평가 탭
+VIEWS.aiEval = async () => {
+  const r = await api('/api/evaluation/ai');
+  state.data.aiEval = r;
+  if (r.error) {
+    return `
+      ${viewHeader('🤖 AI 종합 평가', 'Claude 가 전체 셋업을 진단', null)}
+      <div class="card empty">${escapeHtml(r.error)}</div>
+      <div class="mt-4"><button class="btn-primary btn" onclick="refreshAiEval()">🔄 다시 시도</button></div>`;
+  }
+  if (!r.evaluation || !Object.keys(r.evaluation).length) {
+    return `
+      ${viewHeader('🤖 AI 종합 평가', 'Claude 가 전체 셋업을 진단', null)}
+      <div class="card p-6 empty">
+        <div class="text-2xl mb-2">🤖</div>
+        <div>아직 AI 평가가 실행되지 않았습니다.</div>
+        <div class="text-xs text-[var(--text-mute)] mt-2">하단 버튼을 눌러 Claude 에게 평가를 요청하세요 (30~120초, 비용 발생).</div>
+        <button class="btn-primary btn mt-4" onclick="refreshAiEval()">🚀 AI 평가 받기</button>
+      </div>`;
+  }
+  const ev = r.evaluation;
+  const det = r.deterministic || {};
+  const cost = r.costInfo || {};
+  const ageMin = r.ts ? Math.round((Date.now() - r.ts) / 60000) : 0;
+  const impactColor = { high:'#fca5a5', medium:'#fcd34d', low:'#86efac' };
+  const effortColor = { high:'#fca5a5', medium:'#fcd34d', low:'#86efac' };
+
+  return `
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">🤖 AI 종합 평가</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">Claude 가 전체 셋업을 보고 우선순위 진단 · ${ageMin}분 전 ${r.cached?'(캐시됨)':''} · 비용 $${(cost.costUsd||0).toFixed(4)}</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn-primary btn text-xs" onclick="refreshAiEval()">🔄 새로 평가받기 (30~120초)</button>
+      </div>
+    </div>
+
+    <!-- 두 점수 비교 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+      <div class="card p-5">
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">결정론적 점수 (휴리스틱 + 품질 가중치)</div>
+        <div class="flex items-baseline gap-2">
+          <div class="text-5xl font-bold mono" style="color:${scoreColor(det.overall||0)}">${det.overall||0}</div>
+          <div class="text-sm text-[var(--text-mute)]">/100</div>
+        </div>
+        <div class="text-[11px] text-[var(--text-mute)] mt-2">7축 평균 — 자원 보유 × 30일 활용도</div>
+      </div>
+      <div class="card p-5" style="background: rgba(217,119,87,0.05);">
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">🤖 AI 종합 점수</div>
+        <div class="flex items-baseline gap-2">
+          <div class="text-5xl font-bold mono" style="color:${scoreColor(ev.overall||0)}">${ev.overall||0}</div>
+          <div class="text-sm text-[var(--text-mute)]">/100</div>
+        </div>
+        <div class="text-sm text-[var(--text)] mt-2 line-clamp-2">${escapeHtml(ev.verdict||'')}</div>
+      </div>
+    </div>
+
+    <!-- 강점 / 약점 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+      <div class="card p-5">
+        <div class="font-semibold text-sm mb-3" style="color:#86efac">✅ 강점</div>
+        ${(ev.strengths||[]).map(s => `<div class="text-sm py-1 flex gap-2"><span>•</span><span>${escapeHtml(s)}</span></div>`).join('') || '<div class="text-xs text-[var(--text-dim)]">—</div>'}
+      </div>
+      <div class="card p-5">
+        <div class="font-semibold text-sm mb-3" style="color:#fca5a5">⚠️ 약점</div>
+        ${(ev.weaknesses||[]).map(s => `<div class="text-sm py-1 flex gap-2"><span>•</span><span>${escapeHtml(s)}</span></div>`).join('') || '<div class="text-xs text-[var(--text-dim)]">—</div>'}
+      </div>
+    </div>
+
+    <!-- 우선순위 액션 -->
+    <div class="mb-5">
+      <h3 class="font-semibold text-sm mb-3">🎯 개선 우선순위 (impact / effort)</h3>
+      ${(ev.priorities||[]).map(p => `
+        <div class="card p-4 mb-2">
+          <div class="flex items-start gap-3">
+            <div class="text-2xl font-bold mono" style="color:#d97757">#${p.rank||'?'}</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold flex items-center gap-2 flex-wrap">
+                ${escapeHtml(p.title||'')}
+                <span class="chip text-[9px]" style="color:${impactColor[p.impact]||'#fff'}">impact: ${escapeHtml(p.impact||'?')}</span>
+                <span class="chip text-[9px]" style="color:${effortColor[p.effort]||'#fff'}">effort: ${escapeHtml(p.effort||'?')}</span>
+              </div>
+              <div class="text-xs text-[var(--text-mute)] mt-2">${escapeHtml(p.rationale||'')}</div>
+              <div class="text-sm mt-2 p-2 rounded bg-white/5">📌 ${escapeHtml(p.action||'')}</div>
+            </div>
+          </div>
+        </div>`).join('') || '<div class="card empty text-xs">우선순위 없음</div>'}
+    </div>
+
+    <!-- 패턴 인사이트 -->
+    ${(ev.patternInsights||[]).length ? `
+    <div class="card p-5 mb-5">
+      <div class="font-semibold text-sm mb-3">💡 사용 패턴 인사이트</div>
+      ${ev.patternInsights.map(s => `<div class="text-sm py-1 flex gap-2"><span>•</span><span>${escapeHtml(s)}</span></div>`).join('')}
+    </div>` : ''}
+
+    <details class="card p-3 text-xs">
+      <summary class="cursor-pointer text-[var(--text-dim)]">🔍 원본 응답 / 메타</summary>
+      <pre class="mono text-[10px] whitespace-pre-wrap bg-black/30 p-2 rounded mt-2 max-h-[320px] overflow-y-auto">${escapeHtml(JSON.stringify({ev, cost: r.costInfo, raw: (r.raw||'').slice(0, 1500)}, null, 2))}</pre>
+    </details>
+  `;
+};
+async function refreshAiEval() {
+  showModalLoading('Claude 에게 종합 평가 요청 중 (30~120초)…');
+  try {
+    const r = await api('/api/evaluation/ai', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ force: true }),
+    });
+    closeModal();
+    if (r.error) { toast(r.error, 'err'); return; }
+    state.data.aiEval = r;
+    renderView();
+  } catch (e) { closeModal(); toast(e.message, 'err'); }
 }
 
 // 추천 리스트 형태(plugin/mcp) — 사용자 패턴 기반
