@@ -5283,6 +5283,63 @@ def api_feature_recommend(body: dict) -> dict:
         system_intro = "~/.claude/settings.json 의 statusLine 설정을 추천하세요. 쉘 명령으로 current branch, model, cost 표시."
         output_shape = '{"statusLine": {"type": "command", "command": "<shell command>"}}'
         apply_hint = "settings.json.statusLine 덮어쓰기"
+    elif kind == "plugins":
+        # 사용자가 설치한 플러그인 + 비활성 플러그인 + 사용 패턴 → 추천
+        plugins = list_plugins_api()
+        installed_plugins = [{"id": p.get("id"), "enabled": p.get("enabled"), "marketplace": p.get("marketplace"),
+                              "description": (p.get("description") or "")[:200]} for p in plugins]
+        # 마켓플레이스 카탈로그 (browse) 에서 후보 가져오기
+        try:
+            browse = api_plugins_browse()
+            available = [{"id": p.get("id") or p.get("name"), "marketplace": p.get("marketplace"),
+                          "description": (p.get("description") or "")[:200],
+                          "tags": p.get("tags") or [], "enabled": p.get("enabled")}
+                         for p in browse.get("plugins", []) if not p.get("enabled")][:60]
+        except Exception:
+            available = []
+        current_obj = {"installed": installed_plugins, "candidates": available}
+        system_intro = (
+            "사용자의 작업 패턴에 맞는 Claude Code 플러그인 활성화/추가를 추천하세요. "
+            "이미 활성화된 플러그인은 제외하고, candidates 안에서만 골라 최대 5개까지 우선순위 매겨 추천하세요. "
+            "사용자가 새 마켓플레이스를 추가해야 하는 경우 marketplaceUrl 필드도 함께."
+        )
+        output_shape = (
+            '{"recommendations": ['
+            '{"action":"enable","pluginKey":"<plugin>@<market>","why":"<왜 도움이 되는지>","priority":1},'
+            '{"action":"install","pluginId":"<plugin>","marketplace":"<market>","marketplaceUrl":"<git url 옵션>","why":"...","priority":2}'
+            ']}'
+        )
+        apply_hint = "각 추천을 클릭해 토글/설치"
+    elif kind == "mcp":
+        connectors = list_connectors()
+        # 카탈로그 후보
+        try:
+            cat = api_mcp_catalog()
+            candidates = [{"id": m.get("id"), "name": m.get("name"), "category": m.get("category"),
+                          "description": (m.get("description") or "")[:200], "cli": m.get("cli","")[:200]}
+                         for m in cat.get("catalog", []) if not m.get("installed")][:30]
+        except Exception:
+            candidates = []
+        current_obj = {
+            "installed": {
+                "local": [m.get("name") for m in connectors.get("local", [])],
+                "platform": [m.get("name") for m in connectors.get("platform", [])],
+                "plugin": [m.get("name") for m in connectors.get("plugin", [])],
+                "desktop": [m.get("name") for m in connectors.get("desktop", [])],
+            },
+            "candidates": candidates,
+        }
+        system_intro = (
+            "사용자 작업 패턴에 맞는 MCP 서버 추가를 추천하세요. "
+            "candidates 안에서만 고르고, 이미 설치된 것(installed) 은 제외. "
+            "사용자가 자주 호출하는 도구(top_tools)를 보고 어떤 MCP 가 워크플로우를 더 효율적으로 만들지 판단."
+        )
+        output_shape = (
+            '{"recommendations": ['
+            '{"mcpId":"<id from candidates>","why":"<workflow 에 어떻게 도움되는지>","cli":"<claude mcp add ...>","priority":1}'
+            ']}'
+        )
+        apply_hint = "각 추천을 클릭해 한 번에 설치"
     else:
         return {"error": f"unknown kind: {kind}"}
 

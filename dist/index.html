@@ -553,6 +553,121 @@ async function quickRecommend(kind) {
   if (['hooks','permissions','output-styles','statusline'].includes(kind)) return startFeatureRecommend(kind);
 }
 
+// 추천 리스트 형태(plugin/mcp) — 사용자 패턴 기반
+async function aiRecommendList(kind) {
+  const labelMap = { plugins:'플러그인', mcp:'MCP' };
+  const label = labelMap[kind] || kind;
+  showModalLoading(`Claude 에게 ${label} 추천 요청 중 (30~90초)… 사용자의 작업 패턴 분석 중`);
+  try {
+    const r = await api('/api/feature/recommend', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ kind }),
+    });
+    if (r.error) { closeModal(); toast(r.error, 'err'); return; }
+    // proposed 안에서 recommendations 추출
+    const proposed = r.proposed || {};
+    let recs = proposed.recommendations || [];
+    if (!Array.isArray(recs)) recs = [];
+    closeModal();
+    if (!recs.length) { toast('추천 항목이 없습니다 (응답 비어있음)', 'warn'); return; }
+    renderAiRecListModal(kind, label, recs, r);
+  } catch (e) { closeModal(); toast(e.message, 'err'); }
+}
+
+function renderAiRecListModal(kind, label, recs, raw) {
+  const cost = raw.costInfo || {};
+  const costBadge = `<span class="text-[10px] text-[var(--text-dim)]">비용 $${(cost.costUsd||0).toFixed(4)} · ${Math.round((cost.durationMs||0)/1000)}초</span>`;
+  const cardHtml = (rec, idx) => {
+    const why = escapeHtml(rec.why || rec.reason || '');
+    const prio = rec.priority ? `<span class="chip chip-accent text-[9px]">우선순위 ${rec.priority}</span>` : '';
+    if (kind === 'plugins') {
+      const action = rec.action || (rec.pluginKey ? 'enable' : 'install');
+      const target = rec.pluginKey || rec.pluginId || '';
+      const mkt = rec.marketplace ? `<span class="chip text-[9px]">market: ${escapeHtml(rec.marketplace)}</span>` : '';
+      const mUrl = rec.marketplaceUrl ? `<span class="chip text-[9px] mono">${escapeHtml(rec.marketplaceUrl)}</span>` : '';
+      const btnLabel = action === 'enable' ? '✓ 활성화' : '＋ 설치';
+      return `
+        <div class="card p-4 mb-2">
+          <div class="flex items-start justify-between gap-3 mb-2">
+            <div class="min-w-0 flex-1">
+              <div class="font-semibold text-sm flex items-center gap-2 flex-wrap">
+                <span>${idx+1}. ${escapeHtml(target)}</span> ${prio} ${mkt} ${mUrl}
+              </div>
+              <div class="text-xs text-[var(--text-mute)] mt-2">${why}</div>
+            </div>
+            <button class="btn-primary btn text-xs flex-shrink-0" onclick="applyPluginRec(JSON.parse(this.dataset.r))" data-r="${jsonAttr(rec)}">${btnLabel}</button>
+          </div>
+        </div>`;
+    }
+    if (kind === 'mcp') {
+      const cli = rec.cli ? `<details class="text-[10px] mt-2"><summary class="cursor-pointer text-[var(--text-dim)]">CLI</summary><pre class="mono bg-black/40 p-2 rounded mt-1 whitespace-pre-wrap break-all">${escapeHtml(rec.cli)}</pre></details>` : '';
+      return `
+        <div class="card p-4 mb-2">
+          <div class="flex items-start justify-between gap-3 mb-2">
+            <div class="min-w-0 flex-1">
+              <div class="font-semibold text-sm flex items-center gap-2 flex-wrap">
+                <span>${idx+1}. ${escapeHtml(rec.mcpId || rec.id || '')}</span> ${prio}
+              </div>
+              <div class="text-xs text-[var(--text-mute)] mt-2">${why}</div>
+              ${cli}
+            </div>
+            <button class="btn-primary btn text-xs flex-shrink-0" onclick="applyMcpRec(JSON.parse(this.dataset.r))" data-r="${jsonAttr(rec)}">＋ 설치</button>
+          </div>
+        </div>`;
+    }
+    return '';
+  };
+  showModal(`
+    <div class="p-5 border-b border-[var(--border)] flex items-center justify-between gap-3">
+      <div>
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">🤖 ${label} AI 추천</div>
+        <h2 class="text-lg font-bold">${recs.length}개 추천 항목 · 사용자 작업 패턴 기반</h2>
+        <div class="mt-1">${costBadge}</div>
+      </div>
+      <button class="btn" onclick="closeModal()">닫기</button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-5">
+      ${recs.map(cardHtml).join('')}
+      <details class="mt-4 text-[11px]">
+        <summary class="cursor-pointer text-[var(--text-dim)]">📋 원본 응답</summary>
+        <pre class="mono text-[10px] whitespace-pre-wrap bg-black/30 p-2 rounded mt-2 max-h-[260px] overflow-y-auto">${escapeHtml(JSON.stringify(raw.proposed||raw, null, 2))}</pre>
+      </details>
+    </div>`);
+}
+
+async function applyPluginRec(rec) {
+  const action = rec.action || (rec.pluginKey ? 'enable' : 'install');
+  if (action === 'enable' && rec.pluginKey) {
+    const r = await api('/api/plugins/toggle', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: rec.pluginKey, enable: true }),
+    });
+    toast(r.ok ? `'${rec.pluginKey}' 활성화됨` : (r.error||'실패'), r.ok?'ok':'err');
+  } else if (action === 'install') {
+    if (rec.marketplaceUrl) {
+      // 마켓플레이스 추가 후 안내
+      const mkt = rec.marketplace || rec.marketplaceUrl.split('/').pop().replace('.git','');
+      const r = await api('/api/marketplaces/add', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name: mkt, url: rec.marketplaceUrl }),
+      });
+      toast(r.ok ? `마켓플레이스 추가됨 — 플러그인 탭에서 활성화하세요` : (r.error||'실패'), r.ok?'ok':'err');
+    } else {
+      toast('marketplaceUrl 누락 — 수동으로 마켓 추가 필요', 'warn');
+    }
+  }
+}
+
+async function applyMcpRec(rec) {
+  const id = rec.mcpId || rec.id;
+  if (!id) { toast('mcpId 누락', 'err'); return; }
+  const asName = id;
+  const r = await api('/api/mcp/install', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id, as: asName }),
+  });
+  toast(r.ok ? `'${id}' MCP 설치됨` : (r.error||'실패'), r.ok?'ok':'err');
+}
+
 async function startFeatureRecommend(kind) {
   const labelMap = { hooks:'훅', permissions:'권한', 'output-styles':'출력 스타일', statusline:'상태라인' };
   const label = labelMap[kind] || kind;
@@ -2017,7 +2132,16 @@ VIEWS.mcp = async () => {
     !q || (x.name+' '+x.description+' '+x.id+' '+(x.category||'')).toLowerCase().includes(q)
   );
   return `
-    ${viewHeader('MCP 커넥터', `Code 로컬 ${(conn.local||[]).length} · 플랫폼 ${(conn.platform||[]).length} · 플러그인 ${(conn.plugin||[]).length} · Desktop 앱 ${(conn.desktop||[]).length} · 카탈로그 ${cat.catalog.length}개`, 'mcp')}
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">MCP 커넥터</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">Code 로컬 ${(conn.local||[]).length} · 플랫폼 ${(conn.platform||[]).length} · 플러그인 ${(conn.plugin||[]).length} · Desktop 앱 ${(conn.desktop||[]).length} · 카탈로그 ${cat.catalog.length}개</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn-primary btn text-xs" onclick="aiRecommendList('mcp')">🤖 AI 추천</button>
+        <a class="btn text-xs" href="${DOCS_BASE}mcp" target="_blank" rel="noopener">📖</a>
+      </div>
+    </div>
 
     <div class="card p-5 mb-4">
       <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -2136,6 +2260,7 @@ VIEWS.plugins = async () => {
         <p class="text-sm text-[var(--text-mute)] mt-1">${browse.plugins.length}개 전체 · ${enabledCount}개 활성 · ${browse.marketplaces}개 마켓플레이스 · 한글 번역 ${browse.plugins.filter(p=>p.descriptionKo).length}/${browse.plugins.length}</p>
       </div>
       <div class="flex gap-2">
+        <button class="btn-primary btn text-xs" onclick="aiRecommendList('plugins')">🤖 AI 추천</button>
         <button class="btn text-xs" onclick="translateAll('plugin')">🌐 전체 한국어 번역</button>
         <a class="btn text-xs" href="${DOCS_BASE}plugins" target="_blank" rel="noopener">📖 공식 문서 ↗</a>
       </div>
