@@ -5573,6 +5573,178 @@ _AI_EVAL_CACHE_FILE = _env_path(
 )
 
 
+_LATEST_FEATURES_CACHE = _env_path(
+    "CLAUDE_DASHBOARD_LATEST_FEATURES",
+    Path.home() / ".claude-dashboard-latest-features.json",
+)
+
+# 빌트인 신기능 카탈로그 — 수동으로 큐레이션 (최신 공식 발표 기반)
+BUILTIN_NEW_FEATURES = [
+    {
+        "id": "design", "icon": "🎨", "label": "Claude Design",
+        "released": "2026-04-17",
+        "launchUrl": "https://claude.ai/design",
+        "docUrl": "https://www.anthropic.com/news/claude-design-anthropic-labs",
+        "summary": "프롬프트 → 비주얼 디자인/슬라이드/원페이저. Opus 4.7 기반.",
+    },
+    {
+        "id": "opus47", "icon": "🧠", "label": "Opus 4.7",
+        "released": "2026-04-16",
+        "launchUrl": "https://platform.claude.com/docs/en/about-claude/models/whats-new-claude-4-7",
+        "docUrl": "https://www.anthropic.com/news/claude-opus-4-7",
+        "summary": "복잡 추론 + 에이전틱 코딩 + 고해상도 비전. Opus 4.6 와 동가격 ($5/$25 per MTok).",
+    },
+    {
+        "id": "managedAgents", "icon": "🤖", "label": "Managed Agents",
+        "released": "2026-04-08",
+        "launchUrl": "https://platform.claude.com/docs/en/managed-agents/overview",
+        "docUrl": "https://platform.claude.com/docs/en/managed-agents/overview",
+        "summary": "Claude 를 완전 관리형 에이전트 하네스로 실행. 샌드박스 + 내장 도구 + SSE 스트리밍.",
+    },
+    {
+        "id": "antCli", "icon": "⌨️", "label": "ant CLI",
+        "released": "2026-04-08",
+        "launchUrl": "https://platform.claude.com/docs/en/api/sdks/cli",
+        "docUrl": "https://platform.claude.com/docs/en/api/sdks/cli",
+        "summary": "Claude API 커맨드라인 클라이언트. Claude Code 네이티브 통합 + YAML 리소스 버전 관리.",
+    },
+    {
+        "id": "advisorTool", "icon": "🧭", "label": "Advisor Tool",
+        "released": "2026-04-09",
+        "launchUrl": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool",
+        "docUrl": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool",
+        "summary": "빠른 executor 모델 + 고지능 advisor 모델 페어링으로 장기 에이전트 품질↑ 비용↓.",
+    },
+    {
+        "id": "codeRoutines", "icon": "🔁", "label": "Claude Code Routines",
+        "released": "2026-04-14",
+        "launchUrl": "https://www.anthropic.com/engineering/claude-code-routines",
+        "docUrl": "https://docs.claude.com/en/docs/claude-code/routines",
+        "summary": "반복 작업을 routine 으로 저장. Mac offline 이어도 웹 인프라에서 실행.",
+    },
+    {
+        "id": "agentSkills", "icon": "🎯", "label": "Agent Skills",
+        "released": "2025-10-16",
+        "launchUrl": "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview",
+        "docUrl": "https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills",
+        "summary": "스킬(지시+스크립트+리소스 묶음) 을 Claude 가 동적으로 로드. PowerPoint/Excel/Word/PDF 기본 제공.",
+    },
+    {
+        "id": "mythos", "icon": "🛡", "label": "Claude Mythos (보안)",
+        "released": "2026-04-07",
+        "launchUrl": "https://anthropic.com/glasswing",
+        "docUrl": "https://red.anthropic.com/2026/mythos-preview/",
+        "summary": "방어 보안 특화 언어모델. 초대제 research preview (Project Glasswing).",
+    },
+]
+
+
+def api_features_list() -> dict:
+    """빌트인 신기능 + 사용자가 '최신 정보 로딩' 으로 발견한 동적 항목."""
+    dynamic = []
+    if _LATEST_FEATURES_CACHE.exists():
+        try:
+            cache = json.loads(_LATEST_FEATURES_CACHE.read_text(encoding="utf-8"))
+            dynamic = cache.get("features") or []
+        except Exception:
+            dynamic = []
+    return {"builtin": BUILTIN_NEW_FEATURES, "dynamic": dynamic,
+            "lastFetched": _LATEST_FEATURES_CACHE.stat().st_mtime if _LATEST_FEATURES_CACHE.exists() else 0}
+
+
+def api_features_refresh(body: dict) -> dict:
+    """Claude CLI 로 최신 Anthropic 발표 조회 → 기존 카탈로그에 없는 항목만 dynamic 에 저장."""
+    claude_bin = shutil.which("claude")
+    if not claude_bin:
+        return {"error": "claude CLI 설치 필요"}
+    if not api_auth_status().get("connected"):
+        return {"error": "Claude 계정 연결 필요"}
+
+    existing_ids = {f["id"] for f in BUILTIN_NEW_FEATURES}
+    existing_summary = "\n".join(f"- {f['label']} ({f['released']}): {f['summary']}" for f in BUILTIN_NEW_FEATURES)
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    prompt = f"""오늘은 {today} 입니다. 최근 60일 안에 Anthropic/Claude 가 공식 발표한 **신기능** 을 조사해 JSON 으로만 답하세요.
+
+## 이미 알고 있는 항목 (중복 제외)
+{existing_summary}
+
+## 출력 형식 — JSON 만:
+{{
+  "features": [
+    {{
+      "id": "<kebab-case>",
+      "icon": "<single emoji>",
+      "label": "<한국어 짧은 이름>",
+      "released": "<YYYY-MM-DD>",
+      "launchUrl": "<사용/시작 URL>",
+      "docUrl": "<공식 문서 또는 발표 URL>",
+      "summary": "<한 문장 한국어 설명>"
+    }},
+    ...최대 10개
+  ]
+}}
+
+조건:
+- 위 '이미 알고 있는 항목' 과 같은 기능은 제외.
+- Claude API 파라미터 미세 조정 같은 것 말고, **사용자가 직접 체험 가능한** 제품/도구/모델 신기능만.
+- 공식 URL (anthropic.com / claude.ai / platform.claude.com / docs.claude.com) 우선.
+"""
+    try:
+        proc = subprocess.run(
+            [claude_bin, "-p", prompt, "--output-format", "json"],
+            capture_output=True, text=True, timeout=180,
+        )
+    except Exception as e:
+        return {"error": f"Claude CLI 실행 실패: {e}"}
+    if proc.returncode != 0:
+        return {"error": f"Claude CLI 오류: {(proc.stderr or '')[:400]}"}
+
+    stdout = (proc.stdout or "").strip()
+    response_text = stdout
+    cost_info = {}
+    try:
+        meta = json.loads(stdout)
+        if isinstance(meta, dict):
+            response_text = meta.get("result") or stdout
+            cost_info = {"costUsd": meta.get("total_cost_usd"), "durationMs": meta.get("duration_ms")}
+    except Exception:
+        pass
+
+    parsed = {}
+    m = re.search(r"\{[\s\S]*\}", response_text)
+    if m:
+        try: parsed = json.loads(m.group(0))
+        except Exception: parsed = {}
+
+    found = parsed.get("features") or []
+    # 중복 제거 (빌트인 id 충돌 방지)
+    filtered = []
+    for f in found:
+        if not isinstance(f, dict):
+            continue
+        fid = (f.get("id") or "").strip()
+        if not fid or fid in existing_ids:
+            continue
+        filtered.append({
+            "id": fid,
+            "icon": f.get("icon", "✨"),
+            "label": f.get("label", fid),
+            "released": f.get("released", ""),
+            "launchUrl": f.get("launchUrl", ""),
+            "docUrl": f.get("docUrl", ""),
+            "summary": f.get("summary", ""),
+            "isDynamic": True,
+        })
+
+    out = {"features": filtered, "fetchedAt": int(time.time() * 1000), "costInfo": cost_info}
+    try:
+        _LATEST_FEATURES_CACHE.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return out
+
+
 def api_design_exports(query: dict) -> dict:
     """Claude Design export 의심 파일을 스캔 (~/Downloads + 사용자 지정 경로).
     공식 API 가 아직 없어서 로컬 파일시스템 휴리스틱.
@@ -6294,6 +6466,7 @@ ROUTES_GET = {
     "/api/permissions/diagnose": lambda q: {"issues": validate_permissions(get_settings().get("permissions") or {})},
     "/api/evaluation/ai": lambda q: api_ai_evaluation({"force": False}),
     "/api/design/exports": api_design_exports,
+    "/api/features/list": lambda q: api_features_list(),
     "/api/auth/status": lambda q: api_auth_status(),
     "/api/project/detail": api_project_detail,
     "/api/project/score-detail": api_project_score_detail,
@@ -6471,6 +6644,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(api_ai_evaluation(self._read_body())); return
         if path == "/api/design/add-dir":
             self._send_json(api_design_add_dir(self._read_body())); return
+        if path == "/api/features/refresh":
+            self._send_json(api_features_refresh(self._read_body())); return
         if path == "/api/commands/translate":
             self._send_json(api_commands_translate(self._read_body())); return
         if path == "/api/translate/batch":

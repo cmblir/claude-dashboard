@@ -53,3 +53,4 @@ node_modules/
 # MCP list 디스크 캐시 (런타임 생성)
 *-mcp-cache.json
 *-ai-evaluation.json
+*-latest-features.json
