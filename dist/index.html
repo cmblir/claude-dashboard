@@ -1807,10 +1807,12 @@ async function deleteHook(payload) {
 }
 
 VIEWS.permissions = async () => {
-  const s = await api('/api/settings');
+  const [s, diag] = await Promise.all([api('/api/settings'), api('/api/permissions/diagnose')]);
   const p = (s.permissions && typeof s.permissions === 'object') ? s.permissions : { allow: [], deny: [] };
   const allow = p.allow || [];
   const deny = p.deny || [];
+  const issues = (diag && diag.issues) || [];
+  const issueRules = new Set(issues.map(i => i.rule));
   const col = (title, list, kind, color) => `
     <div class="card p-5">
       <div class="flex items-center justify-between mb-3">
@@ -1822,11 +1824,14 @@ VIEWS.permissions = async () => {
         <button class="btn-primary btn text-xs" onclick="quickAddPerm('${kind}')">추가</button>
       </div>
       <div class="space-y-1 max-h-[520px] overflow-y-auto">
-        ${list.map((x,i) => `
-          <div class="group flex items-center justify-between mono text-xs py-1 px-2 rounded hover:bg-white/5" style="${color}">
-            <span class="truncate">${escapeHtml(x)}</span>
+        ${list.map((x,i) => {
+          const bad = issueRules.has(x);
+          return `
+          <div class="group flex items-center justify-between mono text-xs py-1 px-2 rounded hover:bg-white/5" style="${color} ${bad?'background:rgba(248,113,113,0.12); border:1px solid rgba(248,113,113,0.35);':''}">
+            <span class="truncate" title="${bad?'⚠️ Claude Code doctor 가 거부하는 패턴':''}">${bad?'⚠️ ':''}${escapeHtml(x)}</span>
             <button class="btn-ghost btn text-[10px] opacity-0 group-hover:opacity-100" style="color:#fca5a5" onclick="removePermission('${kind}', ${i})">✕</button>
-          </div>`).join('') || `<div class="empty text-xs">비어있음</div>`}
+          </div>`;
+        }).join('') || `<div class="empty text-xs">비어있음</div>`}
       </div>
     </div>`;
   return `
@@ -1840,15 +1845,39 @@ VIEWS.permissions = async () => {
         <a class="btn text-xs" href="${DOCS_BASE}iam" target="_blank" rel="noopener">📖</a>
       </div>
     </div>
+    ${issues.length ? `
+    <div class="card p-4 mb-4" style="background:rgba(248,113,113,0.08); border-color:rgba(248,113,113,0.4);">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-sm mb-1" style="color:#fca5a5;">⚠️ 잘못된 권한 규칙 ${issues.length}건 — Claude Code 가 무시합니다</div>
+          <div class="space-y-1 text-[11px] mt-2">
+            ${issues.map(i => `<div class="mono">• <b>${escapeHtml(i.rule)}</b> <span class="text-[var(--text-mute)]">— ${escapeHtml(i.error)}</span></div>`).join('')}
+          </div>
+        </div>
+        <button class="btn-primary btn text-xs flex-shrink-0" onclick="autoFixPermissions()">🔧 자동 교정</button>
+      </div>
+    </div>` : ''}
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       ${col('✅ 허용 (allow)', allow, 'allow', '')}
       ${col('🚫 차단 (deny)', deny, 'deny', 'color:#fca5a5;')}
     </div>
     <div class="mt-4 card p-4 text-[11px] text-[var(--text-mute)]">
-      💡 매칭 규칙 예시: <code class="mono">Read</code> · <code class="mono">Bash(git *:*)</code> · <code class="mono">Edit(src/**)</code> · <code class="mono">WebFetch</code>
+      💡 매칭 규칙 예시: <code class="mono">Read</code> · <code class="mono">Bash(git *:*)</code> · <code class="mono">Edit(src/**)</code> · <code class="mono">WebFetch</code><br>
+      ⚠️ <b>:*</b> 패턴은 반드시 <b>맨 끝</b>. 중간에 쓰려면 <b>*</b> 사용. 잘못된 예: <code class="mono">Bash(curl:* | sh)</code> → 올바른 예: <code class="mono">Bash(curl* | sh)</code>
     </div>
   `;
 };
+
+async function autoFixPermissions() {
+  const s = await api('/api/settings');
+  // 서버의 put_settings 가 자동 교정해서 저장
+  const r = await api('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(s) });
+  if (r.ok) {
+    const n = (r.fixed||[]).length;
+    toast(n ? `✅ ${n}개 규칙 자동 교정됨` : '교정할 항목 없음', 'ok');
+  } else toast('실패: ' + (r.error||'unknown'), 'err');
+}
 
 async function quickAddPerm(kind) {
   const inp = document.getElementById(`perm-${kind}-input`);

@@ -541,12 +541,79 @@ def get_settings() -> dict:
         return {}
 
 
+# 권한 규칙 검증 (Claude Code doctor 와 동일 룰)
+# Bash(<cmd>:*)  → :* 는 반드시 마지막에만. 중간에 있으면 invalid.
+_PERM_INVALID_MIDPATTERN = re.compile(r":\*[^\)]")
+
+
+def validate_permission_rule(rule: str) -> Optional[str]:
+    """규칙이 유효하면 None, 잘못이면 에러 메시지 반환."""
+    if not isinstance(rule, str) or not rule.strip():
+        return "빈 규칙"
+    if _PERM_INVALID_MIDPATTERN.search(rule):
+        return "Claude Code 규칙: ':*' 는 패턴 맨 끝에만 올 수 있음. 중간에 쓰려면 '*' 사용. " \
+               f"예: 'Bash(curl:* | sh)' → 'Bash(curl* | sh)'"
+    return None
+
+
+def validate_permissions(perms: dict) -> list:
+    """{allow:[], deny:[]} 검증 → [{rule, kind, error}, ...]"""
+    issues = []
+    if not isinstance(perms, dict):
+        return issues
+    for kind in ("allow", "deny"):
+        for r in (perms.get(kind) or []):
+            err = validate_permission_rule(r)
+            if err:
+                issues.append({"rule": r, "kind": kind, "error": err})
+    return issues
+
+
+def sanitize_permissions(perms: dict) -> tuple[dict, list]:
+    """잘못된 규칙을 자동 교정 — ':*' 가 중간이면 '*' 로 치환. 변경 내역 함께 반환."""
+    out = {"allow": [], "deny": []}
+    fixed = []
+    if not isinstance(perms, dict):
+        return out, fixed
+    for kind in ("allow", "deny"):
+        seen = set()
+        for r in (perms.get(kind) or []):
+            if not isinstance(r, str):
+                continue
+            new = r
+            if _PERM_INVALID_MIDPATTERN.search(r):
+                # ':*' 를 '*' 로 (단, 마지막 ':*' 는 그대로 둠)
+                # 마지막의 ':*)' 는 보존하고 그 외 ':*' → '*'
+                if r.endswith(":*)"):
+                    head = r[:-3]
+                    head = head.replace(":*", "*")
+                    new = head + ":*)"
+                else:
+                    new = r.replace(":*", "*")
+                if new != r:
+                    fixed.append({"from": r, "to": new, "kind": kind})
+            if new not in seen:
+                seen.add(new)
+                out[kind].append(new)
+    return out, fixed
+
+
 def put_settings(body: dict) -> dict:
     if not isinstance(body, dict):
         return {"ok": False, "error": "body must be object"}
+    # 권한 규칙 자동 교정 + 잔존 invalid 차단
+    if isinstance(body.get("permissions"), dict):
+        sanitized, fixed = sanitize_permissions(body["permissions"])
+        body["permissions"] = {**body["permissions"], **sanitized}
+        remaining = validate_permissions(sanitized)
+        if remaining:
+            return {"ok": False, "error": "유효하지 않은 권한 규칙: " +
+                    "; ".join(f"{i['rule']} ({i['error']})" for i in remaining[:3])}
+        if fixed:
+            print(f"[server] permissions auto-fixed: {fixed}", file=sys.stderr)
     text = json.dumps(body, indent=2, ensure_ascii=False)
     ok = _safe_write(SETTINGS_JSON, text)
-    return {"ok": ok}
+    return {"ok": ok, "fixed": fixed if isinstance(body.get("permissions"), dict) else []}
 
 
 def _running_sessions() -> list:
@@ -5249,6 +5316,7 @@ ROUTES_GET = {
     "/api/sessions/stats": lambda q: api_sessions_stats(),
     "/api/agents/graph": api_agent_graph,
     "/api/optimization/score": lambda q: api_optimization_score(),
+    "/api/permissions/diagnose": lambda q: {"issues": validate_permissions(get_settings().get("permissions") or {})},
     "/api/auth/status": lambda q: api_auth_status(),
     "/api/project/detail": api_project_detail,
     "/api/project/score-detail": api_project_score_detail,
