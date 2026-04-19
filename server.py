@@ -2912,11 +2912,53 @@ def _count_enabled_plugin_assets() -> dict:
     return res
 
 
+def _quality_metrics_30d() -> dict:
+    """최근 30일치 사용 패턴 → 품질 가중치 계산용 데이터."""
+    _db_init()
+    since = int((time.time() - 30 * 86400) * 1000)
+    with _db() as c:
+        used_subagents = {r["subagent_type"] for r in c.execute(
+            "SELECT DISTINCT subagent_type FROM tool_uses WHERE subagent_type != '' AND ts >= ?",
+            (since,)
+        ).fetchall()}
+        agent_calls = c.execute(
+            "SELECT COUNT(*) AS n FROM tool_uses WHERE tool='Agent' AND ts >= ?",
+            (since,)
+        ).fetchone()["n"]
+        # 도구 사용 분포 — top 도구가 너무 한쪽으로 쏠리면 다양성 ↓
+        tool_diversity = c.execute(
+            "SELECT COUNT(DISTINCT tool) AS n FROM tool_uses WHERE ts >= ?", (since,)
+        ).fetchone()["n"]
+    return {
+        "usedSubagents": used_subagents,
+        "agentCalls30d": agent_calls,
+        "toolDiversity30d": tool_diversity,
+    }
+
+
+def _q_axis(value_max: int, *, count: int, used: int, weight: float, base_q: float = 0.5) -> dict:
+    """품질-가중 점수 계산.
+      raw    = 단순 카운트 점수 (count × weight)
+      Q      = used / count (0~1) — 0개면 base_q
+      value  = raw × (base_q + (1-base_q) × Q)   ← Q=0 이면 raw 의 base_q 만, Q=1 이면 raw 그대로
+    """
+    raw = min(value_max, count * weight)
+    if count == 0:
+        q = 0.0
+    else:
+        q = max(0.0, min(1.0, used / count))
+    factor = base_q + (1 - base_q) * q
+    value = int(round(raw * factor))
+    return {"raw": raw, "quality": round(q, 3), "factor": round(factor, 3), "value": min(value_max, value)}
+
+
 def api_optimization_score() -> dict:
     """전반적 최적화 스코어 — **사용자가 직접 설정한 자원**만 카운트.
     플러그인이 제공하는 자원은 별도 'plugins' 축에서 측정 (이중 가산 ×).
+    품질 가중치(Q): 보유한 자원 중 30일 안에 실제로 사용된 비율로 점수 조정.
     """
     _db_init()
+    qm = _quality_metrics_30d()
     score = {}
 
     s = get_settings()
@@ -2960,12 +3002,29 @@ def api_optimization_score() -> dict:
     plugin_total = counts.get("plugin", 0)
     plugin_enabled_n = counts.get("pluginEnabled", 0)
     configured_agents = user_agents_n + builtin_n
-    ag_raw = configured_agents * 10  # 사용자 설정 1개 = 10점
+    # 30일 내 위임된 user/builtin 에이전트 (subagent_type 매칭)
+    # subagent_type 은 보통 frontmatter 의 name (또는 invokeId) — 둘 다 시도
+    def _agent_call_keys(a: dict) -> set:
+        keys = set()
+        if a.get("name"): keys.add(a["name"])
+        if a.get("invokeId"): keys.add(a["invokeId"])
+        if a.get("id"): keys.add(a["id"])
+        return keys
+    user_builtin_keys = set()
+    for a in agents_data.get("agents", []):
+        if a.get("scope") in ("global", "builtin"):
+            user_builtin_keys |= _agent_call_keys(a)
+    used_user_builtin = len(user_builtin_keys & qm["usedSubagents"])
+    # configured_agents 카운트와 일치시키려면 매칭된 distinct names 수만 셈
+    used_user_builtin = min(used_user_builtin, configured_agents)
+    ag_q = _q_axis(100, count=configured_agents, used=used_user_builtin, weight=10, base_q=0.4)
     score["agents"] = {
-        "value": min(100, ag_raw), "max": 100,
-        "note": f"사용자 설정 {user_agents_n}개 + 빌트인 {builtin_n}개 = {configured_agents}개 · 플러그인 제공 {plugin_enabled_n}/{plugin_total} 활성 (별도)",
-        "formula": f"min(100, 사용자에이전트×10) = min(100, {configured_agents}×10) = min(100, {ag_raw})",
-        "suggest": "~/.claude/agents/<name>.md 로 자신만의 서브에이전트 추가. 1개 = +10점.",
+        "value": ag_q["value"], "max": 100,
+        "rawValue": min(100, ag_q["raw"]), "quality": ag_q["quality"],
+        "note": f"사용자 설정 {user_agents_n}개 + 빌트인 {builtin_n}개 = {configured_agents}개 · 30일 활용 {used_user_builtin}개 ({int(ag_q['quality']*100)}%) · 플러그인 제공 {plugin_enabled_n}/{plugin_total} 활성 (별도)",
+        "formula": f"raw=min(100, {configured_agents}×10)={ag_q['raw']}, Q={used_user_builtin}/{configured_agents}={ag_q['quality']}, value=raw×(0.4+0.6×Q)={ag_q['value']}",
+        "suggest": ("위임을 더 활용해보세요 — 정의된 에이전트가 30일간 적게 호출됨" if ag_q['quality'] < 0.5 and configured_agents > 0
+                    else "~/.claude/agents/<name>.md 로 자신만의 서브에이전트 추가."),
         "target": "agents",
     }
 
@@ -2983,26 +3042,44 @@ def api_optimization_score() -> dict:
 
     plugins = list_plugins_api()
     enabled = sum(1 for p in plugins if p.get("enabled"))
-    pl_raw = enabled * 6
+    # 활성 플러그인이 제공한 에이전트 중 30일 내 위임된 것 수 → 활용도
+    plugin_agent_keys = set()
+    for a in agents_data.get("agents", []):
+        if a.get("scope") == "plugin" and a.get("pluginEnabled"):
+            plugin_agent_keys |= _agent_call_keys(a)
+    used_plugin_agents = len(plugin_agent_keys & qm["usedSubagents"]) if plugin_agent_keys else 0
+    pl_q = _q_axis(100, count=enabled, used=min(enabled, used_plugin_agents), weight=6, base_q=0.5)
+    if enabled > 0 and plugin_agent_keys:
+        plugin_used_pct = round(used_plugin_agents / max(1, len(plugin_agent_keys)) * 100)
+    else:
+        plugin_used_pct = None
     score["plugins"] = {
-        "value": min(100, pl_raw), "max": 100,
-        "note": f"플러그인 활성 {enabled} / 설치 {len(plugins)}",
-        "formula": f"min(100, 활성플러그인×6) = min(100, {enabled}×6) = min(100, {pl_raw})",
-        "suggest": "플러그인 1개 활성화 = +6점. 플러그인 탭에서 토글.",
+        "value": pl_q["value"], "max": 100,
+        "rawValue": min(100, pl_q["raw"]), "quality": pl_q["quality"],
+        "note": (f"활성 {enabled} / 설치 {len(plugins)}" +
+                 (f" · 그 중 {used_plugin_agents}개 에이전트가 30일 내 위임됨 ({plugin_used_pct}%)"
+                  if plugin_used_pct is not None else "")),
+        "formula": f"raw=min(100, {enabled}×6)={pl_q['raw']}, Q={pl_q['quality']} (활성 플러그인 사용 비율), value={pl_q['value']}",
+        "suggest": "플러그인 1개 활성화 = +6점. 활용 안 하는 플러그인은 비활성화로 노이즈 ↓.",
         "target": "plugins",
     }
 
     connectors = list_connectors()
-    mcp_local = len(connectors.get("local", []))
+    mcp_local_list = connectors.get("local", [])
+    mcp_local = len(mcp_local_list)
     mcp_platform = len(connectors.get("platform", []))
     mcp_plugin = len(connectors.get("plugin", []))
-    mcp_n = mcp_local + mcp_platform  # 사용자 설정 기준 (플러그인 제공은 plugins 축에서 평가)
-    mcp_raw = mcp_n * 8
+    mcp_n = mcp_local + mcp_platform  # 사용자 설정 기준
+    # 품질: connected 인 것의 비율 (failed/needsAuth 는 감점)
+    healthy = sum(1 for m in (mcp_local_list + connectors.get("platform", [])) if m.get("connected"))
+    mcp_q = _q_axis(100, count=mcp_n, used=healthy, weight=8, base_q=0.3)
     score["mcp"] = {
-        "value": min(100, mcp_raw), "max": 100,
-        "note": f"MCP 서버 {mcp_n}개 (로컬 {mcp_local} + 플랫폼 {mcp_platform}) · 플러그인 제공 {mcp_plugin}개는 별도",
-        "formula": f"min(100, MCP수×8) = min(100, {mcp_n}×8) = min(100, {mcp_raw})",
-        "suggest": "MCP 탭의 카탈로그에서 Context7, GitHub, Memory 등 원클릭 설치.",
+        "value": mcp_q["value"], "max": 100,
+        "rawValue": min(100, mcp_q["raw"]), "quality": mcp_q["quality"],
+        "note": f"MCP {mcp_n}개 (로컬 {mcp_local} + 플랫폼 {mcp_platform}) · 그 중 정상 연결 {healthy}개 ({int(mcp_q['quality']*100)}%) · 플러그인 제공 {mcp_plugin}개는 별도",
+        "formula": f"raw=min(100, {mcp_n}×8)={mcp_q['raw']}, Q={healthy}/{mcp_n}={mcp_q['quality']} (연결 성공률), value={mcp_q['value']}",
+        "suggest": ("실패/인증필요 MCP 정리하면 점수 ↑" if mcp_n > 0 and mcp_q['quality'] < 1.0
+                    else "MCP 탭의 카탈로그에서 Context7, GitHub, Memory 등 원클릭 설치."),
         "target": "mcp",
     }
 
@@ -5229,6 +5306,144 @@ def api_project_ai_recommend(body: dict) -> dict:
     }
 
 
+_AI_EVAL_CACHE_FILE = _env_path(
+    "CLAUDE_DASHBOARD_AI_EVAL_CACHE",
+    Path.home() / ".claude-dashboard-ai-evaluation.json",
+)
+
+
+def api_ai_evaluation(body: dict) -> dict:
+    """전체 셋업을 Claude 에게 평가받음. 비싸므로 force=true 시에만 새로 호출."""
+    if not isinstance(body, dict):
+        body = {}
+    force = bool(body.get("force"))
+    # 캐시 (수동 갱신 방식)
+    if not force and _AI_EVAL_CACHE_FILE.exists():
+        try:
+            cached = json.loads(_AI_EVAL_CACHE_FILE.read_text(encoding="utf-8"))
+            return {"cached": True, **cached}
+        except Exception:
+            pass
+    claude_bin = shutil.which("claude")
+    if not claude_bin:
+        return {"error": "claude CLI 설치 필요"}
+    if not api_auth_status().get("connected"):
+        return {"error": "Claude 계정 연결 필요"}
+
+    # 컨텍스트 수집 — 결정론적 점수 + 사용 패턴 통계
+    det = api_optimization_score()
+    qm = _quality_metrics_30d()
+    plugin_assets = _count_enabled_plugin_assets()
+    settings = get_settings()
+    auth = api_auth_status()
+    _db_init()
+    with _db() as c:
+        proj_rows = c.execute(
+            """SELECT cwd, COUNT(*) AS n, AVG(score) AS avg_s, SUM(total_tokens) AS toks
+               FROM sessions WHERE cwd != '' GROUP BY cwd ORDER BY n DESC LIMIT 8"""
+        ).fetchall()
+        top_tools = [dict(r) for r in c.execute(
+            "SELECT tool, COUNT(*) AS n FROM tool_uses GROUP BY tool ORDER BY n DESC LIMIT 12"
+        ).fetchall()]
+        top_subagents = [dict(r) for r in c.execute(
+            "SELECT subagent_type AS name, COUNT(*) AS n FROM tool_uses WHERE subagent_type != '' GROUP BY subagent_type ORDER BY n DESC LIMIT 10"
+        ).fetchall()]
+
+    projects = [{"name": Path(r["cwd"]).name, "cwd": r["cwd"], "sessions": r["n"],
+                 "avg": int(r["avg_s"] or 0), "tokens": r["toks"] or 0} for r in proj_rows]
+
+    deterministic_summary = {k: {"value": v["value"], "quality": v.get("quality"), "note": v["note"]}
+                             for k, v in (det.get("breakdown") or {}).items()}
+
+    prompt = f"""당신은 Claude Code 워크플로우 최적화 전문가입니다.
+아래 사용자의 셋업과 30일 사용 패턴을 보고, 종합적인 평가와 개선 우선순위를 JSON 으로 답하세요.
+
+## 사용자
+- 이름: {auth.get('displayName','')}, 플랜: {auth.get('planLabel','')}
+
+## 결정론적 점수 (참고용 — 단순 휴리스틱)
+- 종합: {det.get('overall')}/100
+{json.dumps(deterministic_summary, ensure_ascii=False, indent=2)[:2500]}
+
+## 30일 사용 패턴
+- 전체 도구 호출 종류: {qm['toolDiversity30d']}종
+- 위임된 서브에이전트 종류: {len(qm['usedSubagents'])}종 → {sorted(list(qm['usedSubagents']))[:20]}
+- Agent 도구 호출 총: {qm['agentCalls30d']}회
+- 상위 도구: {', '.join(t['tool']+'×'+str(t['n']) for t in top_tools[:8])}
+- 상위 위임 에이전트: {', '.join(s['name']+'×'+str(s['n']) for s in top_subagents[:6])}
+
+## 주요 프로젝트 (상위 6개)
+{_format_projects_for_prompt(projects[:6])}
+
+## 셋업 인벤토리
+- 사용자 정의 스킬: {sum(1 for s in list_skills() if s.get('scope')=='user')} (플러그인 제공 추가 {plugin_assets['skills']})
+- 사용자 훅: {sum(len(v) if isinstance(v,list) else 0 for v in (settings.get('hooks',{}) or {}).values())}
+- 사용자 에이전트: {len([a for a in list_agents().get('agents',[]) if a.get('scope')=='global'])}
+- 활성 플러그인: {sum(1 for p in list_plugins_api() if p.get('enabled'))}
+
+## 출력 형식 — JSON 만, 한국어 본문:
+{{
+  "overall": 0~100 정수,
+  "verdict": "한 줄 종합 평가",
+  "strengths": ["잘하고 있는 점 3개 이내"],
+  "weaknesses": ["개선이 필요한 점 3개 이내"],
+  "priorities": [
+    {{"rank": 1, "title": "최우선 개선 항목", "impact": "high|medium|low", "effort": "low|medium|high",
+      "rationale": "왜", "action": "구체적으로 무엇을 해야 하는지"}},
+    ... 최대 5개
+  ],
+  "patternInsights": ["사용 패턴에서 발견한 흥미로운 점 2-3개"]
+}}
+"""
+    try:
+        proc = subprocess.run(
+            [claude_bin, "-p", prompt, "--output-format", "json"],
+            capture_output=True, text=True, timeout=180,
+        )
+    except Exception as e:
+        return {"error": f"Claude CLI 실행 실패: {e}"}
+    if proc.returncode != 0:
+        return {"error": f"Claude CLI 오류: {(proc.stderr or '')[:400]}"}
+
+    stdout = (proc.stdout or "").strip()
+    response_text = stdout
+    cost_info = {}
+    try:
+        meta = json.loads(stdout)
+        if isinstance(meta, dict):
+            response_text = meta.get("result") or stdout
+            cost_info = {
+                "costUsd": meta.get("total_cost_usd"),
+                "durationMs": meta.get("duration_ms"),
+                "model": meta.get("model"),
+            }
+    except Exception:
+        pass
+
+    # JSON 추출
+    parsed: dict = {}
+    m = re.search(r"\{[\s\S]*\}", response_text)
+    if m:
+        try:
+            parsed = json.loads(m.group(0))
+        except Exception:
+            parsed = {}
+
+    out = {
+        "evaluation": parsed,
+        "raw": response_text[:6000],
+        "costInfo": cost_info,
+        "deterministic": {"overall": det.get("overall"), "breakdown": det.get("breakdown")},
+        "ts": int(time.time() * 1000),
+        "cached": False,
+    }
+    try:
+        _AI_EVAL_CACHE_FILE.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+    return out
+
+
 def api_feature_recommend(body: dict) -> dict:
     """훅/권한/출력스타일/상태라인 등 기능별 AI 추천.
     body: { kind: 'hooks'|'permissions'|'output-styles'|'statusline' }
@@ -5723,6 +5938,7 @@ ROUTES_GET = {
     "/api/agents/graph": api_agent_graph,
     "/api/optimization/score": lambda q: api_optimization_score(),
     "/api/permissions/diagnose": lambda q: {"issues": validate_permissions(get_settings().get("permissions") or {})},
+    "/api/evaluation/ai": lambda q: api_ai_evaluation({"force": False}),
     "/api/auth/status": lambda q: api_auth_status(),
     "/api/project/detail": api_project_detail,
     "/api/project/score-detail": api_project_score_detail,
@@ -5896,6 +6112,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(api_global_claude_md_recommend(self._read_body())); return
         if path == "/api/feature/recommend":
             self._send_json(api_feature_recommend(self._read_body())); return
+        if path == "/api/evaluation/ai":
+            self._send_json(api_ai_evaluation(self._read_body())); return
         if path == "/api/commands/translate":
             self._send_json(api_commands_translate(self._read_body())); return
         if path == "/api/translate/batch":
