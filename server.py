@@ -1880,30 +1880,17 @@ def list_marketplaces() -> list:
 
 # ───────────────── API: connectors / MCP ─────────────────
 
-def list_connectors() -> dict:
-    """MCP 커넥터 분류:
-      - platform: claude.ai 플랫폼 연결 (예: 'claude.ai Google Drive') — claude CLI / mcp-needs-auth-cache 로 감지
-      - local:    ~/.claude.json mcpServers (사용자 설치)
-      - plugin:   활성 플러그인이 제공하는 MCP (claude mcp list 의 'plugin:' 접두사)
-    """
-    platform_list: list = []
-    local: list = []
-    plugin_list: list = []
+_MCP_LIST_CACHE = {"ts": 0.0, "status": {}, "url": {}}
+_MCP_LIST_TTL = 60.0  # 초
 
-    # 1) claude.json 의 mcpServers — 사용자 직접 설치
-    local_cfg: dict = {}
-    if CLAUDE_JSON.exists():
-        try:
-            data = json.loads(_safe_read(CLAUDE_JSON))
-        except Exception:
-            data = {}
-        mcp = data.get("mcpServers", {}) if isinstance(data, dict) else {}
-        if isinstance(mcp, dict):
-            local_cfg = mcp
 
-    # 2) `claude mcp list` 로 정확한 분류 + 연결 상태 가져오기 (있으면)
-    cli_status: dict = {}  # name → status string
-    cli_url: dict = {}     # name → endpoint
+def _claude_mcp_list_cached() -> tuple[dict, dict]:
+    """claude mcp list 결과를 60초 캐시 (호출당 ~6초 비용 회피)."""
+    now = time.time()
+    if now - _MCP_LIST_CACHE["ts"] < _MCP_LIST_TTL and _MCP_LIST_CACHE["status"]:
+        return _MCP_LIST_CACHE["status"], _MCP_LIST_CACHE["url"]
+    cli_status: dict = {}
+    cli_url: dict = {}
     claude_bin = shutil.which("claude")
     if claude_bin:
         try:
@@ -1915,7 +1902,6 @@ def list_connectors() -> dict:
                 line = line.strip()
                 if not line or ":" not in line:
                     continue
-                # 형식: "<name>: <endpoint> - <status>"
                 m = re.match(r"^(.+?):\s+(.+?)\s+-\s+(.+)$", line)
                 if not m:
                     continue
@@ -1924,6 +1910,33 @@ def list_connectors() -> dict:
                 cli_url[name] = endpoint
         except Exception:
             pass
+    _MCP_LIST_CACHE["status"] = cli_status
+    _MCP_LIST_CACHE["url"] = cli_url
+    _MCP_LIST_CACHE["ts"] = now
+    return cli_status, cli_url
+
+
+def list_connectors() -> dict:
+    """MCP 커넥터 분류:
+      - platform: claude.ai 플랫폼 연결 (예: 'claude.ai Google Drive')
+      - local:    ~/.claude.json mcpServers (사용자 설치)
+      - plugin:   활성 플러그인이 제공하는 MCP ('plugin:' 접두사)
+    """
+    platform_list: list = []
+    local: list = []
+    plugin_list: list = []
+
+    local_cfg: dict = {}
+    if CLAUDE_JSON.exists():
+        try:
+            data = json.loads(_safe_read(CLAUDE_JSON))
+        except Exception:
+            data = {}
+        mcp = data.get("mcpServers", {}) if isinstance(data, dict) else {}
+        if isinstance(mcp, dict):
+            local_cfg = mcp
+
+    cli_status, cli_url = _claude_mcp_list_cached()
 
     # 3) needs-auth 캐시 (플랫폼 MCP fallback)
     auth_cache_path = CLAUDE_HOME / "mcp-needs-auth-cache.json"
