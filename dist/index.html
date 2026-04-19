@@ -302,6 +302,10 @@ function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+// JSON 객체를 HTML 속성(작은/큰따옴표 모두 안전) 으로 인코딩
+function jsonAttr(obj) {
+  return escapeHtml(JSON.stringify(obj));
+}
 function fmtMs(ms) {
   if (!ms) return '—';
   const d = new Date(ms);
@@ -1591,8 +1595,8 @@ VIEWS.hooks = async () => {
         ${x.timeout ? `<div><span class="text-[var(--text-dim)]">timeout:</span> ${x.timeout}ms</div>`:''}
       </div>
       <div class="flex flex-col gap-1 flex-shrink-0">
-        <button class="btn text-[10px]" onclick='openHookEditor(${JSON.stringify({scope:"user", event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx, matcher:x.matcher, type:x.type||"command", command:x.command||"", timeout:x.timeout})})'>수정</button>
-        <button class="btn text-[10px]" style="color:#fca5a5" onclick='deleteHook(${JSON.stringify({scope:"user", event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx})})'>삭제</button>
+        <button class="btn text-[10px]" onclick="openHookEditor(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr({scope:"user", event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx, matcher:x.matcher||"", type:x.type||"command", command:x.command||"", timeout:x.timeout})}">수정</button>
+        <button class="btn text-[10px]" style="color:#fca5a5" onclick="deleteHook(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr({scope:"user", event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx})}">삭제</button>
       </div>
     </div>`;
 
@@ -1600,8 +1604,8 @@ VIEWS.hooks = async () => {
     const badge = x.pluginEnabled
       ? '<span class="chip text-[9px]" style="background:rgba(217,119,87,0.12); white-space:nowrap;">🔌 플러그인 제공</span>'
       : `<button class="chip chip-warn text-[9px]" style="white-space:nowrap;" onclick="togglePluginFromAgent('${escapeHtml(x.pluginKey||'')}', true)">비활성 플러그인 ▶ 활성화</button>`;
-    const editPayload = JSON.stringify({scope:"plugin", pluginKey:x.pluginKey, event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx, matcher:x.matcher||"", type:x.type||"command", command:x.command||"", timeout:x.timeout});
-    const delPayload = JSON.stringify({scope:"plugin", pluginKey:x.pluginKey, event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx});
+    const editPayload = jsonAttr({scope:"plugin", pluginKey:x.pluginKey, event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx, matcher:x.matcher||"", type:x.type||"command", command:x.command||"", timeout:x.timeout});
+    const delPayload = jsonAttr({scope:"plugin", pluginKey:x.pluginKey, event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx});
     return `
     <div class="rounded-lg p-3 text-xs border border-[var(--border)]" style="display:flex; align-items:flex-start; gap:0.75rem; background:rgba(217,119,87,0.06); min-width:0; max-width:100%; overflow:hidden;">
       <div style="flex:1 1 0; min-width:0; max-width:100%; overflow:hidden;">
@@ -1617,8 +1621,8 @@ VIEWS.hooks = async () => {
         ${x.timeout ? `<div><span class="text-[var(--text-dim)]">timeout:</span> ${x.timeout}ms</div>`:''}
       </div>
       <div class="flex flex-col gap-1 flex-shrink-0">
-        <button class="btn text-[10px]" title="플러그인 hooks.json 직접 수정" onclick='openHookEditor(${editPayload})'>수정</button>
-        <button class="btn text-[10px]" style="color:#fca5a5" onclick='deleteHook(${delPayload})'>삭제</button>
+        <button class="btn text-[10px]" title="플러그인 hooks.json 직접 수정" onclick="openHookEditor(JSON.parse(this.dataset.payload))" data-payload="${editPayload}">수정</button>
+        <button class="btn text-[10px]" style="color:#fca5a5" onclick="deleteHook(JSON.parse(this.dataset.payload))" data-payload="${delPayload}">삭제</button>
       </div>
     </div>`;
   };
