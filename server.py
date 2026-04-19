@@ -1735,9 +1735,7 @@ def api_mcp_project_remove(body: dict) -> dict:
     if not isinstance(servers, dict) or name not in servers:
         return {"ok": False, "error": f"'{name}' 가 {mcp_file} 에 없음"}
     removed = servers.pop(name)
-    # 빈 mcpServers 면 키 자체 제거 (깔끔하게)
-    if not servers:
-        data.pop("mcpServers", None)
+    # 빈이어도 mcpServers 키는 유지 — Claude Code 스키마가 필수로 요구
     ok = _safe_write(mcp_file, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
     if ok:
         _MCP_LIST_CACHE["ts"] = 0
