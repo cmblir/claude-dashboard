@@ -2397,6 +2397,16 @@ async function removeMcp(name) {
   else toast(r.error||'실패', 'err');
 }
 
+async function removeProjectMcp(cwd, name) {
+  if (!confirm(`프로젝트 MCP '${name}' 을 제거할까요?\n${cwd}/.mcp.json 에서 삭제됩니다.`)) return;
+  const r = await api('/api/mcp/project/remove', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ cwd, name }),
+  });
+  if (r.ok) toast(`'${name}' 제거됨 (${r.configPath})`, 'ok');
+  else toast(r.error||'실패', 'err');
+}
+
 function renderConnectorGroup(title, list, allowRemove) {
   const statusBadge = (m) => {
     if (m.connected === true) return '<span class="chip chip-ok text-[9px]" style="white-space:nowrap;">✓ 연결됨</span>';
@@ -2417,7 +2427,9 @@ function renderConnectorGroup(title, list, allowRemove) {
               </div>
               <div class="flex items-center gap-1 flex-shrink-0">
                 ${statusBadge(m)}
-                ${allowRemove ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick="removeMcp(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr(m.name)}">제거</button>` : ''}
+                ${m.scope === 'project' && m.projectCwd
+                  ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick="removeProjectMcp(JSON.parse(this.dataset.cwd), JSON.parse(this.dataset.name))" data-cwd="${jsonAttr(m.projectCwd)}" data-name="${jsonAttr(m.name)}">제거</button>`
+                  : (allowRemove ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick="removeMcp(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr(m.name)}">제거</button>` : '')}
               </div>
             </div>
             ${m.endpoint ? `<div class="text-[10px] mono text-[var(--text-dim)] truncate" title="${escapeHtml(m.endpoint)}">${escapeHtml(m.endpoint)}</div>` : ''}
