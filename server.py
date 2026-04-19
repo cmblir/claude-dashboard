@@ -2031,40 +2031,91 @@ def list_marketplaces() -> list:
 
 # ───────────────── API: connectors / MCP ─────────────────
 
+import threading as _threading
+_MCP_LIST_CACHE_FILE = _env_path("CLAUDE_DASHBOARD_MCP_CACHE", Path.home() / ".claude-dashboard-mcp-cache.json")
 _MCP_LIST_CACHE = {"ts": 0.0, "status": {}, "url": {}}
-_MCP_LIST_TTL = 60.0  # 초
+_MCP_LIST_TTL = 300.0  # 5분 — 거의 안 바뀜
+_MCP_LIST_LOCK = _threading.Lock()
+_MCP_LIST_REFRESH_LOCK = _threading.Lock()  # 단일 in-flight refresh
+
+# 디스크 캐시 로드 (서버 재시작해도 즉시 사용 가능)
+try:
+    if _MCP_LIST_CACHE_FILE.exists():
+        _disk = json.loads(_MCP_LIST_CACHE_FILE.read_text(encoding="utf-8"))
+        if isinstance(_disk, dict):
+            _MCP_LIST_CACHE["status"] = _disk.get("status", {}) or {}
+            _MCP_LIST_CACHE["url"] = _disk.get("url", {}) or {}
+            _MCP_LIST_CACHE["ts"] = float(_disk.get("ts", 0) or 0)
+except Exception:
+    pass
+
+
+def _refresh_mcp_list_blocking() -> tuple[dict, dict]:
+    """실제 claude mcp list 호출 (단일 in-flight 보장)."""
+    # 다른 스레드가 이미 refresh 중이면 그 결과를 기다림 (중복 6초 호출 방지)
+    if not _MCP_LIST_REFRESH_LOCK.acquire(blocking=False):
+        # 다른 호출자가 작업 중 → 끝날 때까지 대기 후 캐시 반환
+        with _MCP_LIST_REFRESH_LOCK:
+            return _MCP_LIST_CACHE["status"], _MCP_LIST_CACHE["url"]
+    try:
+        cli_status: dict = {}
+        cli_url: dict = {}
+        claude_bin = shutil.which("claude")
+        if claude_bin:
+            try:
+                proc = subprocess.run(
+                    [claude_bin, "mcp", "list"],
+                    capture_output=True, text=True, timeout=12,
+                )
+                for line in (proc.stdout or "").splitlines():
+                    line = line.strip()
+                    if not line or ":" not in line:
+                        continue
+                    m = re.match(r"^(.+?):\s+(.+?)\s+-\s+(.+)$", line)
+                    if not m:
+                        continue
+                    name, endpoint, status = m.group(1).strip(), m.group(2).strip(), m.group(3).strip()
+                    cli_status[name] = status
+                    cli_url[name] = endpoint
+            except Exception:
+                pass
+        with _MCP_LIST_LOCK:
+            _MCP_LIST_CACHE["status"] = cli_status
+            _MCP_LIST_CACHE["url"] = cli_url
+            _MCP_LIST_CACHE["ts"] = time.time()
+        # 디스크에도 보관 (서버 재시작 후 즉시 사용)
+        try:
+            _MCP_LIST_CACHE_FILE.write_text(
+                json.dumps({"status": cli_status, "url": cli_url, "ts": _MCP_LIST_CACHE["ts"]}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+        return cli_status, cli_url
+    finally:
+        _MCP_LIST_REFRESH_LOCK.release()
 
 
 def _claude_mcp_list_cached() -> tuple[dict, dict]:
-    """claude mcp list 결과를 60초 캐시 (호출당 ~6초 비용 회피)."""
+    """5분 캐시 + stale-while-revalidate. 캐시 있으면 절대 블로킹 안 함.
+    캐시 없을 때만(부팅 직후 첫 호출) 한 번 동기 대기, 그 외엔 즉시 반환.
+    """
     now = time.time()
-    if now - _MCP_LIST_CACHE["ts"] < _MCP_LIST_TTL and _MCP_LIST_CACHE["status"]:
-        return _MCP_LIST_CACHE["status"], _MCP_LIST_CACHE["url"]
-    cli_status: dict = {}
-    cli_url: dict = {}
-    claude_bin = shutil.which("claude")
-    if claude_bin:
-        try:
-            proc = subprocess.run(
-                [claude_bin, "mcp", "list"],
-                capture_output=True, text=True, timeout=12,
-            )
-            for line in (proc.stdout or "").splitlines():
-                line = line.strip()
-                if not line or ":" not in line:
-                    continue
-                m = re.match(r"^(.+?):\s+(.+?)\s+-\s+(.+)$", line)
-                if not m:
-                    continue
-                name, endpoint, status = m.group(1).strip(), m.group(2).strip(), m.group(3).strip()
-                cli_status[name] = status
-                cli_url[name] = endpoint
-        except Exception:
-            pass
-    _MCP_LIST_CACHE["status"] = cli_status
-    _MCP_LIST_CACHE["url"] = cli_url
-    _MCP_LIST_CACHE["ts"] = now
-    return cli_status, cli_url
+    with _MCP_LIST_LOCK:
+        has_cache = _MCP_LIST_CACHE["ts"] > 0
+        fresh = (now - _MCP_LIST_CACHE["ts"]) < _MCP_LIST_TTL
+        cached = (_MCP_LIST_CACHE["status"], _MCP_LIST_CACHE["url"])
+    if has_cache and fresh:
+        return cached
+    if has_cache:
+        # stale — 즉시 stale 반환 + 백그라운드 갱신 (단일 in-flight)
+        def _bg():
+            try: _refresh_mcp_list_blocking()
+            except Exception: pass
+        _threading.Thread(target=_bg, daemon=True).start()
+        return cached
+    # 캐시 전혀 없음 → 동기 호출 (LOCK 으로 중복 호출 1회로 합쳐짐)
+    return _refresh_mcp_list_blocking()
 
 
 def list_connectors() -> dict:
@@ -5845,9 +5896,23 @@ def _background_index() -> None:
         print(f"[server] index failed: {e}")
 
 
+def _warmup_caches() -> None:
+    """비싼 외부 호출 결과를 미리 채워둠 — 첫 사용자 요청이 6초 걸리던 문제 해결."""
+    import threading
+    def _run():
+        try:
+            t0 = time.time()
+            _claude_mcp_list_cached()  # 6초 caches 채움
+            print(f"[server] warmup mcp list: {time.time()-t0:.2f}s")
+        except Exception as e:
+            print(f"[server] warmup failed: {e}")
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def main() -> None:
     _db_init()
     _background_index()
+    _warmup_caches()
     port = int(os.environ.get("PORT", "8080"))
     host = os.environ.get("HOST", "127.0.0.1")
     httpd = ThreadingHTTPServer((host, port), Handler)
