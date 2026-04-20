@@ -50,11 +50,10 @@ build/
 dist-build/
 node_modules/
 
-# 빌드 산출물 (원본 dist/index.html 과 build-i18n.py 로 재생성)
-dist/index-en.html
-dist/index-zh.html
-
 # MCP list 디스크 캐시 (런타임 생성)
 *-mcp-cache.json
 *-ai-evaluation.json
 *-latest-features.json
+
+# 번역 작업 파일 (검증 보고)
+_missing.json

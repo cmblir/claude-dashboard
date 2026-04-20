@@ -110,17 +110,32 @@ dist/index.html        — 단일 파일 SPA (Vanilla JS + CDN)
 ~/.claude-dashboard.db — 세션 인덱스 (자동 생성)
 ```
 
-## 🛠 빌드
+## 🌐 다국어 (i18n)
 
-다국어 HTML 생성 (영어 · 중국어):
+한국어 · 영어 · 중국어 3개 언어 지원. 번역은 **런타임 fetch** 방식.
 
-```bash
-python3 build-i18n.py
-# → dist/index-en.html, dist/index-zh.html 재생성
+```
+dist/locales/ko.json    # 한국어 원문 → 한국어 (identity)
+dist/locales/en.json    # 한국어 원문 → 영어 번역
+dist/locales/zh.json    # 한국어 원문 → 중국어 번역
 ```
 
-위 두 파일은 `.gitignore` 로 제외되어 있으며, 원본 `dist/index.html` 과
-`build-i18n.py` 만 버전 관리 대상이다.
+- 페이지 로드 시 `_curLang` 감지 (`?lang=en|zh` 쿼리 또는 `cc-lang` 쿠키)
+- `/api/locales/{lang}.json` 으로 사전 fetch → `_translateDOM` 가 정적 DOM 교체
+- JS 에서는 `t('한국어 원문')` 헬퍼로 런타임 번역
+- 누락 시 한국어 원문 fallback + 콘솔 경고
+
+### 번역 추가 / 수정
+
+```bash
+python3 tools/extract_ko_strings.py     # dist/index.html 에서 한국어 phrase 전수 추출 → translation-audit.json
+# 누락된 번역을 tools/translations_manual.py 에 추가 (MANUAL_EN / MANUAL_ZH)
+python3 tools/build_locales.py          # dist/locales/{ko,en,zh}.json 재생성
+node scripts/verify-translations.js     # 0 건 누락 검증 (실패 시 exit 1)
+```
+
+검수가 필요한 항목은 `translation-review.md` 에 자동 기록되며,
+`tools/translations_manual.py::NEEDS_REVIEW` 에서 관리.
 
 ## 🔌 API
 
