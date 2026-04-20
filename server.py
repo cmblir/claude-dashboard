@@ -1668,7 +1668,7 @@ def api_mcp_install(body: dict) -> dict:
     install_spec = _substitute_placeholders(install_spec, values)
 
     if not CLAUDE_JSON.exists():
-        return {"ok": False, "error": "~/.claude.json 없음. `claude login` 먼저 실행."}
+        return {"ok": False, "error": "~/.claude.json 없음. `claude auth login` 먼저 실행."}
     try:
         data = json.loads(_safe_read(CLAUDE_JSON, 500000))
     except Exception as e:
@@ -4279,7 +4279,7 @@ def api_auth_status() -> dict:
     oauth = data.get("oauthAccount") or {}
     if not oauth:
         return {
-            "connected": False, "reason": "OAuth 계정 없음 — `claude login` 실행 필요.",
+            "connected": False, "reason": "OAuth 계정 없음 — `claude auth login` 실행 필요.",
             "cliInstalled": bool(cli_path), "cliPath": cli_path, "cliVersion": cli_version,
         }
 
@@ -4299,16 +4299,35 @@ def api_auth_status() -> dict:
     else:
         plan_label = "무료 / 미확인"
 
+    # `claude auth status` 에서 실시간 구독 타입 가져오기
+    cli_auth: dict = {}
+    if cli_path:
+        try:
+            raw = subprocess.check_output(
+                [cli_path, "auth", "status"], text=True, timeout=5,
+            ).strip()
+            cli_auth = json.loads(raw) if raw.startswith("{") else {}
+        except Exception:
+            cli_auth = {}
+
+    # CLI auth status 에 subscriptionType 이 있으면 plan label 덮어쓰기
+    sub_type = cli_auth.get("subscriptionType", "")
+    if sub_type and not claimed_plan:
+        sub_map = {"free": "Free", "pro": "Pro", "max": "Max", "team": "Team", "enterprise": "Enterprise"}
+        plan_label = f"Claude {sub_map.get(sub_type, sub_type)}"
+
     projects_count = len(data.get("projects", {}) or {})
     return {
         "connected": True,
-        "email": oauth.get("emailAddress", ""),
+        "email": cli_auth.get("email") or oauth.get("emailAddress", ""),
         "displayName": oauth.get("displayName", ""),
         "accountUuid": oauth.get("accountUuid", ""),
-        "organizationUuid": oauth.get("organizationUuid", ""),
+        "organizationUuid": cli_auth.get("orgId") or oauth.get("organizationUuid", ""),
+        "organizationName": cli_auth.get("orgName") or "",
         "organizationRole": oauth.get("organizationRole", ""),
         "workspaceRole": oauth.get("workspaceRole", ""),
         "billingType": billing,
+        "subscriptionType": sub_type,
         "planLabel": plan_label,
         "claimedPlanId": claimed_plan_id,
         "planNote": claimed_plan["note"] if claimed_plan else "플랜은 로컬에 저장되지 않습니다. 직접 선택하세요.",
@@ -5502,6 +5521,10 @@ def api_project_ai_recommend(body: dict) -> dict:
   ]
 }}
 """
+    lang = (body.get("lang") or "ko").lower()
+    _lang_map = {"en": "\n\nIMPORTANT: ALL text in the JSON must be in English.", "zh": "\n\nIMPORTANT: ALL text in the JSON must be in Chinese (简体中文)."}
+    if lang in _lang_map:
+        prompt += _lang_map[lang]
 
     try:
         proc = subprocess.run(
@@ -5907,7 +5930,7 @@ def api_ai_evaluation(body: dict) -> dict:
 - 사용자 에이전트: {len([a for a in list_agents().get('agents',[]) if a.get('scope')=='global'])}
 - 활성 플러그인: {sum(1 for p in list_plugins_api() if p.get('enabled'))}
 
-## 출력 형식 — JSON 만, 한국어 본문:
+## 출력 형식 — JSON 만:
 {{
   "overall": 0~100 정수,
   "verdict": "한 줄 종합 평가",
@@ -5921,6 +5944,11 @@ def api_ai_evaluation(body: dict) -> dict:
   "patternInsights": ["사용 패턴에서 발견한 흥미로운 점 2-3개"]
 }}
 """
+    # 언어 지시 주입
+    lang = (body.get("lang") or "ko").lower() if isinstance(body, dict) else "ko"
+    lang_map = {"en": "\n\nIMPORTANT: ALL text values in the JSON must be in English.", "zh": "\n\nIMPORTANT: ALL text values in the JSON must be in Chinese (简体中文)."}
+    if lang in lang_map:
+        prompt += lang_map[lang]
     try:
         proc = subprocess.run(
             [claude_bin, "-p", prompt, "--output-format", "json"],
@@ -5962,6 +5990,7 @@ def api_ai_evaluation(body: dict) -> dict:
         "deterministic": {"overall": det.get("overall"), "breakdown": det.get("breakdown")},
         "ts": int(time.time() * 1000),
         "cached": False,
+        "lang": lang,
     }
     try:
         _AI_EVAL_CACHE_FILE.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
@@ -6102,6 +6131,10 @@ def api_feature_recommend(body: dict) -> dict:
 ## 출력 형식
 JSON 만: {output_shape}
 """
+    lang = (body.get("lang") or "ko").lower()
+    lang_map = {"en": "\n\nIMPORTANT: ALL text in the response must be in English.", "zh": "\n\nIMPORTANT: ALL text in the response must be in Chinese (简体中文)."}
+    if lang in lang_map:
+        prompt += lang_map[lang]
     try:
         proc = subprocess.run(
             [claude_bin, "-p", prompt, "--output-format", "json"],
@@ -6204,6 +6237,10 @@ def api_global_claude_md_recommend(body: dict) -> dict:
 ## 출력 형식
 JSON 만 반환: {{"content": "<CLAUDE.md 전체 내용>"}}
 """
+    lang = (body.get("lang") or "ko").lower()
+    _lang_map = {"en": "\n\nIMPORTANT: Write the CLAUDE.md content in English.", "zh": "\n\nIMPORTANT: Write the CLAUDE.md content in Chinese (简体中文)."}
+    if lang in _lang_map:
+        prompt += _lang_map[lang]
     try:
         proc = subprocess.run(
             [claude_bin, "-p", prompt, "--output-format", "json"],
@@ -6419,6 +6456,267 @@ def open_session_action(body: dict) -> dict:
     return {"ok": True, "app": app or "unknown", "pid": pid}
 
 
+_CHAT_SYSTEM_PROMPT = """당신은 Claude Control Center 대시보드의 안내 도우미입니다.
+사용자가 대시보드 기능에 대해 질문하면 친절하게 한국어로 답변하고, 관련 탭으로 안내합니다.
+
+## 대시보드 탭 목록 (id → 설명)
+- overview: 전체 개요 · 최적화 점수 · 시스템 요약
+- projects: 프로젝트별 Claude 세팅 · AI 추천 · CLAUDE.md 관리
+- analytics: 통계 & 스코어 · 30일 타임라인 · 도구 분포
+- aiEval: AI 종합 평가 · Claude가 전체 셋업을 진단
+- sessions: 세션 히스토리 · 과거 대화 검색 · 세션 품질 스코어
+- agents: 에이전트 목록 · 상호작용 그래프 (vis-network)
+- projectAgents: 프로젝트별 서브 에이전트 관리 · 16개 역할 프리셋
+- skills: 사용자 정의 스킬 보기/편집
+- commands: 슬래시 명령어 목록
+- hooks: 이벤트 훅 설정
+- permissions: 도구 권한 관리
+- mcp: MCP 커넥터 · 외부 도구 연결
+- plugins: 플러그인 관리
+- settings: settings.json 편집
+- claudemd: CLAUDE.md 편집 (마크다운 프리뷰)
+- usage: 사용량 / 비용 추정
+- metrics: 토큰 메트릭 상세
+- memory: 프로젝트 메모리 관리
+- tasks: 태스크 / TODO 관리
+- team: 팀 / 조직 정보
+- system: 시스템 상태 · 디바이스 정보
+
+## 응답 규칙
+1. 간결하게 2-3문장으로 답변
+2. 관련 탭이 있으면 반드시 `navigate` 필드에 탭 id를 포함
+3. JSON 형식으로만 응답:
+{"answer": "답변 텍스트", "navigate": "tab_id 또는 null"}
+"""
+
+
+def api_chat(body: dict) -> dict:
+    """챗봇 API — 사용자 질문을 받아 대시보드 안내 답변 반환."""
+    if not isinstance(body, dict):
+        return {"error": "잘못된 요청"}
+    user_msg = (body.get("message") or "").strip()
+    if not user_msg:
+        return {"error": "메시지가 비어있습니다."}
+    history = body.get("history") or []
+
+    claude_bin = shutil.which("claude")
+    if not claude_bin:
+        return {"error": "Claude CLI 미설치"}
+    if not api_auth_status().get("connected"):
+        return {"error": "Claude 계정 연결 필요"}
+
+    # 대화 히스토리를 프롬프트에 포함
+    conv_lines = []
+    for h in history[-6:]:  # 최근 6개까지만
+        role = h.get("role", "")
+        text = h.get("text", "")
+        if role == "user":
+            conv_lines.append(f"사용자: {text}")
+        elif role == "assistant":
+            conv_lines.append(f"도우미: {text}")
+
+    lang = (body.get("lang") or "ko").lower()
+    lang_instruction = {"en": "\n\nIMPORTANT: Respond in English only.", "zh": "\n\nIMPORTANT: Respond in Chinese (简体中文) only."}.get(lang, "")
+
+    prompt_parts = [_CHAT_SYSTEM_PROMPT + lang_instruction]
+    if conv_lines:
+        prompt_parts.append("\n## 이전 대화\n" + "\n".join(conv_lines))
+    prompt_parts.append(f"\n## 현재 질문\n사용자: {user_msg}\n\nJSON으로만 답변:")
+
+    full_prompt = "\n".join(prompt_parts)
+
+    try:
+        proc = subprocess.run(
+            [claude_bin, "-p", full_prompt, "--output-format", "json"],
+            capture_output=True, text=True, timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return {"error": "응답 시간 초과 (30초)"}
+    except Exception as e:
+        return {"error": f"CLI 실행 실패: {e}"}
+
+    if proc.returncode != 0:
+        return {"error": f"CLI 오류: {(proc.stderr or '')[:200]}"}
+
+    stdout = (proc.stdout or "").strip()
+    # --output-format json 은 {"result": "..."} 래핑
+    response_text = stdout
+    try:
+        meta = json.loads(stdout)
+        if isinstance(meta, dict) and "result" in meta:
+            response_text = meta["result"]
+    except Exception:
+        pass
+
+    # JSON 파싱 시도
+    parsed = {}
+    m = re.search(r"\{[\s\S]*\}", response_text)
+    if m:
+        try:
+            parsed = json.loads(m.group(0))
+        except Exception:
+            pass
+
+    answer = parsed.get("answer") or response_text[:500]
+    navigate = parsed.get("navigate")
+    # navigate 검증
+    valid_tabs = {
+        "overview", "projects", "analytics", "aiEval", "sessions", "agents",
+        "projectAgents", "skills", "commands", "hooks", "permissions", "mcp",
+        "plugins", "settings", "claudemd", "usage", "metrics", "memory",
+        "tasks", "team", "system", "features", "statusline", "plans",
+        "envConfig", "modelConfig", "ideStatus", "scheduled", "backups",
+        "bashHistory", "telemetry", "homunculus", "outputStyles",
+    }
+    if navigate and navigate not in valid_tabs:
+        navigate = None
+
+    return {"answer": answer, "navigate": navigate}
+
+
+def handle_chat_stream(handler: "Handler", body: dict) -> None:
+    """SSE 스트리밍 챗 — claude CLI stream-json 을 SSE 로 중계."""
+    user_msg = (body.get("message") or "").strip() if isinstance(body, dict) else ""
+    if not user_msg:
+        handler.send_response(400)
+        handler.send_header("Content-Type", "text/plain")
+        handler.end_headers()
+        handler.wfile.write(b"empty message")
+        return
+
+    claude_bin = shutil.which("claude")
+    if not claude_bin:
+        handler.send_response(500)
+        handler.send_header("Content-Type", "text/plain")
+        handler.end_headers()
+        handler.wfile.write(b"claude CLI not found")
+        return
+
+    history = body.get("history") or []
+    lang = (body.get("lang") or "ko").lower()
+    lang_instruction = {"en": "\n\nIMPORTANT: Respond in English only.", "zh": "\n\nIMPORTANT: Respond in Chinese (简体中文) only."}.get(lang, "")
+
+    conv_lines = []
+    for h in history[-6:]:
+        role = h.get("role", "")
+        text = h.get("text", "")
+        if role == "user":
+            conv_lines.append(f"사용자: {text}")
+        elif role == "assistant":
+            conv_lines.append(f"도우미: {text}")
+
+    prompt_parts = [_CHAT_SYSTEM_PROMPT + lang_instruction]
+    if conv_lines:
+        prompt_parts.append("\n## 이전 대화\n" + "\n".join(conv_lines))
+    prompt_parts.append(f"\n## 현재 질문\n사용자: {user_msg}\n\nJSON으로만 답변:")
+    full_prompt = "\n".join(prompt_parts)
+
+    # SSE 헤더
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
+    handler.send_header("Cache-Control", "no-cache")
+    handler.send_header("Connection", "keep-alive")
+    handler.send_header("X-Accel-Buffering", "no")
+    handler.end_headers()
+
+    def _sse(event: str, data: str) -> None:
+        chunk = f"event: {event}\ndata: {data}\n\n"
+        try:
+            handler.wfile.write(chunk.encode("utf-8"))
+            handler.wfile.flush()
+        except Exception:
+            pass
+
+    try:
+        proc = subprocess.Popen(
+            [claude_bin, "-p", full_prompt, "--output-format", "stream-json",
+             "--verbose", "--include-partial-messages"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        full_text = ""
+        for line in proc.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            msg_type = obj.get("type")
+            if msg_type == "assistant":
+                content = (obj.get("message") or {}).get("content") or []
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        new_text = block.get("text", "")
+                        if len(new_text) > len(full_text):
+                            delta = new_text[len(full_text):]
+                            full_text = new_text
+                            _sse("delta", json.dumps({"text": delta}, ensure_ascii=False))
+            elif msg_type == "result":
+                result_text = obj.get("result", "")
+                if result_text and not full_text:
+                    full_text = result_text
+                    _sse("delta", json.dumps({"text": result_text}, ensure_ascii=False))
+                # navigate 추출
+                navigate = None
+                m = re.search(r"\{[\s\S]*\}", full_text)
+                if m:
+                    try:
+                        parsed = json.loads(m.group(0))
+                        nav = parsed.get("navigate")
+                        answer = parsed.get("answer", "")
+                        if nav:
+                            navigate = nav
+                        # 만약 JSON 형태로 답변이 왔으면 answer 부분만 다시 전송
+                        if answer and answer != full_text:
+                            _sse("replace", json.dumps({"text": answer}, ensure_ascii=False))
+                            full_text = answer
+                    except Exception:
+                        pass
+                _sse("done", json.dumps({"navigate": navigate, "text": full_text}, ensure_ascii=False))
+        proc.wait(timeout=5)
+    except Exception as e:
+        _sse("error", json.dumps({"error": str(e)}, ensure_ascii=False))
+
+
+def api_auth_login(body: dict) -> dict:
+    """터미널에서 `claude auth login` 을 실행. 인터랙티브 명령이므로 터미널 앱을 열어준다."""
+    cli = shutil.which("claude")
+    if not cli:
+        return {"ok": False, "error": "Claude CLI 가 설치되어 있지 않습니다. 먼저 설치하세요."}
+    # macOS: AppleScript 로 기본 터미널에서 `claude auth login` 실행
+    if platform.system() == "Darwin":
+        script = f'''
+        tell application "Terminal"
+            activate
+            do script "{cli} auth login"
+        end tell
+        '''
+        try:
+            subprocess.run(["osascript", "-e", script], timeout=5, capture_output=True)
+            return {"ok": True, "method": "terminal", "message": "터미널에서 로그인 창이 열렸습니다. 브라우저 인증 완료 후 돌아오세요."}
+        except Exception as e:
+            return {"ok": False, "error": f"터미널 실행 실패: {e}"}
+    # Linux / fallback
+    try:
+        subprocess.Popen([cli, "auth", "login"], start_new_session=True)
+        return {"ok": True, "method": "background", "message": "claude auth login 이 실행되었습니다. 완료 후 새로고침하세요."}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def api_auth_logout(body: dict) -> dict:
+    """로그아웃 — `claude auth logout` 실행."""
+    cli = shutil.which("claude")
+    if not cli:
+        return {"ok": False, "error": "Claude CLI 미설치"}
+    try:
+        r = subprocess.run([cli, "auth", "logout"], capture_output=True, text=True, timeout=10)
+        return {"ok": True, "message": "로그아웃 되었습니다.", "output": r.stdout.strip()}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def open_folder_action(body: dict) -> dict:
     raw = body.get("folderPath") if isinstance(body, dict) else None
     if not raw:
@@ -6516,6 +6814,22 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _get_lang(self) -> str:
+        """쿼리 파라미터 또는 쿠키에서 언어 감지."""
+        u = urlparse(self.path)
+        qs = parse_qs(u.query)
+        lang = (qs.get("lang", [""])[0] or "").lower()
+        if lang in ("en", "zh"):
+            return lang
+        cookie = self.headers.get("Cookie", "")
+        for part in cookie.split(";"):
+            part = part.strip()
+            if part.startswith("cc-lang="):
+                v = part.split("=", 1)[1].strip().lower()
+                if v in ("en", "zh"):
+                    return v
+        return "ko"
+
     def _send_static(self, path: str) -> None:
         if path in ("/", ""):
             path = "/index.html"
@@ -6525,6 +6839,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(403); self.end_headers(); return
         if not fp.exists() or not fp.is_file():
             fp = DIST / "index.html"
+        # 언어별 HTML 파일 서빙
+        if fp.name == "index.html":
+            lang = self._get_lang()
+            if lang == "en":
+                alt = DIST / "index-en.html"
+                if alt.exists(): fp = alt
+            elif lang == "zh":
+                alt = DIST / "index-zh.html"
+                if alt.exists(): fp = alt
         try:
             data = fp.read_bytes()
         except Exception:
@@ -6664,6 +6987,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(api_plugin_hook_update(self._read_body())); return
         if path == "/api/auth/claimed-plan":
             self._send_json(api_set_claimed_plan(self._read_body())); return
+        if path == "/api/auth/login":
+            self._send_json(api_auth_login(self._read_body())); return
+        if path == "/api/auth/logout":
+            self._send_json(api_auth_logout(self._read_body())); return
         if path == "/api/project-agents/add":
             self._send_json(api_project_agent_add(self._read_body())); return
         if path == "/api/project-agents/delete":
@@ -6688,6 +7015,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(api_marketplace_add(self._read_body())); return
         if path == "/api/marketplaces/remove":
             self._send_json(api_marketplace_remove(self._read_body())); return
+        if path == "/api/chat":
+            self._send_json(api_chat(self._read_body())); return
+        if path == "/api/chat/stream":
+            handle_chat_stream(self, self._read_body()); return
         self._drain()
         self._send_json({"ok": False, "error": "unknown route"}, 404)
 
