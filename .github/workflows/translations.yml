@@ -1,0 +1,49 @@
+name: Translations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dist/**"
+      - "tools/**"
+      - "scripts/verify-translations.js"
+      - "translation-audit.json"
+      - ".github/workflows/translations.yml"
+  pull_request:
+    paths:
+      - "dist/**"
+      - "tools/**"
+      - "scripts/verify-translations.js"
+      - "translation-audit.json"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Rebuild locales from manual dict (idempotent)
+        run: |
+          python3 tools/extract_ko_strings.py
+          PYTHONPATH=tools python3 tools/build_locales.py
+
+      - name: Verify translations (0 missing)
+        run: node scripts/verify-translations.js
+
+      - name: Simulate runtime — 한글 residue must be 0
+        run: python3 tools/runtime_ko_scan.py
+
+      - name: Ensure locale JSON files in tree match rebuild output
+        run: |
+          # If the manual dict drifted from the committed locale files, fail.
+          git diff --exit-code -- dist/locales translation-audit.json \
+            || { echo "::error::dist/locales 또는 translation-audit.json 이 최신 빌드와 다릅니다. 'bash scripts/translate-refresh.sh' 후 커밋하세요."; exit 1; }

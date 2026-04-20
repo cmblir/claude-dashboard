@@ -97,3 +97,43 @@ static DOM phrases: 22
    python3 tools/build_locales.py
    node scripts/verify-translations.js
    ```
+
+---
+
+## Phase 2 (2026-04-21 추가분) — 프로덕션 투입 확정
+
+이전 마이그레이션 이후의 후속 작업을 기록.
+
+### 추가된 파일
+| 파일 | 역할 |
+|---|---|
+| `tools/runtime_ko_scan.py` | 브라우저 런타임 `_translateDOM` 규칙을 파이썬으로 시뮬레이션 — en/zh 적용 후 한글 잔존 0 검증 |
+| `tools/translations_manual_2.py` | 이번 세션 재추출에서 추가 발견된 111개 phrase 의 EN/ZH 번역 |
+| `scripts/translate-refresh.sh` | 파이프라인 단일 진입점 (추출 → 빌드 → 검증 → 런타임 스캔) |
+| `.github/workflows/translations.yml` | CI — PR/merge 시 4단계 검증 자동 실행 |
+| `.github/pull_request_template.md` | i18n 관련 체크리스트 포함 PR 템플릿 |
+| `Makefile` | `make i18n-refresh` / `i18n-verify` / `i18n-scan` / `run` / `dev` |
+| `TRANSLATION_CONTRIBUTING.md` | 신규 텍스트 추가 워크플로 · 트러블슈팅 |
+| `runtime-verification-report.md` | PHASE 2 실측 리포트 |
+
+### 변경된 파일
+- `tools/extract_ko_strings.py` — `const _KO_RE = /[가-힣]/` 같은 JS 정규식 리터럴 선언 라인은 UI 문자열에서 제외
+- `tools/build_locales.py` — **멱등성 강화**: 기존 `dist/locales/*.json` 을 baseline 으로 로드, 재빌드해도 번역 유실 없음
+- `tools/translations_manual.py` — 검수 9건 확정 번역으로 폴리싱 · `NEEDS_REVIEW = set()` (전부 처리) · `translations_manual_2` 자동 병합
+
+### 번역 확장
+- 이번 세션 재추출에서 기존 baseline 에 없던 111 phrase 가 발견되어 EN/ZH 수동 번역 완료.
+- 최종 사전 키 수: **1,148 → 1,259** (모든 언어 동일).
+
+### 최종 검증 결과 (2026-04-21)
+```
+✓ 4-step verifier: 키 일치 · t() · audit · static DOM
+✓ runtime scan: en/zh 한글 잔존 0건
+✓ live endpoints: / 200 · /api/locales/{ko,en,zh}.json 200 · xx 404
+✓ API 회귀: /api/skills /api/agents /api/projects /api/system/info 전부 200
+✓ 응답시간: html ~2ms · locale ~1ms (로컬 vanilla HTTP)
+```
+
+### 상태
+🟢 **프로덕션 투입 준비 완료**
+- 번역 누락 0건, 한글 잔존 0건, CI 자동화, 기여 가이드 확립.
