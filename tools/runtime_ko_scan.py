@@ -24,17 +24,33 @@ LOCALES = ROOT / "dist" / "locales"
 KO = re.compile(r"[\uAC00-\uD7A3]")
 
 
+_HANGUL_BOUNDARY_CACHE: dict = {}
+
+
 def _apply_translation(text: str, dict_: dict, sorted_keys: list) -> str:
-    """_translateDOM 과 동일한 번역 규칙 (파이썬 포팅)."""
+    """_translateDOM 과 동일한 번역 규칙 (파이썬 포팅).
+
+    - 전체 일치 우선
+    - 아니면 긴 키부터 순차 치환
+    - 짧은 키(≤4)는 Hangul word-boundary 로 보호
+    """
     trimmed = text.strip()
     if trimmed and trimmed in dict_:
         return text.replace(trimmed, dict_[trimmed], 1)
     out = text
     for k in sorted_keys:
-        if len(k) < 5:
+        if k not in out:
             continue
-        if k in out:
+        if len(k) >= 5:
             out = out.replace(k, dict_[k])
+        else:
+            pat = _HANGUL_BOUNDARY_CACHE.get(k)
+            if pat is None:
+                pat = re.compile(
+                    r"(?<![\uAC00-\uD7A3])" + re.escape(k) + r"(?![\uAC00-\uD7A3])"
+                )
+                _HANGUL_BOUNDARY_CACHE[k] = pat
+            out = pat.sub(dict_[k], out)
     return out
 
 

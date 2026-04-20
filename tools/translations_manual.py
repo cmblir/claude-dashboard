@@ -25,6 +25,16 @@ try:
 except Exception:
     _NEW_EN_3, _NEW_ZH_3 = {}, {}
 
+try:
+    from translations_manual_4 import NEW_EN as _NEW_EN_4, NEW_ZH as _NEW_ZH_4
+except Exception:
+    _NEW_EN_4, _NEW_ZH_4 = {}, {}
+
+try:
+    from translations_manual_5 import NEW_EN as _NEW_EN_5, NEW_ZH as _NEW_ZH_5
+except Exception:
+    _NEW_EN_5, _NEW_ZH_5 = {}, {}
+
 # ── 구조화 키 → 한국어 라벨 ──
 MANUAL_KO: dict[str, str] = {
     "settings.theme": "테마",
@@ -393,6 +403,18 @@ for _k, _v in _NEW_ZH.items():
 for _k, _v in _NEW_EN_3.items():
     MANUAL_EN.setdefault(_k, _v)
 for _k, _v in _NEW_ZH_3.items():
+    MANUAL_ZH.setdefault(_k, _v)
+
+# 실 브라우저 스캔에서 발견된 UI 잔존 fragment · 서버 emit 라벨 · 짧은 glue token
+for _k, _v in _NEW_EN_4.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH_4.items():
+    MANUAL_ZH.setdefault(_k, _v)
+
+# overview 등 템플릿 composition 잔존 Korean 조각 번역
+for _k, _v in _NEW_EN_5.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH_5.items():
     MANUAL_ZH.setdefault(_k, _v)
 
 # ── 번역 검수 권장 항목 ──
