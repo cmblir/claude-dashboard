@@ -75,15 +75,17 @@ def extract():
     work = re.sub(r"const\s+_NAV_KEYWORDS\s*=\s*\{[\s\S]*?\};", _blank, work)
 
     phrases: dict[str, list[int]] = {}
+    # 정규식 리터럴 전용 노이즈: `/[가-힣]/` 패턴 자체는 UI 문자열 아님
+    _regex_literal_noise = re.compile(r"^\s*(?:const|let|var)\s+\w+\s*=\s*/\[.*?\]/.*$")
     for idx, line in enumerate(work.split("\n"), start=1):
-        # 순수 한줄 주석은 스킵
         stripped = line.lstrip()
         if stripped.startswith("//"):
             continue
-        # 인라인 주석도 최대한 제거: `//` 이후를 제거하되, 따옴표 쌍 홀수면 유지
+        # 정규식 리터럴 선언 라인만 스킵 (`const _KO_RE = /[가-힣]/` 같은 것)
+        if _regex_literal_noise.match(line):
+            continue
+        # 인라인 주석 제거 (따옴표 짝 · URL 제외)
         if "//" in line and line.count('"') % 2 == 0 and line.count("'") % 2 == 0:
-            # 가장 먼저 등장하는 `//` 가 문자열 밖인 경우만 컷
-            # 간단 휴리스틱: `://`, `'//'`, `"//"` 제외
             if "://" not in line:
                 line = re.sub(r"\s*//[^\n]*$", "", line)
         _extract_korean_phrases_from_line(line, idx, phrases)
