@@ -15,6 +15,11 @@ try:
 except Exception:
     _MISSING_ZH = {}
 
+try:
+    from translations_manual_2 import NEW_EN as _NEW_EN, NEW_ZH as _NEW_ZH
+except Exception:
+    _NEW_EN, _NEW_ZH = {}, {}
+
 # ── 구조화 키 → 한국어 라벨 ──
 MANUAL_KO: dict[str, str] = {
     "settings.theme": "테마",
@@ -71,12 +76,12 @@ MANUAL_EN: dict[str, str] = {
     "CLI가 설치되어 있지 않습니다. 먼저 설치하세요": "CLI is not installed. Please install it first",
     "Claude CLI 미설치": "Claude CLI not installed",
     "Claude CLI 설치됨": "Claude CLI installed",
-    "Claude Code 가 읽는 환경변수들. settings.json.env 값과 현재 프로세스 실제 값 비교": "Environment variables Claude Code reads. Comparing settings.json.env values with current process values",
+    "Claude Code 가 읽는 환경변수들. settings.json.env 값과 현재 프로세스 실제 값 비교": "Environment variables Claude Code reads — comparing settings.json.env against the actual running-process values",
     "Claude Code 내부 추적기 ·": "Claude Code internal tracker ·",
     "Claude Code 에서": "In Claude Code",
     "Claude Code 와 연결된 터미널/IDE 상태": "Terminal/IDE status connected to Claude Code",
     "Claude Control Center — 최적화 대시보드": "Claude Control Center — Optimization Dashboard",
-    "Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가": "Find Claude's latest announcements and add them to the New Features tab",
+    "Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가": "Fetch Claude's latest announcements and add them to the New Features tab",
     "Claude 계정에 로그인되지 않았습니다.": "Not logged into Claude account.",
     "Homunculus 프로젝트 추적": "Homunculus project tracking",
     "MCP 커넥터": "MCP Connectors",
@@ -107,13 +112,13 @@ MANUAL_EN: dict[str, str] = {
     "건너뛰기": "Skip",
     "검색… ⌘K": "Search… ⌘K",
     "권한": "Permissions",
-    "는 Claude Code 가 자동으로 발견한 모든 프로젝트 루트를 기록합니다. 우리가": "records every project root Claude Code auto-discovered. We",
+    "는 Claude Code 가 자동으로 발견한 모든 프로젝트 루트를 기록합니다. 우리가": "records every project root Claude Code auto-discovers. Unlike what we see via",
     "다크": "Dark",
     "또는": "or",
     "또는 Claude Code 재시작으로 동기화.": "or restart Claude Code to sync.",
     "또는 터미널에서 직접 실행": "or run directly in the terminal",
     "라이트": "Light",
-    "로 보는 세션 데이터와는 다르게, git remote 추적 + 마지막 작업 시간을 함께 저장.": "Unlike session data viewed via, stores git remote tracking + last-touched time.",
+    "로 보는 세션 데이터와는 다르게, git remote 추적 + 마지막 작업 시간을 함께 저장.": "as session data, it also tracks the git remote and last-touched time.",
     "로 임시 전환.": "to switch temporarily.",
     "로 저장되는 서브 에이전트를 관리. 역할 프리셋으로 즉시 추가.": "Manage saved sub-agents. Add instantly from role presets.",
     "로 첫 스타일 추가": "to add the first style",
@@ -181,7 +186,7 @@ MANUAL_EN: dict[str, str] = {
     "프로젝트 에이전트 편집 —": "Edit project agent —",
     "프로젝트마다": "Per project",
     "한국어": "Korean",
-    "해서 상세 · 비활성 플러그인 에이전트는 뱃지 클릭으로 즉시 활성화 · 전역 에이전트는 우측 상단": "for details · click badge on inactive plugin agents to activate · global agents top-right",
+    "해서 상세 · 비활성 플러그인 에이전트는 뱃지 클릭으로 즉시 활성화 · 전역 에이전트는 우측 상단": "to expand · click the badge on a disabled plugin agent to enable it · add global agents via the top-right",
     "혹은 전역": "or global",
     "환경변수.": "environment variables.",
     "활성 세션 없음": "No active sessions",
@@ -226,12 +231,12 @@ MANUAL_ZH: dict[str, str] = {
     "CLI가 설치되어 있지 않습니다. 먼저 설치하세요": "CLI 未安装，请先安装",
     "Claude CLI 미설치": "Claude CLI 未安装",
     "Claude CLI 설치됨": "Claude CLI 已安装",
-    "Claude Code 가 읽는 환경변수들. settings.json.env 값과 현재 프로세스 실제 값 비교": "Claude Code 读取的环境变量。对比 settings.json.env 值与当前进程的实际值",
+    "Claude Code 가 읽는 환경변수들. settings.json.env 값과 현재 프로세스 실제 값 비교": "Claude Code 读取的环境变量 — 对比 settings.json.env 与实际运行进程的值",
     "Claude Code 내부 추적기 ·": "Claude Code 内部追踪器 ·",
     "Claude Code 에서": "在 Claude Code 中",
     "Claude Code 와 연결된 터미널/IDE 상태": "与 Claude Code 连接的终端/IDE 状态",
     "Claude Control Center — 최적화 대시보드": "Claude 控制中心 — 优化仪表板",
-    "Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가": "查找 Claude 最新发布的新功能并添加到新功能标签",
+    "Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가": "获取 Claude 最新发布的新功能并添加到新功能标签",
     "Claude 계정에 로그인되지 않았습니다.": "未登录 Claude 账户。",
     "Homunculus 프로젝트 추적": "Homunculus 项目追踪",
     "MCP 커넥터": "MCP 连接器",
@@ -262,13 +267,13 @@ MANUAL_ZH: dict[str, str] = {
     "건너뛰기": "跳过",
     "검색… ⌘K": "搜索… ⌘K",
     "권한": "权限",
-    "는 Claude Code 가 자동으로 발견한 모든 프로젝트 루트를 기록합니다. 우리가": "记录 Claude Code 自动发现的所有项目根目录。我们",
+    "는 Claude Code 가 자동으로 발견한 모든 프로젝트 루트를 기록합니다. 우리가": "记录 Claude Code 自动发现的所有项目根目录。与我们通过",
     "다크": "暗色",
     "또는": "或",
     "또는 Claude Code 재시작으로 동기화.": "或重启 Claude Code 以同步。",
     "또는 터미널에서 직접 실행": "或在终端中直接执行",
     "라이트": "亮色",
-    "로 보는 세션 데이터와는 다르게, git remote 추적 + 마지막 작업 시간을 함께 저장.": "与通过查看的会话数据不同，会保存 git remote 追踪 + 最后操作时间。",
+    "로 보는 세션 데이터와는 다르게, git remote 추적 + 마지막 작업 시간을 함께 저장.": "查看的会话数据不同，此处还会保存 git remote 追踪和最后操作时间。",
     "로 임시 전환.": "以临时切换。",
     "로 저장되는 서브 에이전트를 관리. 역할 프리셋으로 즉시 추가.": "管理保存的子代理。通过角色预设立即添加。",
     "로 첫 스타일 추가": "添加第一个样式",
@@ -336,7 +341,7 @@ MANUAL_ZH: dict[str, str] = {
     "프로젝트 에이전트 편집 —": "编辑项目代理 —",
     "프로젝트마다": "每个项目",
     "한국어": "韩语",
-    "해서 상세 · 비활성 플러그인 에이전트는 뱃지 클릭으로 즉시 활성화 · 전역 에이전트는 우측 상단": "查看详情 · 未激活的插件代理点击徽章即可激活 · 全局代理在右上角",
+    "해서 상세 · 비활성 플러그인 에이전트는 뱃지 클릭으로 즉시 활성화 · 전역 에이전트는 우측 상단": "展开详情 · 点击已禁用的插件代理徽章可立即启用 · 全局代理通过右上角",
     "혹은 전역": "或全局",
     "환경변수.": "环境变量。",
     "활성 세션 없음": "无活跃会话",
@@ -373,15 +378,13 @@ MANUAL_ZH: dict[str, str] = {
 for _k, _v in _MISSING_ZH.items():
     MANUAL_ZH.setdefault(_k, _v)
 
+# PHASE 1 후속: 이번 세션 감사에서 추가 발견된 111 phrase 번역 병합
+for _k, _v in _NEW_EN.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH.items():
+    MANUAL_ZH.setdefault(_k, _v)
+
 # ── 번역 검수 권장 항목 ──
-NEEDS_REVIEW: set[str] = {
-    "는 Claude Code 가 자동으로 발견한 모든 프로젝트 루트를 기록합니다. 우리가",
-    "로 보는 세션 데이터와는 다르게, git remote 추적 + 마지막 작업 시간을 함께 저장.",
-    "아직 이 프로젝트에 에이전트가 없습니다. 아래 역할 프리셋에서 하나를 선택해 추가하세요.",
-    "에서 설정하면 모든 세션에 적용. 프로세스 값은 이 대시보드 서버가 실행 중인 쉘의 현재 값.",
-    "해서 상세 · 비활성 플러그인 에이전트는 뱃지 클릭으로 즉시 활성화 · 전역 에이전트는 우측 상단",
-    "Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가",
-    "Claude Code 가 읽는 환경변수들. settings.json.env 값과 현재 프로세스 실제 값 비교",
-    "양쪽 값을 자유롭게 편집한 뒤 어느 쪽을 저장할지 고르세요. ·",
-    "을 누르면 현재 계정이 로그아웃되고 터미널에서 새 로그인 창이 열립니다.",
-}
+# 2026-04-21: 이전 9 항목 모두 확정 — 긴 안내 문구만 자연스러운 현지어로 재작성.
+# 향후 브랜드/금융 전문용어 등 외부 결정이 필요한 항목이 생기면 여기 등록.
+NEEDS_REVIEW: set[str] = set()
