@@ -25,146 +25,23 @@ from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 from typing import Optional, Any
 from urllib.parse import urlparse, parse_qs, unquote
 
-ROOT = Path(__file__).parent
-DIST = ROOT / "dist"
-
-# .env 자동 로드 (있으면) — 표준 라이브러리만 사용
-def _load_dotenv(p: Path) -> None:
-    if not p.exists():
-        return
-    for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if k and k not in os.environ:
-            os.environ[k] = v
-
-_load_dotenv(ROOT / ".env")
-
-# 모든 경로는 환경변수로 오버라이드 가능 (개인정보·시스템 차이 흡수)
-def _env_path(key: str, default: Path) -> Path:
-    v = os.environ.get(key)
-    return Path(os.path.expanduser(v)).resolve() if v else default
-
-CLAUDE_HOME = _env_path("CLAUDE_HOME", Path.home() / ".claude")
-CLAUDE_MD = CLAUDE_HOME / "CLAUDE.md"
-SETTINGS_JSON = CLAUDE_HOME / "settings.json"
-SKILLS_DIR = CLAUDE_HOME / "skills"
-AGENTS_DIR = CLAUDE_HOME / "agents"
-COMMANDS_DIR = CLAUDE_HOME / "commands"
-PROJECTS_DIR = CLAUDE_HOME / "projects"
-PLUGINS_DIR = CLAUDE_HOME / "plugins"
-INSTALLED_PLUGINS_JSON = PLUGINS_DIR / "installed_plugins.json"
-KNOWN_MARKETPLACES_JSON = PLUGINS_DIR / "known_marketplaces.json"
-SESSIONS_DIR = CLAUDE_HOME / "sessions"
-SESSION_DATA_DIR = CLAUDE_HOME / "session-data"
-TODOS_DIR = CLAUDE_HOME / "todos"
-TASKS_DIR = CLAUDE_HOME / "tasks"
-SCHEDULED_TASKS_DIR = CLAUDE_HOME / "scheduled-tasks"
-HISTORY_JSONL = CLAUDE_HOME / "history.jsonl"
-CLAUDE_JSON = _env_path("CLAUDE_JSON", Path.home() / ".claude.json")
-CLAUDE_DESKTOP_CONFIG = _env_path(
-    "CLAUDE_DESKTOP_CONFIG",
-    Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json",
+# 신규 패키지 — 점진적 리팩터링 중. 경로·유틸·로거는 server/ 패키지에서 공급.
+from server.config import (
+    ROOT, DIST,
+    CLAUDE_HOME, CLAUDE_MD, SETTINGS_JSON, SKILLS_DIR, AGENTS_DIR, COMMANDS_DIR,
+    PROJECTS_DIR, PLUGINS_DIR, INSTALLED_PLUGINS_JSON, KNOWN_MARKETPLACES_JSON,
+    SESSIONS_DIR, SESSION_DATA_DIR, TODOS_DIR, TASKS_DIR, SCHEDULED_TASKS_DIR,
+    HISTORY_JSONL, CLAUDE_JSON, CLAUDE_DESKTOP_CONFIG,
+    MEMORY_DIR, DB_PATH, TRANSLATIONS_PATH, DASHBOARD_CONFIG_PATH,
+    SCORE_MIN_TOOLS, _UUID_RE,
+    _load_dotenv, _env_path, _cwd_to_slug, get_bind,
 )
-
-# 메모리 디렉토리 — 현재 프로젝트의 cwd 를 기반으로 동적 산출
-# Claude Code 가 cwd 를 슬러그화: '/' → '-' 치환, 선두에 '-' 추가
-def _cwd_to_slug(cwd: Path) -> str:
-    return "-" + str(cwd).strip("/").replace("/", "-")
-
-MEMORY_DIR = _env_path(
-    "CLAUDE_DASHBOARD_MEMORY_DIR",
-    CLAUDE_HOME / "projects" / _cwd_to_slug(ROOT) / "memory",
+from server.utils import (
+    _safe_read, _safe_write,
+    _parse_frontmatter, _parse_tools_field, _strip_frontmatter,
+    _iso_ms, _fmt_rel,
 )
-
-DB_PATH = _env_path("CLAUDE_DASHBOARD_DB", Path.home() / ".claude-dashboard.db")
-
-# 점수 평균 계산에서 도구 사용이 적은(=짧은/시범) 세션 제외 — UX 노이즈 차단.
-# 환경변수 SCORE_MIN_TOOLS 로 조정 가능. 기본 11 → 도구 호출 11회 이상 세션만 점수 평균에 포함.
-SCORE_MIN_TOOLS = int(os.environ.get("SCORE_MIN_TOOLS", "11"))
-TRANSLATIONS_PATH = _env_path("CLAUDE_DASHBOARD_TRANSLATIONS", Path.home() / ".claude-dashboard-translations.json")
-DASHBOARD_CONFIG_PATH = _env_path("CLAUDE_DASHBOARD_CONFIG", Path.home() / ".claude-dashboard-config.json")
-
-_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
-
-
-# ───────────────── helpers ─────────────────
-
-def _safe_read(p: Path, limit: Optional[int] = None) -> str:
-    try:
-        text = p.read_text(encoding="utf-8", errors="replace")
-        return text if limit is None else text[:limit]
-    except Exception:
-        return ""
-
-
-def _safe_write(p: Path, text: str) -> bool:
-    try:
-        p.parent.mkdir(parents=True, exist_ok=True)
-        # atomic write
-        tmp = p.with_suffix(p.suffix + ".tmp")
-        tmp.write_text(text, encoding="utf-8")
-        tmp.replace(p)
-        return True
-    except Exception as e:
-        print(f"[server] write failed for {p}: {e}", file=sys.stderr)
-        return False
-
-
-def _parse_frontmatter(text: str) -> dict:
-    m = re.match(r"^---\s*\n(.*?)\n---", text, re.DOTALL)
-    if not m:
-        return {}
-    block = m.group(1)
-    out = {}
-    for line in block.splitlines():
-        kv = re.match(r"^(\w[\w-]*):\s*(.*)$", line.strip())
-        if kv:
-            out[kv.group(1)] = kv.group(2).strip().strip('"').strip("'")
-    return out
-
-
-def _parse_tools_field(raw: str) -> list:
-    if not raw:
-        return []
-    raw = raw.strip()
-    if raw.startswith("["):
-        try:
-            return [str(x) for x in json.loads(raw) if x]
-        except Exception:
-            pass
-    return [t.strip().strip('"').strip("'") for t in raw.split(",") if t.strip()]
-
-
-def _strip_frontmatter(text: str) -> str:
-    m = re.match(r"^---\s*\n(.*?)\n---\s*\n?", text, re.DOTALL)
-    return text[m.end():] if m else text
-
-
-def _iso_ms(ts_str: str) -> Optional[int]:
-    if not ts_str:
-        return None
-    try:
-        return int(datetime.fromisoformat(ts_str.replace("Z", "+00:00")).timestamp() * 1000)
-    except Exception:
-        return None
-
-
-def _fmt_rel(ms: Optional[int]) -> str:
-    if not ms:
-        return "—"
-    now = int(time.time() * 1000)
-    d = max(0, (now - ms) // 1000)
-    if d < 60:
-        return f"{d}초 전"
-    if d < 3600:
-        return f"{d // 60}분 전"
-    if d < 86400:
-        return f"{d // 3600}시간 전"
-    return f"{d // 86400}일 전"
+from server.logger import setup_logging, log
 
 
 # ───────────────── device ─────────────────
