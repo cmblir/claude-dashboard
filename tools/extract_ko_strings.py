@@ -20,6 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "dist" / "index.html"
+SERVER_DIR = ROOT / "server"
 OUT = ROOT / "translation-audit.json"
 
 KO = re.compile(r"[\uAC00-\uD7A3]")
@@ -118,6 +119,26 @@ def extract():
                 existing_ko_keys.add(k)
     for k in existing_ko_keys:
         refined.setdefault(k, [])
+
+    # server/*.py 에서 UI 노출되는 Korean 라벨만 가려낸다.
+    # 정책: 길이 ≤ 50 & 개행 없음 & 모듈별 UI-whitelist 에 등장한 경우만.
+    # (전체 스캔은 prompt 템플릿·로그 메시지까지 포함해 over-inclusive)
+    _UI_MODULES = {"agents.py", "system.py", "device.py", "features.py"}
+    if SERVER_DIR.exists():
+        for py in sorted(SERVER_DIR.rglob("*.py")):
+            if py.name not in _UI_MODULES:
+                continue
+            try:
+                src = py.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            for m in re.finditer(r'"([^"\\\n]*(?:\\.[^"\\\n]*)*)"', src):
+                s = m.group(1)
+                if not s or not KO.search(s):
+                    continue
+                if len(s) > 80 or "\\n" in s:
+                    continue
+                refined.setdefault(s, [])
 
     items = []
     for text in sorted(refined.keys()):

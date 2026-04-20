@@ -3660,6 +3660,7 @@ function renderProjectAgentsSection(tb, cwd) {
         </div>
         <div class="text-xs text-[var(--text-mute)]">${definedAgents.length ? `정의된 에이전트 ${definedAgents.length}개가 있지만 세션에서 한 번도 위임되지 않았습니다. AI 추천으로 활용 시나리오를 받아보세요.` : '이 프로젝트 세션들에서는 서브에이전트 위임이 없었습니다. 위의 🤖 AI 추천으로 프로젝트 전용 에이전트를 만들면 delegation 점수가 오릅니다.'}</div>
       </div>`;
+    _translateDOM(slot);
     return;
   }
   slot.innerHTML = `
@@ -3684,6 +3685,7 @@ function renderProjectAgentsSection(tb, cwd) {
           </div>`).join('')}
       </div>
     </div>`;
+  _translateDOM(slot);
 }
 
 function renderProjectDetail(d) {
@@ -5997,61 +5999,71 @@ async function _loadLocale(lang) {
 const _KO_RE = /[가-힣]/;
 let _domTranslateCache = {};
 
+// 정규식 특수문자 이스케이프
+function _escReForI18n(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+// 각 키에 대해 "한글 경계 인식 치환 패턴" 을 미리 만들어 둔다.
+// 긴 키(5+)는 바로 includes + split 으로, 짧은 키(1-4)는 Hangul boundary 보호 regex 로.
+function _buildKeyPatterns(keys) {
+  return keys.map(k => {
+    if (k.length >= 5) return { k, short: false };
+    const pat = new RegExp(
+      `(?<![\\uAC00-\\uD7A3])${_escReForI18n(k)}(?![\\uAC00-\\uD7A3])`,
+      'g'
+    );
+    return { k, short: true, pat };
+  });
+}
+
 function _translateDOM(root) {
   if (_curLang === 'ko') return;
   const dict = I18N[_curLang];
   if (!dict) return;
-  // 사전 키를 길이 내림차순으로 정렬 (긴 문구 우선 매칭)
   if (!_domTranslateCache[_curLang]) {
     const keys = Object.keys(dict).filter(k => _KO_RE.test(k)).sort((a,b) => b.length - a.length);
-    _domTranslateCache[_curLang] = keys;
+    _domTranslateCache[_curLang] = { keys, patterns: _buildKeyPatterns(keys) };
   }
-  const keys = _domTranslateCache[_curLang];
+  const { keys, patterns } = _domTranslateCache[_curLang];
   if (!keys.length) return;
 
-  // 텍스트 노드 수집
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-  const nodes = [];
-  let node;
-  while (node = walker.nextNode()) {
-    if (_KO_RE.test(node.textContent) && node.textContent.trim()) {
-      nodes.push(node);
+  const applyAll = (txt) => {
+    for (const { k, short, pat } of patterns) {
+      if (!txt.includes(k)) continue;
+      if (short) {
+        txt = txt.replace(pat, dict[k]);
+      } else {
+        txt = txt.split(k).join(dict[k]);
+      }
     }
-  }
+    return txt;
+  };
 
-  // placeholder, title, alt 등 속성도 번역
-  root.querySelectorAll('[placeholder],[title],[alt]').forEach(el => {
-    ['placeholder','title','alt'].forEach(attr => {
+  // 속성 먼저
+  root.querySelectorAll('[placeholder],[title],[alt],[aria-label]').forEach(el => {
+    ['placeholder','title','alt','aria-label'].forEach(attr => {
       const v = el.getAttribute(attr);
       if (v && _KO_RE.test(v)) {
-        let translated = v;
-        for (const k of keys) {
-          if (translated.includes(k)) translated = translated.split(k).join(dict[k]);
-        }
-        if (translated !== v) el.setAttribute(attr, translated);
+        const nv = applyAll(v);
+        if (nv !== v) el.setAttribute(attr, nv);
       }
     });
   });
 
-  // 텍스트 노드 교체 — 전체 일치 우선, 부분 치환은 5글자+ 키만
-  for (const tn of nodes) {
-    let txt = tn.textContent;
-    const trimmed = txt.trim();
-    // 1) 전체 일치 (공백 trim 후)
+  // 텍스트 노드 수집 · 교체
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+  let node;
+  while (node = walker.nextNode()) {
+    const t = node.textContent;
+    if (!t || !_KO_RE.test(t) || !t.trim()) continue;
+    const trimmed = t.trim();
+    // 1) 전체 일치 우선
     if (dict[trimmed]) {
-      tn.textContent = txt.replace(trimmed, dict[trimmed]);
+      node.textContent = t.replace(trimmed, dict[trimmed]);
       continue;
     }
-    // 2) 부분 치환 — 긴 키부터, 5글자 미만 키는 건너뜀 (파편화 방지)
-    let changed = false;
-    for (const k of keys) {
-      if (k.length < 5) continue;
-      if (txt.includes(k)) {
-        txt = txt.split(k).join(dict[k]);
-        changed = true;
-      }
-    }
-    if (changed) tn.textContent = txt;
+    // 2) 패턴 순차 적용 (긴 키 우선 + 짧은 키는 Hangul boundary 보호)
+    const next = applyAll(t);
+    if (next !== t) node.textContent = next;
   }
 }
 // t() 번역 함수 — 한국어 원문을 키로 사용, 현재 언어의 번역 반환
@@ -6088,6 +6100,18 @@ function setLang(lang) {
 // 비동기 로케일 준비: boot() 와 _translateDOM 양쪽이 이 Promise 를 await 한다
 window._i18nReady = _loadLocale(_curLang).then(() => {
   _translateDOM(document.body);
+  // 런타임에 innerHTML 로 추가되는 동적 컨텐츠 (모달 · 슬롯 등) 를 자동 번역
+  if (_curLang !== 'ko' && typeof MutationObserver !== 'undefined') {
+    const mo = new MutationObserver(muts => {
+      for (const m of muts) {
+        for (const node of m.addedNodes) {
+          if (node && node.nodeType === 1) _translateDOM(node);
+        }
+      }
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+    window._i18nObserver = mo;
+  }
 });
 function _syncNavToggleVisibility() {
   const isMobile = window.matchMedia('(max-width: 900px)').matches;
