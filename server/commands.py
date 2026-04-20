@@ -1,12 +1,18 @@
-"""슬래시 명령어 (`~/.claude/commands/*.md` + 플러그인 커맨드) 목록 + 카테고리.
+"""슬래시 명령어 (`~/.claude/commands/*.md` + 플러그인 커맨드) 목록 + 카테고리 + 번역 배치.
 
-번역 배치 API (`api_translate_batch`) 는 auth/plugins 의존성이 있어
-server.py 에 잠시 남아있다 — auth.py/plugins.py 분리 후 이 모듈로 합친다.
+번역 배치 (`api_translate_batch`) 는 cmd/skill/plugin/agent 의 description
+을 Claude CLI 한 번 호출로 번역 후 로컬 캐시에 저장 — skills/agents/plugins
+를 순환 없이 참조하기 위해 late import 사용.
 """
 from __future__ import annotations
 
+import json
+import re
+import shutil
+import subprocess
+
 from .config import COMMANDS_DIR, PLUGINS_DIR
-from .translations import _load_translation_cache
+from .translations import _load_translation_cache, _save_translation_cache
 from .utils import _parse_frontmatter, _safe_read, _strip_frontmatter
 
 
@@ -108,3 +114,123 @@ def list_commands() -> list:
 def _cache_key(kind: str, item_id: str) -> str:
     """번역 캐시 키 규칙. cmd 는 prefix 없이 id 만 (기존 호환)."""
     return f"{kind}:{item_id}" if kind != "cmd" else item_id
+
+
+# ───────── 번역 배치 (cmd/skill/plugin/agent 공용) ─────────
+
+def _collect_translate_items(kind: str) -> list:
+    """kind 에 따라 [{id, desc}, ...] 수집. 순환 회피를 위해 late import."""
+    items: list = []
+    if kind == "cmd":
+        for c in list_commands():
+            d = c.get("description") or ""
+            if d:
+                items.append({"id": c["id"], "desc": d[:320]})
+    elif kind == "skill":
+        from .skills import list_skills
+        for s in list_skills():
+            d = s.get("description") or ""
+            if d:
+                items.append({"id": s["id"], "desc": d[:320]})
+    elif kind == "plugin":
+        from .plugins import api_plugins_browse
+        for p in api_plugins_browse().get("plugins", []):
+            d = p.get("description") or ""
+            if d:
+                items.append({"id": p["id"], "desc": d[:320]})
+    elif kind == "agent":
+        from .agents import list_agents
+        for a in list_agents().get("agents", []):
+            d = a.get("description") or ""
+            if d:
+                items.append({"id": a["id"], "desc": d[:320]})
+    return items
+
+
+def api_translate_batch(body: dict) -> dict:
+    """범용 번역 배치. body: {kind: 'cmd'|'skill'|'plugin'|'agent', limit: N (기본 50, 최대 60)}
+
+    캐시에 없는 것만 선별 → Claude CLI 1회 호출.
+    """
+    from .auth import api_auth_status
+
+    claude_bin = shutil.which("claude")
+    if not claude_bin:
+        return {"error": "claude CLI 설치 필요"}
+    if not api_auth_status().get("connected"):
+        return {"error": "Claude 계정 연결 필요"}
+
+    kind = (body or {}).get("kind") if isinstance(body, dict) else "cmd"
+    if kind not in ("cmd", "skill", "plugin", "agent"):
+        return {"error": "unknown kind"}
+    limit = min(60, max(5, int((body or {}).get("limit") or 50)))
+
+    cache = _load_translation_cache()
+    all_items = _collect_translate_items(kind)
+    pending = [x for x in all_items if not cache.get(_cache_key(kind, x["id"]))]
+    if not pending:
+        return {"translated": 0, "requested": 0, "remaining": 0,
+                "total": len(all_items), "done": True}
+
+    batch = pending[:limit]
+    kind_label = {"cmd": "슬래시 명령어", "skill": "스킬",
+                  "plugin": "플러그인", "agent": "에이전트"}[kind]
+
+    prompt = f"""다음 Claude Code {kind_label}의 영문 description 들을 **간결한 한국어 한 줄**로 번역하세요.
+- 기술용어(Claude Code, PR, CLI 등)는 그대로 유지.
+- 20~70자 정도, 핵심 동사 포함 ("~한다" 체).
+- 한국어 요약이 불가능하면 원문 기술 용어 나열.
+
+입력:
+{json.dumps(batch, ensure_ascii=False, indent=2)}
+
+JSON 만 출력 (다른 텍스트 금지):
+{{"translations": {{"<id>": "<한국어>", ...}}}}
+"""
+    try:
+        proc = subprocess.run(
+            [claude_bin, "-p", prompt, "--output-format", "json"],
+            capture_output=True, text=True, timeout=300,
+        )
+    except Exception as e:
+        return {"error": f"Claude CLI 실행 실패: {e}"}
+    if proc.returncode != 0:
+        return {"error": f"Claude CLI 오류: {(proc.stderr or '')[:400]}"}
+
+    stdout = (proc.stdout or "").strip()
+    response_text = stdout
+    try:
+        meta = json.loads(stdout)
+        if isinstance(meta, dict):
+            response_text = meta.get("result") or stdout
+    except Exception:
+        pass
+    m = re.search(r'\{[\s\S]*"translations"[\s\S]*\}', response_text)
+    if not m:
+        return {"error": "번역 JSON 없음", "raw": response_text[:1500]}
+    try:
+        parsed = json.loads(m.group(0))
+        tr = parsed.get("translations", {})
+    except Exception as e:
+        return {"error": f"JSON 파싱 실패: {e}", "raw": response_text[:1500]}
+
+    added = 0
+    for item_id, ko in tr.items():
+        if isinstance(ko, str) and ko.strip():
+            cache[_cache_key(kind, item_id)] = ko.strip()
+            added += 1
+    _save_translation_cache(cache)
+
+    remaining = max(0, len(pending) - added)
+    return {
+        "translated": added, "requested": len(batch),
+        "remaining": remaining, "total": len(all_items),
+        "done": remaining == 0,
+    }
+
+
+def api_commands_translate(body: dict) -> dict:
+    """하위 호환 shim — kind=cmd 로 강제."""
+    b = dict(body or {})
+    b["kind"] = "cmd"
+    return api_translate_batch(b)

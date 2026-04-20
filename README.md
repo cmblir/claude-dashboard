@@ -83,10 +83,44 @@ cp env.example .env       # (선택) 환경 변수 커스터마이징
 ## 📂 구조
 
 ```
-server.py         — HTTP 서버 + SQLite 인덱서 + API
-dist/index.html   — 단일 파일 SPA (Vanilla JS + CDN)
-~/.claude-dashboard.db   — 세션 인덱스 (자동 생성)
+server.py              — 얇은 엔트리 (~30줄): .env 로드 + DB 초기화 + HTTP 서버 시작
+server/                — 기능별 모듈 (모두 stdlib only)
+  ├ config.py          — 경로 상수 · 환경 변수
+  ├ utils.py           — 파일 I/O · frontmatter 파서 · 시간 포맷
+  ├ logger.py          — 표준 logging (LOG_LEVEL 환경변수)
+  ├ db.py              — SQLite 커넥션 + 스키마
+  ├ device.py          — macOS 호스트 정보 (cached)
+  ├ claude_md.py       — CLAUDE.md · settings.json 편집
+  ├ skills.py          — 스킬 + 플러그인 스킬
+  ├ agents.py          — 에이전트 (전역 + 플러그인 + 빌트인)
+  ├ commands.py        — 슬래시 명령어 + 카테고리 + 번역 배치
+  ├ hooks.py           — 훅 설정 (사용자 + 플러그인)
+  ├ mcp.py             — MCP 카탈로그 · 커넥터 · `claude mcp list` 캐시
+  ├ plugins.py         — 플러그인 · 마켓플레이스
+  ├ sessions.py        — JSONL 인덱서 · 스코어링 · 타임라인 · 에이전트 그래프
+  ├ projects.py        — 프로젝트 상세 · 프로젝트별 에이전트 · 서브에이전트 모델
+  ├ briefing.py        — 홈 개요 집계
+  ├ features.py        — AI 평가 · 최적화 스코어 · 추천
+  ├ system.py          — 사용량 · 메트릭 · 태스크 · 출력 스타일 등 정보 API
+  ├ auth.py            — Claude CLI 인증 연동
+  ├ actions.py         — 터미널 활성화 · 폴더 열기 · 챗
+  ├ translations.py    — 번역 캐시 · 대시보드 설정
+  └ routes.py          — Handler + ROUTES_GET/POST/PUT dict
+dist/index.html        — 단일 파일 SPA (Vanilla JS + CDN)
+~/.claude-dashboard.db — 세션 인덱스 (자동 생성)
 ```
+
+## 🛠 빌드
+
+다국어 HTML 생성 (영어 · 중국어):
+
+```bash
+python3 build-i18n.py
+# → dist/index-en.html, dist/index-zh.html 재생성
+```
+
+위 두 파일은 `.gitignore` 로 제외되어 있으며, 원본 `dist/index.html` 과
+`build-i18n.py` 만 버전 관리 대상이다.
 
 ## 🔌 API
 

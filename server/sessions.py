@@ -15,7 +15,17 @@ from typing import Optional
 
 from .config import PROJECTS_DIR, SCORE_MIN_TOOLS, _cwd_to_slug
 from .db import _db, _db_init
+from .logger import log
 from .utils import _iso_ms
+
+
+def background_index() -> None:
+    """부팅 시 호출 — 변경된 세션만 재인덱싱."""
+    try:
+        r = index_all_sessions(force=False)
+        log.info("initial index: %s", r)
+    except Exception as e:
+        log.warning("index failed: %s", e)
 
 
 def _first_user_prompt(lines: list[dict]) -> str:
