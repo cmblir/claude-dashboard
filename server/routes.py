@@ -217,22 +217,6 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _get_lang(self) -> str:
-        """쿼리 파라미터 또는 쿠키에서 언어 감지."""
-        u = urlparse(self.path)
-        qs = parse_qs(u.query)
-        lang = (qs.get("lang", [""])[0] or "").lower()
-        if lang in ("en", "zh"):
-            return lang
-        cookie = self.headers.get("Cookie", "")
-        for part in cookie.split(";"):
-            part = part.strip()
-            if part.startswith("cc-lang="):
-                v = part.split("=", 1)[1].strip().lower()
-                if v in ("en", "zh"):
-                    return v
-        return "ko"
-
     def _send_static(self, path: str) -> None:
         if path in ("/", ""):
             path = "/index.html"
@@ -242,16 +226,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(403); self.end_headers(); return
         if not fp.exists() or not fp.is_file():
             fp = DIST / "index.html"
-        if fp.name == "index.html":
-            lang = self._get_lang()
-            if lang == "en":
-                alt = DIST / "index-en.html"
-                if alt.exists():
-                    fp = alt
-            elif lang == "zh":
-                alt = DIST / "index-zh.html"
-                if alt.exists():
-                    fp = alt
+        # i18n 은 이제 런타임 fetch (dist/locales/*.json). index.html 은 단일 파일만 서빙.
         try:
             data = fp.read_bytes()
         except Exception:
@@ -259,6 +234,24 @@ class Handler(BaseHTTPRequestHandler):
         ct = CONTENT_TYPES.get(fp.suffix.lower(), "application/octet-stream")
         self.send_response(200)
         self.send_header("Content-Type", ct)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _send_locale(self, lang: str) -> None:
+        """/api/locales/{lang}.json 서빙. 화이트리스트 검증."""
+        if lang not in ("ko", "en", "zh"):
+            self.send_response(404); self.end_headers(); return
+        fp = DIST / "locales" / f"{lang}.json"
+        if not fp.exists():
+            self.send_response(404); self.end_headers(); return
+        try:
+            data = fp.read_bytes()
+        except Exception:
+            self.send_response(500); self.end_headers(); return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -282,6 +275,11 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         path = unquote(u.path)
         query = parse_qs(u.query)
+        # /api/locales/{lang}.json 전용 핸들러 (JSON 이지만 dist/locales 파일 서빙)
+        m = re.match(r"^/api/locales/([a-z]{2})\.json$", path)
+        if m:
+            self._send_locale(m.group(1))
+            return
         if path in ROUTES_GET:
             try:
                 self._send_json(ROUTES_GET[path](query))
