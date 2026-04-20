@@ -1,0 +1,346 @@
+"""HTTP 라우팅 · 정적 파일 서빙 · Handler 클래스.
+
+경로별 dict 기반 dispatch + `/api/sessions/detail/<uuid>` 류 regex 라우트.
+피처 모듈들이 여기서 한데 모인다 — 피처 모듈은 routes 를 import 하지 않는다.
+"""
+from __future__ import annotations
+
+import json
+import re
+from http.server import BaseHTTPRequestHandler
+from typing import Any, Callable
+from urllib.parse import parse_qs, unquote, urlparse
+
+from .actions import (
+    api_chat, handle_chat_stream, open_folder_action, open_session_action,
+)
+from .agents import (
+    api_agent_create, api_agent_delete, get_agent, list_agents, put_agent,
+)
+from .auth import (
+    api_auth_login, api_auth_logout, api_auth_status,
+    api_set_claimed_plan, api_team_info,
+)
+from .briefing import (
+    briefing_activity, briefing_devices, briefing_overview,
+    briefing_pending_approvals, briefing_projects_summary, briefing_schedule,
+)
+from .claude_md import (
+    get_claude_md, get_settings, put_claude_md, put_settings,
+    validate_permissions,
+)
+from .commands import list_commands
+from .config import DIST
+from .features import (
+    api_ai_evaluation, api_design_add_dir, api_design_exports,
+    api_feature_recommend, api_features_list, api_features_refresh,
+    api_global_claude_md_recommend, api_optimization_score,
+    api_project_ai_recommend, api_project_file_put, api_settings_preview,
+)
+from .hooks import api_plugin_hook_update, get_hooks
+from .logger import log
+from .mcp import (
+    api_mcp_catalog, api_mcp_install, api_mcp_install_prepare,
+    api_mcp_project_remove, api_mcp_remove, list_connectors,
+)
+from .plugins import (
+    api_marketplace_add, api_marketplace_list, api_marketplace_remove,
+    api_plugin_toggle, api_plugins_browse, list_marketplaces, list_plugins_api,
+)
+from .projects import (
+    api_agent_roles, api_project_agent_add, api_project_agent_delete,
+    api_project_agent_save, api_project_agents_list, api_project_detail,
+    api_project_score_detail, api_project_tool_breakdown,
+    api_subagent_model_choices, api_subagent_set_model, list_projects,
+)
+from .sessions import (
+    api_agent_graph, api_project_timeline, api_session_detail,
+    api_session_timeline, api_session_tokens, api_sessions_list,
+    api_sessions_stats, index_all_sessions,
+)
+from .skills import get_skill, list_skills, put_skill
+from .system import (
+    api_backups_list, api_bash_history, api_env_config, api_homunculus_projects,
+    api_ide_status, api_memory_list, api_metrics_summary, api_model_config,
+    api_output_style_delete, api_output_style_save, api_output_styles_list,
+    api_plans_list, api_scheduled_tasks, api_statusline_info,
+    api_task_delete, api_task_save, api_tasks_list, api_telemetry_summary,
+    api_usage_summary, get_device_info, get_recommended_settings,
+    get_system_status,
+)
+
+
+# ───────── 라우트 테이블 ─────────
+
+ROUTES_GET: dict[str, Callable[[dict], Any]] = {
+    "/api/claude-md": lambda q: get_claude_md(),
+    "/api/system/status": lambda q: get_system_status(),
+    "/api/skills": lambda q: list_skills(),
+    "/api/agents": lambda q: list_agents(),
+    "/api/commands": lambda q: list_commands(),
+    "/api/hooks": lambda q: get_hooks(),
+    "/api/plugins": lambda q: list_plugins_api(),
+    "/api/marketplaces": lambda q: list_marketplaces(),
+    "/api/connectors": lambda q: list_connectors(),
+    "/api/projects": lambda q: list_projects(),
+    "/api/settings": lambda q: get_settings(),
+    "/api/guide/recommended-settings": lambda q: get_recommended_settings(),
+    "/api/briefing/overview": lambda q: briefing_overview(),
+    "/api/briefing/devices": lambda q: briefing_devices(),
+    "/api/briefing/activity": lambda q: briefing_activity(),
+    "/api/briefing/schedule": lambda q: briefing_schedule(),
+    "/api/briefing/projects-summary": lambda q: briefing_projects_summary(),
+    "/api/briefing/pending-approvals": lambda q: briefing_pending_approvals(),
+    "/api/device/info": lambda q: get_device_info(),
+    "/api/sessions/list": api_sessions_list,
+    "/api/sessions/stats": lambda q: api_sessions_stats(),
+    "/api/agents/graph": api_agent_graph,
+    "/api/optimization/score": lambda q: api_optimization_score(),
+    "/api/permissions/diagnose": lambda q: {
+        "issues": validate_permissions(get_settings().get("permissions") or {}),
+    },
+    "/api/evaluation/ai": lambda q: api_ai_evaluation({"force": False}),
+    "/api/design/exports": api_design_exports,
+    "/api/features/list": lambda q: api_features_list(),
+    "/api/auth/status": lambda q: api_auth_status(),
+    "/api/project/detail": api_project_detail,
+    "/api/project/score-detail": api_project_score_detail,
+    "/api/project/tool-breakdown": api_project_tool_breakdown,
+    "/api/project/timeline": api_project_timeline,
+    "/api/mcp/catalog": lambda q: api_mcp_catalog(),
+    "/api/plugins/browse": lambda q: api_plugins_browse(),
+    "/api/project-agents/roles": lambda q: api_agent_roles(),
+    "/api/project-agents/list": api_project_agents_list,
+    "/api/subagent/model-choices": lambda q: api_subagent_model_choices(),
+    "/api/usage/summary": lambda q: api_usage_summary(),
+    "/api/memory/list": api_memory_list,
+    "/api/tasks/list": lambda q: api_tasks_list(),
+    "/api/team/info": lambda q: api_team_info(),
+    "/api/output-styles/list": lambda q: api_output_styles_list(),
+    "/api/statusline/info": lambda q: api_statusline_info(),
+    "/api/plans/list": lambda q: api_plans_list(),
+    "/api/metrics/summary": lambda q: api_metrics_summary(),
+    "/api/backups/list": lambda q: api_backups_list(),
+    "/api/env/config": lambda q: api_env_config(),
+    "/api/model/config": lambda q: api_model_config(),
+    "/api/ide/status": lambda q: api_ide_status(),
+    "/api/scheduled-tasks/list": lambda q: api_scheduled_tasks(),
+    "/api/bash-history/list": api_bash_history,
+    "/api/telemetry/summary": lambda q: api_telemetry_summary(),
+    "/api/homunculus/projects": lambda q: api_homunculus_projects(),
+    "/api/marketplaces/list": lambda q: api_marketplace_list(),
+}
+
+
+# POST 라우트 — body(dict) 를 받는 핸들러 매핑
+def _reindex_handler(body: dict) -> dict:
+    force = bool((body or {}).get("force", False))
+    return index_all_sessions(force=force)
+
+
+# 번역 배치는 auth/plugins/skills/agents 를 모두 참조 — late import 로 순환 회피
+def _translate_batch_handler(body: dict) -> dict:
+    from .commands import api_translate_batch
+    return api_translate_batch(body)
+
+
+def _commands_translate_handler(body: dict) -> dict:
+    from .commands import api_commands_translate
+    return api_commands_translate(body)
+
+
+ROUTES_POST: dict[str, Callable[[dict], Any]] = {
+    "/api/open-folder": open_folder_action,
+    "/api/open-session": open_session_action,
+    "/api/sessions/reindex": _reindex_handler,
+    "/api/settings/preview": api_settings_preview,
+    "/api/project/file": api_project_file_put,
+    "/api/project/ai-recommend": api_project_ai_recommend,
+    "/api/global/claude-md-recommend": api_global_claude_md_recommend,
+    "/api/feature/recommend": api_feature_recommend,
+    "/api/evaluation/ai": api_ai_evaluation,
+    "/api/design/add-dir": api_design_add_dir,
+    "/api/features/refresh": api_features_refresh,
+    "/api/commands/translate": _commands_translate_handler,
+    "/api/translate/batch": _translate_batch_handler,
+    "/api/mcp/install": api_mcp_install,
+    "/api/mcp/install/prepare": api_mcp_install_prepare,
+    "/api/mcp/remove": api_mcp_remove,
+    "/api/mcp/project/remove": api_mcp_project_remove,
+    "/api/plugins/toggle": api_plugin_toggle,
+    "/api/hooks/plugin/update": api_plugin_hook_update,
+    "/api/auth/claimed-plan": api_set_claimed_plan,
+    "/api/auth/login": api_auth_login,
+    "/api/auth/logout": api_auth_logout,
+    "/api/project-agents/add": api_project_agent_add,
+    "/api/project-agents/delete": api_project_agent_delete,
+    "/api/project-agents/save": api_project_agent_save,
+    "/api/subagent/set-model": api_subagent_set_model,
+    "/api/agents/create": api_agent_create,
+    "/api/agents/delete": api_agent_delete,
+    "/api/tasks/save": api_task_save,
+    "/api/tasks/delete": api_task_delete,
+    "/api/output-styles/save": api_output_style_save,
+    "/api/output-styles/delete": api_output_style_delete,
+    "/api/marketplaces/add": api_marketplace_add,
+    "/api/marketplaces/remove": api_marketplace_remove,
+    "/api/chat": api_chat,
+}
+
+
+ROUTES_PUT: dict[str, Callable[[dict], Any]] = {
+    "/api/claude-md": put_claude_md,
+    "/api/settings": put_settings,
+    "/api/project-agents/save": api_project_agent_save,
+}
+
+
+CONTENT_TYPES = {
+    ".html": "text/html; charset=utf-8", ".js": "application/javascript",
+    ".mjs": "application/javascript", ".css": "text/css",
+    ".json": "application/json", ".svg": "image/svg+xml",
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".ico": "image/x-icon", ".woff": "font/woff", ".woff2": "font/woff2",
+    ".map": "application/json",
+}
+
+
+# ───────── Handler ─────────
+
+class Handler(BaseHTTPRequestHandler):
+    def _send_json(self, obj, code: int = 200) -> None:
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _get_lang(self) -> str:
+        """쿼리 파라미터 또는 쿠키에서 언어 감지."""
+        u = urlparse(self.path)
+        qs = parse_qs(u.query)
+        lang = (qs.get("lang", [""])[0] or "").lower()
+        if lang in ("en", "zh"):
+            return lang
+        cookie = self.headers.get("Cookie", "")
+        for part in cookie.split(";"):
+            part = part.strip()
+            if part.startswith("cc-lang="):
+                v = part.split("=", 1)[1].strip().lower()
+                if v in ("en", "zh"):
+                    return v
+        return "ko"
+
+    def _send_static(self, path: str) -> None:
+        if path in ("/", ""):
+            path = "/index.html"
+        rel = path.lstrip("/")
+        fp = (DIST / rel).resolve()
+        if not str(fp).startswith(str(DIST.resolve())):
+            self.send_response(403); self.end_headers(); return
+        if not fp.exists() or not fp.is_file():
+            fp = DIST / "index.html"
+        if fp.name == "index.html":
+            lang = self._get_lang()
+            if lang == "en":
+                alt = DIST / "index-en.html"
+                if alt.exists():
+                    fp = alt
+            elif lang == "zh":
+                alt = DIST / "index-zh.html"
+                if alt.exists():
+                    fp = alt
+        try:
+            data = fp.read_bytes()
+        except Exception:
+            self.send_response(500); self.end_headers(); return
+        ct = CONTENT_TYPES.get(fp.suffix.lower(), "application/octet-stream")
+        self.send_response(200)
+        self.send_header("Content-Type", ct)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _read_body(self) -> dict:
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        if not length:
+            return {}
+        try:
+            return json.loads(self.rfile.read(length))
+        except Exception:
+            return {}
+
+    def _drain(self) -> None:
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        if length:
+            self.rfile.read(length)
+
+    def do_GET(self) -> None:
+        u = urlparse(self.path)
+        path = unquote(u.path)
+        query = parse_qs(u.query)
+        if path in ROUTES_GET:
+            try:
+                self._send_json(ROUTES_GET[path](query))
+            except Exception as e:
+                log.exception("route error: %s", path)
+                self._send_json({"error": str(e)}, 500)
+            return
+        # regex item-routes
+        for pattern, fn in _ITEM_GET_ROUTES:
+            m = pattern.match(path)
+            if m:
+                try:
+                    self._send_json(fn(m.group(1)))
+                except Exception as e:
+                    self._send_json({"error": str(e)}, 500)
+                return
+        if path.startswith("/api/"):
+            self._send_json({})
+            return
+        self._send_static(path)
+
+    def do_PUT(self) -> None:
+        path = unquote(urlparse(self.path).path)
+        body = self._read_body()
+        if path in ROUTES_PUT:
+            self._send_json(ROUTES_PUT[path](body)); return
+        # regex item-routes
+        m = re.match(r"^/api/skills/([^/]+)$", path)
+        if m:
+            self._send_json(put_skill(m.group(1), body)); return
+        m = re.match(r"^/api/agents/([A-Za-z0-9_.:-]+)$", path)
+        if m:
+            self._send_json(put_agent(m.group(1), body)); return
+        self._send_json({"ok": False, "error": "unknown route"}, 404)
+
+    def do_POST(self) -> None:
+        path = unquote(urlparse(self.path).path)
+        # chat/stream 은 SSE 응답 — dict 외 Handler 를 직접 받음
+        if path == "/api/chat/stream":
+            handle_chat_stream(self, self._read_body())
+            return
+        if path in ROUTES_POST:
+            self._send_json(ROUTES_POST[path](self._read_body())); return
+        self._drain()
+        self._send_json({"ok": False, "error": "unknown route"}, 404)
+
+    def do_DELETE(self) -> None:
+        self._drain()
+        self._send_json({"ok": False, "readOnly": True})
+
+    def log_message(self, fmt, *args) -> None:
+        log.info("%s %s", self.command, self.path)
+
+
+# regex 기반 GET 아이템 라우트 (path param 1개)
+_ITEM_GET_ROUTES = [
+    (re.compile(r"^/api/sessions/detail/([0-9a-f-]+)$"), api_session_detail),
+    (re.compile(r"^/api/sessions/tokens/([0-9a-f-]+)$"), api_session_tokens),
+    (re.compile(r"^/api/sessions/timeline/([0-9a-f-]+)$"), api_session_timeline),
+    (re.compile(r"^/api/skills/([^/]+)$"), get_skill),
+    (re.compile(r"^/api/agents/([A-Za-z0-9_.:-]+)$"), get_agent),
+]
