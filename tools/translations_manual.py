@@ -20,6 +20,11 @@ try:
 except Exception:
     _NEW_EN, _NEW_ZH = {}, {}
 
+try:
+    from translations_manual_3 import NEW_EN as _NEW_EN_3, NEW_ZH as _NEW_ZH_3
+except Exception:
+    _NEW_EN_3, _NEW_ZH_3 = {}, {}
+
 # ── 구조화 키 → 한국어 라벨 ──
 MANUAL_KO: dict[str, str] = {
     "settings.theme": "테마",
@@ -382,6 +387,12 @@ for _k, _v in _MISSING_ZH.items():
 for _k, _v in _NEW_EN.items():
     MANUAL_EN.setdefault(_k, _v)
 for _k, _v in _NEW_ZH.items():
+    MANUAL_ZH.setdefault(_k, _v)
+
+# 버그 수정(/* */ false match) 후 감사에 복구된 280 phrase 번역 병합
+for _k, _v in _NEW_EN_3.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH_3.items():
     MANUAL_ZH.setdefault(_k, _v)
 
 # ── 번역 검수 권장 항목 ──
