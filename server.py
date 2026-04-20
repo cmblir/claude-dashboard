@@ -161,15 +161,6 @@ from server.translations import (
 )
 
 
-CLAUDE_PLANS = [
-    {"id": "free",        "label": "무료 (Free)",          "note": "rate limit 있음"},
-    {"id": "pro",         "label": "Claude Pro",          "note": "$20/월"},
-    {"id": "max_5x",      "label": "Claude Max (5×)",      "note": "$100/월"},
-    {"id": "max_20x",     "label": "Claude Max (20×)",     "note": "$200/월"},
-    {"id": "team",        "label": "Claude Team",          "note": "팀 워크스페이스"},
-    {"id": "enterprise",  "label": "Claude Enterprise",    "note": "엔터프라이즈"},
-    {"id": "api_only",    "label": "API 키 전용",          "note": "종량제"},
-]
 
 
 TRANSLATION_CACHE = TRANSLATIONS_PATH  # 구 코드 호환 — 점진적으로 TRANSLATIONS_PATH 로 통일 예정
@@ -328,68 +319,15 @@ from server.projects import (
 
 # ───────────────── briefing (original) ─────────────────
 
-def _today_start_ts_ms() -> int:
-    midnight = datetime.combine(date.today(), datetime.min.time())
-    return int(midnight.timestamp() * 1000)
 
 
-def _iter_history_recent(limit_lines: int = 5000):
-    if not HISTORY_JSONL.exists():
-        return
-    try:
-        lines = HISTORY_JSONL.read_text(encoding="utf-8", errors="replace").splitlines()
-        for line in lines[-limit_lines:]:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                yield json.loads(line)
-            except Exception:
-                continue
-    except Exception:
-        return
 
 
-def _today_history_stats() -> dict:
-    today_start = _today_start_ts_ms()
-    cmd_count = 0
-    projects_today = set()
-    for entry in _iter_history_recent():
-        ts = entry.get("timestamp")
-        if not isinstance(ts, (int, float)):
-            continue
-        if ts >= today_start:
-            cmd_count += 1
-            proj = entry.get("project")
-            if proj:
-                projects_today.add(proj)
-    return {"commandCount": cmd_count, "projectCount": len(projects_today)}
 
 
-def _count_projects() -> int:
-    if not PROJECTS_DIR.exists():
-        return 0
-    return sum(1 for p in PROJECTS_DIR.iterdir() if p.is_dir())
 
 
-def _count_active_sessions() -> int:
-    if not SESSIONS_DIR.exists():
-        return 0
-    return sum(1 for p in SESSIONS_DIR.glob("*.json"))
 
-
-def _count_tasks_in_todos() -> int:
-    if not TODOS_DIR.exists():
-        return 0
-    total = 0
-    for p in TODOS_DIR.glob("*.json"):
-        try:
-            data = json.loads(_safe_read(p))
-            if isinstance(data, list):
-                total += len(data)
-        except Exception:
-            pass
-    return total
 
 
 # ───────────────── NEW: session DB endpoints ─────────────────
@@ -663,207 +601,20 @@ def api_optimization_score() -> dict:
 
 # ───────────────── original briefing ─────────────────
 
-def briefing_overview() -> dict:
-    today = _today_history_stats()
-    return {
-        "projectCount": _count_projects(),
-        "taskCount": _count_tasks_in_todos(),
-        "sessionCount": _count_active_sessions(),
-        "commandCount": today["commandCount"],
-        "todayProjectCount": today["projectCount"],
-        "lastUpdate": int(time.time() * 1000),
-    }
 
 
-def briefing_devices() -> dict:
-    info = _detect_device_info()
-    real_username = info["username"]
-    device_label = info["label"]
-    all_projects: dict = {}
-    for entry in _iter_history_recent(limit_lines=3000):
-        proj = entry.get("project")
-        ts = entry.get("timestamp")
-        if not proj or not isinstance(ts, (int, float)):
-            continue
-        slot = all_projects.setdefault(proj, {"displayName": Path(proj).name or proj, "path": proj, "lastActivity": 0})
-        if ts > slot["lastActivity"]:
-            slot["lastActivity"] = ts
-    devices = []
-    if all_projects:
-        recent = sorted(all_projects.values(), key=lambda x: x["lastActivity"], reverse=True)[:8]
-        devices.append({
-            "id": real_username, "label": device_label,
-            "projectCount": len(all_projects), "recentProjects": recent,
-        })
-    return {"devices": devices}
 
 
-def briefing_activity() -> dict:
-    today = _today_history_stats()
-    return {"today": {"commandCount": today["commandCount"], "projectCount": today["projectCount"]}, "activities": []}
 
 
-def _read_scheduled_tasks() -> list:
-    out = []
-    if not SCHEDULED_TASKS_DIR.exists():
-        return out
-    for d in sorted(SCHEDULED_TASKS_DIR.iterdir()):
-        if not d.is_dir():
-            continue
-        skill_md = d / "SKILL.md"
-        meta = {}
-        updated_at = None
-        if skill_md.exists():
-            meta = _parse_frontmatter(_safe_read(skill_md, 4000))
-            try:
-                updated_at = int(skill_md.stat().st_mtime * 1000)
-            except Exception:
-                updated_at = None
-        out.append({
-            "id": d.name, "title": meta.get("name", d.name),
-            "name": meta.get("name", d.name),
-            "description": meta.get("description", ""),
-            "updatedAt": updated_at,
-        })
-    return out
 
 
-def _read_tasks() -> list:
-    out = []
-    if not TASKS_DIR.exists():
-        return out
-    device = _detect_device_info()["label"]
-    for d in sorted(TASKS_DIR.iterdir()):
-        if not d.is_dir():
-            continue
-        task_id = d.name
-        is_uuid = bool(_UUID_RE.match(task_id))
-        kind = "agent" if is_uuid else "named"
-        subtasks = []
-        try:
-            for f in sorted(d.glob("*.json")):
-                try:
-                    data = json.loads(_safe_read(f))
-                    if isinstance(data, dict):
-                        subtasks.append({
-                            "id": data.get("id", f.stem),
-                            "subject": data.get("subject", ""),
-                            "description": (data.get("description") or "")[:200],
-                            "status": data.get("status", "pending"),
-                        })
-                except Exception:
-                    continue
-        except Exception:
-            pass
-        total = len(subtasks)
-        completed = sum(1 for s in subtasks if s["status"] == "completed")
-        try:
-            updated_at = int(d.stat().st_mtime * 1000)
-        except Exception:
-            updated_at = None
-        out.append({
-            "id": task_id, "kind": kind,
-            "teamName": task_id if not is_uuid else "",
-            "totalCount": total, "completedCount": completed,
-            "lockActive": (d / ".lock").exists(),
-            "device": device, "updatedAt": updated_at, "subtasks": subtasks,
-        })
-    return out
 
 
-def briefing_schedule() -> dict:
-    return {"scheduled": _read_scheduled_tasks(), "tasks": _read_tasks()}
 
 
-def briefing_projects_summary() -> dict:
-    by_project: dict = {}
-    for entry in _iter_history_recent(limit_lines=5000):
-        proj = entry.get("project")
-        ts = entry.get("timestamp")
-        if not proj or not isinstance(ts, (int, float)):
-            continue
-        display = (entry.get("display") or "").strip()
-        slot = by_project.setdefault(proj, {
-            "displayName": Path(proj).name or proj,
-            "cwd": proj,
-            "device": _detect_device_info()["label"],
-            "sessionCount": 0, "lastActivity": 0,
-            "firstRequest": "", "firstTs": 0, "lastResult": "",
-        })
-        slot["sessionCount"] += 1
-        if ts > slot["lastActivity"]:
-            slot["lastActivity"] = ts
-            if display:
-                slot["lastResult"] = display[:160]
-        if slot["firstTs"] == 0 or ts < slot["firstTs"]:
-            slot["firstTs"] = ts
-            if display:
-                slot["firstRequest"] = display[:160]
-    for v in by_project.values():
-        v.pop("firstTs", None)
-    summaries = sorted(by_project.values(), key=lambda x: x["lastActivity"], reverse=True)[:20]
-    return {"summaries": summaries, "projects": list_projects().get("projects", [])}
 
 
-def briefing_pending_approvals() -> dict:
-    out: list = []
-    if not SESSIONS_DIR.exists():
-        return {"approvals": [], "pending": out}
-    now_ms = int(time.time() * 1000)
-    for p in sorted(SESSIONS_DIR.glob("*.json")):
-        try:
-            sd = json.loads(_safe_read(p))
-        except Exception:
-            continue
-        if not isinstance(sd, dict):
-            continue
-        sid = sd.get("sessionId")
-        cwd = sd.get("cwd") or ""
-        if not sid:
-            continue
-        jsonl_files = list(PROJECTS_DIR.glob(f"*/{sid}.jsonl"))
-        if not jsonl_files:
-            continue
-        jsonl = jsonl_files[0]
-        last_tool = None
-        last_ts_ms = None
-        try:
-            text = jsonl.read_text(encoding="utf-8", errors="replace")
-            lines = text.splitlines()[-150:]
-            for line in reversed(lines):
-                try:
-                    msg = json.loads(line)
-                except Exception:
-                    continue
-                if msg.get("type") != "assistant":
-                    continue
-                content = (msg.get("message") or {}).get("content", [])
-                if not isinstance(content, list):
-                    continue
-                tool_name = None
-                for c in content:
-                    if isinstance(c, dict) and c.get("type") == "tool_use":
-                        tool_name = c.get("name")
-                        break
-                if tool_name:
-                    ts_str = msg.get("timestamp", "")
-                    last_ts_ms = _iso_ms(ts_str)
-                    last_tool = tool_name
-                    break
-        except Exception:
-            continue
-        if not last_tool:
-            continue
-        age_seconds = max(0, (now_ms - last_ts_ms) // 1000) if last_ts_ms else 0
-        out.append({
-            "project": Path(cwd).name or sid[:8],
-            "tool": last_tool,
-            "device": _detect_device_info()["label"],
-            "ageSeconds": int(age_seconds),
-            "sessionId": sid,
-        })
-    out.sort(key=lambda x: x["ageSeconds"])
-    return {"approvals": [], "pending": out}
 
 
 def get_recommended_settings() -> dict:
@@ -1538,139 +1289,6 @@ def api_homunculus_projects() -> dict:
             })
     rows.sort(key=lambda x: x.get("lastSeen", ""), reverse=True)
     return {"exists": True, "projects": rows, "count": len(rows)}
-
-
-def api_team_info() -> dict:
-    """조직/워크스페이스/팀 정보 (claude.ai team 기능용)."""
-    if not CLAUDE_JSON.exists():
-        return {"connected": False}
-    try:
-        data = json.loads(_safe_read(CLAUDE_JSON, 500000))
-    except Exception as e:
-        return {"connected": False, "error": str(e)}
-    oauth = data.get("oauthAccount") or {}
-    cfg = _load_dash_config()
-    claimed = cfg.get("claimedPlan") or ""
-    return {
-        "connected": bool(oauth),
-        "displayName": oauth.get("displayName", ""),
-        "email": oauth.get("emailAddress", ""),
-        "organizationUuid": oauth.get("organizationUuid", ""),
-        "organizationName": oauth.get("organizationName", ""),
-        "organizationRole": oauth.get("organizationRole", ""),
-        "workspaceRole": oauth.get("workspaceRole"),
-        "accountUuid": oauth.get("accountUuid", ""),
-        "billingType": oauth.get("billingType", ""),
-        "hasExtraUsageEnabled": bool(oauth.get("hasExtraUsageEnabled", False)),
-        "claimedPlan": claimed,
-        "note": "상세 멤버 리스트/사용량은 claude.ai/settings/organization 에서 관리됩니다. 로컬에는 조직 식별자만 저장됨.",
-    }
-
-
-def api_auth_status() -> dict:
-    """~/.claude.json 에서 oauth 정보 읽어 연결 상태 반환 + claude CLI 설치 여부."""
-    cli_path = shutil.which("claude") or ""
-    cli_version = ""
-    if cli_path:
-        try:
-            cli_version = subprocess.check_output(
-                [cli_path, "--version"], text=True, timeout=5,
-            ).strip()
-        except Exception:
-            cli_version = ""
-
-    if not CLAUDE_JSON.exists():
-        return {
-            "connected": False,
-            "reason": "~/.claude.json 이 없습니다 — Claude Code에 로그인하세요.",
-            "cliInstalled": bool(cli_path),
-            "cliPath": cli_path,
-            "cliVersion": cli_version,
-        }
-    try:
-        data = json.loads(_safe_read(CLAUDE_JSON, 200000))
-    except Exception as e:
-        return {"connected": False, "reason": f"~/.claude.json 파싱 실패: {e}"}
-
-    oauth = data.get("oauthAccount") or {}
-    if not oauth:
-        return {
-            "connected": False, "reason": "OAuth 계정 없음 — `claude auth login` 실행 필요.",
-            "cliInstalled": bool(cli_path), "cliPath": cli_path, "cliVersion": cli_version,
-        }
-
-    billing = oauth.get("billingType") or ""
-    # 로컬에는 세부 플랜(Pro/Max/Team)이 저장되지 않음.
-    # 사용자가 대시보드에서 직접 선택한 값이 있으면 우선.
-    cfg = _load_dash_config()
-    claimed_plan_id = cfg.get("claimedPlan") or ""
-    claimed_plan = next((p for p in CLAUDE_PLANS if p["id"] == claimed_plan_id), None)
-
-    if claimed_plan:
-        plan_label = claimed_plan["label"]
-    elif billing == "stripe_subscription":
-        plan_label = "Claude 구독 활성 (세부 플랜 미지정)"
-    elif billing == "api_key":
-        plan_label = "API 키"
-    else:
-        plan_label = "무료 / 미확인"
-
-    # `claude auth status` 에서 실시간 구독 타입 가져오기
-    cli_auth: dict = {}
-    if cli_path:
-        try:
-            raw = subprocess.check_output(
-                [cli_path, "auth", "status"], text=True, timeout=5,
-            ).strip()
-            cli_auth = json.loads(raw) if raw.startswith("{") else {}
-        except Exception:
-            cli_auth = {}
-
-    # CLI auth status 에 subscriptionType 이 있으면 plan label 덮어쓰기
-    sub_type = cli_auth.get("subscriptionType", "")
-    if sub_type and not claimed_plan:
-        sub_map = {"free": "Free", "pro": "Pro", "max": "Max", "team": "Team", "enterprise": "Enterprise"}
-        plan_label = f"Claude {sub_map.get(sub_type, sub_type)}"
-
-    projects_count = len(data.get("projects", {}) or {})
-    return {
-        "connected": True,
-        "email": cli_auth.get("email") or oauth.get("emailAddress", ""),
-        "displayName": oauth.get("displayName", ""),
-        "accountUuid": oauth.get("accountUuid", ""),
-        "organizationUuid": cli_auth.get("orgId") or oauth.get("organizationUuid", ""),
-        "organizationName": cli_auth.get("orgName") or "",
-        "organizationRole": oauth.get("organizationRole", ""),
-        "workspaceRole": oauth.get("workspaceRole", ""),
-        "billingType": billing,
-        "subscriptionType": sub_type,
-        "planLabel": plan_label,
-        "claimedPlanId": claimed_plan_id,
-        "planNote": claimed_plan["note"] if claimed_plan else "플랜은 로컬에 저장되지 않습니다. 직접 선택하세요.",
-        "availablePlans": CLAUDE_PLANS,
-        "hasExtraUsageEnabled": bool(oauth.get("hasExtraUsageEnabled", False)),
-        "subscriptionCreatedAt": oauth.get("subscriptionCreatedAt", ""),
-        "accountCreatedAt": oauth.get("accountCreatedAt", ""),
-        "userID": data.get("userID", ""),
-        "firstTokenDate": data.get("claudeCodeFirstTokenDate", ""),
-        "projectsKnown": projects_count,
-        "cliInstalled": bool(cli_path),
-        "cliPath": cli_path,
-        "cliVersion": cli_version,
-    }
-
-
-def api_set_claimed_plan(body: dict) -> dict:
-    pid = (body or {}).get("planId") if isinstance(body, dict) else ""
-    if pid and not any(p["id"] == pid for p in CLAUDE_PLANS):
-        return {"ok": False, "error": f"unknown plan id: {pid}"}
-    cfg = _load_dash_config()
-    if pid:
-        cfg["claimedPlan"] = pid
-    else:
-        cfg.pop("claimedPlan", None)
-    _save_dash_config(cfg)
-    return {"ok": True, "planId": pid or ""}
 
 
 def _deep_merge_settings(base: dict, patch: dict) -> dict:
@@ -3023,349 +2641,29 @@ def api_settings_preview(body: dict) -> dict:
 
 # ───────────────── actions ─────────────────
 
-def _find_terminal_app_for_pid(pid: int) -> str:
-    terminal_apps = {"Terminal", "iTerm2", "Alacritty", "kitty", "Warp", "Hyper", "WezTerm"}
-    current = pid
-    for _ in range(20):
-        try:
-            line = subprocess.check_output(["ps", "-o", "ppid=,comm=", "-p", str(current)], text=True, timeout=3).strip()
-        except Exception:
-            break
-        parts = line.split(None, 1)
-        if len(parts) < 2:
-            break
-        ppid_str, comm = parts
-        app_name = Path(comm).name
-        if app_name in terminal_apps:
-            return app_name
-        try:
-            current = int(ppid_str)
-        except ValueError:
-            break
-        if current <= 1:
-            break
-    return ""
 
-
-def open_session_action(body: dict) -> dict:
-    session_id = body.get("sessionId") if isinstance(body, dict) else None
-    if not session_id:
-        return {"ok": False, "error": "no sessionId"}
-    session_file = SESSIONS_DIR / f"{session_id}.json"
-    found = None
-    if session_file.exists():
-        try:
-            found = json.loads(_safe_read(session_file))
-        except Exception:
-            return {"ok": False, "error": "session unreadable"}
-    else:
-        if SESSIONS_DIR.exists():
-            for p in SESSIONS_DIR.glob("*.json"):
-                try:
-                    data = json.loads(_safe_read(p))
-                    if isinstance(data, dict) and data.get("sessionId") == session_id:
-                        found = data
-                        break
-                except Exception:
-                    continue
-    if not found:
-        return {"ok": False, "error": "session not found"}
-    pid = found.get("pid")
-    if not pid:
-        return {"ok": False, "error": "no pid"}
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return {"ok": False, "error": "process not running"}
-    app = _find_terminal_app_for_pid(pid)
-    if app:
-        try:
-            subprocess.run(["osascript", "-e", f'tell application "{app}" to activate'], timeout=3, capture_output=True)
-        except Exception:
-            pass
-    return {"ok": True, "app": app or "unknown", "pid": pid}
-
-
-_CHAT_SYSTEM_PROMPT = """당신은 Claude Control Center 대시보드의 안내 도우미입니다.
-사용자가 대시보드 기능에 대해 질문하면 친절하게 한국어로 답변하고, 관련 탭으로 안내합니다.
-
-## 대시보드 탭 목록 (id → 설명)
-- overview: 전체 개요 · 최적화 점수 · 시스템 요약
-- projects: 프로젝트별 Claude 세팅 · AI 추천 · CLAUDE.md 관리
-- analytics: 통계 & 스코어 · 30일 타임라인 · 도구 분포
-- aiEval: AI 종합 평가 · Claude가 전체 셋업을 진단
-- sessions: 세션 히스토리 · 과거 대화 검색 · 세션 품질 스코어
-- agents: 에이전트 목록 · 상호작용 그래프 (vis-network)
-- projectAgents: 프로젝트별 서브 에이전트 관리 · 16개 역할 프리셋
-- skills: 사용자 정의 스킬 보기/편집
-- commands: 슬래시 명령어 목록
-- hooks: 이벤트 훅 설정
-- permissions: 도구 권한 관리
-- mcp: MCP 커넥터 · 외부 도구 연결
-- plugins: 플러그인 관리
-- settings: settings.json 편집
-- claudemd: CLAUDE.md 편집 (마크다운 프리뷰)
-- usage: 사용량 / 비용 추정
-- metrics: 토큰 메트릭 상세
-- memory: 프로젝트 메모리 관리
-- tasks: 태스크 / TODO 관리
-- team: 팀 / 조직 정보
-- system: 시스템 상태 · 디바이스 정보
-
-## 응답 규칙
-1. 간결하게 2-3문장으로 답변
-2. 관련 탭이 있으면 반드시 `navigate` 필드에 탭 id를 포함
-3. JSON 형식으로만 응답:
-{"answer": "답변 텍스트", "navigate": "tab_id 또는 null"}
-"""
-
-
-def api_chat(body: dict) -> dict:
-    """챗봇 API — 사용자 질문을 받아 대시보드 안내 답변 반환."""
-    if not isinstance(body, dict):
-        return {"error": "잘못된 요청"}
-    user_msg = (body.get("message") or "").strip()
-    if not user_msg:
-        return {"error": "메시지가 비어있습니다."}
-    history = body.get("history") or []
-
-    claude_bin = shutil.which("claude")
-    if not claude_bin:
-        return {"error": "Claude CLI 미설치"}
-    if not api_auth_status().get("connected"):
-        return {"error": "Claude 계정 연결 필요"}
-
-    # 대화 히스토리를 프롬프트에 포함
-    conv_lines = []
-    for h in history[-6:]:  # 최근 6개까지만
-        role = h.get("role", "")
-        text = h.get("text", "")
-        if role == "user":
-            conv_lines.append(f"사용자: {text}")
-        elif role == "assistant":
-            conv_lines.append(f"도우미: {text}")
-
-    lang = (body.get("lang") or "ko").lower()
-    lang_instruction = {"en": "\n\nIMPORTANT: Respond in English only.", "zh": "\n\nIMPORTANT: Respond in Chinese (简体中文) only."}.get(lang, "")
-
-    prompt_parts = [_CHAT_SYSTEM_PROMPT + lang_instruction]
-    if conv_lines:
-        prompt_parts.append("\n## 이전 대화\n" + "\n".join(conv_lines))
-    prompt_parts.append(f"\n## 현재 질문\n사용자: {user_msg}\n\nJSON으로만 답변:")
-
-    full_prompt = "\n".join(prompt_parts)
-
-    try:
-        proc = subprocess.run(
-            [claude_bin, "-p", full_prompt, "--output-format", "json"],
-            capture_output=True, text=True, timeout=30,
-        )
-    except subprocess.TimeoutExpired:
-        return {"error": "응답 시간 초과 (30초)"}
-    except Exception as e:
-        return {"error": f"CLI 실행 실패: {e}"}
-
-    if proc.returncode != 0:
-        return {"error": f"CLI 오류: {(proc.stderr or '')[:200]}"}
-
-    stdout = (proc.stdout or "").strip()
-    # --output-format json 은 {"result": "..."} 래핑
-    response_text = stdout
-    try:
-        meta = json.loads(stdout)
-        if isinstance(meta, dict) and "result" in meta:
-            response_text = meta["result"]
-    except Exception:
-        pass
-
-    # JSON 파싱 시도
-    parsed = {}
-    m = re.search(r"\{[\s\S]*\}", response_text)
-    if m:
-        try:
-            parsed = json.loads(m.group(0))
-        except Exception:
-            pass
-
-    answer = parsed.get("answer") or response_text[:500]
-    navigate = parsed.get("navigate")
-    # navigate 검증
-    valid_tabs = {
-        "overview", "projects", "analytics", "aiEval", "sessions", "agents",
-        "projectAgents", "skills", "commands", "hooks", "permissions", "mcp",
-        "plugins", "settings", "claudemd", "usage", "metrics", "memory",
-        "tasks", "team", "system", "features", "statusline", "plans",
-        "envConfig", "modelConfig", "ideStatus", "scheduled", "backups",
-        "bashHistory", "telemetry", "homunculus", "outputStyles",
-    }
-    if navigate and navigate not in valid_tabs:
-        navigate = None
-
-    return {"answer": answer, "navigate": navigate}
-
-
-def handle_chat_stream(handler: "Handler", body: dict) -> None:
-    """SSE 스트리밍 챗 — claude CLI stream-json 을 SSE 로 중계."""
-    user_msg = (body.get("message") or "").strip() if isinstance(body, dict) else ""
-    if not user_msg:
-        handler.send_response(400)
-        handler.send_header("Content-Type", "text/plain")
-        handler.end_headers()
-        handler.wfile.write(b"empty message")
-        return
-
-    claude_bin = shutil.which("claude")
-    if not claude_bin:
-        handler.send_response(500)
-        handler.send_header("Content-Type", "text/plain")
-        handler.end_headers()
-        handler.wfile.write(b"claude CLI not found")
-        return
-
-    history = body.get("history") or []
-    lang = (body.get("lang") or "ko").lower()
-    lang_instruction = {"en": "\n\nIMPORTANT: Respond in English only.", "zh": "\n\nIMPORTANT: Respond in Chinese (简体中文) only."}.get(lang, "")
-
-    conv_lines = []
-    for h in history[-6:]:
-        role = h.get("role", "")
-        text = h.get("text", "")
-        if role == "user":
-            conv_lines.append(f"사용자: {text}")
-        elif role == "assistant":
-            conv_lines.append(f"도우미: {text}")
-
-    prompt_parts = [_CHAT_SYSTEM_PROMPT + lang_instruction]
-    if conv_lines:
-        prompt_parts.append("\n## 이전 대화\n" + "\n".join(conv_lines))
-    prompt_parts.append(f"\n## 현재 질문\n사용자: {user_msg}\n\nJSON으로만 답변:")
-    full_prompt = "\n".join(prompt_parts)
-
-    # SSE 헤더
-    handler.send_response(200)
-    handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
-    handler.send_header("Cache-Control", "no-cache")
-    handler.send_header("Connection", "keep-alive")
-    handler.send_header("X-Accel-Buffering", "no")
-    handler.end_headers()
-
-    def _sse(event: str, data: str) -> None:
-        chunk = f"event: {event}\ndata: {data}\n\n"
-        try:
-            handler.wfile.write(chunk.encode("utf-8"))
-            handler.wfile.flush()
-        except Exception:
-            pass
-
-    try:
-        proc = subprocess.Popen(
-            [claude_bin, "-p", full_prompt, "--output-format", "stream-json",
-             "--verbose", "--include-partial-messages"],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-        )
-        full_text = ""
-        for line in proc.stdout:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except Exception:
-                continue
-            msg_type = obj.get("type")
-            if msg_type == "assistant":
-                content = (obj.get("message") or {}).get("content") or []
-                for block in content:
-                    if isinstance(block, dict) and block.get("type") == "text":
-                        new_text = block.get("text", "")
-                        if len(new_text) > len(full_text):
-                            delta = new_text[len(full_text):]
-                            full_text = new_text
-                            _sse("delta", json.dumps({"text": delta}, ensure_ascii=False))
-            elif msg_type == "result":
-                result_text = obj.get("result", "")
-                if result_text and not full_text:
-                    full_text = result_text
-                    _sse("delta", json.dumps({"text": result_text}, ensure_ascii=False))
-                # navigate 추출
-                navigate = None
-                m = re.search(r"\{[\s\S]*\}", full_text)
-                if m:
-                    try:
-                        parsed = json.loads(m.group(0))
-                        nav = parsed.get("navigate")
-                        answer = parsed.get("answer", "")
-                        if nav:
-                            navigate = nav
-                        # 만약 JSON 형태로 답변이 왔으면 answer 부분만 다시 전송
-                        if answer and answer != full_text:
-                            _sse("replace", json.dumps({"text": answer}, ensure_ascii=False))
-                            full_text = answer
-                    except Exception:
-                        pass
-                _sse("done", json.dumps({"navigate": navigate, "text": full_text}, ensure_ascii=False))
-        proc.wait(timeout=5)
-    except Exception as e:
-        _sse("error", json.dumps({"error": str(e)}, ensure_ascii=False))
-
-
-def api_auth_login(body: dict) -> dict:
-    """터미널에서 `claude auth login` 을 실행. 인터랙티브 명령이므로 터미널 앱을 열어준다."""
-    cli = shutil.which("claude")
-    if not cli:
-        return {"ok": False, "error": "Claude CLI 가 설치되어 있지 않습니다. 먼저 설치하세요."}
-    # macOS: AppleScript 로 기본 터미널에서 `claude auth login` 실행
-    if platform.system() == "Darwin":
-        script = f'''
-        tell application "Terminal"
-            activate
-            do script "{cli} auth login"
-        end tell
-        '''
-        try:
-            subprocess.run(["osascript", "-e", script], timeout=5, capture_output=True)
-            return {"ok": True, "method": "terminal", "message": "터미널에서 로그인 창이 열렸습니다. 브라우저 인증 완료 후 돌아오세요."}
-        except Exception as e:
-            return {"ok": False, "error": f"터미널 실행 실패: {e}"}
-    # Linux / fallback
-    try:
-        subprocess.Popen([cli, "auth", "login"], start_new_session=True)
-        return {"ok": True, "method": "background", "message": "claude auth login 이 실행되었습니다. 완료 후 새로고침하세요."}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
-def api_auth_logout(body: dict) -> dict:
-    """로그아웃 — `claude auth logout` 실행."""
-    cli = shutil.which("claude")
-    if not cli:
-        return {"ok": False, "error": "Claude CLI 미설치"}
-    try:
-        r = subprocess.run([cli, "auth", "logout"], capture_output=True, text=True, timeout=10)
-        return {"ok": True, "message": "로그아웃 되었습니다.", "output": r.stdout.strip()}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
-def open_folder_action(body: dict) -> dict:
-    raw = body.get("folderPath") if isinstance(body, dict) else None
-    if not raw:
-        return {"ok": False, "error": "no folderPath"}
-    expanded = os.path.expanduser(raw)
-    abs_path = os.path.abspath(expanded)
-    home = str(Path.home())
-    if not (abs_path == home or abs_path.startswith(home + os.sep)):
-        return {"ok": False, "error": "outside home"}
-    if not Path(abs_path).exists():
-        return {"ok": False, "error": "not found"}
-    try:
-        subprocess.Popen(["open", abs_path], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-    return {"ok": True, "path": abs_path}
 
 
 # ───────────────── routes ─────────────────
+
+from server.briefing import (
+    _today_start_ts_ms, _iter_history_recent, _today_history_stats,
+    _count_projects, _count_active_sessions, _count_tasks_in_todos,
+    _read_scheduled_tasks, _read_tasks,
+    briefing_overview, briefing_devices, briefing_activity,
+    briefing_schedule, briefing_projects_summary, briefing_pending_approvals,
+)
+from server.auth import (
+    CLAUDE_PLANS,
+    api_team_info, api_auth_status, api_set_claimed_plan,
+    api_auth_login, api_auth_logout,
+)
+from server.actions import (
+    _find_terminal_app_for_pid, _CHAT_SYSTEM_PROMPT,
+    open_session_action, open_folder_action,
+    api_chat, handle_chat_stream,
+)
+
 
 ROUTES_GET = {
     "/api/claude-md": lambda q: get_claude_md(),
