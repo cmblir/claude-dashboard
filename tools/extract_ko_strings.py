@@ -67,9 +67,11 @@ def extract():
     work = re.sub(r"<style[\s\S]*?</style>", _blank, work)
     # 2) <!-- ... --> 제거
     work = re.sub(r"<!--[\s\S]*?-->", _blank, work)
-    # 3) /* ... */ 블록 주석 제거 (JS 안에서만 발생하지만 전역으로 처리해도 무해)
-    work = re.sub(r"/\*[\s\S]*?\*/", _blank, work)
-    # 4) 기존 사전 블록 제거 (구조 유지)
+    # 3) /* ... */ 는 여기서 stripping 하지 않는다 — JS 내 문자열 리터럴(예: '/*/memory')
+    #    때문에 거대한 false match 가 발생해 중간 컨텐츠를 통째로 삼킬 수 있다.
+    #    한줄 주석 `//` 은 라인 단위로 따로 걸러낸다. 블록 주석은 매우 드물고,
+    #    남아 있어도 `phrase boundaries` 로 끊어지기 때문에 감사에 큰 문제 없음.
+    # 4) 기존 사전 블록 제거 (현재 HTML 에는 없지만 혹시 남아있을 경우 보호)
     work = re.sub(r"I18N\.en\s*=\s*\{[\s\S]*?\};", _blank, work)
     work = re.sub(r"const\s+zhMap\s*=\s*\{[\s\S]*?\};", _blank, work)
     work = re.sub(r"const\s+_NAV_KEYWORDS\s*=\s*\{[\s\S]*?\};", _blank, work)
