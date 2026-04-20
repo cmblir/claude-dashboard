@@ -1,0 +1,8148 @@
+{
+  "source": "dist/index.html",
+  "total": 1104,
+  "items": [
+    {
+      "text": "\"다른 계정으로 로그인\"을 누르면 현재 계정이 로그아웃되고 터미널에서 새 로그인 창이 열립니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "(cwd 미확인)",
+      "count": 1,
+      "sample_lines": [
+        692
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "(별도)",
+      "count": 1,
+      "sample_lines": [
+        1166
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": ") 하위",
+      "count": 1,
+      "sample_lines": [
+        692
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "+ 추가",
+      "count": 1,
+      "sample_lines": [
+        363
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": ".claude/settings.local.json 없음",
+      "count": 1,
+      "sample_lines": [
+        1333
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "/ 스킵",
+      "count": 1,
+      "sample_lines": [
+        1446
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "16개 역할 프리셋",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "7축 평균",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "AI 가 자동 발견한 항목 — 공식 문서 링크로 확인 권장",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "AI 점수",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "AI 제안",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "AI 종합 평가",
+      "count": 1,
+      "sample_lines": [
+        178
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "AI 진단",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "AI 초안 받기",
+      "count": 1,
+      "sample_lines": [
+        1236
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "AI 추천",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "AI 추천 등 claude CLI 가 필요한 기능은 위의 상태 두 개가 모두 초록일 때만 동작합니다.",
+      "count": 1,
+      "sample_lines": [
+        1343
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "AI 추천 받기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "AI 평가 받기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "ANTHROPIC_MODEL, CLAUDE_CONFIG_DIR, 프록시 등",
+      "count": 1,
+      "sample_lines": [
+        204
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "API 레퍼런스, 온보딩 가이드, ADR, 릴리즈 노트.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Anthropic 최신 발표 · 카드 클릭 → 창으로 열림 (여러 개 동시 가능)",
+      "count": 1,
+      "sample_lines": [
+        173
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Bash 도구 실행 히스토리",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Bash 도구 실행 히스토리 (~/.claude/bash-commands.log)",
+      "count": 1,
+      "sample_lines": [
+        1061
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "CI/CD, 인프라 자동화, 모니터링, 온콜 런북.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "CLAUDE.md 갱신됨",
+      "count": 3,
+      "sample_lines": [
+        285,
+        775,
+        1432
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "CLI 미설치",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "CLI 바이너리",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "CLI 상태 확인",
+      "count": 1,
+      "sample_lines": [
+        2274
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "CLI가 설치되어 있지 않습니다. 먼저 설치하세요",
+      "count": 1,
+      "sample_lines": [
+        1695
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "Claude API 커맨드라인 클라이언트.",
+      "count": 1,
+      "sample_lines": [
+        1075
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude CLI 미설치",
+      "count": 1,
+      "sample_lines": [
+        1690
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "Claude CLI 설치됨",
+      "count": 1,
+      "sample_lines": [
+        1690
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "Claude CLI 연결됨",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude CLI 점검",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude Code 가 읽는 환경변수들. settings.json.env 값과 현재 프로세스 실제 값 비교",
+      "count": 1,
+      "sample_lines": [
+        787
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "Claude Code 내부 이벤트 로그",
+      "count": 1,
+      "sample_lines": [
+        1062
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude Code 내부 추적기 ·",
+      "count": 1,
+      "sample_lines": [
+        1028
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "Claude Code 내부 프로젝트 추적기",
+      "count": 1,
+      "sample_lines": [
+        1063
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude Code 에서",
+      "count": 1,
+      "sample_lines": [
+        898
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "Claude Code 와 연결된 터미널/IDE 상태",
+      "count": 1,
+      "sample_lines": [
+        852
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "Claude Code 하단 상태라인, 키 바인딩",
+      "count": 1,
+      "sample_lines": [
+        200
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude Control Center — 최적화 대시보드",
+      "count": 1,
+      "sample_lines": [
+        6
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "Claude 가 전체 셋업을 보고 우선순위 진단",
+      "count": 2,
+      "sample_lines": [
+        178,
+        1319
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가",
+      "count": 1,
+      "sample_lines": [
+        40
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "Claude 계정에 로그인되지 않았습니다.",
+      "count": 1,
+      "sample_lines": [
+        1703
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "Claude 로그인",
+      "count": 1,
+      "sample_lines": [
+        1444
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude 를 완전 관리형 에이전트 하네스로 실행.",
+      "count": 1,
+      "sample_lines": [
+        1074
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude 에게 빠른 AI 추천 받기",
+      "count": 1,
+      "sample_lines": [
+        1462
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude 에게 조사 중… (~1분)",
+      "count": 1,
+      "sample_lines": [
+        1389
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude 에게 종합 평가 요청 중 (30~120초)…",
+      "count": 1,
+      "sample_lines": [
+        1372
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude 에게 초안 요청 중 (30~90초)…",
+      "count": 1,
+      "sample_lines": [
+        1374
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Claude 에게 추천 요청 중 (30~90초)…",
+      "count": 1,
+      "sample_lines": [
+        1373
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Context7, GitHub 등 원클릭",
+      "count": 1,
+      "sample_lines": [
+        1101
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "EDA, 가설 검증, 비즈니스 지표 분석, 대시보드 작성.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Export 된 파일 없음",
+      "count": 1,
+      "sample_lines": [
+        1351
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Homunculus 프로젝트 추적",
+      "count": 1,
+      "sample_lines": [
+        1028
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "IDE 통합",
+      "count": 2,
+      "sample_lines": [
+        207,
+        852
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "MCP 서버",
+      "count": 1,
+      "sample_lines": [
+        1400
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "MCP 설정이 궁금하면 저를 눌러보세요",
+      "count": 2,
+      "sample_lines": [
+        1079,
+        1795
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "MCP 설치됨",
+      "count": 1,
+      "sample_lines": [
+        1428
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "MCP 카탈로그",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "MCP 커넥터",
+      "count": 1,
+      "sample_lines": [
+        189
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "OWASP 관점 코드 리뷰, 비밀 누출, 인증·인가, 의존성 취약점.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Plan Mode 로 만든 계획 문서들",
+      "count": 1,
+      "sample_lines": [
+        202
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Pro / Max / Team / Enterprise 에서 이용. Enterprise 는 관리자가 조직 설정에서 활성화",
+      "count": 1,
+      "sample_lines": [
+        1342
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "QA 엔지니어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "REST/GraphQL API, DB 스키마, 비즈니스 로직 구현을 주도.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "React/Next.js/Vue 컴포넌트와 상태 관리, 접근성·성능 고려.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "SQLite에 인덱스된 세션 데이터 기반 분석",
+      "count": 1,
+      "sample_lines": [
+        1106
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "SessionStart / PreToolUse 등",
+      "count": 1,
+      "sample_lines": [
+        1095
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "Settings 편집",
+      "count": 2,
+      "sample_lines": [
+        193,
+        807
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "Settings 편집으로 이동 →",
+      "count": 1,
+      "sample_lines": [
+        825
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "TODO 를 삭제할까요?",
+      "count": 1,
+      "sample_lines": [
+        1405
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "UX/UI 디자이너",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "VS Code/JetBrains 연결 상태, 감지된 터미널",
+      "count": 1,
+      "sample_lines": [
+        208
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "backups/, file-history/, shell-snapshots/ 관측",
+      "count": 1,
+      "sample_lines": [
+        1060
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "bash-commands.log 없음",
+      "count": 1,
+      "sample_lines": [
+        953
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "command (쉘 명령 실행)",
+      "count": 1,
+      "sample_lines": [
+        1217
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "command 를 입력하세요",
+      "count": 2,
+      "sample_lines": [
+        1219,
+        1430
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "const _KO_RE = /[가-힣]/",
+      "count": 1,
+      "sample_lines": [
+        1478
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "git URL (예: https://github.com/user/repo.git)",
+      "count": 1,
+      "sample_lines": [
+        913
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "iOS(SwiftUI) / Android(Kotlin) / Flutter 공통 패턴.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "marketplaceUrl 누락 — 수동으로 마켓 추가 필요",
+      "count": 1,
+      "sample_lines": [
+        1427
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "matcher (선택",
+      "count": 1,
+      "sample_lines": [
+        1215
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "mcpId 누락",
+      "count": 1,
+      "sample_lines": [
+        1428
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "memory 자동 기억",
+      "count": 2,
+      "sample_lines": [
+        1058
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "metrics/costs.jsonl 토큰 사용량 시계열",
+      "count": 1,
+      "sample_lines": [
+        216
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "pluginKey 없음",
+      "count": 1,
+      "sample_lines": [
+        1429
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "settings.json 의 model / autoUpdates / cleanup 등",
+      "count": 1,
+      "sample_lines": [
+        206
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "settings.json 의 모델 / 인증 / 자동업데이트 옵션",
+      "count": 1,
+      "sample_lines": [
+        818
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "telemetry/ 없음",
+      "count": 1,
+      "sample_lines": [
+        985
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "timeout (ms, 선택)",
+      "count": 1,
+      "sample_lines": [
+        1218
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "~/.claude/projects/*/memory 자동 기억",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "~/.claude/scheduled-tasks/ 에 정의된 cron 스킬",
+      "count": 1,
+      "sample_lines": [
+        887
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "~/.claude/scheduled-tasks/ 정의 스킬",
+      "count": 1,
+      "sample_lines": [
+        212
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "~/.claude/settings.json 직접 편집 + 추천 프로파일 원클릭",
+      "count": 1,
+      "sample_lines": [
+        194
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "· 예상",
+      "count": 1,
+      "sample_lines": [
+        726
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "⌘K로 빠른 검색도 돼요!",
+      "count": 2,
+      "sample_lines": [
+        1077,
+        1798
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "⏰ 시간 초과 — 페이지를 새로고침 하세요.",
+      "count": 1,
+      "sample_lines": [
+        1758
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "⏳ 로그아웃 중…",
+      "count": 1,
+      "sample_lines": [
+        1658
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "⏳ 새 로그인 창 여는 중…",
+      "count": 1,
+      "sample_lines": [
+        1661
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "⏳ 터미널에서 로그인 창 여는 중…",
+      "count": 1,
+      "sample_lines": [
+        1721
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "◀ 좌측(현재값) 유지",
+      "count": 1,
+      "sample_lines": [
+        235
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "⚠️ :* 패턴은 반드시 맨 끝",
+      "count": 1,
+      "sample_lines": [
+        1171
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "⚠️ 이 플러그인은 현재 비활성",
+      "count": 1,
+      "sample_lines": [
+        1151
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "⚠️ 이 플러그인은 현재 비활성화 — Claude Code 에서 호출되지 않습니다. 플러그인 탭에서 토글",
+      "count": 1,
+      "sample_lines": [
+        1336
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "⚠️ 플러그인의 hooks.json 을 직접 수정합니다. 플러그인 업데이트 시 변경이 덮어써질 수 있습니다.",
+      "count": 1,
+      "sample_lines": [
+        1335
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "✅ 터미널에서 브라우저 인증을 완료하세요.",
+      "count": 2,
+      "sample_lines": [
+        1664,
+        1726
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "✓ 사용자 설정",
+      "count": 1,
+      "sample_lines": [
+        1327
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "✓ 연결됨",
+      "count": 1,
+      "sample_lines": [
+        1329
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "✗ 실패",
+      "count": 1,
+      "sample_lines": [
+        1329
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "➕ CLAUDE.md 에 추가",
+      "count": 1,
+      "sample_lines": [
+        630
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "⬛ 세션 / ◆ user 프롬프트 / ⬢ 에이전트 / ● 도구",
+      "count": 1,
+      "sample_lines": [
+        1338
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 거부하는 패턴",
+      "count": 1,
+      "sample_lines": [
+        1147
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 답할 때 쓰는 톤·포맷",
+      "count": 1,
+      "sample_lines": [
+        1361
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 덮어쓴 쉘 환경 스냅샷",
+      "count": 1,
+      "sample_lines": [
+        1346
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 무시합니다",
+      "count": 1,
+      "sample_lines": [
+        1135
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 설치되어 있지 않습니다. 먼저 설치하세요",
+      "count": 1,
+      "sample_lines": [
+        1302
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 없습니다. 아래 역할 프리셋에서 하나를",
+      "count": 1,
+      "sample_lines": [
+        1180
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 이미",
+      "count": 1,
+      "sample_lines": [
+        1141
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 읽는 환경변수들.",
+      "count": 1,
+      "sample_lines": [
+        1147
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 읽는 환경변수들. settings.json.env 값과 현재 프로세스 실제 값 비교",
+      "count": 1,
+      "sample_lines": [
+        1344
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 자동 생성하는 복구/롤백 데이터",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 전체 셋업을 보고 우선순위 진단",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 전체 셋업을 진단",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 프로젝트마다 자동 기록하는 기억들",
+      "count": 1,
+      "sample_lines": [
+        1345
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가 필요한 기능은 위의 상태 두 개가 모두 초록일 때만 동작합니다.",
+      "count": 1,
+      "sample_lines": [
+        1301
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가입일",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가장 많이 호출된 에이전트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "가장 빠름/저렴",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "각 배치 50개씩",
+      "count": 1,
+      "sample_lines": [
+        1283
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "각 추천은 프로젝트 루트(",
+      "count": 1,
+      "sample_lines": [
+        692
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "각 컬럼 에디터 + 적용/건너뛰기 / 병합 저장",
+      "count": 1,
+      "sample_lines": [
+        1304
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "간격·색·레이아웃 실시간 변경",
+      "count": 1,
+      "sample_lines": [
+        1188
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "간결한 한국어 한 줄",
+      "count": 1,
+      "sample_lines": [
+        1143
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "감지된 터미널 없음",
+      "count": 2,
+      "sample_lines": [
+        875,
+        1259
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "값",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "값 입력",
+      "count": 1,
+      "sample_lines": [
+        1224
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "값 조회",
+      "count": 1,
+      "sample_lines": [
+        1224
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "값과 현재 프로세스 실제 값 비교",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "강점",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "강점 / 약점",
+      "count": 1,
+      "sample_lines": [
+        1272
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개",
+      "count": 1,
+      "sample_lines": [
+        398
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 · 이벤트",
+      "count": 1,
+      "sample_lines": [
+        987
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "개 규칙 자동 교정됨",
+      "count": 1,
+      "sample_lines": [
+        1419
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 마켓플레이스 · git URL 로 추가",
+      "count": 1,
+      "sample_lines": [
+        908
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "개 발견",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 발견! 좌측",
+      "count": 1,
+      "sample_lines": [
+        1391
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 번역",
+      "count": 1,
+      "sample_lines": [
+        1165
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 번역 완료",
+      "count": 2,
+      "sample_lines": [
+        1165,
+        1423
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 서브에이전트 활용",
+      "count": 1,
+      "sample_lines": [
+        1160
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 세션. 행을 클릭하면 상세 타임라인.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 세션에서",
+      "count": 2,
+      "sample_lines": [
+        1299,
+        1340
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 세션의 5축 평균 · 각 세션은",
+      "count": 1,
+      "sample_lines": [
+        1310
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 세션의 5축 평균 · 각 세션은 max 100",
+      "count": 1,
+      "sample_lines": [
+        666
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "개 에이전트",
+      "count": 1,
+      "sample_lines": [
+        1158
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 에이전트 활용",
+      "count": 2,
+      "sample_lines": [
+        1160,
+        1339
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 이벤트",
+      "count": 1,
+      "sample_lines": [
+        1155
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 인덱스 프로젝트. 카드를 클릭하면 실제 설정 스냅샷이 열립니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개 프로젝트",
+      "count": 1,
+      "sample_lines": [
+        1028
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "개가 있지만 세션에서 한 번도 위임되지 않았습니다.",
+      "count": 1,
+      "sample_lines": [
+        1303
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개선 우선순위",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개선 우선순위 (impact / effort)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "개요",
+      "count": 1,
+      "sample_lines": [
+        175
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "개인 플랜을 사용 중이거나 조직에 초대되지 않았습니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "갱신",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "건",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "건 · 파싱 오류",
+      "count": 1,
+      "sample_lines": [
+        987
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "건너뛰기",
+      "count": 1,
+      "sample_lines": [
+        234
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "검색",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "검색 경로",
+      "count": 1,
+      "sample_lines": [
+        1167
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "검색 경로 추가",
+      "count": 1,
+      "sample_lines": [
+        1167
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "검색 경로 추가됨",
+      "count": 2,
+      "sample_lines": [
+        1168,
+        1424
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "검색… ⌘K",
+      "count": 1,
+      "sample_lines": [
+        53
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "결과 없음",
+      "count": 3,
+      "sample_lines": [
+        966,
+        1461,
+        2292
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "결정론적",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "결정론적 점수",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "결정론적 점수 (휴리스틱",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "경과",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "경로",
+      "count": 1,
+      "sample_lines": [
+        1105
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "경로 미확인",
+      "count": 1,
+      "sample_lines": [
+        1288
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "계산식 + 파일별 개선 추천",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "계정 / 구독",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "계정 미연결",
+      "count": 1,
+      "sample_lines": [
+        1701
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "계정 연결",
+      "count": 1,
+      "sample_lines": [
+        1233
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "계정 연결 확인 중",
+      "count": 1,
+      "sample_lines": [
+        1232
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "계정 연결이 필요합니다",
+      "count": 1,
+      "sample_lines": [
+        1464
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "계정 전환",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "계정에 로그인되지 않았습니다.",
+      "count": 1,
+      "sample_lines": [
+        1367
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "계정으로 연결",
+      "count": 1,
+      "sample_lines": [
+        1138
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "고급 기능",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "공식 문서",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "공식 문서 ↗",
+      "count": 1,
+      "sample_lines": [
+        1463
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "공식 발표",
+      "count": 1,
+      "sample_lines": [
+        1125
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "공식 요금표 기준 추정",
+      "count": 1,
+      "sample_lines": [
+        1148
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "공식 프로그래밍",
+      "count": 1,
+      "sample_lines": [
+        1125
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "관련 링크",
+      "count": 1,
+      "sample_lines": [
+        1124
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "교정할 항목 없음",
+      "count": 2,
+      "sample_lines": [
+        1208,
+        1418
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "구독 세부 플랜",
+      "count": 1,
+      "sample_lines": [
+        1252
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "구독 시작",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "구독 인증",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "궁금한 거 물어봐주세요!",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "궁금한 거 물어봐주세요! 🤔",
+      "count": 2,
+      "sample_lines": [
+        1084,
+        1792
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "권한",
+      "count": 1,
+      "sample_lines": [
+        187
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "권한 (Permissions)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "권한 정책",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "권한 추천",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "규칙",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "규칙 자동 교정됨",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "규칙 추가",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "규칙을 입력하세요",
+      "count": 2,
+      "sample_lines": [
+        1206,
+        1416
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "균형형",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "그래프",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "그래프 노드는",
+      "count": 1,
+      "sample_lines": [
+        1175
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "그래프 렌더",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "근거",
+      "count": 1,
+      "sample_lines": [
+        231
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "글로벌 CLAUDE.md",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "글로벌 지침",
+      "count": 1,
+      "sample_lines": [
+        1238
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "글로벌 지침. 모든 세션에 로드됩니다.",
+      "count": 1,
+      "sample_lines": [
+        1348
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "기록 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "기본 (Claude Code 선택)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "기본값 사용 중",
+      "count": 1,
+      "sample_lines": [
+        1261
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "기술 문서 작성자",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "기술 문서형",
+      "count": 1,
+      "sample_lines": [
+        1131
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "기억·규칙·선호",
+      "count": 1,
+      "sample_lines": [
+        1239
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "기존 수정",
+      "count": 1,
+      "sample_lines": [
+        1140
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "기존 파일 읽기",
+      "count": 1,
+      "sample_lines": [
+        1140
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "기준 분배)",
+      "count": 1,
+      "sample_lines": [
+        1299
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "긴 세션",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "날짜",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "내 계정",
+      "count": 1,
+      "sample_lines": [
+        1465
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "내리기",
+      "count": 2,
+      "sample_lines": [
+        139,
+        1087
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "내보내기 / 핸드오프",
+      "count": 1,
+      "sample_lines": [
+        1118
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "내부 추적기",
+      "count": 1,
+      "sample_lines": [
+        1145
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "내장",
+      "count": 2,
+      "sample_lines": [
+        925,
+        1244
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "내장 명령어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "노드",
+      "count": 1,
+      "sample_lines": [
+        1338
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "노드 클릭 → 편집",
+      "count": 2,
+      "sample_lines": [
+        391,
+        1315
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "노드 클릭 시 상세",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "는 Claude Code 가 자동으로 발견한 모든 프로젝트 루트를 기록합니다. 우리가",
+      "count": 1,
+      "sample_lines": [
+        1030
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "다른 계정으로 로그인",
+      "count": 2,
+      "sample_lines": [
+        1360,
+        1455
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "다른 변경 키",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "다른 앱에 영향 없음",
+      "count": 1,
+      "sample_lines": [
+        1255
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "다시 받기",
+      "count": 1,
+      "sample_lines": [
+        1132
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "다시 시도",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "다운로드",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "다음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "다음 세션부터 적용",
+      "count": 1,
+      "sample_lines": [
+        1254
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "다크",
+      "count": 1,
+      "sample_lines": [
+        65
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "닫기",
+      "count": 6,
+      "sample_lines": [
+        138,
+        257,
+        730,
+        1087,
+        1409
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "담당 컨텍스트",
+      "count": 1,
+      "sample_lines": [
+        1149
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "답변 톤/포맷 프리셋",
+      "count": 1,
+      "sample_lines": [
+        1097
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "답변 톤/포맷을 바꾸는 output styles",
+      "count": 1,
+      "sample_lines": [
+        198
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "답변 톤/포맷을 바꾸는 출력 스타일",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "대기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "대시보드",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "대시보드 도우미",
+      "count": 1,
+      "sample_lines": [
+        147
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "대시보드 도우미와 대화",
+      "count": 2,
+      "sample_lines": [
+        1321,
+        2273
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "대시보드에서 직접 만든 태스크는",
+      "count": 1,
+      "sample_lines": [
+        1353
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "데스크톱 MCP",
+      "count": 1,
+      "sample_lines": [
+        1226
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "데이터 사이언티스트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "데이터 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "데이터 없음 (세션 재인덱스 필요할 수 있음)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "데이터베이스 전문가",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "데이터에서 검색",
+      "count": 1,
+      "sample_lines": [
+        1262
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 다양성 (Diversity)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 랭킹 (참고)",
+      "count": 1,
+      "sample_lines": [
+        1257
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 사용",
+      "count": 1,
+      "sample_lines": [
+        1105
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 사용 내역 로딩…",
+      "count": 1,
+      "sample_lines": [
+        1377
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 사용 분포",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 사용순",
+      "count": 1,
+      "sample_lines": [
+        1362
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 실행 히스토리",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 총 호출",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 타임라인",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 호출",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 호출 (전체)",
+      "count": 1,
+      "sample_lines": [
+        1112
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구 호출 수",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구≥",
+      "count": 1,
+      "sample_lines": [
+        1108
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구로 위임된 총 횟수 (통계 탭 참고)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구로 추가 가능",
+      "count": 1,
+      "sample_lines": [
+        898
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구별 토큰",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도구순",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도움이 필요하면 불러주세요",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "도움이 필요하면 불러주세요 ✨",
+      "count": 2,
+      "sample_lines": [
+        1082,
+        1799
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "두 점수 비교",
+      "count": 1,
+      "sample_lines": [
+        1277
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "등 원클릭",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "등록할 이름",
+      "count": 1,
+      "sample_lines": [
+        1291
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "디렉토리",
+      "count": 1,
+      "sample_lines": [
+        1293
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "디렉토리 없음",
+      "count": 1,
+      "sample_lines": [
+        1276
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "디바이스",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "디바이스 & 활성 세션 · 권한 요약",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "디자인 → 코드 한 번의 지시",
+      "count": 1,
+      "sample_lines": [
+        1117
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "디자인 열기",
+      "count": 1,
+      "sample_lines": [
+        1291
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "디자인 작성)",
+      "count": 1,
+      "sample_lines": [
+        1128
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "또는",
+      "count": 2,
+      "sample_lines": [
+        692,
+        1016
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "또는 Claude Code 재시작으로 동기화.",
+      "count": 1,
+      "sample_lines": [
+        917
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "또는 터미널에서",
+      "count": 1,
+      "sample_lines": [
+        1136
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "또는 터미널에서 직접 실행",
+      "count": 1,
+      "sample_lines": [
+        1711
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "라고 말하면 여기에 자동으로 나타납니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "라이트",
+      "count": 1,
+      "sample_lines": [
+        68
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "로 변경",
+      "count": 2,
+      "sample_lines": [
+        537,
+        1459
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로 변환",
+      "count": 1,
+      "sample_lines": [
+        1133
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로 보는 세션 데이터와는 다르게, git remote 추적 + 마지막 작업 시간을 함께 저장.",
+      "count": 1,
+      "sample_lines": [
+        1030
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "로 빠른 검색도 돼요!",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로 임시 전환.",
+      "count": 1,
+      "sample_lines": [
+        842
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "로 작성된 계획",
+      "count": 1,
+      "sample_lines": [
+        1146
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로 저장",
+      "count": 1,
+      "sample_lines": [
+        1354
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로 저장 후 다시 보세요",
+      "count": 1,
+      "sample_lines": [
+        1316
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로 저장되는 서브 에이전트를 관리. 역할 프리셋으로 즉시 추가.",
+      "count": 1,
+      "sample_lines": [
+        374
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "로 첫 스타일 추가",
+      "count": 1,
+      "sample_lines": [
+        1235
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "로 추가, 카드에서 삭제",
+      "count": 1,
+      "sample_lines": [
+        1324
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "로 현재 작업 패턴 기반 초안을 받아보세요.",
+      "count": 1,
+      "sample_lines": [
+        1350
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로그아웃",
+      "count": 1,
+      "sample_lines": [
+        1465
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로그아웃 되었습니다",
+      "count": 1,
+      "sample_lines": [
+        1442
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로그아웃 중…",
+      "count": 1,
+      "sample_lines": [
+        1451
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로그인",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로그인 상태 / 플랜 확인",
+      "count": 2,
+      "sample_lines": [
+        1322,
+        2274
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로그인 성공",
+      "count": 1,
+      "sample_lines": [
+        1456
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로그인 성공!",
+      "count": 1,
+      "sample_lines": [
+        1442
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로그인 실행 실패",
+      "count": 1,
+      "sample_lines": [
+        1450
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로그인 확인 중…",
+      "count": 1,
+      "sample_lines": [
+        1454
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로그인이 필요합니다",
+      "count": 1,
+      "sample_lines": [
+        1684
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "로딩",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로딩 중",
+      "count": 1,
+      "sample_lines": [
+        1166
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로딩 중…",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로컬 MCP",
+      "count": 1,
+      "sample_lines": [
+        1225
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로컬 export",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "로컬에서 찾은",
+      "count": 1,
+      "sample_lines": [
+        1128
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "루트 경로",
+      "count": 1,
+      "sample_lines": [
+        1034
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "마지막 활동",
+      "count": 2,
+      "sample_lines": [
+        1034,
+        1130
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "마켓 추가",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "마켓플레이스",
+      "count": 1,
+      "sample_lines": [
+        209
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "마켓플레이스 추가됨 — 플러그인 탭에서 활성화하세요",
+      "count": 1,
+      "sample_lines": [
+        1426
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "마켓플레이스를 제거할까요?",
+      "count": 2,
+      "sample_lines": [
+        942,
+        1403
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "마켓플레이스에서 설치한 기능 팩(스킬+에이전트+명령어 묶음)",
+      "count": 1,
+      "sample_lines": [
+        192
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "만 있는 경우",
+      "count": 1,
+      "sample_lines": [
+        1282
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "만 집계",
+      "count": 2,
+      "sample_lines": [
+        1107,
+        1384
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "만 편집 가능 (안전장치).",
+      "count": 1,
+      "sample_lines": [
+        692
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "만들기",
+      "count": 2,
+      "sample_lines": [
+        1235
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "만들기\" 로 첫 스타일 추가",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "매칭 규칙 예시",
+      "count": 1,
+      "sample_lines": [
+        1209
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "머신러닝 엔지니어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "메모리",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "메시지",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "메시지 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "메인",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "메인 Claude (Orchestrator)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "메인 Claude 따라감",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "명령",
+      "count": 1,
+      "sample_lines": [
+        671
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "명령 검색",
+      "count": 1,
+      "sample_lines": [
+        1268
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "명령 검색 (예: git, npm, curl)",
+      "count": 1,
+      "sample_lines": [
+        957
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "명령어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "명령어 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "모델",
+      "count": 2,
+      "sample_lines": [
+        344,
+        1193
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "모델 설정",
+      "count": 2,
+      "sample_lines": [
+        205,
+        818
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "모델 학습·평가·배포 파이프라인, 데이터셋 처리, 지표 추적.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "모델을",
+      "count": 2,
+      "sample_lines": [
+        537,
+        1459
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "모델을 ",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "모드로 전환",
+      "count": 1,
+      "sample_lines": [
+        1294
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "모든 세션 시작 시 로드되는 글로벌 지침(기억·규칙·취향)",
+      "count": 1,
+      "sample_lines": [
+        196
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "모든 세션 시작 시 자동 로드",
+      "count": 1,
+      "sample_lines": [
+        1240
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "모든 세션에 로드되는 지침",
+      "count": 1,
+      "sample_lines": [
+        1099
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "모바일 개발자",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "미로그인",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "미리보기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "미번역만",
+      "count": 1,
+      "sample_lines": [
+        1161
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "미사용",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "미설치",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "미연결",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "미지정)",
+      "count": 1,
+      "sample_lines": [
+        1133
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "바로가기 + 공식 가이드 + 로컬",
+      "count": 1,
+      "sample_lines": [
+        1115
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "반복 작업을 routine 으로 저장. Mac offline 이어도 웹 인프라에서 실행.",
+      "count": 1,
+      "sample_lines": [
+        1069
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "발견",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "방어 보안 특화 언어모델. 초대제 research preview (Project Glasswing).",
+      "count": 1,
+      "sample_lines": [
+        1071
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "배치",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "백업",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "백엔드 개발자",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "뱃지 클릭으로 즉시 활성화",
+      "count": 1,
+      "sample_lines": [
+        1177
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "버전",
+      "count": 1,
+      "sample_lines": [
+        856
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "번역",
+      "count": 1,
+      "sample_lines": [
+        1161
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "번역 버튼 클릭",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "번역 실패",
+      "count": 2,
+      "sample_lines": [
+        1164,
+        1421
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "번역 실패: ",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "번역 완료",
+      "count": 1,
+      "sample_lines": [
+        1164
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "번역 중",
+      "count": 1,
+      "sample_lines": [
+        1163
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "번역 중 오류",
+      "count": 1,
+      "sample_lines": [
+        1422
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "번역 중 오류: ",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "변경",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "변경된 코드의 정확성·가독성·유지보수성 점검.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "변수",
+      "count": 1,
+      "sample_lines": [
+        791
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "병합",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "보기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "보안 리뷰어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "복사",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "복사됨",
+      "count": 1,
+      "sample_lines": [
+        1411
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "복잡 추론 + 에이전틱 코딩 + 고해상도 비전.",
+      "count": 1,
+      "sample_lines": [
+        1067
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "부분",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "부재 안내",
+      "count": 1,
+      "sample_lines": [
+        1145
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "분",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "분 전",
+      "count": 1,
+      "sample_lines": [
+        1394
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "분석",
+      "count": 1,
+      "sample_lines": [
+        1297
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "불러오기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "불러오기 실패",
+      "count": 1,
+      "sample_lines": [
+        1439
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "불러오기 실패:",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "붙여넣기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "뷰 렌더 실패",
+      "count": 1,
+      "sample_lines": [
+        1408
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "뷰 렌더 실패:",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "비교 보기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "비어있음",
+      "count": 2,
+      "sample_lines": [
+        243,
+        1241
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "비용",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "비용 (",
+      "count": 1,
+      "sample_lines": [
+        1295
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "비용 ($, 추정)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "비활성",
+      "count": 1,
+      "sample_lines": [
+        1195
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "비활성 플러그인",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "비활성 플러그인 ▶ 활성화",
+      "count": 2,
+      "sample_lines": [
+        1150,
+        1326
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "비활성화",
+      "count": 2,
+      "sample_lines": [
+        1159,
+        1331
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "비활성화됨",
+      "count": 2,
+      "sample_lines": [
+        1331,
+        1411
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "빌트인",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "빌트인 (Claude Code)",
+      "count": 2,
+      "sample_lines": [
+        1156,
+        1192
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "빌트인 에이전트",
+      "count": 1,
+      "sample_lines": [
+        1192
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "빠른 executor 모델 + 고지능 advisor 모델 페어링으로 장기 에이전트 품질↑ 비용↓.",
+      "count": 1,
+      "sample_lines": [
+        1068
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "빠른 사용 가이드",
+      "count": 1,
+      "sample_lines": [
+        1127
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "빠른 액션",
+      "count": 1,
+      "sample_lines": [
+        1289
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용 가능 도구",
+      "count": 1,
+      "sample_lines": [
+        1193
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용 가능 모델",
+      "count": 1,
+      "sample_lines": [
+        1279
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용량",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용량 / 비용",
+      "count": 1,
+      "sample_lines": [
+        213
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "사용량 / 비용 (토큰 중심)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용자",
+      "count": 1,
+      "sample_lines": [
+        1244
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용자 설정",
+      "count": 1,
+      "sample_lines": [
+        1158
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용자 설정만",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용자 슬래시 명령어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용자 정의",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용자 플로우, 정보구조, 마이크로인터랙션, 접근성.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용하기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사용한 에이전트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사이드바 버튼",
+      "count": 1,
+      "sample_lines": [
+        1137
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "사이드바 접기/펼치기",
+      "count": 1,
+      "sample_lines": [
+        30
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "사이드바 토글",
+      "count": 1,
+      "sample_lines": [
+        48
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "삭제",
+      "count": 1,
+      "sample_lines": [
+        338
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "삭제?",
+      "count": 3,
+      "sample_lines": [
+        1282,
+        1298,
+        1396
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "삭제됨",
+      "count": 2,
+      "sample_lines": [
+        526,
+        1410
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "상세",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "상위 설계, 모듈 경계, 트레이드오프 분석, ADR 작성.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "상태",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "상태 확인 실패",
+      "count": 2,
+      "sample_lines": [
+        1330,
+        1448
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "상태라인",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "상태라인 / 키바인딩",
+      "count": 1,
+      "sample_lines": [
+        199
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "새 그룹",
+      "count": 1,
+      "sample_lines": [
+        1134
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "새 로그인 창 여는 중…",
+      "count": 1,
+      "sample_lines": [
+        1452
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "새 마켓플레이스 추가",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "새 에이전트 추가",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "새 평가하기 (30~120초)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "새 훅 추가",
+      "count": 1,
+      "sample_lines": [
+        1211
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "새로 평가받기 (30~120초)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "새로고침",
+      "count": 1,
+      "sample_lines": [
+        2275
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "새로운 기능",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "새로운 기능 없음 (이미 최신)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "새로운 기능을 확인해 보세요",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "새로운 기능을 확인해 보세요 🆕",
+      "count": 2,
+      "sample_lines": [
+        1080,
+        1796
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "생각하는 중",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "생산성 (Productivity)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "생성",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "생성됨",
+      "count": 1,
+      "sample_lines": [
+        1413
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "서버",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "서버 연결 실패",
+      "count": 1,
+      "sample_lines": [
+        2369
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "서브에이전트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "서브에이전트 위임 빈도",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "서브에이전트 위임이 없었습니다",
+      "count": 1,
+      "sample_lines": [
+        1369
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "선언한 플랜",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "선택",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "선택 안 함",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "선택해",
+      "count": 1,
+      "sample_lines": [
+        1298
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설명",
+      "count": 1,
+      "sample_lines": [
+        791
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설명 (description)",
+      "count": 1,
+      "sample_lines": [
+        478
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "설정",
+      "count": 1,
+      "sample_lines": [
+        59
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "설정 & 구성",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설정 드롭다운",
+      "count": 1,
+      "sample_lines": [
+        1137
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설정 필요",
+      "count": 1,
+      "sample_lines": [
+        1129
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설정된 모델 관련 키 없음",
+      "count": 1,
+      "sample_lines": [
+        1260
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설정된 모델 관련 키 없음 — 기본값 사용 중",
+      "count": 1,
+      "sample_lines": [
+        824
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "설정이 궁금하면 저를 눌러보세요",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설치",
+      "count": 1,
+      "sample_lines": [
+        1222
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설치 여부",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설치 위치",
+      "count": 1,
+      "sample_lines": [
+        474
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "설치된 플러그인",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설치됨",
+      "count": 4,
+      "sample_lines": [
+        363,
+        500,
+        1221,
+        1413
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설치됨 (CLI)",
+      "count": 1,
+      "sample_lines": [
+        1249
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "설치됨 (Desktop)",
+      "count": 1,
+      "sample_lines": [
+        1249
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "성공",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "성능 엔지니어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세 단계",
+      "count": 1,
+      "sample_lines": [
+        1126
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션 DB 새로고침",
+      "count": 2,
+      "sample_lines": [
+        1320,
+        2272
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션 ID",
+      "count": 1,
+      "sample_lines": [
+        856
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "세션 불러오는 중",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션 불러오는 중…",
+      "count": 1,
+      "sample_lines": [
+        1375
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션 상세",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션 수",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션 재인덱스",
+      "count": 2,
+      "sample_lines": [
+        38,
+        2272
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션 점수 상세",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션 통합 83건으로",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션 평균",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션 품질",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션 히스토리",
+      "count": 2,
+      "sample_lines": [
+        179,
+        1460
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션별",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션별 TaskCreate 저장소",
+      "count": 1,
+      "sample_lines": [
+        1059
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션에 누적.",
+      "count": 1,
+      "sample_lines": [
+        1354
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션에서 위임된 서브에이전트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션에서 위임된 서브에이전트 (Agent 도구 호출)",
+      "count": 1,
+      "sample_lines": [
+        1111
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "세션이 없습니다. 재인덱스 버튼을 눌러보세요.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "셋업이 이미 훌륭합니다. 추천 액션이 없습니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "셸 명령 기록",
+      "count": 2,
+      "sample_lines": [
+        953,
+        955
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "소속된 조직이 없습니다",
+      "count": 1,
+      "sample_lines": [
+        1466
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "소스가 비어있습니다",
+      "count": 1,
+      "sample_lines": [
+        1119
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "수동 단계",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "수동 태스크는",
+      "count": 1,
+      "sample_lines": [
+        1354
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "수정",
+      "count": 1,
+      "sample_lines": [
+        337
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "숨기기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스코어 브레이크다운",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스코어순",
+      "count": 1,
+      "sample_lines": [
+        1362
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스키마 설계, 인덱싱, 쿼리 튜닝, 마이그레이션.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스킬",
+      "count": 2,
+      "sample_lines": [
+        183,
+        670
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스킬 검색",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스킬 로드 실패",
+      "count": 1,
+      "sample_lines": [
+        1420
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스킬 로드 실패: ",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스킬 본문",
+      "count": 1,
+      "sample_lines": [
+        1246
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스킬 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스킬 이름",
+      "count": 1,
+      "sample_lines": [
+        1246
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스킬 편집",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스킬(지시+스크립트+리소스 묶음) 을 Claude 가 동적으로 로드.",
+      "count": 1,
+      "sample_lines": [
+        1070
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스킵",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스타일 본문",
+      "count": 1,
+      "sample_lines": [
+        1292
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "스트리밍 완료",
+      "count": 1,
+      "sample_lines": [
+        1281
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "슬라이드, 원페이저, 프로토타입, 목업 등",
+      "count": 1,
+      "sample_lines": [
+        1185
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "슬래시 명령어",
+      "count": 1,
+      "sample_lines": [
+        184
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "시간",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "시간 전",
+      "count": 1,
+      "sample_lines": [
+        1394
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "시간 초과",
+      "count": 1,
+      "sample_lines": [
+        1289
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "시간 초과 — 페이지를 새로고침 해주세요.",
+      "count": 1,
+      "sample_lines": [
+        1457
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "시스템",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "시스템 & 관측",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "시스템 상태",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "시작",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "시작 중",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "시크릿 형태(토큰/키) 값은 일부 마스킹됩니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "신기능",
+      "count": 4,
+      "sample_lines": [
+        172,
+        1390,
+        1461,
+        2303
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "실제 경로 확인 불가",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "실제 경로 확인 불가 — 재인덱스 해보세요",
+      "count": 1,
+      "sample_lines": [
+        1435
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "실패",
+      "count": 18,
+      "sample_lines": [
+        265,
+        267,
+        285,
+        286,
+        291
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "실행",
+      "count": 2,
+      "sample_lines": [
+        1461,
+        2303
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "실행 프로세스 값",
+      "count": 1,
+      "sample_lines": [
+        791
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "아래 역할 프리셋에서 하나를 선택해 추가하세요",
+      "count": 1,
+      "sample_lines": [
+        1199
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "아직 AI 평가가 실행되지 않았습니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "아직 글로벌",
+      "count": 1,
+      "sample_lines": [
+        1139
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "아직 이 프로젝트에",
+      "count": 1,
+      "sample_lines": [
+        1179
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "아직 이 프로젝트에 에이전트가 없습니다. 아래 역할 프리셋에서 하나를 선택해 추가하세요.",
+      "count": 1,
+      "sample_lines": [
+        352
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "아직 저장된 메모리가 없습니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "아직 저장된 플랜 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "아키텍트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "안녕하세요! 대시보드 기능에 대해 무엇이든 물어보세요.",
+      "count": 1,
+      "sample_lines": [
+        153
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "안정성 (Reliability)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "알 수 없음",
+      "count": 2,
+      "sample_lines": [
+        750,
+        1415
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "알려진",
+      "count": 1,
+      "sample_lines": [
+        908
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "알려진 마켓플레이스 없음",
+      "count": 1,
+      "sample_lines": [
+        930
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "약점",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "양쪽 값을 자유롭게 편집한 뒤 어느 쪽을 저장할지 고르세요",
+      "count": 1,
+      "sample_lines": [
+        1250
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "양쪽 값을 자유롭게 편집한 뒤 어느 쪽을 저장할지 고르세요. ·",
+      "count": 1,
+      "sample_lines": [
+        257
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "언어",
+      "count": 1,
+      "sample_lines": [
+        70
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "없음",
+      "count": 1,
+      "sample_lines": [
+        1042
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에 인덱스된 세션 데이터 기반 분석",
+      "count": 1,
+      "sample_lines": [
+        1386
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에 정의된 cron 스킬",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에 즉시 반영됩니다.",
+      "count": 1,
+      "sample_lines": [
+        1122
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에 추가",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에게",
+      "count": 2,
+      "sample_lines": [
+        1190,
+        1359
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "에게 \"전체에 적용\" 요청 가능",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에게 \"전체에 적용\" 요청 가능.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에게 글로벌",
+      "count": 1,
+      "sample_lines": [
+        1139
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에게 빠른 AI 추천 받기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에게 조사 중",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에게 종합 평가 요청 중 (30~120초)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에게 최신 발표 조회 중 (~1분)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에게 평가를 요청하세요 (30~120초, 비용 발생).",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에서 도구 이름 패턴)",
+      "count": 1,
+      "sample_lines": [
+        1216
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에서 삭제",
+      "count": 1,
+      "sample_lines": [
+        1400
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에서 삭제됩니다.",
+      "count": 1,
+      "sample_lines": [
+        1400
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에서 설정하면 모든 세션에 적용",
+      "count": 1,
+      "sample_lines": [
+        1356
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에서 설정하면 모든 세션에 적용. 프로세스 값은 이 대시보드 서버가 실행 중인 쉘의 현재 값.",
+      "count": 1,
+      "sample_lines": [
+        803
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "에서 이용.",
+      "count": 1,
+      "sample_lines": [
+        1141
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에서 직접 관리합니다.",
+      "count": 1,
+      "sample_lines": [
+        1123
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에서 호출되지 않습니다",
+      "count": 1,
+      "sample_lines": [
+        1175
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에서 호출되지 않습니다.",
+      "count": 1,
+      "sample_lines": [
+        1152
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트",
+      "count": 1,
+      "sample_lines": [
+        669
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 & 그래프",
+      "count": 1,
+      "sample_lines": [
+        180
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "에이전트 & 상호작용 그래프",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 검색",
+      "count": 1,
+      "sample_lines": [
+        1196
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 그래프가 멋있어요",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 그래프가 멋있어요 🤝",
+      "count": 2,
+      "sample_lines": [
+        1081,
+        1797
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 본문",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 본문 (미리보기)",
+      "count": 1,
+      "sample_lines": [
+        482
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "에이전트 삭제",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 위임",
+      "count": 1,
+      "sample_lines": [
+        1368
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 위임 (Delegation)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 위임 기록 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 위임 내역 로딩",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 위임 내역 로딩…",
+      "count": 1,
+      "sample_lines": [
+        1378
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 위임 분포",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 위임이 없었습니다",
+      "count": 1,
+      "sample_lines": [
+        1200
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 이름",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 편집",
+      "count": 1,
+      "sample_lines": [
+        1196
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 프롬프트",
+      "count": 1,
+      "sample_lines": [
+        1149
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 호출",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트 호출 그래프",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트가 설치되지 않았습니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트를 삭제할까요?",
+      "count": 2,
+      "sample_lines": [
+        520,
+        1402
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "에이전트별 토큰",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "여기서 직접 추가/삭제 가능",
+      "count": 1,
+      "sample_lines": [
+        1337
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "여기에 적은 지침",
+      "count": 1,
+      "sample_lines": [
+        1238
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "여러 동시",
+      "count": 1,
+      "sample_lines": [
+        1089
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "역할 프리셋",
+      "count": 1,
+      "sample_lines": [
+        465
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "역할 프리셋 16종",
+      "count": 1,
+      "sample_lines": [
+        1100
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "역할 프리셋 카탈로그",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "연결 상태",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "연결 상태, 감지된 터미널",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "연결 실패",
+      "count": 1,
+      "sample_lines": [
+        1221
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "연결 오류",
+      "count": 1,
+      "sample_lines": [
+        2163
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "연결되지 않음",
+      "count": 1,
+      "sample_lines": [
+        1129
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "연결됨",
+      "count": 3,
+      "sample_lines": [
+        57,
+        1445,
+        1636
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "열기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "예",
+      "count": 1,
+      "sample_lines": [
+        1206
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "예: MCP 어디서 설정해?",
+      "count": 1,
+      "sample_lines": [
+        157
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "예약된 작업",
+      "count": 2,
+      "sample_lines": [
+        211,
+        887
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "예약된 작업 없음",
+      "count": 1,
+      "sample_lines": [
+        898
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "오늘 세션 스코어는 어떤가요?",
+      "count": 2,
+      "sample_lines": [
+        1078,
+        1793
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "오류",
+      "count": 4,
+      "sample_lines": [
+        1445,
+        2092,
+        2098,
+        2143
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "오류 수",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "오류율",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "올바른 예",
+      "count": 2,
+      "sample_lines": [
+        1144,
+        1173
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "와 연결된 터미널",
+      "count": 1,
+      "sample_lines": [
+        1146
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "완료",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "완료!",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "왜 필요한가",
+      "count": 2,
+      "sample_lines": [
+        734,
+        1131
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "외부 시스템(DB·GitHub·브라우저 등)과 연결하는 MCP 서버",
+      "count": 1,
+      "sample_lines": [
+        190
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "요구사항 분석, 스프린트 플래닝, 이슈 관리, 보고.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "요약",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "요청",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "요청 가능",
+      "count": 1,
+      "sample_lines": [
+        1190
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "요청 가능.",
+      "count": 1,
+      "sample_lines": [
+        1359
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "요청 없음",
+      "count": 1,
+      "sample_lines": [
+        1365
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "요청 전송 중",
+      "count": 1,
+      "sample_lines": [
+        1275
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "요청/프로젝트/세션ID 검색",
+      "count": 1,
+      "sample_lines": [
+        1364
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "우선순위 액션",
+      "count": 1,
+      "sample_lines": [
+        1130
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "우선순위 없음",
+      "count": 1,
+      "sample_lines": [
+        1277
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "우측(제안) 적용",
+      "count": 1,
+      "sample_lines": [
+        1296
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "우측(제안) 적용 ▶",
+      "count": 1,
+      "sample_lines": [
+        236
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "워크스페이스 / 조직 정보",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "워크스페이스 / 조직 정보 (claude.ai)",
+      "count": 1,
+      "sample_lines": [
+        1064
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "워크스페이스 역할",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "원문",
+      "count": 1,
+      "sample_lines": [
+        1194
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "원문 영어",
+      "count": 1,
+      "sample_lines": [
+        1182
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "원본",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "원본 JSON",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "원본 보기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "원본 응답 / 메타",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "원본 응답 보기",
+      "count": 1,
+      "sample_lines": [
+        1272
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "원클릭",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "원하는 디자인을 말로 설명",
+      "count": 1,
+      "sample_lines": [
+        1184
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "원하는 쪽 저장",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "웹에서 만든 디자인을 로컬로",
+      "count": 1,
+      "sample_lines": [
+        1116
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "위임",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "위임 기록 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "위임한 에이전트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "으로 기본 모델 변경. 세션 내에서는",
+      "count": 1,
+      "sample_lines": [
+        842
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "으로 추가, 카드에서 삭제",
+      "count": 1,
+      "sample_lines": [
+        1178
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "을 누르면 현재 계정이 로그아웃되고 터미널에서 새 로그인 창이 열립니다.",
+      "count": 1,
+      "sample_lines": [
+        1360
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "을 저장하지 않습니다",
+      "count": 1,
+      "sample_lines": [
+        1253
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "을 제거할까요?",
+      "count": 2,
+      "sample_lines": [
+        1281,
+        1400
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "응답",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "의",
+      "count": 1,
+      "sample_lines": [
+        842
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "의 모델 / 인증 / 자동업데이트 옵션",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이 내용으로 저장",
+      "count": 1,
+      "sample_lines": [
+        1266
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이 축 점수 올리는 방법",
+      "count": 2,
+      "sample_lines": [
+        595,
+        1312
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이 프로젝트에 에이전트가 없습니다",
+      "count": 1,
+      "sample_lines": [
+        1198
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이 프로젝트에서",
+      "count": 1,
+      "sample_lines": [
+        1368
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이 프로젝트에서 서브에이전트 위임 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이 프로젝트에서 실행된 세션 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이 훅을 삭제할까요?",
+      "count": 1,
+      "sample_lines": [
+        1399
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이동",
+      "count": 2,
+      "sample_lines": [
+        1461,
+        2303
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이름",
+      "count": 1,
+      "sample_lines": [
+        1034
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이름 (예: my-marketplace)",
+      "count": 1,
+      "sample_lines": [
+        912
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "이름 없음",
+      "count": 1,
+      "sample_lines": [
+        1288
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이름 입력",
+      "count": 1,
+      "sample_lines": [
+        1412
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이름 필수",
+      "count": 1,
+      "sample_lines": [
+        1412
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이름/URL 모두 입력",
+      "count": 2,
+      "sample_lines": [
+        937,
+        1440
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이메일",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이면 에이전트 카드는 보이지만",
+      "count": 1,
+      "sample_lines": [
+        1174
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이면 에이전트 카드는 보이지만 Claude Code에서 호출되지 않습니다.",
+      "count": 1,
+      "sample_lines": [
+        1325
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이모지 줄임",
+      "count": 1,
+      "sample_lines": [
+        1142
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이미 권장 설정이 갖춰져 있습니다.",
+      "count": 1,
+      "sample_lines": [
+        1114
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이미 권장 설정이 갖춰져 있습니다. 🎉",
+      "count": 1,
+      "sample_lines": [
+        690
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "이미 동일한 규칙이 존재합니다",
+      "count": 1,
+      "sample_lines": [
+        1205
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이미 유사 내용이 있습니다",
+      "count": 3,
+      "sample_lines": [
+        767,
+        1120,
+        1431
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이미 존재하면 덮어쓰기",
+      "count": 2,
+      "sample_lines": [
+        485,
+        1121
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이미지 픽셀 처리 용량 3.3× 증가 (4.6 대비)",
+      "count": 1,
+      "sample_lines": [
+        1306
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이벤트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅",
+      "count": 1,
+      "sample_lines": [
+        186
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이용 범위",
+      "count": 1,
+      "sample_lines": [
+        1126
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "이전",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "인덱스 완료",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "인덱스 완료 — 갱신",
+      "count": 1,
+      "sample_lines": [
+        1446
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "인덱스된 세션",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "인덱싱 중",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "인덱싱 중…",
+      "count": 1,
+      "sample_lines": [
+        1445
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "인라인 편집",
+      "count": 1,
+      "sample_lines": [
+        1186
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "인증 필요",
+      "count": 1,
+      "sample_lines": [
+        1221
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "일",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "일 전",
+      "count": 1,
+      "sample_lines": [
+        1394
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "일괄 번역",
+      "count": 1,
+      "sample_lines": [
+        1163
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "일자별 토큰 (최근 60일)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "일자별 토큰 사용 (최근 30일)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "읽기 전용",
+      "count": 1,
+      "sample_lines": [
+        1247
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "입력",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "있음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "자",
+      "count": 2,
+      "sample_lines": [
+        243,
+        250
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "자동 교정",
+      "count": 1,
+      "sample_lines": [
+        1208
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "자동 승인 규칙",
+      "count": 1,
+      "sample_lines": [
+        1279
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "자원 보유",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "자주 쓰는 명령 allow/deny",
+      "count": 1,
+      "sample_lines": [
+        1096
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "작성 중",
+      "count": 1,
+      "sample_lines": [
+        1132
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "작업 자원",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "잘못된 권한 규칙",
+      "count": 1,
+      "sample_lines": [
+        1207
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "잘못된 예",
+      "count": 2,
+      "sample_lines": [
+        1144,
+        1173
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "재시작으로 동기화",
+      "count": 1,
+      "sample_lines": [
+        1294
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "재인덱스",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "재인덱스 실패",
+      "count": 1,
+      "sample_lines": [
+        1447
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "재인덱스 실패: ",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "재인덱스 해보세요",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "저를 끌어서 옮길 수도 있어요!",
+      "count": 2,
+      "sample_lines": [
+        1083,
+        1800
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "저를 눌러서 대화해요!",
+      "count": 2,
+      "sample_lines": [
+        1085,
+        1794
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "저장",
+      "count": 1,
+      "sample_lines": [
+        1409
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "저장 실패",
+      "count": 3,
+      "sample_lines": [
+        750,
+        1288,
+        1415
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "저장 위치",
+      "count": 2,
+      "sample_lines": [
+        256,
+        737
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "저장됨",
+      "count": 1,
+      "sample_lines": [
+        1410
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "저장됨 (",
+      "count": 1,
+      "sample_lines": [
+        265
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "저장됨 — 다음 세션부터 적용",
+      "count": 2,
+      "sample_lines": [
+        747,
+        1434
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "저장을 눌러 반영",
+      "count": 1,
+      "sample_lines": [
+        1265
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "적용",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "적용 중…",
+      "count": 1,
+      "sample_lines": [
+        1438
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "적용됨",
+      "count": 1,
+      "sample_lines": [
+        1438
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전송",
+      "count": 1,
+      "sample_lines": [
+        158
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전역",
+      "count": 1,
+      "sample_lines": [
+        1156
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전역 (~/.claude/agents)",
+      "count": 1,
+      "sample_lines": [
+        1157
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전역 에이전트",
+      "count": 1,
+      "sample_lines": [
+        1396
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전역 에이전트 추가",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전체",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전체 릴리즈 노트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전체 병합 결과 보기",
+      "count": 1,
+      "sample_lines": [
+        1264
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전체 재인덱스",
+      "count": 1,
+      "sample_lines": [
+        1382
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전체 토큰",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전체 한국어 번역",
+      "count": 1,
+      "sample_lines": [
+        1162
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "전체에 적용",
+      "count": 2,
+      "sample_lines": [
+        1190,
+        1359
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "절대 금지 규칙",
+      "count": 1,
+      "sample_lines": [
+        1280
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "점수",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "점수 / 도구 호출 / 오류",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "점수 계산 상세",
+      "count": 2,
+      "sample_lines": [
+        664,
+        1280
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "점수 계산식 상세",
+      "count": 1,
+      "sample_lines": [
+        1258
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "점수 상세 계산 중…",
+      "count": 2,
+      "sample_lines": [
+        559,
+        1379
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "점수 집계",
+      "count": 1,
+      "sample_lines": [
+        1109
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "점수가 오릅니다",
+      "count": 1,
+      "sample_lines": [
+        1202
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "접기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "정렬",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "정말 로그아웃 하시겠습니까?",
+      "count": 1,
+      "sample_lines": [
+        1406
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "정확한 표시를 원하면 여기서 직접 지정하세요",
+      "count": 1,
+      "sample_lines": [
+        1251
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "제거",
+      "count": 4,
+      "sample_lines": [
+        520,
+        925,
+        1222,
+        1396
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "제거됨",
+      "count": 2,
+      "sample_lines": [
+        944,
+        1410
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "제목을 입력하세요",
+      "count": 2,
+      "sample_lines": [
+        1267,
+        1441
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "제안",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "제안 (오른쪽)",
+      "count": 1,
+      "sample_lines": [
+        1273
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "제안 (오른쪽) · AI",
+      "count": 1,
+      "sample_lines": [
+        249
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "제안 보기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "제안 적용",
+      "count": 2,
+      "sample_lines": [
+        265,
+        1436
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "제외",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "조직",
+      "count": 1,
+      "sample_lines": [
+        1466
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "조직 범위 공유",
+      "count": 1,
+      "sample_lines": [
+        1308
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "조직 역할",
+      "count": 1,
+      "sample_lines": [
+        1366
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "조직 이름",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "종",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "종 도구",
+      "count": 1,
+      "sample_lines": [
+        1340
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "종료",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "종합",
+      "count": 1,
+      "sample_lines": [
+        1297
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "좌(현재) / 우(제안) 2-컬럼",
+      "count": 1,
+      "sample_lines": [
+        1313
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "좌측(현재값) 유지",
+      "count": 1,
+      "sample_lines": [
+        1296
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "주요 기능",
+      "count": 1,
+      "sample_lines": [
+        1124
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "줄 바꿈 많이",
+      "count": 1,
+      "sample_lines": [
+        1142
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "중간에 쓰려면",
+      "count": 1,
+      "sample_lines": [
+        1172
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "중간에 창 닫으면 중단",
+      "count": 1,
+      "sample_lines": [
+        1284
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "지속",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "지속시간",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "지속시간순",
+      "count": 1,
+      "sample_lines": [
+        1363
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "직접 쓰거나, 위의",
+      "count": 2,
+      "sample_lines": [
+        1241,
+        1349
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "진단",
+      "count": 1,
+      "sample_lines": [
+        1297
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "진행",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "진행 그래프",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "짧은 세션",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "짧은 세션 노이즈 제거",
+      "count": 2,
+      "sample_lines": [
+        1107,
+        1385
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "차단",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "차단 규칙",
+      "count": 1,
+      "sample_lines": [
+        1204
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "참고",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "참여도 (Engagement)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "찾을 수 없음",
+      "count": 3,
+      "sample_lines": [
+        509,
+        1276,
+        1413
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "챗봇 열기",
+      "count": 1,
+      "sample_lines": [
+        2273
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "처럼 추가.",
+      "count": 1,
+      "sample_lines": [
+        807
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "처리 중",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "첫 발견",
+      "count": 1,
+      "sample_lines": [
+        1034
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "첫 요청",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "초",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "초 전",
+      "count": 1,
+      "sample_lines": [
+        1394
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "초기화",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "초대제 research preview",
+      "count": 1,
+      "sample_lines": [
+        1072
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "초안 요청 중",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "초안을 받으세요",
+      "count": 1,
+      "sample_lines": [
+        1242
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "총",
+      "count": 2,
+      "sample_lines": [
+        666,
+        955
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "총 도구 호출",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "총 세션",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최강/느림",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최근",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최근 30일",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최근 30일 세션 타임라인",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최근 60일 총",
+      "count": 1,
+      "sample_lines": [
+        1278
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최근 도구 호출 통계 + 일자별 그래프",
+      "count": 1,
+      "sample_lines": [
+        214
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최신 발표 · 카드 클릭 → 창으로 열림 · 여러 개 동시 · 🔴닫기 🟡내리기 🟢펼치기",
+      "count": 1,
+      "sample_lines": [
+        1090
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최신 정보 로딩",
+      "count": 2,
+      "sample_lines": [
+        41,
+        1091
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최신순",
+      "count": 1,
+      "sample_lines": [
+        1362
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최적화 브레이크다운",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최적화 상태를 한눈에.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최적화 스코어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "최적화 추천",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추가",
+      "count": 1,
+      "sample_lines": [
+        914
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추가 사용 허용",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추가 설정 없이 바로 설치",
+      "count": 1,
+      "sample_lines": [
+        1314
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추가 설정 없이 바로 설치 가능합니다",
+      "count": 1,
+      "sample_lines": [
+        1223
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추가 설정 없이 바로 설치 가능합니다.",
+      "count": 1,
+      "sample_lines": [
+        1334
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추가 후 터미널에서",
+      "count": 1,
+      "sample_lines": [
+        917
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "추가될 차단",
+      "count": 1,
+      "sample_lines": [
+        1293
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추가될 허용",
+      "count": 1,
+      "sample_lines": [
+        1292
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추가됨",
+      "count": 2,
+      "sample_lines": [
+        939,
+        1410
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추가로 스캔할 디렉토리 절대경로 (홈 디렉토리 내)",
+      "count": 1,
+      "sample_lines": [
+        1169
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추가하세요",
+      "count": 1,
+      "sample_lines": [
+        1298
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추정 비용 ($)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추정)",
+      "count": 1,
+      "sample_lines": [
+        1295
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "추천",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추천 받기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추천 비교 & 적용",
+      "count": 1,
+      "sample_lines": [
+        225
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "추천 설정",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추천 요청 중",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추천 편집",
+      "count": 1,
+      "sample_lines": [
+        724
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "추천 프로파일 3단계 적용 플로우",
+      "count": 1,
+      "sample_lines": [
+        1230
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추천 프로파일 원클릭 머지",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추천 항목이 없습니다 (응답 비어있음)",
+      "count": 1,
+      "sample_lines": [
+        1425
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추천으로 프로젝트 에이전트를 만들어보세요",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추천으로 프로젝트 전용 에이전트를 만들면",
+      "count": 2,
+      "sample_lines": [
+        1201,
+        1286
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추천으로 프로젝트 전용 에이전트를 만들면 delegation 점수가 오릅니다.",
+      "count": 1,
+      "sample_lines": [
+        1370
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "추천으로 활용 시나리오를 받아보세요",
+      "count": 1,
+      "sample_lines": [
+        1285
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "축 달성률",
+      "count": 2,
+      "sample_lines": [
+        587,
+        1134
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "축 점수 (계산식 + 실측)",
+      "count": 1,
+      "sample_lines": [
+        1311
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "출력",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "출력 스타일",
+      "count": 2,
+      "sample_lines": [
+        197,
+        1057
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "출력 스타일을 삭제할까요?",
+      "count": 1,
+      "sample_lines": [
+        1404
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "출시일",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "취소",
+      "count": 2,
+      "sample_lines": [
+        488,
+        1409
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "카드 클릭 → Claude CLI 분석 → 좌/우 비교 적용",
+      "count": 1,
+      "sample_lines": [
+        1103
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "카드 클릭 → 프리셋 내용 미리보기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "카드 클릭 → 프리셋 내용 미리보기 → Name/Description 커스터마이즈 후 Install",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "카드 클릭 → 프리셋 내용 미리보기 → 이름/설명 커스터마이즈 후 설치",
+      "count": 1,
+      "sample_lines": [
+        399
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "카드 클릭 시 해당 카테고리로 이동",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "카드를 클릭하면 실제 설정 스냅샷이 열립니다",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "카탈로그 · 원클릭 설치",
+      "count": 1,
+      "sample_lines": [
+        1228
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "카테고리",
+      "count": 1,
+      "sample_lines": [
+        1244
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "캐시",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "캐시 create",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "캐시 read",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "캐시됨",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "커넥터",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "커스터마이즈 후",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "코드 리뷰어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "코드 실행",
+      "count": 1,
+      "sample_lines": [
+        1290
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "크기",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "클라이언트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "클릭해서 상세",
+      "count": 1,
+      "sample_lines": [
+        1176
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "타임아웃",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "타입",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "탑 세션",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "태스크",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "탭 이동, 기능 검색",
+      "count": 1,
+      "sample_lines": [
+        1269
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "탭 이동, 기능 검색…",
+      "count": 1,
+      "sample_lines": [
+        2196
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "탭 확인",
+      "count": 1,
+      "sample_lines": [
+        1392
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "탭에서 JSON 루트에",
+      "count": 1,
+      "sample_lines": [
+        807
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "탭으로 이동",
+      "count": 3,
+      "sample_lines": [
+        2086,
+        2137,
+        2158
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "터미널 활성화",
+      "count": 1,
+      "sample_lines": [
+        1433
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "터미널 활성화 (",
+      "count": 1,
+      "sample_lines": [
+        295
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "터미널에서",
+      "count": 1,
+      "sample_lines": [
+        1136
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "터미널에서 로그인 중…",
+      "count": 1,
+      "sample_lines": [
+        1443
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "터미널에서 브라우저 인증을 완료하세요. 자동 감지됩니다.",
+      "count": 1,
+      "sample_lines": [
+        1453
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "터미널을 확인하세요.",
+      "count": 1,
+      "sample_lines": [
+        1449
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "테마",
+      "count": 1,
+      "sample_lines": [
+        63
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "테스트 설계, E2E 자동화, 회귀 방지, 품질 게이트.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "텔레메트리",
+      "count": 2,
+      "sample_lines": [
+        985,
+        987
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "토글",
+      "count": 1,
+      "sample_lines": [
+        1195
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "토큰",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "토큰 많이 쓴 세션",
+      "count": 1,
+      "sample_lines": [
+        1263
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "토큰 메트릭",
+      "count": 1,
+      "sample_lines": [
+        215
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "토큰 사용순",
+      "count": 1,
+      "sample_lines": [
+        1362
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "통계 & 스코어",
+      "count": 2,
+      "sample_lines": [
+        177,
+        1381
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "통합 빌드 지원 확대",
+      "count": 1,
+      "sample_lines": [
+        1309
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "특정 요소에 코멘트",
+      "count": 1,
+      "sample_lines": [
+        1187
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "특정 요소에 코멘트, 텍스트 직접 수정, 조절 손잡이로 간격·색·레이아웃 실시간 변경",
+      "count": 1,
+      "sample_lines": [
+        1358
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "팀 / 조직",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "팀 코드베이스 + 디자인 파일 읽어 브랜드 일관성 유지",
+      "count": 1,
+      "sample_lines": [
+        1305
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "팀/조직 정보를 확인하려면 Claude 계정에 먼저 로그인하세요.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "파일",
+      "count": 1,
+      "sample_lines": [
+        987
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "파일 없음",
+      "count": 2,
+      "sample_lines": [
+        1025,
+        1352
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "파일 없음 / 빈값",
+      "count": 1,
+      "sample_lines": [
+        221
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "파일 존재",
+      "count": 1,
+      "sample_lines": [
+        1352
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "파일 편집",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "파일이 없습니다",
+      "count": 1,
+      "sample_lines": [
+        1295
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "패턴 인사이트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "편집",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "편집 & 저장",
+      "count": 1,
+      "sample_lines": [
+        1274
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "편집 방법",
+      "count": 1,
+      "sample_lines": [
+        807
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "편집 후",
+      "count": 1,
+      "sample_lines": [
+        1347
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "편집으로 이동",
+      "count": 1,
+      "sample_lines": [
+        1274
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "펼치기",
+      "count": 2,
+      "sample_lines": [
+        140,
+        1087
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "평가",
+      "count": 1,
+      "sample_lines": [
+        1297
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "평가가 실행되지 않았습니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "평균",
+      "count": 1,
+      "sample_lines": [
+        660
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "평균 30~120초 소요",
+      "count": 1,
+      "sample_lines": [
+        1317
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "평균 세션 스코어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "평균 세션 토큰",
+      "count": 1,
+      "sample_lines": [
+        1278
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "평균 스코어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "평균 점수는 도구 호출",
+      "count": 1,
+      "sample_lines": [
+        1383
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "폴더",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "폴더 열림",
+      "count": 2,
+      "sample_lines": [
+        291,
+        1432
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "표시",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "표시할 프로젝트 없음",
+      "count": 1,
+      "sample_lines": [
+        382
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "풀스택 개발자",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로세스 값은 이 대시보드 서버가 실행 중인 쉘의 현재 값.",
+      "count": 1,
+      "sample_lines": [
+        1357
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트",
+      "count": 2,
+      "sample_lines": [
+        176,
+        1105
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트 MCP",
+      "count": 2,
+      "sample_lines": [
+        1227,
+        1401
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트 루트에 CLAUDE.md 없음",
+      "count": 1,
+      "sample_lines": [
+        1332
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트 매니저",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트 메모리",
+      "count": 1,
+      "sample_lines": [
+        217
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트 서브 에이전트",
+      "count": 2,
+      "sample_lines": [
+        181,
+        373
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "프로젝트 설정",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트 설정 불러오는 중…",
+      "count": 1,
+      "sample_lines": [
+        1376
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트 세팅",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트 에이전트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트 에이전트 편집",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트 에이전트 편집 —",
+      "count": 1,
+      "sample_lines": [
+        511
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "프로젝트마다",
+      "count": 1,
+      "sample_lines": [
+        374
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "프로젝트별",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트별 5축 계산식",
+      "count": 1,
+      "sample_lines": [
+        1102
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트별 Claude 세팅 + AI 추천",
+      "count": 1,
+      "sample_lines": [
+        176
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트별 서브 에이전트 보기/추가/교체",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋",
+      "count": 1,
+      "sample_lines": [
+        182
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트별 평균 스코어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로젝트별 활동",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로파일",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로파일 적용됨",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로파일 적용됨 — 저장을 눌러 반영",
+      "count": 1,
+      "sample_lines": [
+        1437
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프로파일링, 병목 분석, 알고리즘·메모리·IO 최적화.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프론트·백엔드 모두 다루는 얇은 수직 슬라이스 구현.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프론트엔드 개발자",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프롬프트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프롬프트 → 비주얼 디자인/슬라이드/원페이저. Opus 4.7 기반.",
+      "count": 1,
+      "sample_lines": [
+        1066
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "프롬프트 입력",
+      "count": 1,
+      "sample_lines": [
+        1189
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플랜",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플랜 모드 진입 후 저장",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플랜 보관소",
+      "count": 1,
+      "sample_lines": [
+        201
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플랜 선택 해제됨",
+      "count": 1,
+      "sample_lines": [
+        1458
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플랜 설정",
+      "count": 1,
+      "sample_lines": [
+        1465
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플랜 저장됨",
+      "count": 1,
+      "sample_lines": [
+        1458
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플랫폼 MCP",
+      "count": 1,
+      "sample_lines": [
+        1225
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인",
+      "count": 2,
+      "sample_lines": [
+        191,
+        1244
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 MCP",
+      "count": 1,
+      "sample_lines": [
+        1226
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 마켓 추가/삭제",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 마켓 추가/삭제 (git URL)",
+      "count": 1,
+      "sample_lines": [
+        210
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 마켓플레이스",
+      "count": 1,
+      "sample_lines": [
+        908
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 명령어",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 스킬 (read-only)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 업데이트 시 변경이 덮어써질 수 있습니다",
+      "count": 1,
+      "sample_lines": [
+        1214
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 업데이트 시 복원될 수 있습니다.",
+      "count": 1,
+      "sample_lines": [
+        1398
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 제공",
+      "count": 1,
+      "sample_lines": [
+        1155
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 탭에서 활성화하세요",
+      "count": 1,
+      "sample_lines": [
+        1153
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 훅 삭제됨",
+      "count": 1,
+      "sample_lines": [
+        1414
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 훅 수정",
+      "count": 1,
+      "sample_lines": [
+        1212
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 훅 저장됨",
+      "count": 1,
+      "sample_lines": [
+        1414
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인 훅을 삭제하시겠습니까?",
+      "count": 1,
+      "sample_lines": [
+        1397
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인의 hooks.json 을 직접 수정합니다",
+      "count": 1,
+      "sample_lines": [
+        1213
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "플러그인이",
+      "count": 1,
+      "sample_lines": [
+        1325
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "필수 값 누락",
+      "count": 2,
+      "sample_lines": [
+        1275,
+        1417
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "필수 값 누락:",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "필요 시 직접 생성",
+      "count": 2,
+      "sample_lines": [
+        1256,
+        1352
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "필터",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "필터 결과 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "하단 statusLine 명령",
+      "count": 1,
+      "sample_lines": [
+        1098
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "하단 버튼을 눌러",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "하단 상태라인, 키 바인딩",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "하면 파일에 즉시 반영됩니다.",
+      "count": 1,
+      "sample_lines": [
+        1347
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "하위 세션",
+      "count": 1,
+      "sample_lines": [
+        1289
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "한 줄 설명",
+      "count": 1,
+      "sample_lines": [
+        1290
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "한국어",
+      "count": 1,
+      "sample_lines": [
+        71
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "한글 번역",
+      "count": 2,
+      "sample_lines": [
+        1161,
+        1355
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "합계",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "해 추가하세요",
+      "count": 1,
+      "sample_lines": [
+        1181
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "해당 탭으로 바로 안내해 드릴게요.",
+      "count": 1,
+      "sample_lines": [
+        153
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "해상도 전체 지원",
+      "count": 1,
+      "sample_lines": [
+        1307
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "해서 상세 · 비활성 플러그인 에이전트는 뱃지 클릭으로 즉시 활성화 · 전역 에이전트는 우측 상단",
+      "count": 1,
+      "sample_lines": [
+        1324
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "해서 상세 · 비활성 플러그인 에이전트는 뱃지 클릭으로 즉시 활성화 · 전역 에이전트는 우측 상단 \"＋\" 로 추가, 카드에서 삭제",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "핸드오프",
+      "count": 1,
+      "sample_lines": [
+        1127
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "행 클릭",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "행을 클릭하면 상세 타임라인",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "허용",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "허용 규칙",
+      "count": 1,
+      "sample_lines": [
+        1204
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "허용/차단할 도구·명령 규칙. deny가 안전도를 높입니다",
+      "count": 1,
+      "sample_lines": [
+        188
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "현재",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "현재 (왼쪽)",
+      "count": 2,
+      "sample_lines": [
+        242,
+        1273
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "현재 값 유지",
+      "count": 2,
+      "sample_lines": [
+        265,
+        1436
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "현재 뷰 다시 로드",
+      "count": 2,
+      "sample_lines": [
+        1270,
+        2275
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "현재 설정",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "현재 파일",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "현재 파일, 우측은",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "호출",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "호출 기록 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "호출 없음",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "혹은 전역",
+      "count": 1,
+      "sample_lines": [
+        692
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "확인",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "확인 → 변경 미리보기 → 적용까지 안내됩니다",
+      "count": 1,
+      "sample_lines": [
+        1231
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "확인 중",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "환경 변수",
+      "count": 2,
+      "sample_lines": [
+        203,
+        787
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "환경변수 누락",
+      "count": 1,
+      "sample_lines": [
+        1222
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "환경변수.",
+      "count": 1,
+      "sample_lines": [
+        1016
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "활성",
+      "count": 1,
+      "sample_lines": [
+        1195
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "활성 세션",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "활성 세션 없음",
+      "count": 1,
+      "sample_lines": [
+        867
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "활성 세션이 없습니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "활성 프로젝트",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "활성 플러그인만",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "활성(사용자 설정)",
+      "count": 1,
+      "sample_lines": [
+        1154
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "활성화",
+      "count": 1,
+      "sample_lines": [
+        1159
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "활성화됨",
+      "count": 2,
+      "sample_lines": [
+        1331,
+        1411
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "활용도",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "회",
+      "count": 1,
+      "sample_lines": [
+        874
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "회 세션",
+      "count": 1,
+      "sample_lines": [
+        1384
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "회 세션 평균",
+      "count": 2,
+      "sample_lines": [
+        1108,
+        1341
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "회 에이전트 위임",
+      "count": 1,
+      "sample_lines": [
+        1339
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "회 호출",
+      "count": 1,
+      "sample_lines": [
+        1340
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "회 호출 ·",
+      "count": 1,
+      "sample_lines": [
+        955
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "회당 20~90초",
+      "count": 1,
+      "sample_lines": [
+        1283
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "훅",
+      "count": 1,
+      "sample_lines": [
+        185
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "훅 (Hooks)",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "훅 삭제",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "훅 수정",
+      "count": 1,
+      "sample_lines": [
+        1211
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "훅 자동화",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "훅 저장됨",
+      "count": 1,
+      "sample_lines": [
+        1414
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "훅 추가",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "훅 추천",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "훅 편집",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "훅이 설정되지 않았습니다.",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "＋ 새 마켓플레이스 추가",
+      "count": 1,
+      "sample_lines": [
+        910
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "＋ 이 프로젝트에 설치",
+      "count": 1,
+      "sample_lines": [
+        489
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🆕 신기능",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "🌿 Claude Code 환경 변수 카탈로그",
+      "count": 1,
+      "sample_lines": [
+        789
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🎉 로그인 성공! 대시보드를 불러옵니다…",
+      "count": 1,
+      "sample_lines": [
+        1751
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🎭 역할 프리셋 카탈로그 ·",
+      "count": 1,
+      "sample_lines": [
+        398
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🏆 최고 세션",
+      "count": 1,
+      "sample_lines": [
+        683
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "💀 하위 세션",
+      "count": 1,
+      "sample_lines": [
+        685
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "💡 비활성화",
+      "count": 1,
+      "sample_lines": [
+        1016
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "💡 시크릿 형태(토큰/키) 값은 일부 마스킹됩니다.",
+      "count": 1,
+      "sample_lines": [
+        803
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "💻 활성 Claude Code 세션 (",
+      "count": 1,
+      "sample_lines": [
+        854
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "💾 이 내용으로 저장",
+      "count": 1,
+      "sample_lines": [
+        729
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "💾 적용",
+      "count": 1,
+      "sample_lines": [
+        1438
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "📁 최근 텔레메트리 파일",
+      "count": 1,
+      "sample_lines": [
+        1005
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "📊 상위 이벤트 타입",
+      "count": 1,
+      "sample_lines": [
+        990
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "📋 사용 가능 모델",
+      "count": 1,
+      "sample_lines": [
+        828
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "📌 수동 단계",
+      "count": 1,
+      "sample_lines": [
+        627
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "📐 5-축 점수 (계산식 + 실측)",
+      "count": 1,
+      "sample_lines": [
+        679
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "📖 전체 릴리즈 노트",
+      "count": 1,
+      "sample_lines": [
+        1093
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "📝 파일 편집",
+      "count": 1,
+      "sample_lines": [
+        628
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "📡 최신 정보 로딩",
+      "count": 1,
+      "sample_lines": [
+        1092
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "📦 이 프로젝트의 에이전트 ·",
+      "count": 1,
+      "sample_lines": [
+        384
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🔄 로그인 확인 중…",
+      "count": 2,
+      "sample_lines": [
+        1665,
+        1727
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🔌 플러그인 제공",
+      "count": 1,
+      "sample_lines": [
+        1328
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "🔍 검색",
+      "count": 1,
+      "sample_lines": [
+        2190
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🔐 인증 필요",
+      "count": 1,
+      "sample_lines": [
+        1329
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "🔴닫기 🟡내리기 🟢펼치기",
+      "count": 1,
+      "sample_lines": [
+        1088
+      ],
+      "in_existing_en_dict": true
+    },
+    {
+      "text": "🖥 감지된 터미널 / IDE (텔레메트리 기반)",
+      "count": 1,
+      "sample_lines": [
+        870
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🚀 Claude 로그인",
+      "count": 3,
+      "sample_lines": [
+        1707,
+        1731,
+        1735
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🛠 파일별 개선 추천 (",
+      "count": 1,
+      "sample_lines": [
+        689
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🤝 프로젝트 에이전트",
+      "count": 1,
+      "sample_lines": [
+        390
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🧬 현재 Settings 키",
+      "count": 1,
+      "sample_lines": [
+        821
+      ],
+      "in_existing_en_dict": false
+    }
+  ]
+}
