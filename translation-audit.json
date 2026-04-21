@@ -478,7 +478,7 @@
       "text": "CLI 상태 확인",
       "count": 1,
       "sample_lines": [
-        6546
+        6562
       ],
       "in_existing_en_dict": false
     },
@@ -704,7 +704,7 @@
       "text": "Claude 가 열심히 일하는 중!",
       "count": 1,
       "sample_lines": [
-        6172
+        6175
       ],
       "in_existing_en_dict": false
     },
@@ -2012,7 +2012,7 @@
       "text": "☕ 한 잔의 여유",
       "count": 1,
       "sample_lines": [
-        6174
+        6177
       ],
       "in_existing_en_dict": false
     },
@@ -2124,7 +2124,7 @@
       "text": "⚡ 처리 중…",
       "count": 1,
       "sample_lines": [
-        6174
+        6177
       ],
       "in_existing_en_dict": false
     },
@@ -2589,7 +2589,7 @@
       "text": "거의 다 됐어요!",
       "count": 1,
       "sample_lines": [
-        6172
+        6175
       ],
       "in_existing_en_dict": false
     },
@@ -2686,7 +2686,7 @@
       "count": 2,
       "sample_lines": [
         4412,
-        6564
+        6580
       ],
       "in_existing_en_dict": false
     },
@@ -2777,7 +2777,7 @@
       "text": "곧 결과가 나와요!",
       "count": 1,
       "sample_lines": [
-        6173
+        6176
       ],
       "in_existing_en_dict": false
     },
@@ -3146,7 +3146,7 @@
       "text": "대시보드 도우미와 대화",
       "count": 1,
       "sample_lines": [
-        6545
+        6561
       ],
       "in_existing_en_dict": false
     },
@@ -3471,7 +3471,7 @@
       "text": "로그인 상태 / 플랜 확인",
       "count": 1,
       "sample_lines": [
-        6546
+        6562
       ],
       "in_existing_en_dict": false
     },
@@ -4267,7 +4267,7 @@
       "text": "새로고침",
       "count": 1,
       "sample_lines": [
-        6547
+        6563
       ],
       "in_existing_en_dict": false
     },
@@ -4300,7 +4300,7 @@
       "text": "서버 연결 실패",
       "count": 1,
       "sample_lines": [
-        6643
+        6659
       ],
       "in_existing_en_dict": false
     },
@@ -4440,7 +4440,7 @@
       "text": "세션 DB 새로고침",
       "count": 1,
       "sample_lines": [
-        6544
+        6560
       ],
       "in_existing_en_dict": false
     },
@@ -4487,7 +4487,7 @@
       "count": 2,
       "sample_lines": [
         38,
-        6544
+        6560
       ],
       "in_existing_en_dict": false
     },
@@ -4772,7 +4772,7 @@
       "count": 2,
       "sample_lines": [
         172,
-        6575
+        6591
       ],
       "in_existing_en_dict": false
     },
@@ -4812,7 +4812,7 @@
       "text": "실행",
       "count": 1,
       "sample_lines": [
-        6575
+        6591
       ],
       "in_existing_en_dict": false
     },
@@ -5170,7 +5170,7 @@
       "text": "연결 오류",
       "count": 1,
       "sample_lines": [
-        6435
+        6451
       ],
       "in_existing_en_dict": false
     },
@@ -5554,7 +5554,7 @@
       "text": "이동",
       "count": 1,
       "sample_lines": [
-        6575
+        6591
       ],
       "in_existing_en_dict": false
     },
@@ -5843,7 +5843,7 @@
       "text": "잠시만요…",
       "count": 1,
       "sample_lines": [
-        6173
+        6176
       ],
       "in_existing_en_dict": false
     },
@@ -6177,7 +6177,7 @@
       "text": "조금만 기다려주세요…",
       "count": 1,
       "sample_lines": [
-        6172
+        6175
       ],
       "in_existing_en_dict": false
     },
@@ -6331,7 +6331,7 @@
       "text": "챗봇 열기",
       "count": 1,
       "sample_lines": [
-        6545
+        6561
       ],
       "in_existing_en_dict": false
     },
@@ -6830,7 +6830,7 @@
       "text": "탭 이동, 기능 검색…",
       "count": 1,
       "sample_lines": [
-        6468
+        6484
       ],
       "in_existing_en_dict": false
     },
@@ -6862,9 +6862,9 @@
       "text": "탭으로 이동",
       "count": 3,
       "sample_lines": [
-        6358,
-        6409,
-        6430
+        6374,
+        6425,
+        6446
       ],
       "in_existing_en_dict": false
     },
@@ -7636,7 +7636,7 @@
       "text": "현재 뷰 다시 로드",
       "count": 1,
       "sample_lines": [
-        6547
+        6563
       ],
       "in_existing_en_dict": false
     },
@@ -8100,7 +8100,7 @@
       "text": "🎯 분석 중…",
       "count": 1,
       "sample_lines": [
-        6173
+        6176
       ],
       "in_existing_en_dict": false
     },
@@ -8200,7 +8200,7 @@
       "text": "💭 생각 중…",
       "count": 1,
       "sample_lines": [
-        6174
+        6177
       ],
       "in_existing_en_dict": false
     },
@@ -8625,7 +8625,7 @@
       "text": "🔍 검색",
       "count": 1,
       "sample_lines": [
-        6462
+        6478
       ],
       "in_existing_en_dict": false
     },
@@ -8633,7 +8633,7 @@
       "text": "🔍 꼼꼼하게 보고 있어요",
       "count": 1,
       "sample_lines": [
-        6175
+        6178
       ],
       "in_existing_en_dict": false
     },
@@ -8807,7 +8807,7 @@
       "text": "🚀 거의 다!",
       "count": 1,
       "sample_lines": [
-        6175
+        6178
       ],
       "in_existing_en_dict": false
     },
