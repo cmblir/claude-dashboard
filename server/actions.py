@@ -318,3 +318,56 @@ def open_folder_action(body: dict) -> dict:
         return {"ok": False, "error": str(e)}
     return {"ok": True, "path": abs_path}
 
+
+def _applescript_escape(s: str) -> str:
+    """AppleScript 문자열 리터럴용 이스케이프 — \\ 과 " 만 처리."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def api_session_spawn(body: dict) -> dict:
+    """새 Terminal 창을 열고 `claude [prompt]` 실행. macOS 전용.
+
+    body: { cwd: "~/path", prompt?: "optional first message" }
+    - cwd 는 홈 디렉토리 하위만 허용
+    - claude 바이너리가 PATH 에 없으면 터미널에서 실행되긴 하지만 에러 보고 X
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    raw_cwd = (body.get("cwd") or "").strip()
+    if not raw_cwd:
+        return {"ok": False, "error": "no cwd"}
+    expanded = os.path.expanduser(raw_cwd)
+    abs_cwd = os.path.abspath(expanded)
+    home = str(Path.home())
+    if not (abs_cwd == home or abs_cwd.startswith(home + os.sep)):
+        return {"ok": False, "error": "cwd must be under home"}
+    if not Path(abs_cwd).is_dir():
+        return {"ok": False, "error": "cwd not found"}
+
+    prompt = (body.get("prompt") or "").strip()
+    claude_bin = shutil.which("claude") or "claude"  # fallback: 터미널이 PATH 로 찾음
+
+    # 셸 명령: cd "<cwd>" && claude "<prompt>" (prompt 없으면 그냥 claude)
+    if prompt:
+        shell_cmd = f'cd "{abs_cwd}" && {claude_bin} "{prompt}"'
+    else:
+        shell_cmd = f'cd "{abs_cwd}" && {claude_bin}'
+
+    script = f'''
+tell application "Terminal"
+    activate
+    do script "{_applescript_escape(shell_cmd)}"
+end tell
+'''
+    try:
+        r = subprocess.run(
+            ["osascript", "-e", script], timeout=5, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            return {"ok": False, "error": (r.stderr or "osascript failed").strip()}
+    except FileNotFoundError:
+        return {"ok": False, "error": "osascript not available (macOS only)"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "terminal": "Terminal.app", "cwd": abs_cwd}
+

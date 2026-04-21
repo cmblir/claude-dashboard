@@ -50,6 +50,11 @@ try:
 except Exception:
     _NEW_EN_8, _NEW_ZH_8 = {}, {}
 
+try:
+    from translations_manual_9 import NEW_EN as _NEW_EN_9, NEW_ZH as _NEW_ZH_9
+except Exception:
+    _NEW_EN_9, _NEW_ZH_9 = {}, {}
+
 # ── 구조화 키 → 한국어 라벨 ──
 MANUAL_KO: dict[str, str] = {
     "settings.theme": "테마",
@@ -448,6 +453,12 @@ for _k, _v in _NEW_ZH_7.items():
 for _k, _v in _NEW_EN_8.items():
     MANUAL_EN.setdefault(_k, _v)
 for _k, _v in _NEW_ZH_8.items():
+    MANUAL_ZH.setdefault(_k, _v)
+
+# 워크플로우 에디터(n8n 스타일) 신규 탭 — server/workflows.py 및 프론트 UI
+for _k, _v in _NEW_EN_9.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH_9.items():
     MANUAL_ZH.setdefault(_k, _v)
 
 # ── 번역 검수 권장 항목 ──
