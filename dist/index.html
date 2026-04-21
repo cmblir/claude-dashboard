@@ -710,6 +710,9 @@ const __noReloadPaths = [
   '/api/translate/batch', '/api/translate', '/api/settings/preview',
   '/api/open-folder', '/api/open-session', '/api/sessions/reindex',
   '/api/login', '/api/auth', '/api/chat',
+  // 워크플로우 에디터는 프론트가 권위 상태를 들고 있으므로 서버 응답 후
+  // renderView() 로 뷰를 리셋하면 드래그 중 깜빡임·선택 초기화 발생
+  '/api/workflows/', '/api/session/spawn',
 ];
 async function api(path, opts = {}) {
   const r = await fetch(path, opts);
