@@ -37,6 +37,7 @@ from .features import (
     api_global_claude_md_recommend, api_optimization_score,
     api_project_ai_recommend, api_project_file_put, api_settings_preview,
 )
+from .guide import api_guide_onboarding, api_guide_toolkit
 from .hooks import api_plugin_hook_update, get_hooks
 from .logger import log
 from .mcp import (
@@ -129,6 +130,8 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/telemetry/summary": lambda q: api_telemetry_summary(),
     "/api/homunculus/projects": lambda q: api_homunculus_projects(),
     "/api/marketplaces/list": lambda q: api_marketplace_list(),
+    "/api/guide/toolkit": lambda q: api_guide_toolkit(),
+    "/api/guide/onboarding": lambda q: api_guide_onboarding(),
 }
 
 

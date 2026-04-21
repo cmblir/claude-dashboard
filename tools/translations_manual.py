@@ -45,6 +45,11 @@ try:
 except Exception:
     _NEW_EN_7, _NEW_ZH_7 = {}, {}
 
+try:
+    from translations_manual_8 import NEW_EN as _NEW_EN_8, NEW_ZH as _NEW_ZH_8
+except Exception:
+    _NEW_EN_8, _NEW_ZH_8 = {}, {}
+
 # ── 구조화 키 → 한국어 라벨 ──
 MANUAL_KO: dict[str, str] = {
     "settings.theme": "테마",
@@ -437,6 +442,12 @@ for _k, _v in _NEW_ZH_6.items():
 for _k, _v in _NEW_EN_7.items():
     MANUAL_EN.setdefault(_k, _v)
 for _k, _v in _NEW_ZH_7.items():
+    MANUAL_ZH.setdefault(_k, _v)
+
+# 신규 탭: 시작하기(onboarding) + 가이드 & 툴(guideHub) — server/guide.py 및 프론트 UI
+for _k, _v in _NEW_EN_8.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH_8.items():
     MANUAL_ZH.setdefault(_k, _v)
 
 # ── 번역 검수 권장 항목 ──

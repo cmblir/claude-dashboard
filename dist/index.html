@@ -210,6 +210,8 @@
   .prose-claude ul { padding-left: 1.2em; }
   .hover-lift { transition: transform 0.15s, background 0.15s; }
   .hover-lift:hover { transform: translateY(-2px); background: var(--card-hi); }
+  .btn-active { background: var(--grad-soft) !important; border-color: rgba(167,139,250,0.45) !important; color: var(--text) !important; }
+  .onboard-done { opacity: 0.78; }
   .grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
   .empty { text-align: center; padding: 3rem 1rem; color: var(--text-dim); }
   .tag-tool { display: inline-block; padding: 1px 7px; font-size: 0.68rem; border-radius: 4px; background: rgba(217,119,87,0.14); color: #f5b997; font-family: 'JetBrains Mono', monospace; margin: 1px; }
@@ -550,6 +552,12 @@ const NAV = [
   // 🆕 신기능 — 단일 탭 (카드 클릭 시 macOS 스타일 플로팅 창)
   { id: 'features', icon: '🆕', label: '신기능', group: 'new',
     desc: 'Anthropic 최신 발표 · 카드 클릭 → 창으로 열림 (여러 개 동시 가능)' },
+
+  // 🚀 가이드 — 온보딩 체크리스트 + 외부 툴/가이드 허브
+  { id: 'onboarding', icon: '🚀', label: '시작하기', group: 'new',
+    desc: '처음 사용자를 위한 단계별 체크리스트 (현재 셋업 자동 감지)' },
+  { id: 'guideHub',   icon: '📚', label: '가이드 & 툴', group: 'new',
+    desc: '외부 가이드 · 유용한 툴 · 베스트 프랙티스 · 치트시트' },
 
   { id: 'overview',    icon: '✦',  label: '개요',            group: 'main', docUrl: DOCS_BASE+'overview' },
   { id: 'projects',    icon: '📁', label: '프로젝트',          group: 'main', desc: '프로젝트별 Claude 세팅 + AI 추천', docUrl: DOCS_BASE+'memory' },
@@ -1029,6 +1037,270 @@ function _makeDraggable(w) {
     w.style.top = Math.max(0, origTop + (e.clientY - startY)) + 'px';
   });
   document.addEventListener('mouseup', () => { dragging = false; });
+}
+
+// ────────────────────────────────────────────────────────────────
+// 🚀 ONBOARDING — 단계별 체크리스트 (현재 셋업 자동 감지)
+// ────────────────────────────────────────────────────────────────
+VIEWS.onboarding = async () => {
+  const r = await api('/api/guide/onboarding');
+  const p = r.progress || { done:0, total:0, percent:0 };
+  const steps = r.steps || [];
+  const tips = r.tips || [];
+  const ringColor = p.percent >= 80 ? '#4ade80' : (p.percent >= 50 ? '#a78bfa' : '#fbbf24');
+
+  return `
+    ${viewHeader('🚀 시작하기', '처음 사용자를 위한 단계별 체크리스트 — 현재 ~/.claude 상태를 실시간으로 감지합니다.', 'onboarding')}
+
+    <div class="card p-5 mb-4 flex items-center gap-5 flex-wrap">
+      <div style="--p:${p.percent}; width:84px; height:84px; border-radius:50%;
+                  background: conic-gradient(${ringColor} calc(var(--p)*1%), rgba(255,255,255,0.08) 0);
+                  display:flex;align-items:center;justify-content:center; position:relative;">
+        <div style="position:absolute; inset:8px; border-radius:50%; background:var(--bg-soft);
+                    display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <div style="font-size:1.2rem; font-weight:700;">${p.percent}%</div>
+          <div style="font-size:0.65rem; color:var(--text-dim);">${p.done}/${p.total}</div>
+        </div>
+      </div>
+      <div class="flex-1 min-w-[220px]">
+        <div class="text-lg font-semibold mb-1">${t('셋업 진행률')}</div>
+        <div class="text-sm text-[var(--text-mute)]">
+          ${p.percent >= 100
+            ? t('완료 🎉 — 이제 AI 종합 평가 탭에서 품질 점수를 받아보세요.')
+            : t('남은 단계를 하나씩 체크하면 Claude Code 를 더 안전하고 생산적으로 쓸 수 있습니다.')}
+        </div>
+        ${tips.length ? `<ul class="mt-2 text-xs text-[var(--text-dim)] space-y-0.5">
+          ${tips.map(x => `<li>• ${escapeHtml(x)}</li>`).join('')}
+        </ul>` : ''}
+      </div>
+      <button class="btn text-xs" onclick="renderView()">↻ ${t('새로고침')}</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      ${steps.map((s, i) => `
+        <div class="card p-4 hover-lift ${s.done ? 'onboard-done' : ''}"
+             style="border-left: 3px solid ${s.done ? '#4ade80' : 'rgba(167,139,250,0.45)'};">
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                          background:${s.done ? 'rgba(74,222,128,0.18)' : 'rgba(255,255,255,0.05)'};
+                          color:${s.done ? '#4ade80' : 'var(--text-dim)'}; font-size:0.9rem; font-weight:600;">
+                ${s.done ? '✓' : (i+1)}
+              </div>
+              <div class="min-w-0">
+                <div class="font-semibold text-sm">${escapeHtml(s.title)}</div>
+                ${s.detail ? `<div class="text-[10px] text-[var(--text-dim)] mt-0.5">${escapeHtml(s.detail)}</div>` : ''}
+              </div>
+            </div>
+            <span class="chip text-[10px]" style="background:${s.done?'rgba(74,222,128,0.15)':'rgba(251,191,36,0.15)'};color:${s.done?'#4ade80':'#fbbf24'};">
+              ${s.done ? t('완료') : t('필요')}
+            </span>
+          </div>
+          <div class="text-xs text-[var(--text-mute)] leading-relaxed mb-2">${escapeHtml(s.desc||'')}</div>
+          ${s.hint ? `<div class="text-[11px] text-[var(--text-dim)] mb-2">💡 ${escapeHtml(s.hint)}</div>` : ''}
+          <div class="flex gap-2 flex-wrap">
+            ${s.navigate ? `<button class="btn text-[11px]" onclick="go('${s.navigate}')">→ ${t('해당 탭으로')}</button>` : ''}
+            ${s.doc ? `<a class="btn text-[11px]" href="${s.doc}" target="_blank" rel="noopener">📖 ${t('공식 문서')}</a>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+};
+
+// ────────────────────────────────────────────────────────────────
+// 📚 GUIDE HUB — 외부 가이드 · 유용한 툴 · 베스트 프랙티스 · 치트시트
+// ────────────────────────────────────────────────────────────────
+VIEWS.guideHub = async () => {
+  const r = await api('/api/guide/toolkit');
+  state.data.guide = r;
+  const sub = state.data.guideSub || 'toolkits';
+
+  const subtabs = [
+    { id: 'toolkits',       label: '🧰 유용한 툴' },
+    { id: 'externalGuides', label: '🔗 외부 가이드' },
+    { id: 'bestPractices',  label: '💡 베스트 프랙티스' },
+    { id: 'cheatsheet',     label: '⌨️ 치트시트' },
+  ];
+
+  return `
+    ${viewHeader('📚 가이드 & 툴', '세 리소스(everything-claude-code · claude-code-best-practice · 위키독스 한국어 가이드) 를 한 곳에서.', 'guideHub')}
+
+    <div class="flex gap-2 flex-wrap mb-4">
+      ${subtabs.map(s => `
+        <button class="btn text-xs ${sub===s.id?'btn-active':''}"
+                onclick="state.data.guideSub='${s.id}'; renderView();">
+          ${t(s.label)}
+        </button>`).join('')}
+    </div>
+
+    ${sub === 'toolkits'       ? _renderGuideToolkits(r.toolkits || []) : ''}
+    ${sub === 'externalGuides' ? _renderGuideExternal(r.toolkits || []) : ''}
+    ${sub === 'bestPractices'  ? _renderGuideBestPractices(r.bestPractices || []) : ''}
+    ${sub === 'cheatsheet'     ? _renderGuideCheatsheet(r.cheatsheet || {}) : ''}
+  `;
+};
+
+function _renderGuideToolkits(list) {
+  if (!list.length) return `<div class="card p-8 empty">${t('데이터 없음')}</div>`;
+  return `
+    <div class="grid grid-cols-1 gap-4">
+      ${list.map(tk => `
+        <div class="card p-5">
+          <div class="flex items-start justify-between gap-3 flex-wrap mb-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <h3 class="text-lg font-semibold">${escapeHtml(tk.title)}</h3>
+                ${tk.stars ? `<span class="chip text-[10px]" style="background:rgba(250,204,21,0.15);color:#fbbf24;">⭐ ${escapeHtml(tk.stars)}</span>` : ''}
+                ${tk.license ? `<span class="chip text-[10px]">${escapeHtml(tk.license)}</span>` : ''}
+              </div>
+              <div class="text-sm text-[var(--text-mute)] mb-1">${escapeHtml(tk.subtitle||'')}</div>
+              <div class="text-[11px] text-[var(--text-dim)]">${t('제작')}: ${escapeHtml(tk.author||'')}</div>
+            </div>
+            <a class="btn text-xs" href="${escapeHtml(tk.repo)}" target="_blank" rel="noopener">↗ ${t('리포 열기')}</a>
+          </div>
+
+          ${tk.highlights?.length ? `
+            <div class="mb-3">
+              <div class="text-xs font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">${t('하이라이트')}</div>
+              <ul class="text-sm text-[var(--text-mute)] space-y-1">
+                ${tk.highlights.map(h => `<li>• ${escapeHtml(h)}</li>`).join('')}
+              </ul>
+            </div>` : ''}
+
+          ${tk.install?.length ? `
+            <div class="mb-3">
+              <div class="text-xs font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">${t('설치 & 사용')}</div>
+              <div class="space-y-2">
+                ${tk.install.map(inst => `
+                  <div>
+                    <div class="text-[11px] text-[var(--text-dim)] mb-0.5">${escapeHtml(inst.label)}</div>
+                    <div class="flex items-center gap-2">
+                      <code class="flex-1 min-w-0 px-2 py-1.5 rounded text-xs font-mono"
+                            style="background:rgba(0,0,0,0.3); color:#a7f3d0; word-break:break-all;">${escapeHtml(inst.code)}</code>
+                      <button class="btn text-[11px]" onclick="_copyToClipboard(this, ${JSON.stringify(inst.code).replace(/"/g,'&quot;')})">📋 ${t('복사')}</button>
+                    </div>
+                  </div>`).join('')}
+              </div>
+            </div>` : ''}
+
+          ${tk.categories?.length ? `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              ${tk.categories.map(c => `
+                <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; padding:10px 12px;">
+                  <div class="text-xs font-semibold mb-1.5">${escapeHtml(c.name)}</div>
+                  <div class="flex flex-wrap gap-1">
+                    ${(c.items||[]).map(it => `<span class="chip text-[10px]" style="background:rgba(167,139,250,0.12); color:#c4b5fd;">${escapeHtml(it)}</span>`).join('')}
+                  </div>
+                </div>`).join('')}
+            </div>` : ''}
+        </div>`).join('')}
+    </div>
+  `;
+}
+
+function _renderGuideExternal(list) {
+  return `
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      ${list.map(tk => `
+        <a class="card p-4 hover-lift block no-underline" href="${escapeHtml(tk.repo)}" target="_blank" rel="noopener"
+           style="text-decoration:none; color:inherit;">
+          <div class="text-3xl mb-2">${tk.id==='wikidocs-claude-code-guide'?'📖':(tk.id==='claude-code-best-practice'?'🎯':'🧰')}</div>
+          <div class="font-semibold text-sm mb-1">${escapeHtml(tk.title)}</div>
+          <div class="text-xs text-[var(--text-mute)] mb-2 line-clamp-2">${escapeHtml(tk.subtitle||'')}</div>
+          <div class="text-[11px] text-[var(--text-dim)]">${t('바로가기')} ↗</div>
+        </a>`).join('')}
+    </div>
+    <div class="card p-4 mt-4">
+      <div class="text-sm font-semibold mb-2">🎓 ${t('추천 학습 경로')}</div>
+      <ol class="text-sm text-[var(--text-mute)] space-y-1 list-decimal pl-5">
+        <li>${t('위키독스 한국어 가이드 기초 7강 → 개발 17강 순으로 학습')}</li>
+        <li>${t('best-practice 레포에서 창시자(Boris Cherny) 워크플로 영상 시청')}</li>
+        <li>${t('everything-claude-code 플러그인 설치 → 실전 기능 확보')}</li>
+        <li>${t('시작하기 탭으로 돌아와 체크리스트 완료')}</li>
+      </ol>
+    </div>
+  `;
+}
+
+function _renderGuideBestPractices(list) {
+  if (!list.length) return `<div class="card p-8 empty">${t('데이터 없음')}</div>`;
+  return `
+    <div class="space-y-3">
+      ${list.map(bp => `
+        <div class="card p-5">
+          <div class="flex items-start justify-between gap-3 mb-2">
+            <div>
+              <div class="text-lg font-semibold">${escapeHtml(bp.title)}</div>
+              <div class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(bp.desc||'')}</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
+            ${(bp.steps||[]).map((st, i) => `
+              <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; padding:10px 12px;">
+                <div class="flex items-center gap-2 mb-1">
+                  <span style="width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+                               background:rgba(167,139,250,0.18);color:#c4b5fd; font-size:0.7rem; font-weight:700;">${i+1}</span>
+                  <span class="text-sm font-semibold">${escapeHtml(st.label)}</span>
+                </div>
+                <div class="text-xs text-[var(--text-mute)] leading-relaxed">${escapeHtml(st.tip)}</div>
+              </div>`).join('')}
+          </div>
+        </div>`).join('')}
+    </div>
+  `;
+}
+
+function _renderGuideCheatsheet(cs) {
+  const cmds = cs.commands || [];
+  const keys = cs.keys || [];
+  return `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="font-semibold">/ ${t('내장 슬래시 명령어')}</div>
+          <div class="text-[11px] text-[var(--text-dim)]">${cmds.length} ${t('개')}</div>
+        </div>
+        <div class="space-y-1.5">
+          ${cmds.map(c => `
+            <div class="flex items-start gap-3 py-1.5" style="border-bottom:1px dashed var(--border);">
+              <code class="font-mono text-xs px-2 py-0.5 rounded flex-shrink-0"
+                    style="background:rgba(167,139,250,0.12); color:#c4b5fd; min-width:130px;">${escapeHtml(c.cmd)}</code>
+              <div class="text-xs text-[var(--text-mute)] flex-1">${escapeHtml(c.desc)}</div>
+              <button class="btn text-[10px] flex-shrink-0" onclick="_copyToClipboard(this, ${JSON.stringify(c.cmd).replace(/"/g,'&quot;')})">📋</button>
+            </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="font-semibold">⌨️ ${t('키보드 단축키')}</div>
+          <div class="text-[11px] text-[var(--text-dim)]">${keys.length} ${t('개')}</div>
+        </div>
+        <div class="space-y-1.5">
+          ${keys.map(k => `
+            <div class="flex items-start gap-3 py-1.5" style="border-bottom:1px dashed var(--border);">
+              <kbd class="font-mono text-xs px-2 py-0.5 rounded flex-shrink-0"
+                   style="background:rgba(74,222,128,0.12); color:#86efac; min-width:110px; border:1px solid rgba(74,222,128,0.25);">${escapeHtml(k.key)}</kbd>
+              <div class="text-xs text-[var(--text-mute)] flex-1">${escapeHtml(k.desc)}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function _copyToClipboard(btn, text) {
+  try {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '✓ ' + t('복사됨');
+      setTimeout(() => { btn.innerHTML = orig; }, 1400);
+      toast(t('클립보드에 복사됨'), 'ok');
+    });
+  } catch (e) {
+    toast(t('복사 실패'), 'err');
+  }
 }
 
 // ────────────────────────────────────────────────────────────────
