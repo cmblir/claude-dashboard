@@ -1617,6 +1617,16 @@ async function _wfOpen(wfId) {
   }
 }
 
+function _wfRepeatSet(field, value) {
+  if (!__wf.current) return;
+  __wf.current.repeat = __wf.current.repeat || {};
+  __wf.current.repeat[field] = value;
+  __wf.dirty = true;
+  _wfUpdateToolbar();
+  // 체크박스 토글 시 하위 필드가 바뀌므로 인스펙터 부분만 재렌더
+  if (field === 'enabled' || field === 'scheduleEnabled') _wfRenderInspector();
+}
+
 function _wfToggleInspector() {
   const el = document.getElementById('wfInspector');
   if (!el) return;
@@ -2182,7 +2192,12 @@ function _wfRenderInspector() {
     host.innerHTML = `<div class="text-xs text-[var(--text-dim)] text-center py-8">${t('워크플로우를 선택하세요')}</div>`;
     return;
   }
-  // 워크플로우 메타 섹션 (항상 표시)
+  // 워크플로우 메타 섹션 + 반복 실행 설정
+  const rp = __wf.current.repeat || { enabled:false, maxIterations:5, intervalSeconds:0, scheduleEnabled:false, scheduleStart:'09:00', scheduleEnd:'18:00', feedbackNote:'', feedbackNodeId:'' };
+  // 세션/서브에이전트 노드 목록 — 피드백 대상 선택지
+  const fbOptions = (__wf.current.nodes || [])
+    .filter(n => n.type === 'session' || n.type === 'subagent')
+    .map(n => `<option value="${n.id}" ${rp.feedbackNodeId===n.id?'selected':''}>${escapeHtml(n.title||n.id)}</option>`).join('');
   const meta = `
     <div class="mb-4">
       <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('워크플로우 메타')}</div>
@@ -2190,6 +2205,57 @@ function _wfRenderInspector() {
       <input class="input w-full mt-1" value="${escapeHtml(__wf.current.name||'')}" oninput="__wf.current.name=this.value;__wf.dirty=true;_wfUpdateToolbar();_wfRenderList();">
       <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('설명')}</label>
       <textarea class="input w-full mt-1" rows="2" oninput="__wf.current.description=this.value;__wf.dirty=true;_wfUpdateToolbar();">${escapeHtml(__wf.current.description||'')}</textarea>
+    </div>
+
+    <div class="mb-4 pt-3 border-t border-[var(--border)]">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-[11px] font-semibold">🔁 ${t('반복 실행')}</div>
+        <label class="flex items-center gap-1 text-[11px]">
+          <input type="checkbox" ${rp.enabled?'checked':''} onchange="_wfRepeatSet('enabled',this.checked)">
+          <span>${t('활성')}</span>
+        </label>
+      </div>
+      <div class="text-[10px] text-[var(--text-dim)] mb-2">
+        ${t('실행 완료 후 결과를 피드백 노드의 입력으로 주입하며 반복. DAG 는 수정 없이 같은 흐름을 여러 번 돌림.')}
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-[10px] text-[var(--text-dim)]">${t('최대 반복 횟수')}</label>
+          <input type="number" min="1" max="100" class="input w-full mt-1" value="${rp.maxIterations||5}" onchange="_wfRepeatSet('maxIterations',parseInt(this.value)||1)">
+        </div>
+        <div>
+          <label class="text-[10px] text-[var(--text-dim)]">${t('반복 사이 대기 (초)')}</label>
+          <input type="number" min="0" max="86400" class="input w-full mt-1" value="${rp.intervalSeconds||0}" onchange="_wfRepeatSet('intervalSeconds',parseInt(this.value)||0)">
+        </div>
+      </div>
+
+      <label class="flex items-center gap-2 mt-2 text-[11px]">
+        <input type="checkbox" ${rp.scheduleEnabled?'checked':''} onchange="_wfRepeatSet('scheduleEnabled',this.checked)">
+        <span>${t('스케줄 (시간대 내에서만 실행)')}</span>
+      </label>
+      ${rp.scheduleEnabled ? `
+        <div class="grid grid-cols-2 gap-2 mt-1">
+          <div>
+            <label class="text-[10px] text-[var(--text-dim)]">${t('시작 시각')}</label>
+            <input type="time" class="input w-full mt-1" value="${escapeHtml(rp.scheduleStart||'09:00')}" onchange="_wfRepeatSet('scheduleStart',this.value)">
+          </div>
+          <div>
+            <label class="text-[10px] text-[var(--text-dim)]">${t('종료 시각')}</label>
+            <input type="time" class="input w-full mt-1" value="${escapeHtml(rp.scheduleEnd||'18:00')}" onchange="_wfRepeatSet('scheduleEnd',this.value)">
+          </div>
+        </div>
+      ` : ''}
+
+      <label class="text-[10px] text-[var(--text-dim)] mt-3 block">${t('피드백 노트 (반복 시 이전 결과에 덧붙여 피드백 노드로 주입)')}</label>
+      <textarea class="input w-full mt-1" rows="3"
+        placeholder="${t('예: 이 결과를 기반으로 다음 액션 기획을 해줘. 실현 가능성과 우선순위를 명확히.')}"
+        onchange="_wfRepeatSet('feedbackNote',this.value)">${escapeHtml(rp.feedbackNote||'')}</textarea>
+
+      <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('피드백 대상 노드 (비우면 자동: start 다음 세션)')}</label>
+      <select class="input w-full mt-1" onchange="_wfRepeatSet('feedbackNodeId',this.value)">
+        <option value="">${t('자동 선택')}</option>
+        ${fbOptions}
+      </select>
     </div>
   `;
   // 선택된 노드가 있으면 요약 + 편집/삭제 버튼
@@ -2677,6 +2743,8 @@ function _wfStartPolling() {
 function _wfShowRunResult(run) {
   const ok = run.status === 'ok';
   const results = run.nodeResults || {};
+  const iterInfo = (typeof run.iteration === 'number' && run.iteration > 0)
+    ? `<div class="text-xs text-[var(--text-dim)] mb-2">🔁 ${t('최종 반복')}: ${run.iteration + 1}</div>` : '';
   const rows = Object.entries(results).map(([nid, r]) => {
     const node = (__wf.current.nodes || []).find(n => n.id === nid) || {};
     const icon = (WF_TYPE_MAP[node.type]||{}).icon || '•';
@@ -2707,6 +2775,7 @@ function _wfShowRunResult(run) {
         <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
       </div>
       ${run.error ? `<div class="text-sm text-red-400 mb-2">⚠ ${escapeHtml(run.error)}</div>` : ''}
+      ${iterInfo}
       <div class="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">${rows || '<div class="empty card p-4">'+t('결과 없음')+'</div>'}</div>
     </div>
   `);
