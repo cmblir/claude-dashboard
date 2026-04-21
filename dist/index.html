@@ -2658,7 +2658,8 @@ async function translateAll(kind) {
       <div id="tbLog" class="mono text-[10px] text-[var(--text-mute)] whitespace-pre-wrap max-h-[260px] overflow-y-auto p-2 bg-[var(--code-bg)] rounded"></div>
       <div class="text-[11px] text-[var(--text-dim)] mt-2">각 배치 50개씩 · Claude CLI 1회당 20~90초 · 중간에 창 닫으면 중단</div>
     </div>
-  `);
+  `, { keepMascot: true });
+  if (typeof _mascotJumpOnModal === 'function') _mascotJumpOnModal();
   window.__tbCancel = false;
   let totalTranslated = 0;
   let batch = 0;
@@ -5654,12 +5655,16 @@ function showModal(html, opts) {
   const wide = opts && opts.wide ? ' modal-wide' : '';
   root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="modal${wide}">${html}</div></div>`;
   _translateDOM(root);
+  // 결과 모달이 떴으면 (loading 이 아니면) 마스코트 점프 종료
+  if (typeof _mascotLeaveModal === 'function' && !(opts && opts.keepMascot)) _mascotLeaveModal();
 }
 function showModalLoading(msg) {
-  showModal(`<div class="p-10 empty"><div class="shimmer h-4 w-48 mx-auto mb-2"></div><div>${escapeHtml(msg)}</div></div>`);
+  showModal(`<div class="p-10 empty"><div class="shimmer h-4 w-48 mx-auto mb-2"></div><div>${escapeHtml(msg)}</div></div>`, { keepMascot: true });
+  if (typeof _mascotJumpOnModal === 'function') _mascotJumpOnModal();
 }
 function closeModal() {
   document.getElementById('modal-root').innerHTML = '';
+  if (typeof _mascotLeaveModal === 'function') _mascotLeaveModal();
 }
 function showEditModal({ title, raw, save, readOnly }) {
   const ro = !!readOnly;
@@ -6537,6 +6542,79 @@ function _mascotLeaveChat() {
   _mascotOnChat = false;
   if (_mascotChatBounceTimer) { clearInterval(_mascotChatBounceTimer); _mascotChatBounceTimer = null; }
   _startMascotWander();
+}
+
+// ── 모달 위에서 점프 (대기 중 사용자 심심하지 않게) ──
+let _mascotOnModal = false;
+let _mascotModalBounceTimer = null;
+const _mascotCheerLines = [
+  '거의 다 됐어요!', '조금만 기다려주세요…', 'Claude 가 열심히 일하는 중!',
+  '잠시만요…', '곧 결과가 나와요!', '🎯 분석 중…',
+  '💭 생각 중…', '⚡ 처리 중…', '☕ 한 잔의 여유',
+  '🚀 거의 다!', '🔍 꼼꼼하게 보고 있어요',
+];
+function _mascotShowCheer() {
+  const bubble = document.getElementById('mascotBubble');
+  if (!bubble) return;
+  bubble.textContent = _mascotCheerLines[Math.floor(Math.random() * _mascotCheerLines.length)];
+  bubble.style.display = '';
+  setTimeout(() => { bubble.style.display = 'none'; }, 2500);
+}
+function _mascotJumpOnModal() {
+  if (_mascotOnModal) return;  // 이미 진행 중
+  _mascotOnModal = true;
+  _stopMascotWander();
+  if (_mascotChatBounceTimer) { clearInterval(_mascotChatBounceTimer); _mascotChatBounceTimer = null; }
+  const el = document.getElementById('claudeMascot');
+  if (!el) return;
+  if (el.style.display === 'none') el.style.display = '';
+  el.style.pointerEvents = 'none';  // 모달 클릭 막지 않도록
+  el.style.zIndex = '60';            // modal-backdrop(50) 위, 시스템 모달 아래
+
+  function _bounce() {
+    if (!_mascotOnModal) return;
+    const modal = document.querySelector('#modal-root .modal') || document.querySelector('#modal-root .modal-backdrop');
+    if (!modal) { _mascotLeaveModal(); return; }
+    const rect = modal.getBoundingClientRect();
+    // 모달 주변 (위/옆) 으로 점프 위치 결정
+    const margin = 50;
+    const minX = Math.max(10, rect.left - margin);
+    const maxX = Math.min(window.innerWidth - 80, rect.right + margin);
+    const minY = Math.max(40, rect.top - margin);
+    const maxY = Math.min(window.innerHeight - 80, rect.bottom);
+    const tx = minX + Math.random() * Math.max(1, (maxX - minX));
+    const ty = minY + Math.random() * Math.max(1, (maxY - minY));
+    if (tx < parseFloat(el.style.left || 0)) el.classList.add('facing-left');
+    else el.classList.remove('facing-left');
+    el.style.transition = 'left 1.4s cubic-bezier(0.34,1.56,0.64,1), top 1.4s cubic-bezier(0.34,1.56,0.64,1)';
+    el.style.left = tx + 'px';
+    el.style.top = ty + 'px';
+    el.style.right = 'auto'; el.style.bottom = 'auto';
+    setTimeout(() => { el.style.transition = ''; }, 1500);
+
+    // 30% 확률로 speaking + 응원 메시지
+    if (Math.random() < 0.30) {
+      _mascotSetMode('speaking');
+      _mascotShowCheer();
+      setTimeout(() => _mascotSetMode('jumping'), 2000);
+    }
+  }
+  setTimeout(_bounce, 100);
+  _mascotModalBounceTimer = setInterval(_bounce, 1800);
+}
+function _mascotLeaveModal() {
+  if (!_mascotOnModal) return;
+  _mascotOnModal = false;
+  if (_mascotModalBounceTimer) { clearInterval(_mascotModalBounceTimer); _mascotModalBounceTimer = null; }
+  const el = document.getElementById('claudeMascot');
+  if (el) {
+    el.style.pointerEvents = '';
+    el.style.zIndex = '1150';
+  }
+  const bubble = document.getElementById('mascotBubble');
+  if (bubble) bubble.style.display = 'none';
+  _mascotSetMode('jumping');
+  if (!_mascotOnChat) _startMascotWander();
 }
 
 function _showRandomBubble() {
