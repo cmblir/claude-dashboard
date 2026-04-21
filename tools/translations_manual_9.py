@@ -101,7 +101,9 @@ NEW_EN = {
     "작성": "Writing",
     "리드": "Lead",
     "프론트": "Frontend",
+    "프론트엔드": "Frontend",
     "백엔드": "Backend",
+    "리뷰": "Review",
     # 튜토리얼 커서 라벨
     "🎭 페르소나": "🎭 Persona",
     "🖥️ spawn": "🖥️ Spawn",
@@ -118,8 +120,12 @@ NEW_EN = {
     "실행 결과 모달의 session_id 를 📋 복사하거나 ↪ 이어쓰기 로 다른 노드 resume 필드에 적용. 다음 실행 시 claude --resume 으로 같은 컨텍스트에서 이어서 대화.":
         "Copy a session_id from the run result modal (📋) or use ↪ Resume to paste it into another node's resume field. On next run, claude --resume continues with the same context.",
     "13. 📋 템플릿 — 팀 개발 등 원클릭 시작": "13. 📋 Templates — one-click team dev & more",
-    "툴바 📋 템플릿 버튼에서 팀 개발 · 리서치 파이프라인 · 병렬 3 작업 프리셋을 선택하면 페르소나까지 채워진 완성 DAG 가 한 번에 생성.":
-        "The 📋 Templates button offers presets — Team dev, Research pipeline, Parallel 3 tasks. Pick one and a fully-wired DAG (with personas filled in) appears instantly.",
+    "툴바 📋 템플릿 버튼에서 팀 개발 · 리서치 파이프라인 · 병렬 3 작업 프리셋을 선택하면 페르소나까지 채워진 완성 DAG 가 한 번에 생성. 내 워크플로우를 커스텀 템플릿으로 저장해 재사용도 가능.":
+        "The 📋 Templates button offers presets — Team dev, Research pipeline, Parallel 3 tasks. Pick one and a fully-wired DAG (with personas filled in) appears instantly. You can also save your own workflow as a reusable custom template.",
+    "14. 🔁 Repeat — 자동 반복 실행": "14. 🔁 Repeat — automatic re-runs",
+    "메타 패널의 🔁 반복 실행 섹션에서 최대 횟수·간격·스케줄(HH:MM)·피드백 노트를 설정. 실행 완료 후 결과에 노트를 덧붙여 피드백 노드로 자동 주입하며 같은 DAG 를 여러 번 반복 — 리드가 스프린트를 N회 이어서 기획/실행/리뷰하는 자동화.":
+        "Configure max iterations · interval · schedule (HH:MM) · feedback note in the meta panel's 🔁 Repeat section. After each run, the output is appended with your note and injected into the feedback node — the same DAG repeats N times. Perfect for a Lead running N consecutive sprints autonomously.",
+    "🔁 피드백": "🔁 Feedback",
     "메타": "Meta",
     "메타 패널 보이기/가리기": "Show/hide meta panel",
     "가리기": "Hide",
@@ -437,7 +443,9 @@ NEW_ZH = {
     "작성": "撰写",
     "리드": "Lead",
     "프론트": "前端",
+    "프론트엔드": "前端",
     "백엔드": "后端",
+    "리뷰": "评审",
     "🎭 페르소나": "🎭 人设",
     "🖥️ spawn": "🖥️ 启动",
     "🔄 resume": "🔄 继续",
@@ -452,8 +460,12 @@ NEW_ZH = {
     "실행 결과 모달의 session_id 를 📋 복사하거나 ↪ 이어쓰기 로 다른 노드 resume 필드에 적용. 다음 실행 시 claude --resume 으로 같은 컨텍스트에서 이어서 대화.":
         "从运行结果弹窗复制 session_id（📋）或使用 ↪ 继续 将其写入其他节点的 resume 字段。下次运行 claude --resume 将在相同上下文中继续对话。",
     "13. 📋 템플릿 — 팀 개발 등 원클릭 시작": "13. 📋 模板 — 团队开发等一键生成",
-    "툴바 📋 템플릿 버튼에서 팀 개발 · 리서치 파이프라인 · 병렬 3 작업 프리셋을 선택하면 페르소나까지 채워진 완성 DAG 가 한 번에 생성.":
-        "工具栏的 📋 模板按钮提供预设：团队开发、研究流水线、并行 3 任务。选择后一次性生成包含人设的完整 DAG。",
+    "툴바 📋 템플릿 버튼에서 팀 개발 · 리서치 파이프라인 · 병렬 3 작업 프리셋을 선택하면 페르소나까지 채워진 완성 DAG 가 한 번에 생성. 내 워크플로우를 커스텀 템플릿으로 저장해 재사용도 가능.":
+        "工具栏的 📋 模板按钮提供预设：团队开发、研究流水线、并行 3 任务。选择后一次性生成含人设的完整 DAG。也可将自己的工作流保存为可复用的自定义模板。",
+    "14. 🔁 Repeat — 자동 반복 실행": "14. 🔁 Repeat — 自动循环执行",
+    "메타 패널의 🔁 반복 실행 섹션에서 최대 횟수·간격·스케줄(HH:MM)·피드백 노트를 설정. 실행 완료 후 결과에 노트를 덧붙여 피드백 노드로 자동 주입하며 같은 DAG 를 여러 번 반복 — 리드가 스프린트를 N회 이어서 기획/실행/리뷰하는 자동화.":
+        "在元数据面板的 🔁 重复执行 中配置最大次数 · 间隔 · 计划 (HH:MM) · 反馈备注。每次运行后将输出附加备注并注入反馈节点，同一 DAG 重复 N 次 — 适合让 Lead 自动连续执行 N 个冲刺的规划/执行/复盘。",
+    "🔁 피드백": "🔁 反馈",
     "메타": "元数据",
     "메타 패널 보이기/가리기": "显示/隐藏元数据面板",
     "가리기": "隐藏",
