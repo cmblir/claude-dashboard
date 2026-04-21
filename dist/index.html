@@ -269,7 +269,7 @@
     100% { r: 28; opacity: 0;   stroke-width: 1; }
   }
   .wf-tut-node-pop { animation: wfTutFadeIn 0.45s ease-out backwards; }
-  #wfTutStage { background: #15151c !important; color: #fff; }
+  #wfTutStage { background: #15151c !important; color: #fff; min-height: 280px; }
   #wfTutStage .wf-node-body { fill: rgba(255,255,255,0.05); stroke: rgba(255,255,255,0.14); stroke-width: 1; }
   #wfTutStage .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2; animation: wfPulse 1.4s infinite; }
   #wfTutStage .wf-node[data-status="ok"] .wf-node-body { stroke: #4ade80; stroke-width: 2; }
@@ -422,6 +422,11 @@
       height: auto !important;
       max-height: calc(100vh - 16px) !important;
       resize: none !important;
+    }
+    /* 튜토리얼·노드 에디터처럼 flex 기반 레이아웃 창은 화면 전체 높이 보장 */
+    .feat-win.wf-tut-win,
+    .feat-win[id^="wfNodeWin-"] {
+      height: calc(100vh - 16px) !important;
     }
     .feat-win-title { touch-action: none; cursor: move; }
 
@@ -2813,7 +2818,7 @@ function _wfShowTutorial() {
   if (ex) { ex.style.zIndex = ++_winMgr.zIndex; ex.classList.remove('feat-win-minimized'); return; }
   const w = document.createElement('div');
   w.id = winId;
-  w.className = 'feat-win';
+  w.className = 'feat-win wf-tut-win';
   w.style.zIndex = ++_winMgr.zIndex;
   const initW = Math.min(820, window.innerWidth - 40);
   const initH = Math.min(640, window.innerHeight - 40);
