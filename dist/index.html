@@ -202,6 +202,7 @@
   .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(4px); z-index: 50; display: grid; place-items: center; padding: 24px; }
   .modal { background: var(--bg-soft); border: 1px solid var(--border-hi); border-radius: 18px; max-width: 1100px; width: 100%; max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
   .modal-wide { max-width: 1440px; height: 90vh; max-height: 90vh; }
+  .modal-narrow { max-width: 520px !important; }
   .modal-wide textarea { font-size: 13px; line-height: 1.55; }
   .prose-claude { color: var(--text); font-size: 0.9rem; line-height: 1.6; }
   .prose-claude h1, .prose-claude h2, .prose-claude h3 { color: var(--text); margin-top: 1em; }
@@ -6888,7 +6889,8 @@ VIEWS.system = async () => {
 function showModal(html, opts) {
   const root = document.getElementById('modal-root');
   const wide = opts && opts.wide ? ' modal-wide' : '';
-  root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="modal${wide}">${html}</div></div>`;
+  const narrow = opts && opts.narrow ? ' modal-narrow' : '';
+  root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="modal${wide}${narrow}">${html}</div></div>`;
   _translateDOM(root);
   // 결과 모달이 떴으면 (loading 이 아니면) 마스코트 점프 종료
   if (typeof _mascotLeaveModal === 'function' && !(opts && opts.keepMascot)) _mascotLeaveModal();
@@ -6911,7 +6913,7 @@ function promptModal({ title, message, placeholder, defaultValue, confirmLabel, 
       ? `<textarea id="${mid}-input" class="input w-full" rows="4" placeholder="${escapeHtml(placeholder||'')}">${escapeHtml(defaultValue||'')}</textarea>`
       : `<input id="${mid}-input" class="input w-full" placeholder="${escapeHtml(placeholder||'')}" value="${escapeHtml(defaultValue||'')}">`;
     showModal(`
-      <div class="p-5" style="max-width:480px;">
+      <div class="p-5">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-base font-semibold">${escapeHtml(title || t('입력'))}</h3>
           <button class="btn text-xs" onclick="__pmResolve('${mid}', null)">✕</button>
@@ -6923,7 +6925,7 @@ function promptModal({ title, message, placeholder, defaultValue, confirmLabel, 
           <button class="btn-primary btn text-sm" onclick="__pmResolve('${mid}', 'ok')">${escapeHtml(confirmLabel || t('확인'))}</button>
         </div>
       </div>
-    `, { keepMascot: true });
+    `, { keepMascot: true, narrow: true });
     window.__pmResolve = (id, kind) => {
       if (id !== mid) return;
       const el = document.getElementById(mid + '-input');
@@ -6958,7 +6960,7 @@ function confirmModal({ title, message, confirmLabel, cancelLabel, danger }) {
     const btnCls = danger ? 'btn text-sm' : 'btn-primary btn text-sm';
     const btnStyle = danger ? 'style="background:rgba(248,113,113,0.18);color:#fca5a5;border-color:rgba(248,113,113,0.4);"' : '';
     showModal(`
-      <div class="p-5" style="max-width:480px;">
+      <div class="p-5">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-base font-semibold">${escapeHtml(title || t('확인'))}</h3>
           <button class="btn text-xs" onclick="__cmResolve('${mid}', false)">✕</button>
@@ -6969,7 +6971,7 @@ function confirmModal({ title, message, confirmLabel, cancelLabel, danger }) {
           <button class="${btnCls}" ${btnStyle} onclick="__cmResolve('${mid}', true)">${escapeHtml(confirmLabel || t('확인'))}</button>
         </div>
       </div>
-    `, { keepMascot: true });
+    `, { keepMascot: true, narrow: true });
     window.__cmResolve = (id, v) => {
       if (id !== mid) return;
       closeModal();
