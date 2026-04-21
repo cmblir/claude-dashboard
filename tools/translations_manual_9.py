@@ -291,6 +291,25 @@ NEW_EN = {
     "커스텀 템플릿 삭제": "Delete custom template",
     "이 커스텀 템플릿을 삭제할까요?": "Delete this custom template?",
     "복제": "copy",
+
+    # Repeat 기능
+    "반복 실행": "Repeat",
+    "활성": "Enabled",
+    "실행 완료 후 결과를 피드백 노드의 입력으로 주입하며 반복. DAG 는 수정 없이 같은 흐름을 여러 번 돌림.":
+        "After each run, inject the result into a feedback node's input and repeat. The DAG itself stays unchanged.",
+    "최대 반복 횟수": "Max iterations",
+    "반복 사이 대기 (초)": "Wait between iterations (s)",
+    "스케줄 (시간대 내에서만 실행)": "Schedule (run only within time window)",
+    "시작 시각": "Start time",
+    "종료 시각": "End time",
+    "피드백 노트 (반복 시 이전 결과에 덧붙여 피드백 노드로 주입)":
+        "Feedback note (appended to previous output and injected at each iteration)",
+    "예: 이 결과를 기반으로 다음 액션 기획을 해줘. 실현 가능성과 우선순위를 명확히.":
+        "e.g. Based on this result, plan the next actions. Clarify feasibility and priorities.",
+    "피드백 대상 노드 (비우면 자동: start 다음 세션)":
+        "Feedback target node (auto = first session after start)",
+    "자동 선택": "Auto",
+    "최종 반복": "Final iteration",
     "이름을 입력하세요": "Enter a name",
     "예: README 작성 파이프라인": "e.g. README writing pipeline",
     "생성": "Create",
@@ -604,6 +623,24 @@ NEW_ZH = {
     "커스텀 템플릿 삭제": "删除自定义模板",
     "이 커스텀 템플릿을 삭제할까요?": "要删除此自定义模板吗？",
     "복제": "副本",
+
+    "반복 실행": "重复执行",
+    "활성": "启用",
+    "실행 완료 후 결과를 피드백 노드의 입력으로 주입하며 반복. DAG 는 수정 없이 같은 흐름을 여러 번 돌림.":
+        "运行结束后，将结果作为反馈节点的输入注入并重复执行。DAG 本身不变。",
+    "최대 반복 횟수": "最大重复次数",
+    "반복 사이 대기 (초)": "重复间隔（秒）",
+    "스케줄 (시간대 내에서만 실행)": "计划（仅在时间段内运行）",
+    "시작 시각": "开始时间",
+    "종료 시각": "结束时间",
+    "피드백 노트 (반복 시 이전 결과에 덧붙여 피드백 노드로 주입)":
+        "反馈备注（每次重复附加到上次结果并注入反馈节点）",
+    "예: 이 결과를 기반으로 다음 액션 기획을 해줘. 실현 가능성과 우선순위를 명확히.":
+        "例：基于此结果规划下一步行动，明确可行性与优先级。",
+    "피드백 대상 노드 (비우면 자동: start 다음 세션)":
+        "反馈目标节点（留空 = 自动：start 后的第一个 session）",
+    "자동 선택": "自动",
+    "최종 반복": "最终迭代",
     "이름을 입력하세요": "请输入名称",
     "예: README 작성 파이프라인": "例如：README 撰写流程",
     "생성": "创建",

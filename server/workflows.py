@@ -191,6 +191,28 @@ def _sanitize_edge(raw: Any, node_ids: set[str]) -> Optional[dict]:
     }
 
 
+_TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
+
+
+def _sanitize_repeat(raw: Any) -> dict:
+    """반복 실행 설정 sanitize. enabled 기본 False."""
+    if not isinstance(raw, dict):
+        return {"enabled": False}
+    def _time_str(s):
+        s = _clamp_str(s, 5)
+        return s if _TIME_RE.match(s) else ""
+    return {
+        "enabled":          bool(raw.get("enabled")),
+        "maxIterations":    max(1, min(int(raw.get("maxIterations") or 5), 100)),
+        "intervalSeconds":  max(0, min(int(raw.get("intervalSeconds") or 0), 86400)),
+        "scheduleEnabled":  bool(raw.get("scheduleEnabled")),
+        "scheduleStart":    _time_str(raw.get("scheduleStart")),
+        "scheduleEnd":      _time_str(raw.get("scheduleEnd")),
+        "feedbackNote":     _clamp_str(raw.get("feedbackNote"), 4000),
+        "feedbackNodeId":   _clamp_str(raw.get("feedbackNodeId"), 60),
+    }
+
+
 def _sanitize_workflow(raw: Any) -> Optional[dict]:
     if not isinstance(raw, dict):
         return None
@@ -222,6 +244,7 @@ def _sanitize_workflow(raw: Any) -> Optional[dict]:
             "panY": _clamp_float(vp.get("panY"), 0.0),
             "zoom": max(0.25, min(3.0, _clamp_float(vp.get("zoom"), 1.0))),
         },
+        "repeat":      _sanitize_repeat(raw.get("repeat")),
     }
     return out
 
@@ -539,9 +562,169 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     return {"status": "ok", "output": output, "sessionId": session_id, "durationMs": _elapsed()}
 
 
+def _parse_hhmm(s: str) -> Optional[tuple[int, int]]:
+    m = _TIME_RE.match(s or "")
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def _minutes_now_local() -> int:
+    from datetime import datetime as _dt
+    n = _dt.now()
+    return n.hour * 60 + n.minute
+
+
+def _in_schedule(start_s: str, end_s: str) -> bool:
+    a = _parse_hhmm(start_s); b = _parse_hhmm(end_s)
+    if not a or not b:
+        return True  # 잘못된 설정이면 항상 OK
+    sm = a[0]*60 + a[1]; em = b[0]*60 + b[1]
+    now = _minutes_now_local()
+    if sm <= em:
+        return sm <= now <= em
+    # wrap over midnight
+    return now >= sm or now <= em
+
+
+def _find_feedback_target(nodes: list[dict], edges: list[dict]) -> str:
+    """feedbackNodeId 가 지정되지 않았을 때 자동 탐지:
+    start 바로 다음의 session/subagent 노드 id 반환. 없으면 첫 session 노드.
+    """
+    starts = [n["id"] for n in nodes if n.get("type") == "start"]
+    if starts:
+        after_start = {e["to"] for e in edges if e["from"] in starts}
+        for n in nodes:
+            if n["id"] in after_start and n.get("type") in ("session", "subagent"):
+                return n["id"]
+    for n in nodes:
+        if n.get("type") in ("session", "subagent"):
+            return n["id"]
+    return ""
+
+
+def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
+                       extra_inputs: dict[str, str] | None = None,
+                       total_t0: float | None = None) -> tuple[bool, dict, str]:
+    """한 번의 DAG 실행. (ok, results, final_output) 반환.
+
+    - extra_inputs[nid] 가 있으면 해당 노드의 첫 input 으로 prepend (피드백 주입)
+    - runs[runId].nodeResults 는 이 iteration 결과로 덮어씀
+    - runs[runId].iteration 에 현재 iter_idx 기록
+    """
+    nodes = wf.get("nodes", [])
+    edges = wf.get("edges", [])
+    order = _topological_order(nodes, edges)
+    node_by_id = {n["id"]: n for n in nodes}
+    inputs_map: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    for e in edges:
+        inputs_map[e["to"]].append((e["from"], e["fromPort"]))
+    disabled: set[str] = set()
+    results: dict[str, dict] = {}
+    extra = extra_inputs or {}
+    if total_t0 is None:
+        total_t0 = time.time()
+
+    # 이 iteration 시작 시 nodeResults 초기화 + iter_idx 기록
+    with _LOCK:
+        s = _load_all()
+        if runId in s["runs"]:
+            s["runs"][runId]["nodeResults"] = {}
+            s["runs"][runId]["iteration"] = iter_idx
+            _dump_all(s)
+
+    for nid in order:
+        if nid in disabled:
+            with _LOCK:
+                s = _load_all()
+                if runId in s["runs"]:
+                    s["runs"][runId]["nodeResults"][nid] = {"status": "skipped"}
+                    _dump_all(s)
+            continue
+        # 입력 수집
+        in_items = inputs_map.get(nid, [])
+        input_strs: list[str] = []
+        for (src_id, src_port) in in_items:
+            src = results.get(src_id)
+            if src and src.get("status") == "ok":
+                if "_branch" in src and src["_branch"] != src_port:
+                    continue
+                input_strs.append(src.get("output") or "")
+        # 반복 피드백 주입 — 해당 노드에 extra_inputs 가 있으면 맨 앞에 prepend
+        if extra.get(nid):
+            input_strs.insert(0, extra[nid])
+        # 전체 timeout
+        if time.time() - total_t0 > _DEFAULT_TOTAL_TIMEOUT:
+            with _LOCK:
+                s = _load_all()
+                if runId in s["runs"]:
+                    s["runs"][runId]["status"] = "err"
+                    s["runs"][runId]["error"] = "total workflow timeout"
+                    s["runs"][runId]["finishedAt"] = int(time.time()*1000)
+                    _dump_all(s)
+            return (False, results, "")
+        # 진행 상황: running
+        with _LOCK:
+            s = _load_all()
+            if runId in s["runs"]:
+                s["runs"][runId]["currentNodeId"] = nid
+                s["runs"][runId]["nodeResults"][nid] = {"status": "running"}
+                _dump_all(s)
+        # 실행
+        prev_sids = []
+        for (src_id, _) in in_items:
+            src = results.get(src_id)
+            if src and src.get("sessionId"):
+                prev_sids.append(src["sessionId"])
+        node = node_by_id[nid]
+        res = _execute_node(node, input_strs, prev_sids)
+        results[nid] = res
+        if node.get("type") == "branch" and "_branch" in res:
+            active = res["_branch"]
+            for e in edges:
+                if e["from"] == nid and e["fromPort"] != active:
+                    disabled.add(e["to"])
+        if res.get("status") == "err":
+            with _LOCK:
+                s = _load_all()
+                if runId in s["runs"]:
+                    s["runs"][runId]["nodeResults"][nid] = {
+                        "status": "err",
+                        "error": res.get("error", ""),
+                        "durationMs": res.get("durationMs", 0),
+                    }
+                    s["runs"][runId]["status"] = "err"
+                    s["runs"][runId]["error"] = f"node {nid}: {res.get('error','')}"
+                    s["runs"][runId]["finishedAt"] = int(time.time()*1000)
+                    _dump_all(s)
+            return (False, results, "")
+        # 성공 기록
+        with _LOCK:
+            s = _load_all()
+            if runId in s["runs"]:
+                s["runs"][runId]["nodeResults"][nid] = {
+                    "status": "ok",
+                    "output": (res.get("output") or "")[:4000],
+                    "sessionId": res.get("sessionId") or "",
+                    "durationMs": res.get("durationMs", 0),
+                }
+                _dump_all(s)
+
+    # iteration 최종 output 찾기: 마지막 output 노드 → 없으면 DAG 마지막 노드
+    final_output = ""
+    for n in reversed(nodes):
+        if n.get("type") == "output":
+            r = results.get(n["id"])
+            if r and r.get("output"):
+                final_output = r["output"]; break
+    if not final_output:
+        for nid_rev in reversed(order):
+            r = results.get(nid_rev)
+            if r and r.get("output"):
+                final_output = r["output"]; break
+    return (True, results, final_output)
+
+
 def _run_workflow_background(wfId: str, runId: str) -> None:
-    """스레드에서 돌리는 워크플로우 실행 함수. 진행 상황을 runs store 에 반영."""
-    total_t0 = time.time()
+    """repeat 설정에 따라 iteration 을 반복 실행."""
     try:
         store = _load_all()
         wf = store["workflows"].get(wfId)
@@ -555,9 +738,7 @@ def _run_workflow_background(wfId: str, runId: str) -> None:
                     _dump_all(s)
             return
 
-        nodes = wf.get("nodes", [])
-        edges = wf.get("edges", [])
-        cyc = _check_dag(nodes, edges)
+        cyc = _check_dag(wf.get("nodes", []), wf.get("edges", []))
         if cyc:
             with _LOCK:
                 s = _load_all()
@@ -568,95 +749,42 @@ def _run_workflow_background(wfId: str, runId: str) -> None:
                     _dump_all(s)
             return
 
-        order = _topological_order(nodes, edges)
-        node_by_id = {n["id"]: n for n in nodes}
-        # 입력 그래프: to_node → [(from_node, from_port)]
-        inputs_map: dict[str, list[tuple[str, str]]] = defaultdict(list)
-        for e in edges:
-            inputs_map[e["to"]].append((e["from"], e["fromPort"]))
-        # branch 출력으로 인해 disable 될 downstream 집합
-        disabled: set[str] = set()
-        results: dict[str, dict] = {}
+        repeat = wf.get("repeat") or {"enabled": False}
+        enabled = bool(repeat.get("enabled"))
+        max_iter = max(1, int(repeat.get("maxIterations") or 1)) if enabled else 1
+        interval = int(repeat.get("intervalSeconds") or 0) if enabled else 0
+        schedule_on = bool(repeat.get("scheduleEnabled")) if enabled else False
+        sch_start = repeat.get("scheduleStart") or ""
+        sch_end   = repeat.get("scheduleEnd") or ""
+        fb_note   = (repeat.get("feedbackNote") or "").strip()
+        fb_nid    = (repeat.get("feedbackNodeId") or "").strip() \
+                    or _find_feedback_target(wf.get("nodes", []), wf.get("edges", []))
 
-        for nid in order:
-            if nid in disabled:
-                # skip 상태 기록
-                with _LOCK:
-                    s = _load_all()
-                    if runId in s["runs"]:
-                        s["runs"][runId]["nodeResults"][nid] = {"status": "skipped"}
-                        _dump_all(s)
-                continue
-            # 입력 수집
-            in_items = inputs_map.get(nid, [])
-            input_strs: list[str] = []
-            for (src_id, src_port) in in_items:
-                src = results.get(src_id)
-                if src and src.get("status") == "ok":
-                    # branch 의 활성 포트가 아니면 skip
-                    if "_branch" in src and src["_branch"] != src_port:
-                        continue
-                    input_strs.append(src.get("output") or "")
-            # 전체 timeout 체크
-            if time.time() - total_t0 > _DEFAULT_TOTAL_TIMEOUT:
-                with _LOCK:
-                    s = _load_all()
-                    if runId in s["runs"]:
-                        s["runs"][runId]["status"] = "err"
-                        s["runs"][runId]["error"] = "total workflow timeout"
-                        s["runs"][runId]["finishedAt"] = int(time.time()*1000)
-                        _dump_all(s)
-                return
-            # 진행 상황: running
-            with _LOCK:
-                s = _load_all()
-                if runId in s["runs"]:
-                    s["runs"][runId]["currentNodeId"] = nid
-                    s["runs"][runId]["nodeResults"][nid] = {"status": "running"}
-                    _dump_all(s)
-            # 실행 — 이전 노드의 session_id 수집해 전달 (continueFromPrev 용)
-            prev_sids = []
-            for (src_id, _) in in_items:
-                src = results.get(src_id)
-                if src and src.get("sessionId"):
-                    prev_sids.append(src["sessionId"])
-            node = node_by_id[nid]
-            res = _execute_node(node, input_strs, prev_sids)
-            results[nid] = res
-            # branch 의 비활성 포트로 이어진 downstream 을 disabled 에 표시
-            if node.get("type") == "branch" and "_branch" in res:
-                active = res["_branch"]
-                for e in edges:
-                    if e["from"] == nid and e["fromPort"] != active:
-                        disabled.add(e["to"])
-            # 실패면 중단
-            if res.get("status") == "err":
-                with _LOCK:
-                    s = _load_all()
-                    if runId in s["runs"]:
-                        s["runs"][runId]["nodeResults"][nid] = {
-                            "status": "err",
-                            "error": res.get("error", ""),
-                            "durationMs": res.get("durationMs", 0),
-                        }
-                        s["runs"][runId]["status"] = "err"
-                        s["runs"][runId]["error"] = f"node {nid}: {res.get('error','')}"
-                        s["runs"][runId]["finishedAt"] = int(time.time()*1000)
-                        _dump_all(s)
-                return
-            # 성공 기록 (session_id 도 함께 저장 — 다음 resume 에 사용)
-            with _LOCK:
-                s = _load_all()
-                if runId in s["runs"]:
-                    s["runs"][runId]["nodeResults"][nid] = {
-                        "status": "ok",
-                        "output": (res.get("output") or "")[:4000],
-                        "sessionId": res.get("sessionId") or "",
-                        "durationMs": res.get("durationMs", 0),
-                    }
-                    _dump_all(s)
+        total_t0 = time.time()
+        prev_output = ""
 
-        # 완료
+        for it in range(max_iter):
+            # 스케줄 모드: 시간대 밖이면 최대 10분 간격으로 대기 (최대 총 12시간)
+            if schedule_on and not _in_schedule(sch_start, sch_end):
+                waited = 0
+                while waited < 12 * 3600 and not _in_schedule(sch_start, sch_end):
+                    time.sleep(60); waited += 60
+                    # 실행 중단 요청 체크 (future: status 가 cancelled 로 바뀌면 탈출)
+
+            # 피드백 주입: iteration > 0 이고 feedbackNodeId 가 설정되고 prev_output 이 있으면
+            extra = {}
+            if it > 0 and fb_nid and prev_output:
+                extra[fb_nid] = f"# 이전 반복 결과\n{prev_output}\n\n# 추가 지시\n{fb_note or '(추가 지시 없음)'}"
+
+            ok, _results, final_out = _run_one_iteration(wf, runId, it, extra, total_t0)
+            if not ok:
+                return  # 실패 시 _run_one_iteration 이 이미 status=err 기록
+            prev_output = final_out
+
+            if it + 1 < max_iter and interval > 0:
+                time.sleep(interval)
+
+        # 전체 완료
         with _LOCK:
             s = _load_all()
             if runId in s["runs"]:
@@ -699,6 +827,7 @@ def api_workflow_run(body: dict) -> dict:
             "finishedAt": 0,
             "currentNodeId": None,
             "nodeResults": {},
+            "iteration": 0,
             "error": None,
         }
         _dump_all(store)
