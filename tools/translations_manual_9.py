@@ -166,6 +166,21 @@ NEW_EN = {
     "맞춤": "Fit",
     "화면에 맞춤": "Fit to screen",
     "자동 정렬 + 화면 맞춤": "Auto-layout + fit to view",
+    "템플릿": "Templates",
+    "템플릿에서 새 워크플로우 만들기": "Create from template",
+    "워크플로우 템플릿": "Workflow templates",
+    "자주 쓰는 DAG 패턴을 원클릭으로 만듭니다. 생성 후 노드별 업무 내용을 자유롭게 수정하세요.":
+        "One-click common DAG patterns. Edit each node's task after creation.",
+    "템플릿에서 생성됨": "Created from template",
+    "팀 개발 (리드 + 프론트 + 백엔드)": "Team dev (Lead + Frontend + Backend)",
+    "리드가 스프린트 업무를 분배 → 프론트·백엔드가 병렬 작업 → 둘 다 완료되면 리드가 리뷰 + 다음 스프린트 기획.":
+        "Lead distributes sprint tasks → Frontend & Backend work in parallel → when both are done, Lead reviews and plans the next sprint.",
+    "리서치 파이프라인": "Research pipeline",
+    "리서처가 자료 수집 → 작가가 초안 작성 → 리뷰어가 검토 → 최종 문서.":
+        "Researcher gathers sources → Writer drafts → Reviewer polishes → Final doc.",
+    "단순 병렬 3 작업": "Simple parallel 3 tasks",
+    "독립적인 3개 세션이 병렬 실행 → 결과 취합 → 하나의 문서로 출력.":
+        "Three independent sessions run in parallel → aggregate → single output.",
     "이름을 입력하세요": "Enter a name",
     "예: README 작성 파이프라인": "e.g. README writing pipeline",
     "생성": "Create",
@@ -359,6 +374,21 @@ NEW_ZH = {
     "맞춤": "适配",
     "화면에 맞춤": "适配视图",
     "자동 정렬 + 화면 맞춤": "自动布局 + 适配视图",
+    "템플릿": "模板",
+    "템플릿에서 새 워크플로우 만들기": "从模板创建工作流",
+    "워크플로우 템플릿": "工作流模板",
+    "자주 쓰는 DAG 패턴을 원클릭으로 만듭니다. 생성 후 노드별 업무 내용을 자유롭게 수정하세요.":
+        "一键创建常用 DAG 模式。创建后可自由修改每个节点的任务。",
+    "템플릿에서 생성됨": "已从模板创建",
+    "팀 개발 (리드 + 프론트 + 백엔드)": "团队开发（Lead + 前端 + 后端）",
+    "리드가 스프린트 업무를 분배 → 프론트·백엔드가 병렬 작업 → 둘 다 완료되면 리드가 리뷰 + 다음 스프린트 기획.":
+        "Lead 分配冲刺任务 → 前端、后端并行 → 双方完成后 Lead 复盘并规划下一个冲刺。",
+    "리서치 파이프라인": "研究流水线",
+    "리서처가 자료 수집 → 작가가 초안 작성 → 리뷰어가 검토 → 최종 문서.":
+        "Researcher 收集资料 → Writer 撰稿 → Reviewer 审校 → 最终文档。",
+    "단순 병렬 3 작업": "简单并行 3 任务",
+    "독립적인 3개 세션이 병렬 실행 → 결과 취합 → 하나의 문서로 출력.":
+        "三个独立会话并行执行 → 汇总 → 输出单一文档。",
     "이름을 입력하세요": "请输入名称",
     "예: README 작성 파이프라인": "例如：README 撰写流程",
     "생성": "创建",
