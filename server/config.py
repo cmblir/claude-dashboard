@@ -80,6 +80,9 @@ TRANSLATIONS_PATH = _env_path(
 DASHBOARD_CONFIG_PATH = _env_path(
     "CLAUDE_DASHBOARD_CONFIG", Path.home() / ".claude-dashboard-config.json"
 )
+WORKFLOWS_PATH = _env_path(
+    "CLAUDE_DASHBOARD_WORKFLOWS", Path.home() / ".claude-dashboard-workflows.json"
+)
 
 # ───────── 세션 점수 필터 ─────────
 # 도구 호출이 적은(=짧거나 시범) 세션을 점수 평균에서 제외해 UX 노이즈를 줄인다.

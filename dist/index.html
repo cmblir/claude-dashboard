@@ -212,6 +212,53 @@
   .hover-lift:hover { transform: translateY(-2px); background: var(--card-hi); }
   .btn-active { background: var(--grad-soft) !important; border-color: rgba(167,139,250,0.45) !important; color: var(--text) !important; }
   .onboard-done { opacity: 0.78; }
+
+  /* ─── 워크플로우 에디터 (n8n 스타일) ─── */
+  #wfRoot { display: flex; gap: 10px; height: calc(100vh - 140px); min-height: 480px; }
+  #wfList { width: 260px; flex-shrink: 0; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  #wfCanvasWrap { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+  #wfToolbar { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; background: var(--card); border-radius: 12px 12px 0 0; }
+  #wfCanvasHost { flex: 1; position: relative; overflow: hidden; background:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0),
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0);
+    background-size: 20px 20px, 60px 60px;
+    background-position: 0 0, 10px 10px;
+    border-radius: 0 0 12px 12px;
+    border: 1px solid var(--border); border-top: 0;
+  }
+  #wfCanvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; user-select: none; }
+  #wfCanvas:active { cursor: grabbing; }
+  #wfInspector { width: 320px; flex-shrink: 0; overflow-y: auto; padding: 12px; }
+  .wf-list-item { padding: 10px 12px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; }
+  .wf-list-item:hover { background: rgba(255,255,255,0.04); }
+  .wf-list-item.active { background: var(--grad-soft); border-color: rgba(167,139,250,0.35); }
+  .wf-node { cursor: grab; }
+  .wf-node:active { cursor: grabbing; }
+  .wf-node-body { fill: var(--card); stroke: var(--border); stroke-width: 1; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); }
+  .wf-node.selected .wf-node-body { stroke: var(--accent); stroke-width: 2; }
+  .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2; animation: wfPulse 1.4s infinite; }
+  .wf-node[data-status="ok"] .wf-node-body { stroke: #4ade80; stroke-width: 2; }
+  .wf-node[data-status="err"] .wf-node-body { stroke: #f87171; stroke-width: 2; }
+  .wf-node[data-status="skipped"] .wf-node-body { stroke: rgba(255,255,255,0.1); stroke-dasharray: 4 4; }
+  @keyframes wfPulse { 0%,100%{filter:drop-shadow(0 0 0 rgba(167,139,250,0))} 50%{filter:drop-shadow(0 0 12px rgba(167,139,250,0.8))} }
+  .wf-node-title { fill: var(--text); font-size: 13px; font-weight: 600; pointer-events: none; }
+  .wf-node-sub { fill: var(--text-dim); font-size: 10px; pointer-events: none; }
+  .wf-node-icon { font-size: 18px; pointer-events: none; }
+  .wf-port { fill: var(--accent); stroke: var(--bg); stroke-width: 2; cursor: crosshair; transition: r 0.12s; }
+  .wf-port:hover { r: 8; }
+  .wf-port-in { fill: #a78bfa; }
+  .wf-edge { stroke: var(--accent); stroke-width: 2; fill: none; marker-end: url(#wfArrow); pointer-events: stroke; cursor: pointer; }
+  .wf-edge:hover { stroke: #fbbf24; stroke-width: 3; }
+  .wf-edge.selected { stroke: #fbbf24; stroke-width: 3; }
+  .wf-edge-draft { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; fill: none; pointer-events: none; opacity: 0.7; }
+  .wf-dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; display: inline-block; margin-right: 4px; }
+  .wf-ok-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; display: inline-block; margin-right: 4px; }
+
+  @media (max-width: 900px) {
+    #wfRoot { flex-direction: column; height: auto; }
+    #wfList, #wfInspector { width: 100%; max-height: 260px; }
+    #wfCanvasWrap { height: 60vh; min-height: 360px; }
+  }
   .grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
   .empty { text-align: center; padding: 3rem 1rem; color: var(--text-dim); }
   .tag-tool { display: inline-block; padding: 1px 7px; font-size: 0.68rem; border-radius: 4px; background: rgba(217,119,87,0.14); color: #f5b997; font-family: 'JetBrains Mono', monospace; margin: 1px; }
@@ -571,6 +618,8 @@ const NAV = [
   { id: 'analytics',   icon: '📊', label: '통계 & 스코어',      group: 'main', docUrl: DOCS_BASE+'costs' },
   { id: 'aiEval',      icon: '🤖', label: 'AI 종합 평가',       group: 'main', desc: 'Claude 가 전체 셋업을 보고 우선순위 진단' },
   { id: 'sessions',    icon: '🗂️', label: '세션 히스토리',      group: 'main', docUrl: DOCS_BASE+'interactive-mode' },
+  { id: 'workflows',   icon: '🔀', label: '워크플로우', group: 'work',
+    desc: '세션 노드를 DAG 로 연결해 업무 흐름 설계' },
   { id: 'agents',      icon: '🤝', label: '에이전트 & 그래프',  group: 'work', docUrl: DOCS_BASE+'sub-agents' },
   { id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'work',
     desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE+'sub-agents' },
@@ -1308,6 +1357,772 @@ function _copyToClipboard(btn, text) {
   } catch (e) {
     toast(t('복사 실패'), 'err');
   }
+}
+
+// ────────────────────────────────────────────────────────────────
+// 🔀 WORKFLOWS — n8n 스타일 세션 워크플로우 에디터
+// ────────────────────────────────────────────────────────────────
+const __wf = {
+  workflows: [],
+  current: null,
+  dirty: false,
+  selectedNodeId: null,
+  selectedEdgeId: null,
+  drag: null,          // {kind:'node'|'pan'|'edge', ...}
+  edgeDraft: null,
+  patchTimer: null,
+  lastTouchTs: 0,
+  pollTimer: null,
+  runId: null,
+};
+
+const WF_NODE_TYPES = [
+  { id: 'start',     icon: '🚀', label: '시작', portIn: false, portOut: true },
+  { id: 'session',   icon: '🗂️', label: '세션', portIn: true,  portOut: true },
+  { id: 'subagent',  icon: '🤝', label: '서브에이전트', portIn: true, portOut: true },
+  { id: 'aggregate', icon: '🧩', label: '취합', portIn: true, portOut: true },
+  { id: 'branch',    icon: '🔀', label: '분기', portIn: true, portOut: true },  // out_y/out_n 포트
+  { id: 'output',    icon: '📤', label: '결과', portIn: true,  portOut: false },
+];
+const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
+const WF_NODE_W = 180, WF_NODE_H = 64;
+
+VIEWS.workflows = async () => {
+  const r = await api('/api/workflows/list');
+  __wf.workflows = (r && r.workflows) || [];
+  // current 유지 (현재 선택된 워크플로우가 삭제되지 않았으면)
+  if (__wf.current && !__wf.workflows.find(w => w.id === __wf.current.id)) {
+    __wf.current = null;
+    __wf.selectedNodeId = null;
+  }
+  // 첫 로드 시 자동 선택 (있을 때)
+  if (!__wf.current && __wf.workflows.length) {
+    // 선택은 렌더 후 비동기 (하단 _wfSelect)
+  }
+  return `
+    ${viewHeader('🔀 워크플로우', '세션 노드를 DAG 로 연결해 업무 흐름 설계. 포트를 드래그해 화살표로 연결.', 'workflows')}
+    <div id="wfRoot">
+      <div id="wfList" class="card">
+        <div class="flex items-center gap-2 mb-2">
+          <input id="wfSearch" class="input flex-1" placeholder="${t('검색…')}" style="font-size:13px;">
+          <button class="btn-primary btn text-xs" onclick="_wfCreateNew()">＋ ${t('새 워크플로우')}</button>
+        </div>
+        <div id="wfListItems" class="flex flex-col gap-1"></div>
+      </div>
+
+      <div id="wfCanvasWrap" class="card" style="padding:0;">
+        <div id="wfToolbar">
+          <div class="flex items-center gap-2" style="min-width:0;">
+            <span id="wfCurName" class="text-sm font-semibold truncate" style="max-width:260px;">${t('워크플로우를 선택하거나 생성하세요')}</span>
+            <span id="wfDirty" class="text-[10px] text-[var(--text-dim)]"></span>
+          </div>
+          <div class="flex-1"></div>
+          <button class="btn text-xs" onclick="_wfAddNode('start')" title="${t('시작 노드')}">🚀</button>
+          <button class="btn text-xs" onclick="_wfAddNode('session')" title="${t('세션 노드')}">🗂️</button>
+          <button class="btn text-xs" onclick="_wfAddNode('subagent')" title="${t('서브에이전트 노드')}">🤝</button>
+          <button class="btn text-xs" onclick="_wfAddNode('aggregate')" title="${t('취합 노드')}">🧩</button>
+          <button class="btn text-xs" onclick="_wfAddNode('branch')" title="${t('분기 노드')}">🔀</button>
+          <button class="btn text-xs" onclick="_wfAddNode('output')" title="${t('결과 노드')}">📤</button>
+          <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
+          <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn">💾 ${t('저장')}</button>
+          <button class="btn-primary btn text-xs" onclick="_wfRun()" id="wfRunBtn">▶ ${t('실행')}</button>
+        </div>
+        <div id="wfCanvasHost">
+          <svg id="wfCanvas" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="wfArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#d97757"/>
+              </marker>
+            </defs>
+            <g id="wfViewport" transform="translate(0,0)">
+              <g id="wfEdges"></g>
+              <g id="wfNodes"></g>
+              <g id="wfDraft"></g>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <div id="wfInspector" class="card">
+        <div id="wfInspectorBody">
+          <div class="text-xs text-[var(--text-dim)] text-center py-8">${t('노드를 선택하면 편집 패널이 표시됩니다')}</div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+AFTER.workflows = async () => {
+  _wfRenderList();
+  // 검색 바인딩
+  const se = document.getElementById('wfSearch');
+  if (se) se.oninput = (e) => { __wf.search = e.target.value.toLowerCase(); _wfRenderList(); };
+  // 캔버스 이벤트 바인딩
+  _wfBindCanvas();
+  // current 자동 선택
+  if (!__wf.current && __wf.workflows.length) {
+    await _wfOpen(__wf.workflows[0].id);
+  } else if (__wf.current) {
+    _wfRenderCanvas();
+    _wfRenderInspector();
+    _wfUpdateToolbar();
+  }
+};
+
+function _wfRenderList() {
+  const host = document.getElementById('wfListItems');
+  if (!host) return;
+  const q = (__wf.search || '').trim();
+  const list = __wf.workflows.filter(w => !q || (w.name||'').toLowerCase().includes(q));
+  if (!list.length) {
+    host.innerHTML = `<div class="text-[11px] text-[var(--text-dim)] text-center py-4">${t('워크플로우 없음')}</div>`;
+    return;
+  }
+  host.innerHTML = list.map(w => `
+    <div class="wf-list-item ${__wf.current && __wf.current.id === w.id ? 'active' : ''}" onclick="_wfOpen('${w.id}')">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-medium truncate">${escapeHtml(w.name || 'Untitled')}</div>
+          <div class="text-[10px] text-[var(--text-dim)] mt-0.5">
+            ${w.nodeCount} ${t('노드')} · ${w.edgeCount} ${t('연결')} · ${fmtRel(w.updatedAt)}
+          </div>
+        </div>
+        <button class="text-[var(--text-dim)] hover:text-red-400 text-sm" onclick="event.stopPropagation();_wfDelete('${w.id}')" title="${t('삭제')}">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function _wfCreateNew() {
+  const name = prompt(t('워크플로우 이름'), 'New workflow');
+  if (!name) return;
+  const body = {
+    name,
+    nodes: [{ id: 'n-start', type: 'start', x: 80, y: 160, title: t('시작') }],
+    edges: [],
+  };
+  const r = await api('/api/workflows/save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
+  toast(t('생성됨'), 'ok');
+  // 목록 새로 불러오고 새 항목 선택
+  const list = await api('/api/workflows/list');
+  __wf.workflows = list.workflows || [];
+  await _wfOpen(r.id);
+  _wfRenderList();
+}
+
+async function _wfDelete(wfId) {
+  if (!confirm(t('이 워크플로우를 삭제할까요?'))) return;
+  const r = await api('/api/workflows/delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: wfId }),
+  });
+  if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
+  toast(t('삭제됨'), 'ok');
+  if (__wf.current && __wf.current.id === wfId) {
+    __wf.current = null; __wf.selectedNodeId = null;
+  }
+  const list = await api('/api/workflows/list');
+  __wf.workflows = list.workflows || [];
+  _wfRenderList();
+  _wfRenderCanvas();
+  _wfRenderInspector();
+  _wfUpdateToolbar();
+}
+
+async function _wfOpen(wfId) {
+  const r = await api('/api/workflows/' + wfId);
+  if (!r.ok) { toast(r.error || t('로드 실패'), 'err'); return; }
+  __wf.current = { id: wfId, ...r.workflow };
+  __wf.selectedNodeId = null;
+  __wf.selectedEdgeId = null;
+  __wf.dirty = false;
+  _wfRenderList();
+  _wfRenderCanvas();
+  _wfRenderInspector();
+  _wfUpdateToolbar();
+}
+
+function _wfUpdateToolbar() {
+  const nameEl = document.getElementById('wfCurName');
+  const dirtyEl = document.getElementById('wfDirty');
+  if (!nameEl || !dirtyEl) return;
+  if (!__wf.current) {
+    nameEl.textContent = t('워크플로우를 선택하거나 생성하세요');
+    dirtyEl.innerHTML = '';
+    return;
+  }
+  nameEl.textContent = __wf.current.name || 'Untitled';
+  dirtyEl.innerHTML = __wf.dirty
+    ? `<span class="wf-dirty-dot"></span>${t('변경사항 있음')}`
+    : `<span class="wf-ok-dot"></span>${t('저장됨')}`;
+}
+
+// ─── 캔버스 렌더링 ─────────────────────────────────────────────
+function _wfRenderCanvas() {
+  const nodesG = document.getElementById('wfNodes');
+  const edgesG = document.getElementById('wfEdges');
+  const vp = document.getElementById('wfViewport');
+  if (!nodesG || !edgesG || !vp) return;
+  if (!__wf.current) {
+    nodesG.innerHTML = ''; edgesG.innerHTML = ''; return;
+  }
+  const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
+  vp.setAttribute('transform', `translate(${view.panX},${view.panY}) scale(${view.zoom||1})`);
+  // 노드
+  nodesG.innerHTML = (__wf.current.nodes || []).map(n => _wfRenderNode(n)).join('');
+  // 엣지
+  edgesG.innerHTML = (__wf.current.edges || []).map(e => _wfRenderEdge(e)).join('');
+}
+
+function _wfPortPos(node, port) {
+  // port = 'in' | 'out' | 'out_y' | 'out_n'
+  if (port === 'in') return { x: node.x, y: node.y + WF_NODE_H/2 };
+  if (port === 'out' || port === 'out_y') return { x: node.x + WF_NODE_W, y: node.y + WF_NODE_H/2 };
+  if (port === 'out_n') return { x: node.x + WF_NODE_W, y: node.y + WF_NODE_H - 10 };
+  return { x: node.x + WF_NODE_W, y: node.y + WF_NODE_H/2 };
+}
+
+function _wfRenderNode(n) {
+  const meta = WF_TYPE_MAP[n.type] || WF_TYPE_MAP.session;
+  const sel = __wf.selectedNodeId === n.id ? ' selected' : '';
+  const sub = n.type === 'session' || n.type === 'subagent'
+    ? `<text class="wf-node-sub" x="40" y="48">@${escapeHtml((n.data||{}).assignee || 'auto')}</text>`
+    : `<text class="wf-node-sub" x="40" y="48">${escapeHtml(meta.label)}</text>`;
+  const portIn = meta.portIn
+    ? `<circle class="wf-port wf-port-in" cx="0" cy="${WF_NODE_H/2}" r="6" data-port="in" data-node="${n.id}"></circle>` : '';
+  let portsOut = '';
+  if (n.type === 'branch') {
+    portsOut = `
+      <circle class="wf-port" cx="${WF_NODE_W}" cy="18" r="6" data-port="out_y" data-node="${n.id}"></circle>
+      <text x="${WF_NODE_W-12}" y="22" class="wf-node-sub" text-anchor="end" style="fill:#4ade80;">Y</text>
+      <circle class="wf-port" cx="${WF_NODE_W}" cy="${WF_NODE_H-18}" r="6" data-port="out_n" data-node="${n.id}"></circle>
+      <text x="${WF_NODE_W-12}" y="${WF_NODE_H-14}" class="wf-node-sub" text-anchor="end" style="fill:#f87171;">N</text>
+    `;
+  } else if (meta.portOut) {
+    portsOut = `<circle class="wf-port" cx="${WF_NODE_W}" cy="${WF_NODE_H/2}" r="6" data-port="out" data-node="${n.id}"></circle>`;
+  }
+  return `
+    <g class="wf-node${sel}" data-node="${n.id}" transform="translate(${n.x},${n.y})">
+      <rect class="wf-node-body" width="${WF_NODE_W}" height="${WF_NODE_H}" rx="12" ry="12"></rect>
+      <text class="wf-node-icon" x="14" y="30">${meta.icon}</text>
+      <text class="wf-node-title" x="40" y="28">${escapeHtml(n.title || meta.label)}</text>
+      ${sub}
+      ${portIn}${portsOut}
+    </g>
+  `;
+}
+
+function _wfRenderEdge(e) {
+  if (!__wf.current) return '';
+  const fromN = __wf.current.nodes.find(x => x.id === e.from);
+  const toN   = __wf.current.nodes.find(x => x.id === e.to);
+  if (!fromN || !toN) return '';
+  const p1 = _wfPortPos(fromN, e.fromPort || 'out');
+  const p2 = _wfPortPos(toN, e.toPort || 'in');
+  const sel = __wf.selectedEdgeId === e.id ? ' selected' : '';
+  return `<path class="wf-edge${sel}" data-edge="${e.id}" d="${_wfBezier(p1.x, p1.y, p2.x, p2.y)}"></path>`;
+}
+
+function _wfBezier(x1, y1, x2, y2) {
+  const dx = Math.max(60, Math.abs(x2 - x1) * 0.4);
+  return `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+}
+
+// ─── 노드/엣지 추가·삭제 ──────────────────────────────────────
+function _wfAddNode(type) {
+  if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
+  const nid = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
+  // 캔버스 중앙 근처
+  const host = document.getElementById('wfCanvasHost');
+  const rect = host ? host.getBoundingClientRect() : { width: 600, height: 400 };
+  const cx = (rect.width / 2 - (view.panX||0)) / (view.zoom||1) - WF_NODE_W/2;
+  const cy = (rect.height / 2 - (view.panY||0)) / (view.zoom||1) - WF_NODE_H/2;
+  const meta = WF_TYPE_MAP[type] || WF_TYPE_MAP.session;
+  const newNode = {
+    id: nid, type, x: Math.round(cx), y: Math.round(cy),
+    title: meta.label, data: {},
+  };
+  if (type === 'session' || type === 'subagent') {
+    newNode.data = { subject: '', description: '', assignee: 'sonnet-4.6', agentRole: '', cwd: '', inputsMode: 'concat' };
+  } else if (type === 'branch') newNode.data = { condition: '' };
+  else if (type === 'aggregate') newNode.data = { mode: 'concat' };
+  else if (type === 'output') newNode.data = { exportTo: '' };
+  __wf.current.nodes.push(newNode);
+  __wf.selectedNodeId = nid;
+  __wf.dirty = true;
+  _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
+}
+
+function _wfDeleteSelectedNode() {
+  if (!__wf.current || !__wf.selectedNodeId) return;
+  const nid = __wf.selectedNodeId;
+  __wf.current.nodes = __wf.current.nodes.filter(n => n.id !== nid);
+  __wf.current.edges = __wf.current.edges.filter(e => e.from !== nid && e.to !== nid);
+  __wf.selectedNodeId = null;
+  __wf.dirty = true;
+  _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
+}
+
+function _wfDeleteSelectedEdge() {
+  if (!__wf.current || !__wf.selectedEdgeId) return;
+  __wf.current.edges = __wf.current.edges.filter(e => e.id !== __wf.selectedEdgeId);
+  __wf.selectedEdgeId = null;
+  __wf.dirty = true;
+  _wfRenderCanvas(); _wfUpdateToolbar();
+}
+
+// DAG 사이클 검사 (from → ... → to 경로가 이미 있는지)
+function _wfHasPath(edges, from, to) {
+  if (from === to) return true;
+  const adj = {};
+  edges.forEach(e => { (adj[e.from] = adj[e.from] || []).push(e.to); });
+  const seen = new Set(); const stack = [from];
+  while (stack.length) {
+    const u = stack.pop();
+    if (u === to) return true;
+    if (seen.has(u)) continue; seen.add(u);
+    (adj[u] || []).forEach(v => stack.push(v));
+  }
+  return false;
+}
+
+function _wfAddEdge(fromId, fromPort, toId, toPort) {
+  if (!__wf.current) return false;
+  if (fromId === toId) { toast(t('같은 노드에 연결할 수 없습니다'), 'warn'); return false; }
+  // 중복 방지
+  if (__wf.current.edges.some(e => e.from===fromId && e.to===toId && e.fromPort===fromPort)) {
+    toast(t('이미 연결되어 있습니다'), 'warn'); return false;
+  }
+  // 사이클 검사 — 이 edge 추가 후 to→from 경로가 있으면 cycle
+  if (_wfHasPath(__wf.current.edges, toId, fromId)) {
+    toast(t('순환 연결은 허용되지 않습니다'), 'err'); return false;
+  }
+  const eid = 'e-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  __wf.current.edges.push({ id: eid, from: fromId, to: toId, fromPort, toPort });
+  __wf.dirty = true;
+  _wfRenderCanvas(); _wfUpdateToolbar();
+  return true;
+}
+
+// ─── 이벤트 바인딩 ───────────────────────────────────────────
+function _wfBindCanvas() {
+  const svg = document.getElementById('wfCanvas');
+  if (!svg || svg.__wfBound) return;
+  svg.__wfBound = true;
+
+  // 좌표 변환 — 스크린 좌표를 SVG 뷰포트 좌표(팬/줌 적용 후)로
+  function svgPt(evt) {
+    const rect = svg.getBoundingClientRect();
+    const view = (__wf.current && __wf.current.viewport) || { panX:0, panY:0, zoom:1 };
+    return {
+      x: (evt.clientX - rect.left - (view.panX||0)) / (view.zoom||1),
+      y: (evt.clientY - rect.top  - (view.panY||0)) / (view.zoom||1),
+    };
+  }
+
+  function onDown(e, touch) {
+    if (!__wf.current) return;
+    const pt = svgPt(e);
+    const target = e.target;
+    // 포트 클릭 → 엣지 드래프트
+    if (target.classList && target.classList.contains('wf-port')) {
+      const port = target.getAttribute('data-port');
+      const nodeId = target.getAttribute('data-node');
+      if (port && port.startsWith('out') || port === 'out_y' || port === 'out_n') {
+        __wf.drag = { kind: 'edge', fromId: nodeId, fromPort: port };
+        __wf.edgeDraft = { x1: pt.x, y1: pt.y, x2: pt.x, y2: pt.y };
+        _wfDraftRender();
+        if (touch) { try{e.preventDefault();}catch(_){} }
+        return;
+      }
+      // in-port 에서 시작하는 드래그는 무시
+      return;
+    }
+    // 노드 클릭 → 선택 + 드래그
+    const g = target.closest && target.closest('.wf-node');
+    if (g) {
+      const nid = g.getAttribute('data-node');
+      const node = __wf.current.nodes.find(n => n.id === nid);
+      if (!node) return;
+      __wf.selectedNodeId = nid; __wf.selectedEdgeId = null;
+      __wf.drag = { kind: 'node', nodeId: nid, origX: node.x, origY: node.y, startX: pt.x, startY: pt.y };
+      _wfRenderCanvas(); _wfRenderInspector();
+      if (touch) { try{e.preventDefault();}catch(_){} }
+      return;
+    }
+    // 엣지 클릭
+    if (target.classList && target.classList.contains('wf-edge')) {
+      __wf.selectedEdgeId = target.getAttribute('data-edge');
+      __wf.selectedNodeId = null;
+      _wfRenderCanvas(); _wfRenderInspector();
+      return;
+    }
+    // 빈 영역 → 팬 + 선택 해제
+    __wf.selectedNodeId = null; __wf.selectedEdgeId = null;
+    const view = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
+    __wf.drag = { kind: 'pan', startX: e.clientX, startY: e.clientY, origPanX: view.panX||0, origPanY: view.panY||0 };
+    _wfRenderCanvas(); _wfRenderInspector();
+    if (touch) { try{e.preventDefault();}catch(_){} }
+  }
+
+  function onMove(e, touch) {
+    if (!__wf.drag || !__wf.current) return;
+    const pt = svgPt(e);
+    if (__wf.drag.kind === 'node') {
+      const n = __wf.current.nodes.find(x => x.id === __wf.drag.nodeId);
+      if (!n) return;
+      n.x = Math.round(__wf.drag.origX + (pt.x - __wf.drag.startX));
+      n.y = Math.round(__wf.drag.origY + (pt.y - __wf.drag.startY));
+      _wfRenderCanvas();
+      __wf.dirty = true; _wfUpdateToolbar();
+      _wfSchedulePatch();
+      if (touch) { try{e.preventDefault();}catch(_){} }
+    } else if (__wf.drag.kind === 'pan') {
+      const dx = e.clientX - __wf.drag.startX;
+      const dy = e.clientY - __wf.drag.startY;
+      __wf.current.viewport = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
+      __wf.current.viewport.panX = __wf.drag.origPanX + dx;
+      __wf.current.viewport.panY = __wf.drag.origPanY + dy;
+      const vp = document.getElementById('wfViewport');
+      if (vp) vp.setAttribute('transform',
+        `translate(${__wf.current.viewport.panX},${__wf.current.viewport.panY}) scale(${__wf.current.viewport.zoom||1})`);
+      _wfSchedulePatch();
+    } else if (__wf.drag.kind === 'edge') {
+      __wf.edgeDraft.x2 = pt.x; __wf.edgeDraft.y2 = pt.y;
+      _wfDraftRender();
+      if (touch) { try{e.preventDefault();}catch(_){} }
+    }
+  }
+
+  function onUp(e, touch) {
+    if (!__wf.drag) return;
+    if (__wf.drag.kind === 'edge') {
+      // 드롭 타겟 검사 — touch 면 changedTouches 사용
+      let tx, ty;
+      if (touch) {
+        const ct = (e.changedTouches && e.changedTouches[0]);
+        tx = ct ? ct.clientX : 0; ty = ct ? ct.clientY : 0;
+      } else { tx = e.clientX; ty = e.clientY; }
+      const el = document.elementFromPoint(tx, ty);
+      if (el && el.classList && el.classList.contains('wf-port') && el.getAttribute('data-port') === 'in') {
+        const toId = el.getAttribute('data-node');
+        _wfAddEdge(__wf.drag.fromId, __wf.drag.fromPort, toId, 'in');
+      }
+      __wf.edgeDraft = null;
+      _wfDraftRender();
+    }
+    __wf.drag = null;
+  }
+
+  // Mouse
+  svg.addEventListener('mousedown', (e) => {
+    if (Date.now() - __wf.lastTouchTs < 500) return;
+    onDown(e, false);
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!__wf.drag) return;
+    onMove(e, false);
+  });
+  document.addEventListener('mouseup', (e) => {
+    if (!__wf.drag) return;
+    onUp(e, false);
+  });
+
+  // Touch
+  svg.addEventListener('touchstart', (e) => {
+    __wf.lastTouchTs = Date.now();
+    if (e.touches.length !== 1) return;
+    const te = e.touches[0];
+    onDown({ clientX: te.clientX, clientY: te.clientY, target: e.target }, true);
+  }, { passive: false });
+  document.addEventListener('touchmove', (e) => {
+    if (!__wf.drag) return;
+    __wf.lastTouchTs = Date.now();
+    const te = e.touches[0];
+    onMove({ clientX: te.clientX, clientY: te.clientY }, true);
+    try { e.preventDefault(); } catch (_) {}
+  }, { passive: false });
+  document.addEventListener('touchend', (e) => {
+    if (!__wf.drag) return;
+    __wf.lastTouchTs = Date.now();
+    onUp(e, true);
+  }, { passive: false });
+
+  // 키보드: Delete / Backspace
+  document.addEventListener('keydown', (e) => {
+    if (state.view !== 'workflows') return;
+    if (!['Delete','Backspace'].includes(e.key)) return;
+    // input 포커스 중이면 무시
+    if (['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName)) return;
+    if (__wf.selectedNodeId) { e.preventDefault(); _wfDeleteSelectedNode(); }
+    else if (__wf.selectedEdgeId) { e.preventDefault(); _wfDeleteSelectedEdge(); }
+  });
+
+  // 휠 줌
+  svg.addEventListener('wheel', (e) => {
+    if (!__wf.current) return;
+    e.preventDefault();
+    const view = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
+    const dz = e.deltaY < 0 ? 1.1 : 0.9;
+    view.zoom = Math.max(0.4, Math.min(2.5, (view.zoom||1) * dz));
+    __wf.current.viewport = view;
+    _wfRenderCanvas();
+    _wfSchedulePatch();
+  }, { passive: false });
+}
+
+function _wfDraftRender() {
+  const g = document.getElementById('wfDraft');
+  if (!g) return;
+  if (!__wf.edgeDraft) { g.innerHTML = ''; return; }
+  const d = __wf.edgeDraft;
+  g.innerHTML = `<path class="wf-edge-draft" d="${_wfBezier(d.x1, d.y1, d.x2, d.y2)}"></path>`;
+}
+
+function _wfSchedulePatch() {
+  if (!__wf.current) return;
+  if (__wf.patchTimer) clearTimeout(__wf.patchTimer);
+  __wf.patchTimer = setTimeout(async () => {
+    __wf.patchTimer = null;
+    if (!__wf.current) return;
+    const patch = {
+      nodes: __wf.current.nodes.map(n => ({ id: n.id, x: n.x, y: n.y })),
+      viewport: __wf.current.viewport,
+    };
+    try {
+      await api('/api/workflows/patch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: __wf.current.id, patch }),
+      });
+    } catch (e) { /* silent — 다음 save 가 덮어씀 */ }
+  }, 500);
+}
+
+// ─── 인스펙터 (우측 패널) ──────────────────────────────────
+function _wfRenderInspector() {
+  const host = document.getElementById('wfInspectorBody');
+  if (!host) return;
+  if (!__wf.current) {
+    host.innerHTML = `<div class="text-xs text-[var(--text-dim)] text-center py-8">${t('워크플로우를 선택하세요')}</div>`;
+    return;
+  }
+  // 워크플로우 메타 섹션
+  const meta = `
+    <div class="mb-4">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('이름')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(__wf.current.name||'')}" oninput="__wf.current.name=this.value;__wf.dirty=true;_wfUpdateToolbar();_wfRenderList();">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('설명')}</label>
+      <textarea class="input w-full mt-1" rows="2" oninput="__wf.current.description=this.value;__wf.dirty=true;_wfUpdateToolbar();">${escapeHtml(__wf.current.description||'')}</textarea>
+    </div>
+  `;
+  if (!__wf.selectedNodeId) {
+    host.innerHTML = meta + `<div class="text-xs text-[var(--text-dim)] text-center py-4">${t('노드를 클릭하면 편집 폼이 표시됩니다')}</div>`;
+    return;
+  }
+  const n = __wf.current.nodes.find(x => x.id === __wf.selectedNodeId);
+  if (!n) { host.innerHTML = meta; return; }
+  const typeMeta = WF_TYPE_MAP[n.type] || WF_TYPE_MAP.session;
+  host.innerHTML = meta + `
+    <div class="border-t border-[var(--border)] pt-3">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-sm font-semibold">${typeMeta.icon} ${escapeHtml(typeMeta.label)}</div>
+        <button class="text-[10px] text-red-400 hover:text-red-500" onclick="_wfDeleteSelectedNode()">🗑️ ${t('삭제')}</button>
+      </div>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('제목')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(n.title||'')}" oninput="_wfNodeSet('${n.id}','title',this.value)">
+      ${_wfInspectorBody(n)}
+    </div>
+  `;
+}
+
+function _wfInspectorBody(n) {
+  const d = n.data || {};
+  if (n.type === 'session' || n.type === 'subagent') {
+    return `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('업무 (subject)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.subject||'')}" oninput="_wfNodeSetData('${n.id}','subject',this.value)" placeholder="${t('이 세션이 수행할 업무 한 줄')}">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('설명 (description)')}</label>
+      <textarea class="input w-full mt-1" rows="4" oninput="_wfNodeSetData('${n.id}','description',this.value)" placeholder="${t('상세 지시·제약·출력 형식')}">${escapeHtml(d.description||'')}</textarea>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('모델')}</label>
+      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','assignee',this.value)">
+        ${['opus-4.7','sonnet-4.6','haiku-4.5'].map(m => `<option value="${m}" ${d.assignee===m?'selected':''}>${m}</option>`).join('')}
+      </select>
+      ${n.type==='subagent' ? `
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('에이전트 역할')}</label>
+        <input class="input w-full mt-1" value="${escapeHtml(d.agentRole||'')}" oninput="_wfNodeSetData('${n.id}','agentRole',this.value)" placeholder="researcher / writer / reviewer …">
+      ` : ''}
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('작업 디렉토리 (cwd)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.cwd||'')}" oninput="_wfNodeSetData('${n.id}','cwd',this.value)" placeholder="~/projects/my-app">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('입력 합치기 모드')}</label>
+      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','inputsMode',this.value)">
+        <option value="concat" ${d.inputsMode==='concat'?'selected':''}>${t('이어붙이기 (concat)')}</option>
+        <option value="first"  ${d.inputsMode==='first'?'selected':''}>${t('첫 입력만 (first)')}</option>
+        <option value="json"   ${d.inputsMode==='json'?'selected':''}>${t('JSON 배열 (json)')}</option>
+      </select>
+      <div class="mt-4 flex gap-2 flex-wrap">
+        <button class="btn-primary btn text-xs" onclick="_wfSpawnSession('${n.id}')">🆕 ${t('새 Claude 세션 spawn')}</button>
+      </div>
+    `;
+  }
+  if (n.type === 'branch') {
+    return `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('조건 (입력에 포함되면 Y 포트 활성)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.condition||'')}" oninput="_wfNodeSetData('${n.id}','condition',this.value)" placeholder="success">
+    `;
+  }
+  if (n.type === 'aggregate') {
+    return `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('합치기 모드')}</label>
+      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','mode',this.value)">
+        <option value="concat" ${d.mode==='concat'?'selected':''}>${t('텍스트 concat')}</option>
+        <option value="json"   ${d.mode==='json'?'selected':''}>${t('JSON 배열')}</option>
+      </select>
+    `;
+  }
+  if (n.type === 'output') {
+    return `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('파일로 저장 (선택, ~/ 하위만)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.exportTo||'')}" oninput="_wfNodeSetData('${n.id}','exportTo',this.value)" placeholder="~/workflow-output.md">
+    `;
+  }
+  return '';
+}
+
+function _wfNodeSet(nid, field, value) {
+  if (!__wf.current) return;
+  const n = __wf.current.nodes.find(x => x.id === nid);
+  if (!n) return;
+  n[field] = value;
+  __wf.dirty = true;
+  _wfUpdateToolbar();
+  // title 은 캔버스에도 반영
+  if (field === 'title') _wfRenderCanvas();
+}
+
+function _wfNodeSetData(nid, field, value) {
+  if (!__wf.current) return;
+  const n = __wf.current.nodes.find(x => x.id === nid);
+  if (!n) return;
+  n.data = n.data || {};
+  n.data[field] = value;
+  __wf.dirty = true;
+  _wfUpdateToolbar();
+  if (field === 'assignee') _wfRenderCanvas();
+}
+
+// ─── 저장 / 실행 / spawn ───────────────────────────────────
+async function _wfSave() {
+  if (!__wf.current) return;
+  const body = {
+    id: __wf.current.id,
+    name: __wf.current.name,
+    description: __wf.current.description,
+    nodes: __wf.current.nodes,
+    edges: __wf.current.edges,
+    viewport: __wf.current.viewport,
+  };
+  const r = await api('/api/workflows/save', {
+    method: 'POST', headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { toast(r.error||t('저장 실패'), 'err'); return; }
+  __wf.dirty = false;
+  toast(t('저장됨'), 'ok');
+  // 목록 refresh
+  const list = await api('/api/workflows/list');
+  __wf.workflows = list.workflows || [];
+  _wfRenderList();
+  _wfUpdateToolbar();
+}
+
+async function _wfRun() {
+  if (!__wf.current) return;
+  // 저장 먼저
+  if (__wf.dirty) await _wfSave();
+  const r = await api('/api/workflows/run', {
+    method: 'POST', headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({ id: __wf.current.id }),
+  });
+  if (!r.ok) { toast(r.error||t('실행 실패'), 'err'); return; }
+  toast(t('실행 시작됨'), 'ok');
+  __wf.runId = r.runId;
+  // 노드 상태 초기화
+  document.querySelectorAll('.wf-node').forEach(el => el.removeAttribute('data-status'));
+  // 폴링 시작
+  _wfStartPolling();
+}
+
+function _wfStartPolling() {
+  if (__wf.pollTimer) { clearInterval(__wf.pollTimer); __wf.pollTimer = null; }
+  __wf.pollTimer = setInterval(async () => {
+    if (!__wf.runId) { clearInterval(__wf.pollTimer); __wf.pollTimer = null; return; }
+    try {
+      const s = await api('/api/workflows/run-status?runId=' + __wf.runId);
+      if (!s.ok) return;
+      const run = s.run || {};
+      // 노드별 상태 배지
+      const results = run.nodeResults || {};
+      document.querySelectorAll('.wf-node').forEach(el => {
+        const nid = el.getAttribute('data-node');
+        const r = results[nid];
+        if (r) el.setAttribute('data-status', r.status);
+      });
+      if (run.status === 'ok' || run.status === 'err') {
+        clearInterval(__wf.pollTimer); __wf.pollTimer = null;
+        _wfShowRunResult(run);
+        __wf.runId = null;
+      }
+    } catch (e) { /* silent */ }
+  }, 1200);
+}
+
+function _wfShowRunResult(run) {
+  const ok = run.status === 'ok';
+  const results = run.nodeResults || {};
+  const rows = Object.entries(results).map(([nid, r]) => {
+    const node = (__wf.current.nodes || []).find(n => n.id === nid) || {};
+    const icon = (WF_TYPE_MAP[node.type]||{}).icon || '•';
+    const preview = (r.output||'').slice(0, 500);
+    const err = r.error ? `<div class="text-[11px] text-red-400 mt-1">⚠ ${escapeHtml(r.error)}</div>` : '';
+    return `<div class="card p-3">
+      <div class="flex items-center justify-between mb-1">
+        <div class="text-xs font-semibold">${icon} ${escapeHtml(node.title||nid)} <span class="text-[10px] text-[var(--text-dim)]">(${r.status})</span></div>
+        <div class="text-[10px] text-[var(--text-dim)]">${r.durationMs||0}ms</div>
+      </div>
+      ${preview ? `<pre class="text-[11px] whitespace-pre-wrap break-words" style="max-height:160px;overflow-y:auto;">${escapeHtml(preview)}</pre>` : ''}
+      ${err}
+    </div>`;
+  }).join('');
+  showModal(`
+    <div class="modal p-5" style="max-width:720px;">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">${ok ? '✅' : '❌'} ${t('실행 결과')}</h2>
+        <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+      </div>
+      ${run.error ? `<div class="text-sm text-red-400 mb-2">⚠ ${escapeHtml(run.error)}</div>` : ''}
+      <div class="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">${rows || '<div class="empty card p-4">'+t('결과 없음')+'</div>'}</div>
+    </div>
+  `);
+}
+
+async function _wfSpawnSession(nid) {
+  if (!__wf.current) return;
+  const n = __wf.current.nodes.find(x => x.id === nid);
+  if (!n) return;
+  const d = n.data || {};
+  const cwd = d.cwd || '~';
+  const prompt = [d.subject, d.description].filter(Boolean).join('\n\n');
+  const r = await api('/api/session/spawn', {
+    method: 'POST', headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({ cwd, prompt }),
+  });
+  if (!r.ok) { toast(r.error||t('세션 생성 실패'), 'err'); return; }
+  toast(t('Claude 세션 시작됨'), 'ok');
 }
 
 // ────────────────────────────────────────────────────────────────

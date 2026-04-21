@@ -12,7 +12,8 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .actions import (
-    api_chat, handle_chat_stream, open_folder_action, open_session_action,
+    api_chat, api_session_spawn, handle_chat_stream,
+    open_folder_action, open_session_action,
 )
 from .agents import (
     api_agent_create, api_agent_delete, get_agent, list_agents, put_agent,
@@ -39,6 +40,10 @@ from .features import (
 )
 from .guide import api_guide_onboarding, api_guide_toolkit
 from .hooks import api_plugin_hook_update, get_hooks
+from .workflows import (
+    api_workflow_delete, api_workflow_get, api_workflow_patch, api_workflow_run,
+    api_workflow_run_status, api_workflow_save, api_workflows_list,
+)
 from .logger import log
 from .mcp import (
     api_mcp_catalog, api_mcp_install, api_mcp_install_prepare,
@@ -132,6 +137,8 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/marketplaces/list": lambda q: api_marketplace_list(),
     "/api/guide/toolkit": lambda q: api_guide_toolkit(),
     "/api/guide/onboarding": lambda q: api_guide_onboarding(),
+    "/api/workflows/list": lambda q: api_workflows_list(q),
+    "/api/workflows/run-status": api_workflow_run_status,
 }
 
 
@@ -188,6 +195,11 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/marketplaces/add": api_marketplace_add,
     "/api/marketplaces/remove": api_marketplace_remove,
     "/api/chat": api_chat,
+    "/api/workflows/save": api_workflow_save,
+    "/api/workflows/patch": api_workflow_patch,
+    "/api/workflows/delete": api_workflow_delete,
+    "/api/workflows/run": api_workflow_run,
+    "/api/session/spawn": api_session_spawn,
 }
 
 
@@ -344,4 +356,5 @@ _ITEM_GET_ROUTES = [
     (re.compile(r"^/api/sessions/timeline/([0-9a-f-]+)$"), api_session_timeline),
     (re.compile(r"^/api/skills/([^/]+)$"), get_skill),
     (re.compile(r"^/api/agents/([A-Za-z0-9_.:-]+)$"), get_agent),
+    (re.compile(r"^/api/workflows/(wf-[0-9]{10,14}-[a-z0-9]{3,6})$"), api_workflow_get),
 ]

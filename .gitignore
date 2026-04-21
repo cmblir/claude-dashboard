@@ -42,6 +42,7 @@ credentials.json
 # 사용자 데이터 (혹시 폴더로 떨궈진 경우)
 *-translations.json
 *-dashboard-config.json
+*-workflows.json
 private/
 local/
 
