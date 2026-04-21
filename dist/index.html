@@ -6391,6 +6391,8 @@ function _initMascot() {
 
   // 드래그 (mouse)
   el.addEventListener('mousedown', (e) => {
+    // 모달 위 바운스 중에는 드래그/클릭 무시 (pointer-events:none 추가 안전장치)
+    if (_mascotOnModal) return;
     e.preventDefault();
     _mascotDragging = true;
     _mascotDragMoved = false;
@@ -6421,6 +6423,7 @@ function _initMascot() {
 
   // 드래그 (touch)
   el.addEventListener('touchstart', (e) => {
+    if (_mascotOnModal) return;
     const t = e.touches[0];
     _mascotDragging = true; _mascotDragMoved = false;
     _stopMascotWander();
@@ -6573,17 +6576,30 @@ function _mascotJumpOnModal() {
 
   function _bounce() {
     if (!_mascotOnModal) return;
-    const modal = document.querySelector('#modal-root .modal') || document.querySelector('#modal-root .modal-backdrop');
+    const modal = document.querySelector('#modal-root .modal');
     if (!modal) { _mascotLeaveModal(); return; }
     const rect = modal.getBoundingClientRect();
-    // 모달 주변 (위/옆) 으로 점프 위치 결정
-    const margin = 50;
-    const minX = Math.max(10, rect.left - margin);
-    const maxX = Math.min(window.innerWidth - 80, rect.right + margin);
-    const minY = Math.max(40, rect.top - margin);
-    const maxY = Math.min(window.innerHeight - 80, rect.bottom);
-    const tx = minX + Math.random() * Math.max(1, (maxX - minX));
-    const ty = minY + Math.random() * Math.max(1, (maxY - minY));
+    // 모달 **내부** 로 제한 — 바깥으로 나가면 backdrop click 으로 모달 닫힘.
+    // 또한 우측 상단 70×60px (닫기 ✕ 버튼 영역) 는 피함.
+    const INSET = 16;   // 모달 안쪽 여유
+    const MASCOT_W = 70;
+    const MASCOT_H = 63;
+    const TOP_RIGHT_AVOID_W = 80;
+    const TOP_RIGHT_AVOID_H = 60;
+    const minX = rect.left + INSET;
+    const maxX = rect.right - MASCOT_W - INSET;
+    const minY = rect.top + INSET;
+    const maxY = rect.bottom - MASCOT_H - INSET;
+    if (maxX <= minX || maxY <= minY) { return; }  // 모달이 너무 작음
+    let tx, ty, tries = 0;
+    do {
+      tx = minX + Math.random() * (maxX - minX);
+      ty = minY + Math.random() * (maxY - minY);
+      tries++;
+      // 우측 상단 ✕ 영역 회피
+      const inAvoid = tx > (rect.right - TOP_RIGHT_AVOID_W) && ty < (rect.top + TOP_RIGHT_AVOID_H);
+      if (!inAvoid) break;
+    } while (tries < 8);
     if (tx < parseFloat(el.style.left || 0)) el.classList.add('facing-left');
     else el.classList.remove('facing-left');
     el.style.transition = 'left 1.4s cubic-bezier(0.34,1.56,0.64,1), top 1.4s cubic-bezier(0.34,1.56,0.64,1)';
