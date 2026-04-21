@@ -93,7 +93,10 @@ def api_plugins_browse() -> dict:
             })
     cache = _load_translation_cache()
     for p in out:
-        p["descriptionKo"] = cache.get(f"plugin:{p['id']}", "")
+        pid = p["id"]
+        p["descriptionKo"] = cache.get(f"plugin:{pid}", "")
+        p["descriptionEn"] = cache.get(f"en:plugin:{pid}", "")
+        p["descriptionZh"] = cache.get(f"zh:plugin:{pid}", "")
     return {
         "plugins": out,
         "marketplaces": len({m.name for m in markets_dir.iterdir() if m.is_dir() and not m.name.endswith('.bak')}),

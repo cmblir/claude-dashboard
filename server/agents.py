@@ -147,10 +147,13 @@ def list_agents() -> dict:
     for b in _BUILTIN_AGENTS:
         agents.append({**b, "scope": "builtin", "source": "Claude Code", "path": "", "content": ""})
 
-    # 번역 주입
+    # 번역 주입 (ko/en/zh 모두)
     tr_cache = _load_translation_cache()
     for a in agents:
-        a["descriptionKo"] = tr_cache.get(f"agent:{a['id']}", "")
+        aid = a["id"]
+        a["descriptionKo"] = tr_cache.get(f"agent:{aid}", "")
+        a["descriptionEn"] = tr_cache.get(f"en:agent:{aid}", "")
+        a["descriptionZh"] = tr_cache.get(f"zh:agent:{aid}", "")
 
     # 플러그인 활성 여부 주입 — settings.json.enabledPlugins 참조
     settings = get_settings()
