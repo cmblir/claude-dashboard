@@ -301,6 +301,7 @@ NEW_EN = {
     # Repeat 기능
     "반복 실행": "Repeat",
     "활성": "Enabled",
+    "반복 실행 활성": "Enable repeat",
     "실행 완료 후 결과를 피드백 노드의 입력으로 주입하며 반복. DAG 는 수정 없이 같은 흐름을 여러 번 돌림.":
         "After each run, inject the result into a feedback node's input and repeat. The DAG itself stays unchanged.",
     "최대 반복 횟수": "Max iterations",
@@ -638,6 +639,7 @@ NEW_ZH = {
 
     "반복 실행": "重复执行",
     "활성": "启用",
+    "반복 실행 활성": "启用重复执行",
     "실행 완료 후 결과를 피드백 노드의 입력으로 주입하며 반복. DAG 는 수정 없이 같은 흐름을 여러 번 돌림.":
         "运行结束后，将结果作为反馈节点的输入注入并重复执行。DAG 本身不变。",
     "최대 반복 횟수": "最大重复次数",
