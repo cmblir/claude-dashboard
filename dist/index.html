@@ -2773,36 +2773,36 @@ const WF_TEMPLATES = [
     title: '팀 개발 (리드 + 프론트 + 백엔드)',
     desc: '리드가 스프린트 업무를 분배 → 프론트·백엔드가 병렬 작업 → 둘 다 완료되면 리드가 리뷰 + 다음 스프린트 기획.',
     build: () => ({
-      name: '팀 개발 스프린트',
-      description: '리드 ↔ 프론트·백엔드 병렬 협업 플로우. DAG 이 두 번째 리드에서 다시 분배하며 반복 스프린트를 확장할 수 있음.',
+      name: t('팀 개발 스프린트'),
+      description: t('리드 ↔ 프론트·백엔드 병렬 협업 플로우. DAG 이 두 번째 리드에서 다시 분배하며 반복 스프린트를 확장할 수 있음.'),
       nodes: [
-        { id:'n-s',  type:'start',     x:40,  y:180, title:'시작', data:{} },
-        { id:'n-l1', type:'session',   x:260, y:180, title:'리드 스프린트 기획', data:{
-          subject: '이번 스프린트 목표와 업무 분담',
-          description: '아래 형식으로 답하라.\n\n# 프론트\n(프론트엔드에게 전달할 구체적 업무 지시)\n\n# 백엔드\n(백엔드에게 전달할 구체적 업무 지시)',
+        { id:'n-s',  type:'start',     x:40,  y:180, title:t('시작'), data:{} },
+        { id:'n-l1', type:'session',   x:260, y:180, title:t('리드 스프린트 기획'), data:{
+          subject: t('이번 스프린트 목표와 업무 분담'),
+          description: t('아래 형식으로 답하라.') + '\n\n# ' + t('프론트') + '\n' + t('(프론트엔드에게 전달할 구체적 업무 지시)') + '\n\n# ' + t('백엔드') + '\n' + t('(백엔드에게 전달할 구체적 업무 지시)'),
           assignee: 'opus-4.7', agentRole: 'team-lead', cwd: '~', inputsMode: 'concat',
-          systemPrompt: '너는 스프린트를 이끄는 테크 리드다. 요구사항을 명확한 실행 단위로 분해해 프론트·백엔드 팀에게 분배한다. 모호함을 남기지 말고 수용 기준까지 명시하라.',
+          systemPrompt: t('너는 스프린트를 이끄는 테크 리드다. 요구사항을 명확한 실행 단위로 분해해 프론트·백엔드 팀에게 분배한다. 모호함을 남기지 말고 수용 기준까지 명시하라.'),
         }},
-        { id:'n-fe', type:'subagent',  x:520, y:60,  title:'프론트엔드', data:{
-          subject: '프론트엔드 구현',
-          description: '리드 지시 중 프론트 섹션만 구현. React + TypeScript 기준. 완료된 파일 경로·핵심 변경 요약 반환.',
+        { id:'n-fe', type:'subagent',  x:520, y:60,  title:t('프론트엔드'), data:{
+          subject: t('프론트엔드 구현'),
+          description: t('리드 지시 중 프론트 섹션만 구현. React + TypeScript 기준. 완료된 파일 경로·핵심 변경 요약 반환.'),
           assignee: 'sonnet-4.6', agentRole: 'frontend-dev', cwd: '~', inputsMode: 'first',
-          systemPrompt: '너는 React + TypeScript + Tailwind 에 능숙한 시니어 프론트엔드 개발자다. 접근성·성능·타입 안전성을 우선시한다. 입력에서 프론트 관련 업무만 실행하고, 백엔드 섹션은 무시한다.',
+          systemPrompt: t('너는 React + TypeScript + Tailwind 에 능숙한 시니어 프론트엔드 개발자다. 접근성·성능·타입 안전성을 우선시한다. 입력에서 프론트 관련 업무만 실행하고, 백엔드 섹션은 무시한다.'),
         }},
-        { id:'n-be', type:'subagent',  x:520, y:300, title:'백엔드', data:{
-          subject: '백엔드 구현',
-          description: '리드 지시 중 백엔드 섹션만 구현. API · DB · 테스트까지. 완료된 파일 경로·핵심 변경 요약 반환.',
+        { id:'n-be', type:'subagent',  x:520, y:300, title:t('백엔드'), data:{
+          subject: t('백엔드 구현'),
+          description: t('리드 지시 중 백엔드 섹션만 구현. API · DB · 테스트까지. 완료된 파일 경로·핵심 변경 요약 반환.'),
           assignee: 'sonnet-4.6', agentRole: 'backend-dev', cwd: '~', inputsMode: 'first',
-          systemPrompt: '너는 Node.js · PostgreSQL · REST/GraphQL 에 능숙한 시니어 백엔드 개발자다. 보안·확장성·테스트 커버리지를 우선시한다. 입력에서 백엔드 관련 업무만 실행하고, 프론트 섹션은 무시한다.',
+          systemPrompt: t('너는 Node.js · PostgreSQL · REST/GraphQL 에 능숙한 시니어 백엔드 개발자다. 보안·확장성·테스트 커버리지를 우선시한다. 입력에서 백엔드 관련 업무만 실행하고, 프론트 섹션은 무시한다.'),
         }},
-        { id:'n-agg', type:'aggregate', x:780, y:180, title:'결과 취합', data:{ mode: 'concat' }},
-        { id:'n-l2',  type:'session',   x:1040, y:180, title:'리드 리뷰 + 다음 기획', data:{
-          subject: '스프린트 리뷰 및 다음 스프린트 계획',
-          description: '두 결과를 보고 1) 문제/개선, 2) 다음 스프린트 업무 분담(다시 프론트·백엔드 섹션) 을 생성. 같은 포맷 유지.',
+        { id:'n-agg', type:'aggregate', x:780, y:180, title:t('결과 취합'), data:{ mode: 'concat' }},
+        { id:'n-l2',  type:'session',   x:1040, y:180, title:t('리드 리뷰 + 다음 기획'), data:{
+          subject: t('스프린트 리뷰 및 다음 스프린트 계획'),
+          description: t('두 결과를 보고 1) 문제/개선, 2) 다음 스프린트 업무 분담(다시 프론트·백엔드 섹션) 을 생성. 같은 포맷 유지.'),
           assignee: 'opus-4.7', agentRole: 'team-lead', cwd: '~', inputsMode: 'concat',
-          systemPrompt: '너는 스프린트를 이끄는 테크 리드다. 이전 스프린트 결과를 비판적으로 평가하고, 리스크를 식별하며, 다음 스프린트의 업무 분담을 명확히 작성한다.',
+          systemPrompt: t('너는 스프린트를 이끄는 테크 리드다. 이전 스프린트 결과를 비판적으로 평가하고, 리스크를 식별하며, 다음 스프린트의 업무 분담을 명확히 작성한다.'),
         }},
-        { id:'n-o',   type:'output',    x:1300, y:180, title:'최종 결과', data:{} },
+        { id:'n-o',   type:'output',    x:1300, y:180, title:t('최종 결과'), data:{} },
       ],
       edges: [
         { id:'e1', from:'n-s',  to:'n-l1', fromPort:'out', toPort:'in' },
@@ -2821,26 +2821,26 @@ const WF_TEMPLATES = [
     title: '리서치 파이프라인',
     desc: '리서처가 자료 수집 → 작가가 초안 작성 → 리뷰어가 검토 → 최종 문서.',
     build: () => ({
-      name: '리서치 → 초안 → 리뷰',
-      description: '순차 3 단계 리서치 파이프라인.',
+      name: t('리서치 → 초안 → 리뷰'),
+      description: t('순차 3 단계 리서치 파이프라인.'),
       nodes: [
-        { id:'n-s', type:'start',    x:40,  y:180, title:'시작' },
-        { id:'n-r', type:'subagent', x:260, y:180, title:'리서치', data:{
-          subject: '주제 심층 리서치',
-          description: '웹·문서·기존 자료를 종합해 핵심 근거와 인용 정리.',
+        { id:'n-s', type:'start',    x:40,  y:180, title:t('시작') },
+        { id:'n-r', type:'subagent', x:260, y:180, title:t('리서치'), data:{
+          subject: t('주제 심층 리서치'),
+          description: t('웹·문서·기존 자료를 종합해 핵심 근거와 인용 정리.'),
           assignee: 'sonnet-4.6', agentRole: 'researcher', cwd: '~', inputsMode: 'first',
         }},
-        { id:'n-w', type:'subagent', x:520, y:180, title:'작가 초안', data:{
-          subject: '초안 작성',
-          description: '리서치 결과를 바탕으로 독자 친화적인 초안 작성. 톤·구조 명확히.',
+        { id:'n-w', type:'subagent', x:520, y:180, title:t('작가 초안'), data:{
+          subject: t('초안 작성'),
+          description: t('리서치 결과를 바탕으로 독자 친화적인 초안 작성. 톤·구조 명확히.'),
           assignee: 'sonnet-4.6', agentRole: 'writer', cwd: '~', inputsMode: 'first',
         }},
-        { id:'n-v', type:'subagent', x:780, y:180, title:'리뷰', data:{
-          subject: '편집 리뷰',
-          description: '정확성·톤·가독성·중복을 체크하고 다듬은 최종본 반환.',
+        { id:'n-v', type:'subagent', x:780, y:180, title:t('리뷰'), data:{
+          subject: t('편집 리뷰'),
+          description: t('정확성·톤·가독성·중복을 체크하고 다듬은 최종본 반환.'),
           assignee: 'opus-4.7', agentRole: 'reviewer', cwd: '~', inputsMode: 'first',
         }},
-        { id:'n-o', type:'output',   x:1040, y:180, title:'최종 문서' },
+        { id:'n-o', type:'output',   x:1040, y:180, title:t('최종 문서') },
       ],
       edges: [
         { id:'e1', from:'n-s', to:'n-r' },
@@ -2856,15 +2856,15 @@ const WF_TEMPLATES = [
     title: '단순 병렬 3 작업',
     desc: '독립적인 3개 세션이 병렬 실행 → 결과 취합 → 하나의 문서로 출력.',
     build: () => ({
-      name: '병렬 3 작업',
-      description: '시작 → 3 개 병렬 세션 → 취합 → 결과.',
+      name: t('병렬 3 작업'),
+      description: t('시작 → 3 개 병렬 세션 → 취합 → 결과.'),
       nodes: [
-        { id:'n-s',  type:'start',     x:40,  y:220, title:'시작' },
-        { id:'n-a',  type:'session',   x:260, y:60,  title:'작업 A', data:{ subject:'작업 A', description:'...', assignee:'sonnet-4.6', inputsMode:'first' }},
-        { id:'n-b',  type:'session',   x:260, y:220, title:'작업 B', data:{ subject:'작업 B', description:'...', assignee:'sonnet-4.6', inputsMode:'first' }},
-        { id:'n-c',  type:'session',   x:260, y:380, title:'작업 C', data:{ subject:'작업 C', description:'...', assignee:'sonnet-4.6', inputsMode:'first' }},
-        { id:'n-ag', type:'aggregate', x:520, y:220, title:'취합',   data:{ mode:'concat' }},
-        { id:'n-o',  type:'output',    x:780, y:220, title:'결과' },
+        { id:'n-s',  type:'start',     x:40,  y:220, title:t('시작') },
+        { id:'n-a',  type:'session',   x:260, y:60,  title:t('작업 A'), data:{ subject:t('작업 A'), description:'...', assignee:'sonnet-4.6', inputsMode:'first' }},
+        { id:'n-b',  type:'session',   x:260, y:220, title:t('작업 B'), data:{ subject:t('작업 B'), description:'...', assignee:'sonnet-4.6', inputsMode:'first' }},
+        { id:'n-c',  type:'session',   x:260, y:380, title:t('작업 C'), data:{ subject:t('작업 C'), description:'...', assignee:'sonnet-4.6', inputsMode:'first' }},
+        { id:'n-ag', type:'aggregate', x:520, y:220, title:t('취합'),   data:{ mode:'concat' }},
+        { id:'n-o',  type:'output',    x:780, y:220, title:t('결과') },
       ],
       edges: [
         { id:'e1', from:'n-s', to:'n-a' },
@@ -2880,7 +2880,9 @@ const WF_TEMPLATES = [
 ];
 
 async function _wfShowTemplates() {
-  const cards = WF_TEMPLATES.map(tpl => `
+  const customList = await api('/api/workflows/templates/list');
+  const customTemplates = (customList && customList.templates) || [];
+  const builtInCards = WF_TEMPLATES.map(tpl => `
     <div class="card p-4 hover-lift" style="cursor:pointer;" onclick="_wfUseTemplate('${tpl.id}')">
       <div class="flex items-center gap-2 mb-2">
         <span style="font-size:1.5rem;">${tpl.icon}</span>
@@ -2889,6 +2891,19 @@ async function _wfShowTemplates() {
       <div class="text-[11px] text-[var(--text-mute)] leading-relaxed">${escapeHtml(t(tpl.desc))}</div>
     </div>
   `).join('');
+  const customCards = customTemplates.length ? customTemplates.map(tpl => `
+    <div class="card p-4 hover-lift" style="cursor:pointer;position:relative;" onclick="_wfUseCustomTemplate('${tpl.id}')">
+      <button class="btn text-[10px]" style="position:absolute;top:8px;right:8px;color:#fca5a5;"
+              onclick="event.stopPropagation();_wfDeleteCustomTemplate('${tpl.id}')">🗑️</button>
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:1.5rem;">${escapeHtml(tpl.icon||'💾')}</span>
+        <span class="text-sm font-semibold">${escapeHtml(tpl.name)}</span>
+      </div>
+      <div class="text-[11px] text-[var(--text-mute)] leading-relaxed mb-1">${escapeHtml(tpl.description || '')}</div>
+      <div class="text-[10px] text-[var(--text-dim)]">${tpl.nodeCount} ${t('노드')} · ${tpl.edgeCount} ${t('연결')}</div>
+    </div>
+  `).join('') : `<div class="card p-4 text-xs text-[var(--text-dim)] text-center">${t('저장된 커스텀 템플릿이 없습니다')}</div>`;
+  const canSaveCurrent = !!(__wf.current && (__wf.current.nodes||[]).length);
   showModal(`
     <div class="p-5">
       <div class="flex items-center justify-between mb-3">
@@ -2898,7 +2913,16 @@ async function _wfShowTemplates() {
       <div class="text-xs text-[var(--text-mute)] mb-3">
         ${t('자주 쓰는 DAG 패턴을 원클릭으로 만듭니다. 생성 후 노드별 업무 내용을 자유롭게 수정하세요.')}
       </div>
-      <div class="flex flex-col gap-2">${cards}</div>
+
+      <div class="text-[11px] uppercase tracking-wider text-[var(--text-dim)] mb-2">${t('기본 템플릿')}</div>
+      <div class="flex flex-col gap-2 mb-4">${builtInCards}</div>
+
+      <div class="flex items-center justify-between mt-4 mb-2">
+        <div class="text-[11px] uppercase tracking-wider text-[var(--text-dim)]">${t('내 커스텀 템플릿')}</div>
+        <button class="btn-primary btn text-xs" ${canSaveCurrent?'':'disabled style="opacity:0.5;pointer-events:none;"'}
+                onclick="_wfSaveCurrentAsTemplate()">＋ ${t('현재 워크플로우를 템플릿으로 저장')}</button>
+      </div>
+      <div class="flex flex-col gap-2">${customCards}</div>
     </div>
   `, { narrow: true });
 }
@@ -2918,8 +2942,86 @@ async function _wfUseTemplate(tplId) {
   __wf.workflows = list.workflows || [];
   await _wfOpen(r.id);
   _wfRenderList();
-  // 자동 맞춤 (정렬 포함)
   setTimeout(() => _wfFitView(), 150);
+}
+
+async function _wfUseCustomTemplate(tplId) {
+  const r = await api('/api/workflows/templates/' + encodeURIComponent(tplId));
+  if (!r.ok) { toast(r.error || t('로드 실패'), 'err'); return; }
+  closeModal();
+  const tpl = r.template;
+  // 템플릿을 바탕으로 새 워크플로우 생성 (id 제거해서 신규 ID 할당)
+  const body = {
+    name: tpl.name + ' (' + t('복제') + ')',
+    description: tpl.description,
+    nodes: tpl.nodes,
+    edges: tpl.edges,
+    viewport: tpl.viewport,
+  };
+  const s = await api('/api/workflows/save', {
+    method: 'POST', headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!s.ok) { toast(s.error || t('실패'), 'err'); return; }
+  toast(t('템플릿에서 생성됨'), 'ok');
+  const list = await api('/api/workflows/list');
+  __wf.workflows = list.workflows || [];
+  await _wfOpen(s.id);
+  _wfRenderList();
+  setTimeout(() => _wfFitView(), 150);
+}
+
+async function _wfSaveCurrentAsTemplate() {
+  if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
+  const name = await promptModal({
+    title: t('템플릿으로 저장'),
+    message: t('템플릿 이름을 입력하세요'),
+    placeholder: t('예: 내 리뷰 플로우'),
+    defaultValue: __wf.current.name || '',
+    confirmLabel: t('저장'),
+  });
+  if (!name || !name.trim()) return;
+  const desc = await promptModal({
+    title: t('템플릿 설명 (선택)'),
+    message: t('이 템플릿이 무엇인지 한두 줄로 적어주세요. 비워도 됩니다.'),
+    placeholder: '',
+    defaultValue: __wf.current.description || '',
+    confirmLabel: t('저장'),
+  });
+  const body = {
+    name: name.trim(),
+    description: (desc || '').trim(),
+    icon: '💾',
+    nodes: __wf.current.nodes,
+    edges: __wf.current.edges,
+    viewport: __wf.current.viewport,
+  };
+  const r = await api('/api/workflows/templates/save', {
+    method: 'POST', headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
+  toast(t('커스텀 템플릿 저장됨'), 'ok');
+  // 모달 다시 열어 목록 갱신
+  closeModal();
+  setTimeout(() => _wfShowTemplates(), 100);
+}
+
+async function _wfDeleteCustomTemplate(tplId) {
+  const ok = await confirmModal({
+    title: t('커스텀 템플릿 삭제'),
+    message: t('이 커스텀 템플릿을 삭제할까요?'),
+    confirmLabel: t('삭제'), danger: true,
+  });
+  if (!ok) return;
+  const r = await api('/api/workflows/templates/delete', {
+    method: 'POST', headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({ id: tplId }),
+  });
+  if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
+  toast(t('삭제됨'), 'ok');
+  closeModal();
+  setTimeout(() => _wfShowTemplates(), 100);
 }
 
 // ─── 인터랙티브 튜토리얼 ─────────────────────────────────────

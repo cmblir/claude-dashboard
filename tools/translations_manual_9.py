@@ -227,6 +227,70 @@ NEW_EN = {
     "단순 병렬 3 작업": "Simple parallel 3 tasks",
     "독립적인 3개 세션이 병렬 실행 → 결과 취합 → 하나의 문서로 출력.":
         "Three independent sessions run in parallel → aggregate → single output.",
+
+    # 템플릿 내부 한글 필드 (build() 에서 t() 로 감쌌음)
+    "팀 개발 스프린트": "Team Development Sprint",
+    "리드 ↔ 프론트·백엔드 병렬 협업 플로우. DAG 이 두 번째 리드에서 다시 분배하며 반복 스프린트를 확장할 수 있음.":
+        "Lead ↔ Frontend/Backend parallel collaboration flow. The DAG can extend into repeated sprints by having a second Lead re-distribute tasks.",
+    "리드 스프린트 기획": "Lead — Sprint Planning",
+    "이번 스프린트 목표와 업무 분담": "This sprint's goals and task breakdown",
+    "아래 형식으로 답하라.": "Answer in this format.",
+    "(프론트엔드에게 전달할 구체적 업무 지시)": "(Concrete task instructions for the frontend team)",
+    "(백엔드에게 전달할 구체적 업무 지시)": "(Concrete task instructions for the backend team)",
+    "너는 스프린트를 이끄는 테크 리드다. 요구사항을 명확한 실행 단위로 분해해 프론트·백엔드 팀에게 분배한다. 모호함을 남기지 말고 수용 기준까지 명시하라.":
+        "You are the tech lead running the sprint. Decompose requirements into clear execution units and distribute them to frontend/backend teams. Leave no ambiguity — include acceptance criteria.",
+    "프론트엔드 구현": "Frontend implementation",
+    "리드 지시 중 프론트 섹션만 구현. React + TypeScript 기준. 완료된 파일 경로·핵심 변경 요약 반환.":
+        "Implement only the Frontend section of the Lead's instructions. React + TypeScript. Return the completed file paths and a summary of key changes.",
+    "너는 React + TypeScript + Tailwind 에 능숙한 시니어 프론트엔드 개발자다. 접근성·성능·타입 안전성을 우선시한다. 입력에서 프론트 관련 업무만 실행하고, 백엔드 섹션은 무시한다.":
+        "You are a senior frontend engineer fluent in React + TypeScript + Tailwind. Prioritize accessibility, performance, and type safety. Execute only the frontend portion of the input; ignore backend sections.",
+    "백엔드 구현": "Backend implementation",
+    "리드 지시 중 백엔드 섹션만 구현. API · DB · 테스트까지. 완료된 파일 경로·핵심 변경 요약 반환.":
+        "Implement only the Backend section of the Lead's instructions — API, DB, tests included. Return the completed file paths and a summary of key changes.",
+    "너는 Node.js · PostgreSQL · REST/GraphQL 에 능숙한 시니어 백엔드 개발자다. 보안·확장성·테스트 커버리지를 우선시한다. 입력에서 백엔드 관련 업무만 실행하고, 프론트 섹션은 무시한다.":
+        "You are a senior backend engineer fluent in Node.js · PostgreSQL · REST/GraphQL. Prioritize security, scalability, and test coverage. Execute only the backend portion of the input; ignore frontend sections.",
+    "결과 취합": "Result Aggregate",
+    "리드 리뷰 + 다음 기획": "Lead — Review + Next Planning",
+    "스프린트 리뷰 및 다음 스프린트 계획": "Sprint review and next sprint plan",
+    "두 결과를 보고 1) 문제/개선, 2) 다음 스프린트 업무 분담(다시 프론트·백엔드 섹션) 을 생성. 같은 포맷 유지.":
+        "Looking at both outputs: 1) issues & improvements, 2) next sprint task distribution (again Frontend/Backend sections). Keep the same format.",
+    "너는 스프린트를 이끄는 테크 리드다. 이전 스프린트 결과를 비판적으로 평가하고, 리스크를 식별하며, 다음 스프린트의 업무 분담을 명확히 작성한다.":
+        "You are the tech lead running the sprint. Critically evaluate the previous sprint, identify risks, and clearly specify the next sprint's task distribution.",
+    "최종 결과": "Final Result",
+
+    "리서치 → 초안 → 리뷰": "Research → Draft → Review",
+    "순차 3 단계 리서치 파이프라인.": "A 3-stage sequential research pipeline.",
+    "주제 심층 리서치": "In-depth topic research",
+    "웹·문서·기존 자료를 종합해 핵심 근거와 인용 정리.":
+        "Synthesize web, docs, and existing material — compile key evidence and citations.",
+    "작가 초안": "Writer Draft",
+    "초안 작성": "Write draft",
+    "리서치 결과를 바탕으로 독자 친화적인 초안 작성. 톤·구조 명확히.":
+        "Based on the research, write a reader-friendly draft. Clear tone and structure.",
+    "편집 리뷰": "Editorial Review",
+    "정확성·톤·가독성·중복을 체크하고 다듬은 최종본 반환.":
+        "Check accuracy, tone, readability, redundancy, and return a polished final version.",
+    "최종 문서": "Final Document",
+
+    "병렬 3 작업": "Parallel 3 Tasks",
+    "시작 → 3 개 병렬 세션 → 취합 → 결과.": "Start → 3 parallel sessions → aggregate → result.",
+    "작업 A": "Task A", "작업 B": "Task B", "작업 C": "Task C",
+
+    # 커스텀 템플릿 UI
+    "기본 템플릿": "Built-in templates",
+    "내 커스텀 템플릿": "My custom templates",
+    "저장된 커스텀 템플릿이 없습니다": "No custom templates saved",
+    "현재 워크플로우를 템플릿으로 저장": "Save current workflow as template",
+    "템플릿으로 저장": "Save as template",
+    "템플릿 이름을 입력하세요": "Enter a template name",
+    "예: 내 리뷰 플로우": "e.g. My review flow",
+    "템플릿 설명 (선택)": "Template description (optional)",
+    "이 템플릿이 무엇인지 한두 줄로 적어주세요. 비워도 됩니다.":
+        "Briefly describe what this template is for. Can be empty.",
+    "커스텀 템플릿 저장됨": "Custom template saved",
+    "커스텀 템플릿 삭제": "Delete custom template",
+    "이 커스텀 템플릿을 삭제할까요?": "Delete this custom template?",
+    "복제": "copy",
     "이름을 입력하세요": "Enter a name",
     "예: README 작성 파이프라인": "e.g. README writing pipeline",
     "생성": "Create",
@@ -478,6 +542,68 @@ NEW_ZH = {
     "단순 병렬 3 작업": "简单并行 3 任务",
     "독립적인 3개 세션이 병렬 실행 → 결과 취합 → 하나의 문서로 출력.":
         "三个独立会话并行执行 → 汇总 → 输出单一文档。",
+
+    "팀 개발 스프린트": "团队开发冲刺",
+    "리드 ↔ 프론트·백엔드 병렬 협업 플로우. DAG 이 두 번째 리드에서 다시 분배하며 반복 스프린트를 확장할 수 있음.":
+        "Lead ↔ 前端·后端并行协作流程。DAG 可在第二个 Lead 再次分配，从而扩展为重复冲刺。",
+    "리드 스프린트 기획": "Lead — 冲刺规划",
+    "이번 스프린트 목표와 업무 분담": "本次冲刺的目标与任务分配",
+    "아래 형식으로 답하라.": "按以下格式回答。",
+    "(프론트엔드에게 전달할 구체적 업무 지시)": "（给前端的具体任务指令）",
+    "(백엔드에게 전달할 구체적 업무 지시)": "（给后端的具体任务指令）",
+    "너는 스프린트를 이끄는 테크 리드다. 요구사항을 명확한 실행 단위로 분해해 프론트·백엔드 팀에게 분배한다. 모호함을 남기지 말고 수용 기준까지 명시하라.":
+        "你是领导冲刺的 Tech Lead。将需求拆解为明确的执行单元，分发给前端·后端团队。不要留下模糊地带，并注明验收标准。",
+    "프론트엔드 구현": "前端实现",
+    "리드 지시 중 프론트 섹션만 구현. React + TypeScript 기준. 완료된 파일 경로·핵심 변경 요약 반환.":
+        "仅实现 Lead 指令中的前端部分。使用 React + TypeScript。返回已完成的文件路径与关键变更摘要。",
+    "너는 React + TypeScript + Tailwind 에 능숙한 시니어 프론트엔드 개발자다. 접근성·성능·타입 안전성을 우선시한다. 입력에서 프론트 관련 업무만 실행하고, 백엔드 섹션은 무시한다.":
+        "你是精通 React + TypeScript + Tailwind 的资深前端工程师。优先考虑可访问性、性能、类型安全。只执行输入中前端相关的任务，忽略后端部分。",
+    "백엔드 구현": "后端实现",
+    "리드 지시 중 백엔드 섹션만 구현. API · DB · 테스트까지. 완료된 파일 경로·핵심 변경 요약 반환.":
+        "仅实现 Lead 指令中的后端部分，包括 API · DB · 测试。返回已完成的文件路径与关键变更摘要。",
+    "너는 Node.js · PostgreSQL · REST/GraphQL 에 능숙한 시니어 백엔드 개발자다. 보안·확장성·테스트 커버리지를 우선시한다. 입력에서 백엔드 관련 업무만 실행하고, 프론트 섹션은 무시한다.":
+        "你是精通 Node.js · PostgreSQL · REST/GraphQL 的资深后端工程师。优先考虑安全、可扩展性、测试覆盖率。只执行输入中后端相关的任务，忽略前端部分。",
+    "결과 취합": "结果汇总",
+    "리드 리뷰 + 다음 기획": "Lead — 复盘 + 下一轮规划",
+    "스프린트 리뷰 및 다음 스프린트 계획": "冲刺复盘与下一冲刺计划",
+    "두 결과를 보고 1) 문제/개선, 2) 다음 스프린트 업무 분담(다시 프론트·백엔드 섹션) 을 생성. 같은 포맷 유지.":
+        "查看两个结果：1) 问题与改进，2) 下一冲刺的任务分配（再次按前端·后端分节）。保持相同格式。",
+    "너는 스프린트를 이끄는 테크 리드다. 이전 스프린트 결과를 비판적으로 평가하고, 리스크를 식별하며, 다음 스프린트의 업무 분담을 명확히 작성한다.":
+        "你是领导冲刺的 Tech Lead。批判性评估上一次冲刺结果，识别风险，并清晰书写下一冲刺的任务分配。",
+    "최종 결과": "最终结果",
+
+    "리서치 → 초안 → 리뷰": "研究 → 初稿 → 评审",
+    "순차 3 단계 리서치 파이프라인.": "顺序 3 阶段研究流水线。",
+    "주제 심층 리서치": "主题深度研究",
+    "웹·문서·기존 자료를 종합해 핵심 근거와 인용 정리.":
+        "综合网络、文档和现有材料，整理关键证据与引用。",
+    "작가 초안": "作者初稿",
+    "초안 작성": "撰写初稿",
+    "리서치 결과를 바탕으로 독자 친화적인 초안 작성. 톤·구조 명확히.":
+        "基于研究结果撰写对读者友好的初稿。语气与结构要明确。",
+    "편집 리뷰": "编辑评审",
+    "정확성·톤·가독성·중복을 체크하고 다듬은 최종본 반환.":
+        "检查准确性、语气、可读性、重复内容，返回打磨后的最终版。",
+    "최종 문서": "最终文档",
+
+    "병렬 3 작업": "并行 3 任务",
+    "시작 → 3 개 병렬 세션 → 취합 → 결과.": "开始 → 3 个并行会话 → 汇总 → 结果。",
+    "작업 A": "任务 A", "작업 B": "任务 B", "작업 C": "任务 C",
+
+    "기본 템플릿": "内置模板",
+    "내 커스텀 템플릿": "我的自定义模板",
+    "저장된 커스텀 템플릿이 없습니다": "尚无已保存的自定义模板",
+    "현재 워크플로우를 템플릿으로 저장": "将当前工作流保存为模板",
+    "템플릿으로 저장": "保存为模板",
+    "템플릿 이름을 입력하세요": "请输入模板名称",
+    "예: 내 리뷰 플로우": "例如：我的评审流程",
+    "템플릿 설명 (선택)": "模板说明（可选）",
+    "이 템플릿이 무엇인지 한두 줄로 적어주세요. 비워도 됩니다.":
+        "用一两句话描述这个模板是做什么的。可以留空。",
+    "커스텀 템플릿 저장됨": "已保存自定义模板",
+    "커스텀 템플릿 삭제": "删除自定义模板",
+    "이 커스텀 템플릿을 삭제할까요?": "要删除此自定义模板吗？",
+    "복제": "副本",
     "이름을 입력하세요": "请输入名称",
     "예: README 작성 파이프라인": "例如：README 撰写流程",
     "생성": "创建",
