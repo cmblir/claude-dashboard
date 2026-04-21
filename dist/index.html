@@ -261,6 +261,10 @@
   .wf-floating .btn:hover { background: var(--card-hi); }
   /* 인스펙터 접기 */
   #wfInspector.wf-collapsed { display: none; }
+  /* 튜토리얼 애니메이션 */
+  @keyframes wfTutFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes wfTutDraw { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+  .wf-tut-node-pop { animation: wfTutFadeIn 0.45s ease-out backwards; }
   .wf-floating-right { position: absolute; right: 12px; top: 12px; z-index: 5; }
   .wf-floating-right .btn { background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(4px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
   .wf-floating-right .btn:hover { background: var(--card-hi); }
@@ -1435,6 +1439,7 @@ VIEWS.workflows = async () => {
             <span id="wfDirty" class="text-[10px] text-[var(--text-dim)]"></span>
           </div>
           <div class="flex-1"></div>
+          <button class="btn text-xs" onclick="_wfShowTutorial()" title="${t('사용법 보기')}">🎬 ${t('사용법')}</button>
           <button class="btn-primary btn text-xs" onclick="_wfOpenNodeEditor(null)" title="${t('새 노드 추가')}">＋ ${t('노드 추가')}</button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
           <button class="btn text-xs" onclick="_wfShowRuns()" title="${t('실행 이력')}">📜 ${t('이력')}</button>
@@ -2564,6 +2569,232 @@ async function _wfSpawnSession(nid) {
   });
   if (!r.ok) { toast(r.error||t('세션 생성 실패'), 'err'); return; }
   toast(t('Claude 세션 시작됨'), 'ok');
+}
+
+// ─── 인터랙티브 튜토리얼 ─────────────────────────────────────
+// 6 단계로 워크플로우 사용법을 자동 재생. 맥 스타일 feat-win 창에서
+// SVG 무대 위로 노드/엣지를 순차적으로 페이드인·드로잉 애니메이션.
+let __wfTut = null;
+
+const WF_TUT_STEPS = [
+  {
+    title: '1. 새 워크플로우 생성',
+    caption: '좌측 사이드바의 ＋ 버튼으로 새 워크플로우를 만들면 빈 캔버스가 열립니다. 여기가 우리가 업무 흐름을 설계할 무대.',
+    nodes: [],
+    edges: [],
+  },
+  {
+    title: '2. 🚀 시작 노드 추가',
+    caption: '상단 툴바의 ＋ 노드 추가 → 창에서 🚀 시작 카테고리 선택. 워크플로우의 진입점이 되는 노드.',
+    nodes: [{ id:'s', type:'start', x:60, y:120, title:'시작' }],
+    edges: [],
+  },
+  {
+    title: '3. 🗂️ 세션 노드로 업무 정의',
+    caption: '＋ 노드 추가 → 🗂️ 세션. 제목과 업무(subject)를 입력. 예: "경쟁 제품 3개 분석". 이 노드가 실행되면 claude -p 로 작업을 처리.',
+    nodes: [
+      { id:'s', type:'start',   x:60,  y:120, title:'시작' },
+      { id:'a', type:'session', x:260, y:120, title:'리서치', sub:'@sonnet-4.6' },
+    ],
+    edges: [],
+  },
+  {
+    title: '4. 포트 드래그로 화살표 연결',
+    caption: '노드 우측의 주황 포트를 다음 노드 좌측 보라 포트로 드래그. 베지어 곡선 + 방향 화살표가 자동으로 그려짐.',
+    nodes: [
+      { id:'s', type:'start',   x:60,  y:120, title:'시작' },
+      { id:'a', type:'session', x:260, y:120, title:'리서치', sub:'@sonnet-4.6' },
+    ],
+    edges: [{ from:'s', to:'a' }],
+  },
+  {
+    title: '5. 결과 노드로 마무리 + ▶ 실행',
+    caption: '📤 결과 노드를 추가하고 연결. ▶ 실행 누르면 DAG 를 토폴로지 순서로 자동 실행. 각 노드가 실행 중에는 보라색 펄스.',
+    nodes: [
+      { id:'s', type:'start',   x:60,  y:120, title:'시작',   status:'ok' },
+      { id:'a', type:'session', x:260, y:120, title:'리서치', sub:'@sonnet-4.6', status:'running' },
+      { id:'o', type:'output',  x:460, y:120, title:'결과' },
+    ],
+    edges: [{ from:'s', to:'a' }, { from:'a', to:'o' }],
+  },
+  {
+    title: '6. 완료 → 결과 모달 / 터미널',
+    caption: '완료된 노드는 녹색 테두리. 결과 모달에 노드별 출력 미리보기. 세션 노드 우상단 🖥️ 아이콘으로 Terminal 새 창에서 대화형 세션도 시작 가능.',
+    nodes: [
+      { id:'s', type:'start',   x:60,  y:120, title:'시작',   status:'ok' },
+      { id:'a', type:'session', x:260, y:120, title:'리서치', sub:'@sonnet-4.6', status:'ok' },
+      { id:'o', type:'output',  x:460, y:120, title:'결과',   status:'ok' },
+    ],
+    edges: [{ from:'s', to:'a' }, { from:'a', to:'o' }],
+  },
+];
+
+function _wfShowTutorial() {
+  const winId = 'wfTutWin';
+  const ex = document.getElementById(winId);
+  if (ex) { ex.style.zIndex = ++_winMgr.zIndex; ex.classList.remove('feat-win-minimized'); return; }
+  const w = document.createElement('div');
+  w.id = winId;
+  w.className = 'feat-win';
+  w.style.zIndex = ++_winMgr.zIndex;
+  const initW = Math.min(720, window.innerWidth - 40);
+  const initH = Math.min(560, window.innerHeight - 40);
+  w.style.left = (window.innerWidth/2 - initW/2) + 'px';
+  w.style.top  = (window.innerHeight/2 - initH/2) + 'px';
+  w.style.width = initW + 'px';
+  w.style.height = initH + 'px';
+  w.style.maxHeight = 'calc(100vh - 24px)';
+  w.innerHTML = `
+    <div class="feat-win-title">
+      <div class="feat-win-lights">
+        <button class="feat-light feat-light-close" title="${t('닫기')}" onclick="_wfCloseTutorial()"></button>
+        <button class="feat-light feat-light-min"   title="${t('내리기')}" onclick="document.getElementById('${winId}').classList.toggle('feat-win-minimized')"></button>
+        <button class="feat-light feat-light-max"   title="${t('펼치기')}" onclick="_wfMaxTutorial('${winId}')"></button>
+      </div>
+      <div class="feat-win-title-text">🎬 ${t('워크플로우 사용법')}</div>
+    </div>
+    <div class="feat-win-body" style="padding:0;display:flex;flex-direction:column;">
+      <div id="wfTutStage" style="flex:1;min-height:0;position:relative;overflow:hidden;background:
+          radial-gradient(circle at 1px 1px,rgba(255,255,255,0.06) 1px,transparent 0);
+          background-size:20px 20px;">
+        <svg id="wfTutSvg" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">
+          <defs>
+            <marker id="wfTutArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#d97757"/>
+            </marker>
+          </defs>
+          <g id="wfTutEdges"></g>
+          <g id="wfTutNodes"></g>
+        </svg>
+        <div id="wfTutCaption" style="position:absolute;left:12px;right:12px;bottom:12px;
+            background:rgba(0,0,0,0.72);backdrop-filter:blur(8px);
+            border:1px solid var(--border);border-radius:10px;padding:12px 16px;">
+          <div id="wfTutTitle" class="text-sm font-semibold mb-1"></div>
+          <div id="wfTutBody"  class="text-[12px] text-[var(--text-mute)] leading-relaxed"></div>
+        </div>
+      </div>
+      <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-shrink:0;">
+        <div style="flex:1;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">
+          <div id="wfTutBar" style="height:100%;width:0;background:var(--grad);transition:width 0.4s;"></div>
+        </div>
+        <span id="wfTutCount" class="text-[11px] text-[var(--text-dim)]" style="min-width:44px;text-align:center;">1 / ${WF_TUT_STEPS.length}</span>
+        <button class="btn text-xs" onclick="_wfTutGo(-1)" title="${t('이전')}">◀</button>
+        <button class="btn text-xs" id="wfTutPlayBtn" onclick="_wfTutTogglePlay()">⏸</button>
+        <button class="btn text-xs" onclick="_wfTutGo(1)" title="${t('다음')}">▶</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(w);
+  try { _makeDraggable(w); } catch (e) {}
+  _translateDOM(w);
+  __wfTut = { step: 0, playing: true, timer: null, winId };
+  _wfTutRender();
+  _wfTutSchedule();
+}
+
+function _wfCloseTutorial() {
+  if (__wfTut && __wfTut.timer) clearTimeout(__wfTut.timer);
+  const w = document.getElementById('wfTutWin');
+  if (w) w.remove();
+  __wfTut = null;
+}
+
+function _wfMaxTutorial(winId) {
+  const w = document.getElementById(winId);
+  if (!w) return;
+  const isMax = w.classList.toggle('feat-win-maxed');
+  if (isMax) {
+    w.style.left = '5vw'; w.style.top = '5vh';
+    w.style.width = '90vw'; w.style.maxHeight = '90vh';
+    w.style.height = '90vh';
+  } else {
+    const initW = 720, initH = 560;
+    w.style.width = initW + 'px'; w.style.height = initH + 'px';
+    w.style.maxHeight = 'calc(100vh - 24px)';
+    w.style.left = (window.innerWidth/2 - initW/2) + 'px';
+    w.style.top  = (window.innerHeight/2 - initH/2) + 'px';
+  }
+}
+
+function _wfTutTogglePlay() {
+  if (!__wfTut) return;
+  __wfTut.playing = !__wfTut.playing;
+  const b = document.getElementById('wfTutPlayBtn');
+  if (b) b.innerHTML = __wfTut.playing ? '⏸' : '▶';
+  if (__wfTut.playing) _wfTutSchedule();
+  else if (__wfTut.timer) { clearTimeout(__wfTut.timer); __wfTut.timer = null; }
+}
+
+function _wfTutGo(delta) {
+  if (!__wfTut) return;
+  if (__wfTut.timer) { clearTimeout(__wfTut.timer); __wfTut.timer = null; }
+  __wfTut.step = Math.max(0, Math.min(WF_TUT_STEPS.length - 1, __wfTut.step + delta));
+  _wfTutRender();
+  if (__wfTut.playing) _wfTutSchedule();
+}
+
+function _wfTutSchedule() {
+  if (!__wfTut || !__wfTut.playing) return;
+  if (__wfTut.timer) clearTimeout(__wfTut.timer);
+  __wfTut.timer = setTimeout(() => {
+    if (!__wfTut) return;
+    if (__wfTut.step < WF_TUT_STEPS.length - 1) {
+      __wfTut.step++; _wfTutRender(); _wfTutSchedule();
+    } else {
+      // 마지막 단계에서 정지
+      __wfTut.playing = false;
+      const b = document.getElementById('wfTutPlayBtn');
+      if (b) b.innerHTML = '▶';
+    }
+  }, 3800);
+}
+
+function _wfTutRender() {
+  if (!__wfTut) return;
+  const idx = __wfTut.step;
+  const step = WF_TUT_STEPS[idx];
+  const titleEl = document.getElementById('wfTutTitle');
+  const bodyEl  = document.getElementById('wfTutBody');
+  const barEl   = document.getElementById('wfTutBar');
+  const cntEl   = document.getElementById('wfTutCount');
+  const nodesG  = document.getElementById('wfTutNodes');
+  const edgesG  = document.getElementById('wfTutEdges');
+  if (!titleEl || !nodesG || !edgesG) return;
+  titleEl.textContent = t(step.title);
+  bodyEl.textContent  = t(step.caption);
+  barEl.style.width   = ((idx + 1) / WF_TUT_STEPS.length * 100).toFixed(1) + '%';
+  cntEl.textContent   = `${idx + 1} / ${WF_TUT_STEPS.length}`;
+
+  // 엣지
+  edgesG.innerHTML = (step.edges || []).map(e => {
+    const fromN = step.nodes.find(n => n.id === e.from);
+    const toN   = step.nodes.find(n => n.id === e.to);
+    if (!fromN || !toN) return '';
+    const x1 = fromN.x + WF_NODE_W, y1 = fromN.y + WF_NODE_H/2;
+    const x2 = toN.x,               y2 = toN.y + WF_NODE_H/2;
+    const dx = Math.max(60, Math.abs(x2 - x1) * 0.4);
+    const d = `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+    // stroke-dashoffset 애니메이션으로 그려지는 효과
+    return `<path class="wf-tut-edge" d="${d}"
+      stroke="#d97757" stroke-width="2" fill="none"
+      marker-end="url(#wfTutArrow)"
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"
+      style="animation: wfTutDraw 0.9s ease-out forwards;"></path>`;
+  }).join('');
+  // 노드
+  nodesG.innerHTML = (step.nodes || []).map((n, i) => {
+    const meta = WF_TYPE_MAP[n.type] || WF_TYPE_MAP.session;
+    const statusAttr = n.status ? ` data-status="${n.status}"` : '';
+    const sub = n.sub || t(meta.label);
+    return `
+      <g class="wf-node wf-tut-node-pop"${statusAttr} transform="translate(${n.x},${n.y})"
+         style="animation-delay: ${(i*0.18).toFixed(2)}s;">
+        <rect class="wf-node-body" width="${WF_NODE_W}" height="${WF_NODE_H}" rx="12" ry="12"></rect>
+        <text class="wf-node-icon" x="14" y="30">${meta.icon}</text>
+        <text class="wf-node-title" x="40" y="28">${escapeHtml(n.title || meta.label)}</text>
+        <text class="wf-node-sub"   x="40" y="48">${escapeHtml(sub)}</text>
+      </g>`;
+  }).join('');
 }
 
 async function _wfShowRuns() {
