@@ -1720,8 +1720,21 @@ function _wfRenderEdge(e) {
 }
 
 function _wfBezier(x1, y1, x2, y2) {
-  const dx = Math.max(60, Math.abs(x2 - x1) * 0.4);
-  return `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+  const diffX = x2 - x1;
+  if (diffX >= 0) {
+    // 정방향(또는 동일 x): 기존처럼 수평 베지어
+    const dx = Math.max(20, diffX * 0.45);
+    return `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+  }
+  // 역류: 출발이 도착보다 오른쪽. 제어점을 수직 방향(y2 쪽)으로 크게
+  // 꺼내 부드러운 S-curve 로 우회. 루프·교차 방지.
+  const verticalGap = Math.max(70, Math.abs(diffX) * 0.3);
+  const dirY = (y2 >= y1) ? 1 : -1;
+  const c1x = x1 + 60;
+  const c1y = y1 + verticalGap * dirY;
+  const c2x = x2 - 60;
+  const c2y = y2 - verticalGap * dirY;
+  return `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
 }
 
 // 모든 노드 bounding box 를 캔버스에 맞춰 pan/zoom 을 계산해 적용.
@@ -2653,12 +2666,12 @@ const WF_TUT_STEPS = [
     title: '6. 📤 결과 노드 + DAG 완성',
     caption: '📤 결과 노드를 추가하고 분기 → 결과로 마무리. 이 노드가 워크플로우 종착지. exportTo 경로를 지정하면 파일로 저장.',
     nodes: [
-      { id:'s', type:'start',     x:40,  y:40,  title:'시작' },
-      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6' },
-      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer' },
-      { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
-      { id:'d', type:'branch',    x:480, y:200, title:'분기' },
-      { id:'o', type:'output',    x:40,  y:200, title:'결과' },
+      { id:'s', type:'start',     x:20,  y:40,  title:'시작' },
+      { id:'a', type:'session',   x:230, y:40,  title:'리서치', sub:'@sonnet-4.6' },
+      { id:'b', type:'subagent',  x:440, y:40,  title:'작성',  sub:'@writer' },
+      { id:'c', type:'aggregate', x:230, y:220, title:'취합' },
+      { id:'d', type:'branch',    x:440, y:220, title:'분기' },
+      { id:'o', type:'output',    x:640, y:130, title:'결과' },
     ],
     edges: [
       { from:'s', to:'a' }, { from:'a', to:'b' },
@@ -2671,12 +2684,12 @@ const WF_TUT_STEPS = [
     title: '7. 🎯 맞춤으로 전체 한눈에',
     caption: '캔버스 우하단 🎯 맞춤 버튼 → 모든 노드 bounding box 가 보이도록 pan/zoom 자동 조정. 복잡한 워크플로우도 한 번에 정렬.',
     nodes: [
-      { id:'s', type:'start',     x:40,  y:40,  title:'시작' },
-      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6' },
-      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer' },
-      { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
-      { id:'d', type:'branch',    x:480, y:200, title:'분기' },
-      { id:'o', type:'output',    x:40,  y:200, title:'결과' },
+      { id:'s', type:'start',     x:20,  y:40,  title:'시작' },
+      { id:'a', type:'session',   x:230, y:40,  title:'리서치', sub:'@sonnet-4.6' },
+      { id:'b', type:'subagent',  x:440, y:40,  title:'작성',  sub:'@writer' },
+      { id:'c', type:'aggregate', x:230, y:220, title:'취합' },
+      { id:'d', type:'branch',    x:440, y:220, title:'분기' },
+      { id:'o', type:'output',    x:640, y:130, title:'결과' },
     ],
     edges: [
       { from:'s', to:'a' }, { from:'a', to:'b' },
@@ -2881,15 +2894,14 @@ function _wfTutRender() {
     vpG.setAttribute('transform', `translate(${vp.panX||0},${vp.panY||0}) scale(${vp.scale||1})`);
   }
 
-  // 엣지 — stroke-dashoffset 드로잉
+  // 엣지 — stroke-dashoffset 드로잉 (공용 _wfBezier 사용)
   edgesG.innerHTML = (step.edges || []).map((e, i) => {
     const fromN = step.nodes.find(n => n.id === e.from);
     const toN   = step.nodes.find(n => n.id === e.to);
     if (!fromN || !toN) return '';
     const x1 = fromN.x + WF_NODE_W, y1 = fromN.y + WF_NODE_H/2;
     const x2 = toN.x,               y2 = toN.y + WF_NODE_H/2;
-    const dx = Math.max(60, Math.abs(x2 - x1) * 0.4);
-    const d = `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+    const d = _wfBezier(x1, y1, x2, y2);
     return `<path class="wf-tut-edge" d="${d}"
       stroke="#d97757" stroke-width="2" fill="none"
       marker-end="url(#wfTutArrow)"
