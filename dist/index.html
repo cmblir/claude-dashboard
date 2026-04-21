@@ -9539,6 +9539,48 @@ function _appendChatMsg(role, html) {
   return div;
 }
 
+// 챗 응답 대기 중 마스코트 말풍선으로 대기 메시지 순환 — 첫 delta 도착 시 중단
+let _chatWaitTimer = null;
+const _CHAT_WAIT_MSGS = [
+  '잠시만요~! 결과를 불러오고 있어요',
+  '🤔 좋은 답을 고르는 중…',
+  '💡 관련 탭을 찾고 있어요',
+  '⚡ 거의 다 왔어요!',
+  '🎯 정리해서 알려드릴게요',
+];
+function _chatStartWaitBubble() {
+  const bubble = document.getElementById('mascotBubble');
+  if (!bubble) return;
+  // 기존 자동 말풍선 루프 잠시 정지
+  if (typeof _mascotBubbleTimer !== 'undefined' && _mascotBubbleTimer) {
+    clearInterval(_mascotBubbleTimer);
+  }
+  let i = 0;
+  const show = () => {
+    bubble.textContent = t(_CHAT_WAIT_MSGS[i % _CHAT_WAIT_MSGS.length]);
+    bubble.style.display = 'block';
+    bubble.style.animation = 'none';
+    requestAnimationFrame(() => { bubble.style.animation = ''; });
+    if (typeof _mascotSetMode === 'function') _mascotSetMode('speaking');
+    i++;
+  };
+  show();
+  _chatWaitTimer = setInterval(show, 2600);
+}
+function _chatStopWaitBubble() {
+  if (_chatWaitTimer) { clearInterval(_chatWaitTimer); _chatWaitTimer = null; }
+  const bubble = document.getElementById('mascotBubble');
+  if (bubble) bubble.style.display = 'none';
+  if (typeof _mascotSetMode === 'function') _mascotSetMode('jumping');
+  // 자동 말풍선 루프 재시작
+  if (typeof _showRandomBubble === 'function') {
+    if (typeof _mascotBubbleTimer !== 'undefined') {
+      try { clearInterval(_mascotBubbleTimer); } catch {}
+    }
+    window._mascotBubbleTimer = setInterval(_showRandomBubble, 15000);
+  }
+}
+
 async function sendChat() {
   const input = document.getElementById('chatInput');
   const msg = input.value.trim();
@@ -9548,10 +9590,11 @@ async function sendChat() {
   _appendChatMsg('user', escapeHtml(msg));
   _chatHistory.push({ role: 'user', text: msg });
 
-  // 스트리밍 버블 생성
+  // 스트리밍 버블 생성 + 마스코트 대기 말풍선 시작
   const botDiv = _appendChatMsg('bot', '<span class="streaming-cursor"></span>');
   const bubble = botDiv.querySelector('.chat-bubble-bot');
   let fullText = '';
+  _chatStartWaitBubble();
 
   try {
     const _chatBody = JSON.stringify({ message: msg, history: _chatHistory.slice(-6), lang: _curLang });
@@ -9568,6 +9611,7 @@ async function sendChat() {
       try {
         const fr = await fetch('/api/chat', { method: 'POST', headers: _chatHeaders, body: _chatBody });
         const r = await fr.json();
+        _chatStopWaitBubble();
         if (r.error) {
           bubble.innerHTML = `<span style="color:var(--err);">${escapeHtml(r.error)}</span>`;
         } else {
@@ -9581,12 +9625,14 @@ async function sendChat() {
           _chatHistory.push({ role: 'assistant', text: r.answer || '' });
         }
       } catch(e2) {
+        _chatStopWaitBubble();
         bubble.innerHTML = `<span style="color:var(--err);">오류: ${escapeHtml(e2.message)}</span>`;
       }
       _chatStreaming = false;
       return;
     }
     if (!res.ok) {
+      _chatStopWaitBubble();
       bubble.innerHTML = `<span style="color:var(--err);">오류: ${res.status}</span>`;
       _chatStreaming = false;
       return;
@@ -9611,17 +9657,19 @@ async function sendChat() {
           try {
             const data = JSON.parse(line.slice(6));
             if (evtType === 'delta') {
+              if (!fullText) _chatStopWaitBubble();  // 첫 토큰 도착 — 대기 말풍선 종료
               fullText += data.text || '';
               bubble.innerHTML = escapeHtml(fullText).replace(/\n/g, '<br>') + '<span class="streaming-cursor"></span>';
               const msgs = document.getElementById('chatMessages');
               msgs.scrollTop = msgs.scrollHeight;
             } else if (evtType === 'replace') {
+              _chatStopWaitBubble();
               fullText = data.text || fullText;
               bubble.innerHTML = escapeHtml(fullText).replace(/\n/g, '<br>') + '<span class="streaming-cursor"></span>';
             } else if (evtType === 'done') {
+              _chatStopWaitBubble();
               navigate = data.navigate;
               if (data.text && data.text !== fullText) fullText = data.text;
-              // 즉시 커서 제거 + 네비 버튼 표시
               let doneNavBtn = '';
               if (navigate) {
                 const ni = NAV.find(n => n.id === navigate);
@@ -9632,6 +9680,7 @@ async function sendChat() {
               _chatHistory.push({ role: 'assistant', text: fullText });
               _chatStreaming = false;
             } else if (evtType === 'error') {
+              _chatStopWaitBubble();
               bubble.innerHTML = `<span style="color:var(--err);">${escapeHtml(data.error||'오류')}</span>`;
               _chatStreaming = false;
               return;
@@ -9653,6 +9702,8 @@ async function sendChat() {
     _chatHistory.push({ role: 'assistant', text: fullText });
   } catch (e) {
     bubble.innerHTML = `<span style="color:var(--err);">연결 오류: ${escapeHtml(e.message)}</span>`;
+  } finally {
+    _chatStopWaitBubble();  // 어떤 경로로 종료되든 말풍선 정리
   }
   _chatStreaming = false;
 }

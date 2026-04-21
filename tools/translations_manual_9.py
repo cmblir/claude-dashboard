@@ -304,6 +304,11 @@ NEW_EN = {
     "반복 실행 활성": "Enable repeat",
     "피드백 노트": "Feedback note",
     "버전 정보": "Version",
+    "잠시만요~! 결과를 불러오고 있어요": "Just a moment~ loading the answer",
+    "🤔 좋은 답을 고르는 중…": "🤔 Picking a good answer…",
+    "💡 관련 탭을 찾고 있어요": "💡 Finding the right tab",
+    "⚡ 거의 다 왔어요!": "⚡ Almost there!",
+    "🎯 정리해서 알려드릴게요": "🎯 I'll wrap it up for you",
     "최근 변경 이력 (CHANGELOG.md)": "Recent changes (CHANGELOG.md)",
     "이 결과를 기반으로 다음 스프린트 업무를 프론트/백엔드 형식으로 기획해줘. 실현 가능성과 우선순위를 명확히.":
         "Based on this result, plan the next sprint tasks in the Frontend/Backend format. Clarify feasibility and priorities.",
@@ -647,6 +652,11 @@ NEW_ZH = {
     "반복 실행 활성": "启用重复执行",
     "피드백 노트": "反馈备注",
     "버전 정보": "版本信息",
+    "잠시만요~! 결과를 불러오고 있어요": "请稍等~ 正在加载结果",
+    "🤔 좋은 답을 고르는 중…": "🤔 正在挑选合适的回答…",
+    "💡 관련 탭을 찾고 있어요": "💡 正在查找相关标签",
+    "⚡ 거의 다 왔어요!": "⚡ 快好了！",
+    "🎯 정리해서 알려드릴게요": "🎯 马上整理告诉你",
     "최근 변경 이력 (CHANGELOG.md)": "近期变更 (CHANGELOG.md)",
     "이 결과를 기반으로 다음 스프린트 업무를 프론트/백엔드 형식으로 기획해줘. 실현 가능성과 우선순위를 명확히.":
         "基于此结果，按前端/后端格式规划下一冲刺的任务，明确可行性与优先级。",
