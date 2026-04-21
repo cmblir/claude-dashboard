@@ -89,17 +89,25 @@ def build():
     for d in (base_ko, base_en, base_zh, legacy_en, legacy_zh):
         structured |= {k for k in d if not KO.search(k)}
 
-    # 기존 locale 의 모든 키(구조화 + 한국어)를 포함 — 재빌드 시 손실 방지.
-    # audit 축소로 기존 번역이 삭제되지 않도록 합집합 유지.
-    all_keys = sorted(
-        set(audit_keys)
-        | structured
-        | set(base_ko)
-        | set(base_en)
-        | set(base_zh)
-        | set(MANUAL_EN.keys())
-        | set(MANUAL_ZH.keys())
-    )
+    # 기존 locale 키 보존하되, 아래 중 하나를 만족하면 STALE 로 간주해 제외:
+    #   (1) 현재 audit 에 없고 + MANUAL 에도 없고 + structured 아님 + baseline 에서 identity(KO→KO) 인 경우
+    #       → 과거 실수로 추가된 서버 prompt 템플릿 등. 번역 없이 유지해봤자 UI 에 KO 노출만 유발.
+    # 그 외에는 유지 (합집합).
+    current_set = set(audit_keys) | structured | set(MANUAL_EN) | set(MANUAL_ZH) | set(MANUAL_KO)
+
+    def _is_stale(k: str) -> bool:
+        if k in current_set:
+            return False
+        if not KO.search(k):
+            return False  # 구조화 키 등 한글 아닌 키 유지
+        en_has_trans = k in base_en and not KO.search(base_en[k])
+        zh_has_trans = k in base_zh and not KO.search(base_zh[k])
+        if en_has_trans or zh_has_trans:
+            return False  # 유효한 번역이 이미 있음 → 유지
+        return True  # audit·MANUAL 어디에도 없고 번역도 없음 → stale
+
+    union = set(base_ko) | set(base_en) | set(base_zh) | current_set
+    all_keys = sorted(k for k in union if not _is_stale(k))
 
     ko_out: dict[str, str] = {}
     en_out: dict[str, str] = {}
@@ -128,9 +136,12 @@ def build():
         zh_val, zh_miss = _pick(k, MANUAL_ZH, base_zh, legacy_zh, k)
         en_out[k] = en_val
         zh_out[k] = zh_val
-        if en_miss and (KO.search(k) or k in structured):
+        # 실질 누락 판정: key 가 한글인데 value 에도 한글이 남아있으면 번역 안 된 것
+        en_effective_miss = en_miss or (KO.search(k) and KO.search(en_val))
+        zh_effective_miss = zh_miss or (KO.search(k) and KO.search(zh_val))
+        if en_effective_miss and (KO.search(k) or k in structured):
             missing_en.append(k)
-        if zh_miss and (KO.search(k) or k in structured):
+        if zh_effective_miss and (KO.search(k) or k in structured):
             missing_zh.append(k)
 
     LOCALES.mkdir(parents=True, exist_ok=True)

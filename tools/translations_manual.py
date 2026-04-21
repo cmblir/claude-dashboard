@@ -35,6 +35,11 @@ try:
 except Exception:
     _NEW_EN_5, _NEW_ZH_5 = {}, {}
 
+try:
+    from translations_manual_6 import NEW_EN as _NEW_EN_6, NEW_ZH as _NEW_ZH_6
+except Exception:
+    _NEW_EN_6, _NEW_ZH_6 = {}, {}
+
 # ── 구조화 키 → 한국어 라벨 ──
 MANUAL_KO: dict[str, str] = {
     "settings.theme": "테마",
@@ -415,6 +420,12 @@ for _k, _v in _NEW_ZH_4.items():
 for _k, _v in _NEW_EN_5.items():
     MANUAL_EN.setdefault(_k, _v)
 for _k, _v in _NEW_ZH_5.items():
+    MANUAL_ZH.setdefault(_k, _v)
+
+# Deep-scan 에서 새로 발견된 109 서버 emit 라벨·설명·메시지
+for _k, _v in _NEW_EN_6.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH_6.items():
     MANUAL_ZH.setdefault(_k, _v)
 
 # ── 번역 검수 권장 항목 ──
