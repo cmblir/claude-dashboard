@@ -2148,10 +2148,17 @@ function _wfOpenNodeEditor(nid) {
   w.style.zIndex = ++_winMgr.zIndex;
   // 중앙 근처 + 여러 개 띄우면 살짝 계단식
   const offset = _winMgr.openIds.size * 24;
-  w.style.left = (Math.max(100, window.innerWidth / 2 - 240) + offset) + 'px';
-  w.style.top = (80 + offset) + 'px';
-  w.style.width = '480px';
-  w.style.maxHeight = '82vh';
+  // 초기 크기를 넉넉히 — 카테고리 grid + 선택한 카테고리의 전체 폼까지
+  // 스크롤 없이 한눈에 들어오는 사이즈
+  const initW = Math.min(620, window.innerWidth - 40);
+  const initH = Math.min(720, window.innerHeight - 40);
+  w.style.left = (Math.max(20, window.innerWidth / 2 - initW / 2) + offset) + 'px';
+  w.style.top = (Math.max(20, window.innerHeight / 2 - initH / 2) + offset) + 'px';
+  w.style.width = initW + 'px';
+  w.style.height = initH + 'px';
+  w.style.maxHeight = 'calc(100vh - 24px)';
+  w.style.resize = 'both';
+  w.style.overflow = 'hidden';
   w._wfDraft = draft;
   w._wfIsNew = isNew;
   _winMgr.openIds.add(winId);
