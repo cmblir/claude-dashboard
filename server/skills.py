@@ -136,10 +136,13 @@ def list_skills() -> list:
         ps["pluginEnabled"] = bool(enabled_map.get(ps.get("pluginKey", ""), False))
     out.extend(plugin_skills)
 
-    # 번역 주입
+    # 번역 주입 (ko/en/zh)
     cache = _load_translation_cache()
     for s in out:
-        s["descriptionKo"] = cache.get(f"skill:{s['id']}", "")
+        sid = s["id"]
+        s["descriptionKo"] = cache.get(f"skill:{sid}", "")
+        s["descriptionEn"] = cache.get(f"en:skill:{sid}", "")
+        s["descriptionZh"] = cache.get(f"zh:skill:{sid}", "")
     return out
 
 

@@ -2108,11 +2108,8 @@ VIEWS.agents = async () => {
         </div>
         <!-- 2행: 호출 id (마켓프리픽스 포함) -->
         <div class="text-[10px] mono text-[var(--text-dim)] truncate mb-2" title="${escapeHtml(a.source||a.id||'')}">${escapeHtml(invoke)}</div>
-        <!-- 3행: 설명 -->
-        ${a.descriptionKo
-          ? `<div class="text-xs text-[var(--text)] line-clamp-2 mb-1" style="min-height:2.2em;">${escapeHtml(a.descriptionKo)}</div>
-             <details class="text-[11px] text-[var(--text-dim)] mb-2" onclick="event.stopPropagation();"><summary class="cursor-pointer">원문</summary><div class="mt-1">${escapeHtml(a.description||'—')}</div></details>`
-          : `<div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2" style="min-height:3.2em;">${escapeHtml(a.description || '—')}</div>`}
+        <!-- 3행: 설명 (현재 UI 언어 기준) -->
+        <div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2" style="min-height:3.2em;">${escapeHtml(_localDesc(a) || '—')}</div>
         <!-- 4행: 도구 -->
         <div class="mb-2 flex-1">${(a.tools||[]).slice(0,6).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('')}</div>
         <!-- 5행: 모델 (별도 줄, 풀폭) -->
@@ -2130,15 +2127,13 @@ VIEWS.agents = async () => {
         <h1 class="text-2xl font-bold">에이전트 & 상호작용 그래프</h1>
         <p class="text-sm text-[var(--text-mute)] mt-1"><b>활성(사용자 설정 ${counts.global||0} + 빌트인 ${counts.builtin||0}) = ${(counts.global||0)+(counts.builtin||0)}개</b> · 플러그인 제공 ${counts.pluginEnabled||0}/${counts.plugin||0} (별도)</p>
         <div class="text-xs mt-1 flex gap-2 flex-wrap">
-          ${agents.filter(a=>a.descriptionKo).length === 0
-            ? `<span class="chip chip-warn">⚠️ 한국어 번역 0/${agents.length} — 우측 "🌐" 버튼 클릭</span>`
-            : `<span class="chip chip-ok">한글 번역 ${agents.filter(a=>a.descriptionKo).length}/${agents.length}</span>`}
+          ${_localizedDescStatus(agents)}
           <span class="text-[10px] text-[var(--text-dim)]">💡 플러그인이 <b>비활성</b>이면 에이전트 카드는 보이지만 Claude Code에서 호출되지 않습니다.</span>
         </div>
       </div>
       <div class="flex gap-2">
         <button class="btn text-xs" onclick="openCreateAgent()">＋ 전역 에이전트</button>
-        <button class="btn text-xs" onclick="translateAll('agent')">🌐 번역</button>
+        ${_localizeBtnHtml('agent', agents)}
         <a class="btn text-xs" href="${DOCS_BASE}sub-agents" target="_blank" rel="noopener">📖</a>
       </div>
     </div>
@@ -2432,7 +2427,7 @@ VIEWS.skills = async () => {
   state.data.skills = skills;
   const q = (state.data.skillsFilter || '').toLowerCase();
   const onlyEnabled = !!state.data.skillsOnlyEnabled;
-  let filtered = skills.filter(s => !q || (s.name+s.description+s.id+(s.descriptionKo||'')).toLowerCase().includes(q));
+  let filtered = skills.filter(s => !q || (s.name+s.description+s.id+(_localDesc(s)||'')).toLowerCase().includes(q));
   if (onlyEnabled) filtered = filtered.filter(s => s.scope === 'user');
 
   const groups = { user: [], plugin: [] };
@@ -2441,7 +2436,6 @@ VIEWS.skills = async () => {
   const userN = skills.filter(s => s.scope === 'user').length;
   const pluginN = skills.filter(s => s.scope === 'plugin').length;
   const pluginEnabledN = skills.filter(s => s.scope === 'plugin' && s.pluginEnabled).length;
-  const translatedCount = skills.filter(s => s.descriptionKo).length;
 
   const renderSkillCard = s => {
     const scopeBadge = s.scope === 'plugin'
@@ -2456,10 +2450,7 @@ VIEWS.skills = async () => {
           ${scopeBadge}
         </div>
         <div class="text-[10px] mono text-[var(--text-dim)] mb-2 truncate" title="${escapeHtml(s.source||'')}">${escapeHtml(s.id)}</div>
-        ${s.descriptionKo
-          ? `<div class="text-xs text-[var(--text)] line-clamp-2 mb-1">${escapeHtml(s.descriptionKo)}</div>
-             <details class="text-[11px] text-[var(--text-dim)]" onclick="event.stopPropagation();"><summary class="cursor-pointer">원문</summary><div class="mt-1">${escapeHtml(s.description||'')}</div></details>`
-          : `<div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(s.description || '—')}</div>`}
+        <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(_localDesc(s) || '—')}</div>
         ${s.scope === 'plugin' && !s.pluginEnabled ? '<div class="text-[10px] text-[var(--warn)] mt-2">⚠️ 이 플러그인은 비활성 — Claude Code 가 호출하지 않습니다.</div>' : ''}
       </div>`;
   };
@@ -2471,14 +2462,14 @@ VIEWS.skills = async () => {
     <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">스킬</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1"><b>활성(사용자 설정) ${userN}개</b> · 플러그인 제공 ${pluginEnabledN}/${pluginN} (별도) · 한글 번역 ${translatedCount}/${skills.length}</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1"><b>활성(사용자 설정) ${userN}개</b> · 플러그인 제공 ${pluginEnabledN}/${pluginN} (별도) · ${_localizedDescStatusText(skills)}</p>
       </div>
       <div class="flex gap-2">
         <input id="skillQ" class="input max-w-[260px]" placeholder="스킬 검색…" value="${escapeHtml(state.data.skillsFilter||'')}" />
         <label class="flex items-center gap-1 text-xs text-[var(--text-mute)]">
           <input type="checkbox" id="skillOnlyEnabled" ${onlyEnabled?'checked':''}/> 사용자 설정만
         </label>
-        <button class="btn text-xs" onclick="translateAll('skill')">🌐 전체 한국어 번역</button>
+        ${_localizeBtnHtml('skill', skills)}
         <a class="btn text-xs" href="${DOCS_BASE}skills" target="_blank" rel="noopener">📖</a>
       </div>
     </div>
@@ -2528,11 +2519,11 @@ VIEWS.commands = async () => {
 
   const filtered = cmds.filter(c => {
     if (q) {
-      const t = (c.name+' '+c.description+' '+c.id+' '+(c.descriptionKo||'')).toLowerCase();
+      const t = (c.name+' '+c.description+' '+c.id+' '+(_localDesc(c)||'')).toLowerCase();
       if (!t.includes(q)) return false;
     }
     if (selCat && c.category !== selCat) return false;
-    if (onlyUntranslated && c.descriptionKo) return false;
+    if (onlyUntranslated && _localDesc(c)) return false;
     return true;
   });
 
@@ -2551,20 +2542,18 @@ VIEWS.commands = async () => {
     .map(([cid, n]) => `<button class="chip ${cid===selCat?'chip-accent':''}" onclick="setCmdCat('${cid}')">${catLabels[cid]||cid} <span class="ml-1 text-[9px] text-[var(--text-dim)]">${n}</span></button>`)
     .join('');
 
-  const translatedCount = cmds.filter(c => c.descriptionKo).length;
-
   return `
     <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">슬래시 명령어</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">${cmds.length}개 명령어 · ${Object.keys(allCatCounts).length}개 카테고리 · 한글 번역 ${translatedCount}/${cmds.length}</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${cmds.length}개 명령어 · ${Object.keys(allCatCounts).length}개 카테고리 · ${_localizedDescStatusText(cmds)}</p>
       </div>
       <div class="flex gap-2 flex-wrap">
         <input id="cmdQ" class="input max-w-[260px]" placeholder="검색…" value="${escapeHtml(state.data.cmdFilter||'')}" />
         <label class="flex items-center gap-1 text-xs text-[var(--text-mute)]">
           <input type="checkbox" id="cmdOnlyUntr" ${onlyUntranslated?'checked':''}/> 미번역만
         </label>
-        <button class="btn text-xs" onclick="translateAll('cmd')">🌐 전체 한국어 번역</button>
+        ${_localizeBtnHtml('cmd', cmds)}
         <a class="btn text-xs" href="${DOCS_BASE}slash-commands" target="_blank" rel="noopener">📖</a>
       </div>
     </div>
@@ -2583,10 +2572,7 @@ VIEWS.commands = async () => {
                 <span class="chip ${c.scope==='user'?'chip-ok':'chip-accent'}">${c.scope}</span>
                 <span class="font-semibold text-sm mono">/${escapeHtml(c.name||c.id)}</span>
               </div>
-              ${c.descriptionKo
-                ? `<div class="text-xs text-[var(--text)] mb-1 line-clamp-2">${escapeHtml(c.descriptionKo)}</div>
-                   <details class="text-[11px] text-[var(--text-dim)]"><summary class="cursor-pointer">원문 영어</summary><div class="mt-1">${escapeHtml(c.description||'—')}</div></details>`
-                : `<div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(c.description||'—')}</div>`}
+              <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(_localDesc(c) || '—')}</div>
             </div>`).join('')}
         </div>
       </div>`).join('') : `<div class="card empty">명령어 없음</div>`}
@@ -2610,13 +2596,59 @@ function setCmdCat(cat) {
   renderView();
 }
 
+// ── description 다국어 헬퍼 ──
+// 우선순위: description_<curLang> > description (원본). _curLang === 'ko' 일 때는
+// descriptionKo (legacy 캐시) 도 fallback 으로 사용.
+function _localDesc(item) {
+  if (!item) return '';
+  const lang = (typeof _curLang !== 'undefined' ? _curLang : 'ko');
+  if (lang === 'en') return item.descriptionEn || item.description || '';
+  if (lang === 'zh') return item.descriptionZh || item.description || '';
+  // ko: description 이 한국어일 가능성 높음. 없으면 descriptionKo (legacy 영문→한국어 번역 캐시) 사용.
+  return item.description || item.descriptionKo || '';
+}
+function _localDescField() {
+  const lang = (typeof _curLang !== 'undefined' ? _curLang : 'ko');
+  return lang === 'en' ? 'descriptionEn' : (lang === 'zh' ? 'descriptionZh' : 'descriptionKo');
+}
+function _hasLocalTranslation(item) {
+  if (!item) return false;
+  const lang = (typeof _curLang !== 'undefined' ? _curLang : 'ko');
+  if (lang === 'ko') return !!item.description;  // 원본은 사실상 한국어
+  return !!item[_localDescField()];
+}
+function _localizedDescStatusText(items) {
+  const lang = (typeof _curLang !== 'undefined' ? _curLang : 'ko');
+  const langName = { ko: '한글', en: 'English', zh: '中文' }[lang] || lang;
+  const n = items.filter(_hasLocalTranslation).length;
+  return `${langName} 번역 ${n}/${items.length}`;
+}
+function _localizedDescStatus(items) {
+  const lang = (typeof _curLang !== 'undefined' ? _curLang : 'ko');
+  const n = items.filter(_hasLocalTranslation).length;
+  if (n === items.length) return `<span class="chip chip-ok">${_localizedDescStatusText(items)}</span>`;
+  if (n === 0) return `<span class="chip chip-warn">⚠️ ${_localizedDescStatusText(items)}</span>`;
+  return `<span class="chip">${_localizedDescStatusText(items)}</span>`;
+}
+function _localizeBtnHtml(kind, items) {
+  const lang = (typeof _curLang !== 'undefined' ? _curLang : 'ko');
+  const langName = { ko: '한국어', en: 'English', zh: '中文' }[lang] || lang;
+  const missing = items.filter(it => !_hasLocalTranslation(it)).length;
+  if (missing === 0) {
+    return `<button class="btn text-xs" disabled style="opacity:0.5;">🌐 ${langName} ✓</button>`;
+  }
+  return `<button class="btn text-xs" onclick="translateAll('${kind}')">🌐 ${langName} 번역 (${missing})</button>`;
+}
+
 async function translateAll(kind) {
-  const label = { cmd: '명령어', skill: '스킬', plugin: '플러그인' }[kind] || kind;
+  const lang = (typeof _curLang !== 'undefined' ? _curLang : 'ko');
+  const langName = { ko: '한국어', en: 'English', zh: '中文' }[lang] || lang;
+  const label = { cmd: '명령어', skill: '스킬', plugin: '플러그인', agent: '에이전트' }[kind] || kind;
   showModal(`
     <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
       <div>
-        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">전체 한국어 번역</div>
-        <h2 class="text-lg font-bold">${label} 일괄 번역</h2>
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${langName} 일괄 번역</div>
+        <h2 class="text-lg font-bold">${label} → ${langName}</h2>
       </div>
       <button class="btn-ghost btn" id="tbClose" onclick="__tbCancel=true;closeModal();">✕</button>
     </div>
@@ -2641,7 +2673,7 @@ async function translateAll(kind) {
       logLine(`[배치 ${batch}] Claude CLI 요청…`);
       const r = await api('/api/translate/batch', {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ kind, limit: 50 }),
+        body: JSON.stringify({ kind, limit: 50, targetLang: lang }),
       });
       if (r.error) {
         logLine(`  ❌ ${r.error}`);
@@ -2659,7 +2691,7 @@ async function translateAll(kind) {
       if (r.done || r.translated === 0) break;
     }
     if (!window.__tbCancel) {
-      logLine(`\n🎉 완료! ${label} ${totalTranslated}개 번역 (${batch}배치, ${Math.round((Date.now()-started)/1000)}초)`);
+      logLine(`\n🎉 완료! ${label} ${totalTranslated}개 ${langName} 번역 (${batch}배치, ${Math.round((Date.now()-started)/1000)}초)`);
       toast(`${label} ${totalTranslated}개 번역 완료`, 'ok');
       setTimeout(() => { closeModal(); renderView(); }, 1500);
     }
@@ -3237,11 +3269,11 @@ VIEWS.plugins = async () => {
     <div class="mb-4 flex items-center justify-between gap-2 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">플러그인</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">${browse.plugins.length}개 전체 · ${enabledCount}개 활성 · ${browse.marketplaces}개 마켓플레이스 · 한글 번역 ${browse.plugins.filter(p=>p.descriptionKo).length}/${browse.plugins.length}</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${browse.plugins.length}개 전체 · ${enabledCount}개 활성 · ${browse.marketplaces}개 마켓플레이스 · ${_localizedDescStatusText(browse.plugins)}</p>
       </div>
       <div class="flex gap-2">
         <button class="btn-primary btn text-xs" onclick="aiRecommendList('plugins')">🤖 AI 추천</button>
-        <button class="btn text-xs" onclick="translateAll('plugin')">🌐 전체 한국어 번역</button>
+        ${_localizeBtnHtml('plugin', browse.plugins)}
         <a class="btn text-xs" href="${DOCS_BASE}plugins" target="_blank" rel="noopener">📖 공식 문서 ↗</a>
       </div>
     </div>
@@ -3268,10 +3300,7 @@ VIEWS.plugins = async () => {
               <span>${p.enabled?'활성':'비활성'}</span>
             </label>
           </div>
-          ${p.descriptionKo
-            ? `<div class="text-xs text-[var(--text)] line-clamp-2 mb-1" style="min-height:2.4em;">${escapeHtml(p.descriptionKo)}</div>
-               <details class="text-[10px] text-[var(--text-dim)] mb-2"><summary class="cursor-pointer">원문</summary><div class="mt-1">${escapeHtml(p.description||'')}</div></details>`
-            : `<div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2" style="min-height:3.2em;">${escapeHtml(p.description||'—')}</div>`}
+          <div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2" style="min-height:3.2em;">${escapeHtml(_localDesc(p) || '—')}</div>
           <div class="flex gap-1 flex-wrap mb-2">
             ${(p.tags||[]).slice(0,4).map(t => `<span class="chip text-[9px]">${escapeHtml(t)}</span>`).join('')}
           </div>

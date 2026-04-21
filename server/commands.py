@@ -101,19 +101,28 @@ def list_commands() -> list:
                 })
             except Exception:
                 continue
-    # 카테고리 + 번역 주입
+    # 카테고리 + 번역 주입 (ko/en/zh 모두)
     tr_cache = _load_translation_cache()
     for c in out:
         cat_id, cat_label = _categorize_command(c)
         c["category"] = cat_id
         c["categoryLabel"] = cat_label
-        c["descriptionKo"] = tr_cache.get(c["id"], "")
+        # legacy: descriptionKo 유지
+        c["descriptionKo"] = tr_cache.get(_cache_key("cmd", c["id"], "ko"), "")
+        c["descriptionEn"] = tr_cache.get(_cache_key("cmd", c["id"], "en"), "")
+        c["descriptionZh"] = tr_cache.get(_cache_key("cmd", c["id"], "zh"), "")
     return out
 
 
-def _cache_key(kind: str, item_id: str) -> str:
-    """번역 캐시 키 규칙. cmd 는 prefix 없이 id 만 (기존 호환)."""
-    return f"{kind}:{item_id}" if kind != "cmd" else item_id
+def _cache_key(kind: str, item_id: str, lang: str = "ko") -> str:
+    """번역 캐시 키 규칙.
+
+    - ko (기본): cmd 는 prefix 없이 id 만, 나머지는 `{kind}:{id}` (legacy 호환)
+    - 기타 언어: `{lang}:{kind}:{id}`
+    """
+    if lang == "ko":
+        return f"{kind}:{item_id}" if kind != "cmd" else item_id
+    return f"{lang}:{kind}:{item_id}"
 
 
 # ───────── 번역 배치 (cmd/skill/plugin/agent 공용) ─────────
@@ -147,10 +156,37 @@ def _collect_translate_items(kind: str) -> list:
     return items
 
 
-def api_translate_batch(body: dict) -> dict:
-    """범용 번역 배치. body: {kind: 'cmd'|'skill'|'plugin'|'agent', limit: N (기본 50, 최대 60)}
+_LANG_PROMPT = {
+    "ko": {
+        "label": "한국어",
+        "instructions": "- 기술용어(Claude Code, PR, CLI 등)는 그대로 유지.\n"
+                        "- 20~70자 정도, 핵심 동사 포함 (\"~한다\" 체).\n"
+                        "- 한국어 요약이 불가능하면 원문 기술 용어 나열.",
+    },
+    "en": {
+        "label": "English",
+        "instructions": "- Keep technical terms (Claude Code, PR, CLI, etc.) as-is.\n"
+                        "- One concise sentence, 10-20 words, present tense.\n"
+                        "- If the input is already English, lightly polish and return.",
+    },
+    "zh": {
+        "label": "简体中文",
+        "instructions": "- 保留技术术语（Claude Code、PR、CLI 等）。\n"
+                        "- 简洁一句话（20-40 字），使用动词短语。\n"
+                        "- 若输入已是中文，轻度润色后返回。",
+    },
+}
 
-    캐시에 없는 것만 선별 → Claude CLI 1회 호출.
+
+def api_translate_batch(body: dict) -> dict:
+    """범용 번역 배치.
+
+    body:
+      kind        : 'cmd' | 'skill' | 'plugin' | 'agent'
+      targetLang  : 'ko' | 'en' | 'zh'  (기본 'ko', legacy 호환)
+      limit       : 5~60, 기본 50
+
+    캐시에 없는 항목만 Claude CLI 로 번역.
     """
     from .auth import api_auth_status
 
@@ -160,32 +196,39 @@ def api_translate_batch(body: dict) -> dict:
     if not api_auth_status().get("connected"):
         return {"error": "Claude 계정 연결 필요"}
 
-    kind = (body or {}).get("kind") if isinstance(body, dict) else "cmd"
+    body = body or {}
+    kind = body.get("kind") if isinstance(body, dict) else "cmd"
     if kind not in ("cmd", "skill", "plugin", "agent"):
         return {"error": "unknown kind"}
-    limit = min(60, max(5, int((body or {}).get("limit") or 50)))
+    target_lang = (body.get("targetLang") or body.get("lang") or "ko").lower()
+    if target_lang not in _LANG_PROMPT:
+        return {"error": f"unknown targetLang: {target_lang}"}
+    limit = min(60, max(5, int(body.get("limit") or 50)))
 
     cache = _load_translation_cache()
     all_items = _collect_translate_items(kind)
-    pending = [x for x in all_items if not cache.get(_cache_key(kind, x["id"]))]
+    pending = [
+        x for x in all_items
+        if not cache.get(_cache_key(kind, x["id"], target_lang))
+    ]
     if not pending:
         return {"translated": 0, "requested": 0, "remaining": 0,
-                "total": len(all_items), "done": True}
+                "total": len(all_items), "done": True,
+                "targetLang": target_lang}
 
     batch = pending[:limit]
-    kind_label = {"cmd": "슬래시 명령어", "skill": "스킬",
-                  "plugin": "플러그인", "agent": "에이전트"}[kind]
+    kind_label = {"cmd": "slash command", "skill": "skill",
+                  "plugin": "plugin", "agent": "agent"}[kind]
+    lang_cfg = _LANG_PROMPT[target_lang]
 
-    prompt = f"""다음 Claude Code {kind_label}의 영문 description 들을 **간결한 한국어 한 줄**로 번역하세요.
-- 기술용어(Claude Code, PR, CLI 등)는 그대로 유지.
-- 20~70자 정도, 핵심 동사 포함 ("~한다" 체).
-- 한국어 요약이 불가능하면 원문 기술 용어 나열.
+    prompt = f"""Translate each Claude Code {kind_label} description below into **concise {lang_cfg['label']} (one line)**.
+{lang_cfg['instructions']}
 
-입력:
+입력/Input:
 {json.dumps(batch, ensure_ascii=False, indent=2)}
 
-JSON 만 출력 (다른 텍스트 금지):
-{{"translations": {{"<id>": "<한국어>", ...}}}}
+JSON 만 출력 / Output JSON only:
+{{"translations": {{"<id>": "<translation>", ...}}}}
 """
     try:
         proc = subprocess.run(
@@ -215,9 +258,9 @@ JSON 만 출력 (다른 텍스트 금지):
         return {"error": f"JSON 파싱 실패: {e}", "raw": response_text[:1500]}
 
     added = 0
-    for item_id, ko in tr.items():
-        if isinstance(ko, str) and ko.strip():
-            cache[_cache_key(kind, item_id)] = ko.strip()
+    for item_id, val in tr.items():
+        if isinstance(val, str) and val.strip():
+            cache[_cache_key(kind, item_id, target_lang)] = val.strip()
             added += 1
     _save_translation_cache(cache)
 
@@ -225,7 +268,7 @@ JSON 만 출력 (다른 텍스트 금지):
     return {
         "translated": added, "requested": len(batch),
         "remaining": remaining, "total": len(all_items),
-        "done": remaining == 0,
+        "done": remaining == 0, "targetLang": target_lang,
     }
 
 
