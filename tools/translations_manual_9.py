@@ -65,24 +65,37 @@ NEW_EN = {
     "워크플로우 사용법": "Workflow walkthrough",
     "이전": "Previous",
     "다음": "Next",
-    "1. 새 워크플로우 생성": "1. Create a new workflow",
-    "좌측 사이드바의 ＋ 버튼으로 새 워크플로우를 만들면 빈 캔버스가 열립니다. 여기가 우리가 업무 흐름을 설계할 무대.":
-        "Click ＋ in the left sidebar to create a new workflow — an empty canvas opens. This is where you design the task flow.",
-    "2. 🚀 시작 노드 추가": "2. Add a 🚀 Start node",
-    "상단 툴바의 ＋ 노드 추가 → 창에서 🚀 시작 카테고리 선택. 워크플로우의 진입점이 되는 노드.":
-        "Toolbar ＋ Add node → pick 🚀 Start in the window. This is the entry point of the workflow.",
-    "3. 🗂️ 세션 노드로 업무 정의": "3. Define a task with a 🗂️ Session node",
-    "＋ 노드 추가 → 🗂️ 세션. 제목과 업무(subject)를 입력. 예: \"경쟁 제품 3개 분석\". 이 노드가 실행되면 claude -p 로 작업을 처리.":
-        "＋ Add node → 🗂️ Session. Fill in title and subject — e.g. \"Analyze 3 competitors\". When it runs, claude -p handles the task.",
-    "4. 포트 드래그로 화살표 연결": "4. Connect with a port drag",
-    "노드 우측의 주황 포트를 다음 노드 좌측 보라 포트로 드래그. 베지어 곡선 + 방향 화살표가 자동으로 그려짐.":
-        "Drag the orange port on a node's right to the purple port on the next node. A bezier curve with an arrow is drawn automatically.",
-    "5. 결과 노드로 마무리 + ▶ 실행": "5. Finish with an Output node + ▶ Run",
-    "📤 결과 노드를 추가하고 연결. ▶ 실행 누르면 DAG 를 토폴로지 순서로 자동 실행. 각 노드가 실행 중에는 보라색 펄스.":
-        "Add a 📤 Output node and connect. Hitting ▶ Run executes the DAG in topological order. Running nodes pulse in purple.",
-    "6. 완료 → 결과 모달 / 터미널": "6. Done → result modal / Terminal",
-    "완료된 노드는 녹색 테두리. 결과 모달에 노드별 출력 미리보기. 세션 노드 우상단 🖥️ 아이콘으로 Terminal 새 창에서 대화형 세션도 시작 가능.":
-        "Completed nodes get a green border. The result modal shows a preview per node. A session node's 🖥️ icon also launches an interactive Terminal session in a new window.",
+    "1. 새 워크플로우 만들기": "1. Create a new workflow",
+    "좌측 사이드바의 ＋ 새 워크플로우 버튼을 눌러 빈 캔버스를 엽니다. 커서가 ＋ 를 클릭하는 동작을 보여줍니다.":
+        "Click ＋ New workflow in the left sidebar to open an empty canvas. The cursor shows where to click.",
+    "2. 🚀 시작 노드 자동 배치": "2. Start node placed automatically",
+    "워크플로우의 진입점인 🚀 시작 노드가 캔버스 왼쪽에 자동 배치됩니다.":
+        "The 🚀 Start node (entry point) is auto-placed on the left of the canvas.",
+    "3. 🗂️ 세션 + 🤝 서브에이전트 추가": "3. Add 🗂️ Session and 🤝 Subagent",
+    "＋ 노드 추가 → 카테고리 선택 창에서 🗂️ 세션과 🤝 서브에이전트를 추가. subject(업무) · 모델 · 역할을 입력.":
+        "＋ Add node → pick 🗂️ Session and 🤝 Subagent in the category window. Fill subject · model · role.",
+    "4. 🧩 취합 + 🔀 분기 추가": "4. Add 🧩 Aggregate and 🔀 Branch",
+    "🧩 취합 노드는 여러 입력을 concat/JSON 으로 합침. 🔀 분기 노드는 조건 문자열 일치 여부로 Y/N 포트를 활성화.":
+        "🧩 Aggregate merges multiple inputs (concat/JSON). 🔀 Branch activates Y/N port based on a condition string.",
+    "5. 포트 드래그로 화살표 연결": "5. Connect by dragging ports",
+    "주황 out-port 에서 보라 in-port 로 드래그하면 베지어 곡선 + 방향 화살표가 자동 생성. DAG 사이클은 즉시 거부.":
+        "Drag from orange out-port to purple in-port — a bezier curve with an arrow appears. DAG cycles are rejected on the spot.",
+    "6. 📤 결과 노드 + DAG 완성": "6. 📤 Output node + complete DAG",
+    "📤 결과 노드를 추가하고 분기 → 결과로 마무리. 이 노드가 워크플로우 종착지. exportTo 경로를 지정하면 파일로 저장.":
+        "Add 📤 Output and wire Branch → Output. This is the end of the workflow. Set exportTo to also write a file.",
+    "7. 🎯 맞춤으로 전체 한눈에": "7. 🎯 Fit everything into view",
+    "캔버스 우하단 🎯 맞춤 버튼 → 모든 노드 bounding box 가 보이도록 pan/zoom 자동 조정. 복잡한 워크플로우도 한 번에 정렬.":
+        "Click 🎯 Fit at the canvas bottom-right — pan/zoom auto-adjusts to fit every node. One tap tames even a busy flow.",
+    "8. ▶ 실행 → 순차 자동 처리": "8. ▶ Run → sequential automation",
+    "상단 ▶ 실행 → DAG 토폴로지 순서로 각 노드가 보라색 펄스(실행 중) → 녹색(완료)로 전환. 세션 노드는 claude -p 로 subprocess 실행.":
+        "Top ▶ Run → nodes pulse purple (running) then turn green (ok) in topological order. Session nodes run via `claude -p` subprocesses.",
+    "9. 완료 → 결과 모달 · 터미널 · 파일": "9. Done → result modal · Terminal · file",
+    "완료된 노드는 녹색 테두리. 결과 모달에 노드별 출력 미리보기. 세션 노드 🖥️ 아이콘으로 Terminal 새 창에서 대화형 세션도 시작 가능. 📜 이력 으로 과거 실행 재조회.":
+        "Completed nodes have a green border. The result modal previews each node's output. A session node's 🖥️ icon spawns an interactive Terminal, and 📜 History replays past runs.",
+    "＋ 새 워크플로우": "＋ New workflow",
+    "＋ 노드": "＋ Add",
+    "🎯 맞춤": "🎯 Fit",
+    "▶ 실행": "▶ Run",
     "메타": "Meta",
     "메타 패널 보이기/가리기": "Show/hide meta panel",
     "가리기": "Hide",
@@ -244,24 +257,37 @@ NEW_ZH = {
     "워크플로우 사용법": "工作流演示",
     "이전": "上一步",
     "다음": "下一步",
-    "1. 새 워크플로우 생성": "1. 创建新工作流",
-    "좌측 사이드바의 ＋ 버튼으로 새 워크플로우를 만들면 빈 캔버스가 열립니다. 여기가 우리가 업무 흐름을 설계할 무대.":
-        "点击左侧 ＋ 创建新工作流 — 打开空白画布。这里就是设计任务流程的舞台。",
-    "2. 🚀 시작 노드 추가": "2. 添加 🚀 起始节点",
-    "상단 툴바의 ＋ 노드 추가 → 창에서 🚀 시작 카테고리 선택. 워크플로우의 진입점이 되는 노드.":
-        "上方工具栏 ＋ 添加节点 → 在窗口中选择 🚀 起始类别。这是工作流的入口。",
-    "3. 🗂️ 세션 노드로 업무 정의": "3. 用 🗂️ 会话节点定义任务",
-    "＋ 노드 추가 → 🗂️ 세션. 제목과 업무(subject)를 입력. 예: \"경쟁 제품 3개 분석\". 이 노드가 실행되면 claude -p 로 작업을 처리.":
-        "＋ 添加节点 → 🗂️ 会话。填写标题和任务 (subject)。示例：\"分析 3 个竞品\"。运行时通过 claude -p 处理任务。",
-    "4. 포트 드래그로 화살표 연결": "4. 拖动端口连接箭头",
-    "노드 우측의 주황 포트를 다음 노드 좌측 보라 포트로 드래그. 베지어 곡선 + 방향 화살표가 자동으로 그려짐.":
-        "将节点右侧的橙色端口拖到下一节点左侧的紫色端口。自动绘制贝塞尔曲线和方向箭头。",
-    "5. 결과 노드로 마무리 + ▶ 실행": "5. 用结果节点收尾 + ▶ 运行",
-    "📤 결과 노드를 추가하고 연결. ▶ 실행 누르면 DAG 를 토폴로지 순서로 자동 실행. 각 노드가 실행 중에는 보라색 펄스.":
-        "添加 📤 结果节点并连接。点击 ▶ 运行，按拓扑顺序自动执行 DAG。运行中节点显示紫色脉冲。",
-    "6. 완료 → 결과 모달 / 터미널": "6. 完成 → 结果弹窗 / 终端",
-    "완료된 노드는 녹색 테두리. 결과 모달에 노드별 출력 미리보기. 세션 노드 우상단 🖥️ 아이콘으로 Terminal 새 창에서 대화형 세션도 시작 가능.":
-        "已完成节点呈绿色边框。结果弹窗展示各节点输出预览。点击会话节点右上角 🖥️ 图标还可在 Terminal 新窗口启动交互会话。",
+    "1. 새 워크플로우 만들기": "1. 创建新工作流",
+    "좌측 사이드바의 ＋ 새 워크플로우 버튼을 눌러 빈 캔버스를 엽니다. 커서가 ＋ 를 클릭하는 동작을 보여줍니다.":
+        "点击左侧 ＋ 新建工作流打开空白画布。光标演示点击位置。",
+    "2. 🚀 시작 노드 자동 배치": "2. 自动放置 🚀 起始节点",
+    "워크플로우의 진입점인 🚀 시작 노드가 캔버스 왼쪽에 자동 배치됩니다.":
+        "作为入口的 🚀 起始节点自动放置在画布左侧。",
+    "3. 🗂️ 세션 + 🤝 서브에이전트 추가": "3. 添加 🗂️ 会话与 🤝 子代理",
+    "＋ 노드 추가 → 카테고리 선택 창에서 🗂️ 세션과 🤝 서브에이전트를 추가. subject(업무) · 모델 · 역할을 입력.":
+        "＋ 添加节点 → 在类别选择窗口中添加 🗂️ 会话和 🤝 子代理。填写 subject（任务）· 模型 · 角色。",
+    "4. 🧩 취합 + 🔀 분기 추가": "4. 添加 🧩 聚合与 🔀 分支",
+    "🧩 취합 노드는 여러 입력을 concat/JSON 으로 합침. 🔀 분기 노드는 조건 문자열 일치 여부로 Y/N 포트를 활성화.":
+        "🧩 聚合节点将多个输入通过 concat/JSON 合并。🔀 分支节点根据条件字符串激活 Y/N 端口。",
+    "5. 포트 드래그로 화살표 연결": "5. 拖动端口连接箭头",
+    "주황 out-port 에서 보라 in-port 로 드래그하면 베지어 곡선 + 방향 화살표가 자동 생성. DAG 사이클은 즉시 거부.":
+        "从橙色 out-port 拖到紫色 in-port，自动生成贝塞尔曲线与方向箭头。循环连接会立即被拒绝。",
+    "6. 📤 결과 노드 + DAG 완성": "6. 📤 结果节点 + 完成 DAG",
+    "📤 결과 노드를 추가하고 분기 → 결과로 마무리. 이 노드가 워크플로우 종착지. exportTo 경로를 지정하면 파일로 저장.":
+        "添加 📤 结果节点并连接 分支→结果。这是工作流终点。设置 exportTo 可同时写入文件。",
+    "7. 🎯 맞춤으로 전체 한눈에": "7. 🎯 一键适配全视图",
+    "캔버스 우하단 🎯 맞춤 버튼 → 모든 노드 bounding box 가 보이도록 pan/zoom 자동 조정. 복잡한 워크플로우도 한 번에 정렬.":
+        "点击画布右下角 🎯 适配 — 自动 pan/zoom 将所有节点收入视图。再复杂的流程也能一键归位。",
+    "8. ▶ 실행 → 순차 자동 처리": "8. ▶ 运行 → 顺序自动处理",
+    "상단 ▶ 실행 → DAG 토폴로지 순서로 각 노드가 보라색 펄스(실행 중) → 녹색(완료)로 전환. 세션 노드는 claude -p 로 subprocess 실행.":
+        "顶部 ▶ 运行 → 按 DAG 拓扑顺序，节点先紫色脉冲（运行中）再转绿色（完成）。会话节点通过 claude -p 子进程执行。",
+    "9. 완료 → 결과 모달 · 터미널 · 파일": "9. 完成 → 结果弹窗 · 终端 · 文件",
+    "완료된 노드는 녹색 테두리. 결과 모달에 노드별 출력 미리보기. 세션 노드 🖥️ 아이콘으로 Terminal 새 창에서 대화형 세션도 시작 가능. 📜 이력 으로 과거 실행 재조회.":
+        "已完成节点呈绿色边框。结果弹窗预览每个节点的输出。会话节点的 🖥️ 图标可在 Terminal 新窗口启动交互会话，📜 历史 可重新查看过去运行。",
+    "＋ 새 워크플로우": "＋ 新建工作流",
+    "＋ 노드": "＋ 节点",
+    "🎯 맞춤": "🎯 适配",
+    "▶ 실행": "▶ 运行",
     "메타": "元数据",
     "메타 패널 보이기/가리기": "显示/隐藏元数据面板",
     "가리기": "隐藏",
