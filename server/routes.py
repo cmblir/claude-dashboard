@@ -43,6 +43,8 @@ from .hooks import api_plugin_hook_update, get_hooks
 from .workflows import (
     api_workflow_delete, api_workflow_get, api_workflow_patch, api_workflow_run,
     api_workflow_run_status, api_workflow_runs_list, api_workflow_save,
+    api_workflow_template_delete, api_workflow_template_get,
+    api_workflow_template_save, api_workflow_templates_list,
     api_workflows_list,
 )
 from .logger import log
@@ -141,6 +143,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/list": lambda q: api_workflows_list(q),
     "/api/workflows/run-status": api_workflow_run_status,
     "/api/workflows/runs": api_workflow_runs_list,
+    "/api/workflows/templates/list": lambda q: api_workflow_templates_list(q),
 }
 
 
@@ -201,6 +204,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/patch": api_workflow_patch,
     "/api/workflows/delete": api_workflow_delete,
     "/api/workflows/run": api_workflow_run,
+    "/api/workflows/templates/save": api_workflow_template_save,
+    "/api/workflows/templates/delete": api_workflow_template_delete,
     "/api/session/spawn": api_session_spawn,
 }
 
@@ -359,4 +364,5 @@ _ITEM_GET_ROUTES = [
     (re.compile(r"^/api/skills/([^/]+)$"), get_skill),
     (re.compile(r"^/api/agents/([A-Za-z0-9_.:-]+)$"), get_agent),
     (re.compile(r"^/api/workflows/(wf-[0-9]{10,14}-[a-z0-9]{3,6})$"), api_workflow_get),
+    (re.compile(r"^/api/workflows/templates/(tpl-[0-9]{10,14}-[a-z0-9]{3,6})$"), api_workflow_template_get),
 ]

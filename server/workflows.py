@@ -44,7 +44,7 @@ _LOCK = threading.Lock()
 # ───────── 영속 ─────────
 
 def _empty_store() -> dict:
-    return {"version": 1, "workflows": {}, "runs": {}}
+    return {"version": 1, "workflows": {}, "runs": {}, "customTemplates": {}}
 
 
 def _load_all() -> dict:
@@ -58,10 +58,13 @@ def _load_all() -> dict:
         data.setdefault("version", 1)
         data.setdefault("workflows", {})
         data.setdefault("runs", {})
+        data.setdefault("customTemplates", {})
         if not isinstance(data["workflows"], dict):
             data["workflows"] = {}
         if not isinstance(data["runs"], dict):
             data["runs"] = {}
+        if not isinstance(data["customTemplates"], dict):
+            data["customTemplates"] = {}
         return data
     except Exception as e:
         log.warning("workflows load failed: %s — using empty store", e)
@@ -717,6 +720,88 @@ def api_workflow_run_status(query: dict) -> dict:
     if not (isinstance(rid, str) and _RUN_ID_RE.match(rid)):
         return {"ok": False, "error": "invalid runId"}
     return _run_status_snapshot(rid)
+
+
+_TPL_ID_RE = re.compile(r"^tpl-[0-9]{10,14}-[a-z0-9]{3,6}$")
+
+
+def _new_tpl_id() -> str:
+    return f"tpl-{int(time.time()*1000)}-{uuid.uuid4().hex[:4]}"
+
+
+def api_workflow_templates_list(query: dict | None = None) -> dict:
+    store = _load_all()
+    out = []
+    for tid, tpl in (store.get("customTemplates") or {}).items():
+        out.append({
+            "id": tid,
+            "name": tpl.get("name", "Untitled"),
+            "description": tpl.get("description", ""),
+            "icon": tpl.get("icon") or "💾",
+            "nodeCount": len(tpl.get("nodes") or []),
+            "edgeCount": len(tpl.get("edges") or []),
+            "createdAt": tpl.get("createdAt", 0),
+        })
+    out.sort(key=lambda x: x["createdAt"], reverse=True)
+    return {"ok": True, "templates": out}
+
+
+def api_workflow_template_save(body: dict) -> dict:
+    """현재 워크플로우 구조를 커스텀 템플릿으로 저장.
+
+    body: { name, description?, icon?, nodes, edges, viewport? }
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    wf_clean = _sanitize_workflow(body)
+    if wf_clean is None:
+        return {"ok": False, "error": "invalid workflow"}
+    name = (body.get("name") or "").strip() or "Untitled"
+    now = int(time.time() * 1000)
+    with _LOCK:
+        store = _load_all()
+        raw_id = body.get("id")
+        is_new = not (isinstance(raw_id, str) and _TPL_ID_RE.match(raw_id) and raw_id in (store.get("customTemplates") or {}))
+        tid = raw_id if not is_new else _new_tpl_id()
+        tpl = {
+            "id": tid,
+            "name": _clamp_str(name, 120),
+            "description": _clamp_str(body.get("description"), 2000),
+            "icon": _clamp_str(body.get("icon"), 8) or "💾",
+            "nodes": wf_clean["nodes"],
+            "edges": wf_clean["edges"],
+            "viewport": wf_clean["viewport"],
+            "createdAt": (store.get("customTemplates", {}).get(tid) or {}).get("createdAt") or now,
+            "updatedAt": now,
+        }
+        store.setdefault("customTemplates", {})[tid] = tpl
+        _dump_all(store)
+    return {"ok": True, "id": tid, "created": is_new}
+
+
+def api_workflow_template_delete(body: dict) -> dict:
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    tid = body.get("id")
+    if not (isinstance(tid, str) and _TPL_ID_RE.match(tid)):
+        return {"ok": False, "error": "invalid id"}
+    with _LOCK:
+        store = _load_all()
+        if tid not in (store.get("customTemplates") or {}):
+            return {"ok": False, "error": "not found"}
+        del store["customTemplates"][tid]
+        _dump_all(store)
+    return {"ok": True, "id": tid}
+
+
+def api_workflow_template_get(tid: str) -> dict:
+    if not (isinstance(tid, str) and _TPL_ID_RE.match(tid)):
+        return {"ok": False, "error": "invalid id"}
+    store = _load_all()
+    tpl = (store.get("customTemplates") or {}).get(tid)
+    if not tpl:
+        return {"ok": False, "error": "not found"}
+    return {"ok": True, "template": tpl}
 
 
 def api_workflow_runs_list(query: dict) -> dict:
