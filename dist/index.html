@@ -3295,18 +3295,21 @@ const WF_TUT_STEPS = [
     title: '14. 🔁 Repeat — 자동 반복 실행',
     caption: '메타 패널의 🔁 반복 실행 섹션에서 최대 횟수·간격·스케줄(HH:MM)·피드백 노트를 설정. 실행 완료 후 결과에 노트를 덧붙여 피드백 노드로 자동 주입하며 같은 DAG 를 여러 번 반복 — 리드가 스프린트를 N회 이어서 기획/실행/리뷰하는 자동화.',
     nodes: [
-      { id:'s',  type:'start',     x:40,  y:130, title:'시작',   status:'ok' },
-      { id:'l1', type:'session',   x:260, y:130, title:'리드',   sub:'@team-lead', status:'ok' },
-      { id:'fe', type:'subagent',  x:480, y:40,  title:'프론트', sub:'@frontend-dev', status:'ok' },
-      { id:'be', type:'subagent',  x:480, y:220, title:'백엔드', sub:'@backend-dev', status:'ok' },
-      { id:'ag', type:'aggregate', x:700, y:130, title:'취합',   status:'ok' },
-      { id:'o',  type:'output',    x:860, y:130, title:'결과',   status:'running' },
+      { id:'s',  type:'start',     x:40,  y:200, title:'시작',   status:'ok' },
+      { id:'l1', type:'session',   x:260, y:200, title:'리드',   sub:'@team-lead', status:'ok' },
+      { id:'fe', type:'subagent',  x:480, y:60,  title:'프론트', sub:'@frontend-dev', status:'ok' },
+      { id:'be', type:'subagent',  x:480, y:340, title:'백엔드', sub:'@backend-dev', status:'ok' },
+      { id:'ag', type:'aggregate', x:700, y:200, title:'취합',   status:'ok' },
+      { id:'o',  type:'output',    x:920, y:200, title:'결과',   status:'running' },
     ],
     edges: [
       { from:'s',  to:'l1' }, { from:'l1', to:'fe' }, { from:'l1', to:'be' },
       { from:'fe', to:'ag' }, { from:'be', to:'ag' }, { from:'ag', to:'o' },
     ],
-    cursor: { x: 260, y: 180, label: '🔁 피드백' },
+    cursor: { x: 260, y: 250, label: '🔁 피드백' },
+    // 우측 메타 패널 mockup + 피드백 노트 typewriter
+    overlay: { kind: 'repeatMeta', x: 1160, y: 40, w: 340, h: 380 },
+    typewriter: '이 결과를 기반으로 다음 스프린트 업무를 프론트/백엔드 형식으로 기획해줘. 실현 가능성과 우선순위를 명확히.',
   },
 ];
 
@@ -3349,6 +3352,7 @@ function _wfShowTutorial() {
           <g id="wfTutViewport" transform="translate(0,0) scale(1)">
             <g id="wfTutEdges"></g>
             <g id="wfTutNodes"></g>
+            <g id="wfTutOverlay"></g>
           </g>
           <g id="wfTutClickFx"></g>
           <g id="wfTutCursor" transform="translate(-100,-100)">
@@ -3385,6 +3389,7 @@ function _wfShowTutorial() {
 
 function _wfCloseTutorial() {
   if (__wfTut && __wfTut.timer) clearTimeout(__wfTut.timer);
+  if (__wfTut && __wfTut.typeTimer) clearInterval(__wfTut.typeTimer);
   const w = document.getElementById('wfTutWin');
   if (w) w.remove();
   __wfTut = null;
@@ -3427,17 +3432,22 @@ function _wfTutGo(delta) {
 function _wfTutSchedule() {
   if (!__wfTut || !__wfTut.playing) return;
   if (__wfTut.timer) clearTimeout(__wfTut.timer);
+  // 기본 3.8초. typewriter 있는 장면은 문자수 × 40ms + 2s 여유
+  const step = WF_TUT_STEPS[__wfTut.step];
+  let delay = 3800;
+  if (step && step.typewriter) {
+    delay = Math.max(delay, (step.typewriter.length * 45) + 2000);
+  }
   __wfTut.timer = setTimeout(() => {
     if (!__wfTut) return;
     if (__wfTut.step < WF_TUT_STEPS.length - 1) {
       __wfTut.step++; _wfTutRender(); _wfTutSchedule();
     } else {
-      // 마지막 단계에서 정지
       __wfTut.playing = false;
       const b = document.getElementById('wfTutPlayBtn');
       if (b) b.innerHTML = '▶';
     }
-  }, 3800);
+  }, delay);
 }
 
 function _wfTutRender() {
@@ -3467,8 +3477,7 @@ function _wfTutRender() {
     vpG.setAttribute('transform', `translate(${vp.panX||0},${vp.panY||0}) scale(${vp.scale||1})`);
   }
 
-  // 노드/엣지/커서 bounding box → SVG viewBox 동적 설정. 어떤 장면이라도
-  // 전체 컨텐츠가 한 화면에 들어오고 잘리지 않음.
+  // 노드/엣지/커서/오버레이 bounding box → SVG viewBox 동적 설정.
   const svgEl = document.getElementById('wfTutSvg');
   if (svgEl) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -3485,12 +3494,75 @@ function _wfTutRender() {
       maxX = Math.max(maxX, cx + 120);
       maxY = Math.max(maxY, cy + 40);
     }
+    if (step.overlay) {
+      const o = step.overlay;
+      minX = Math.min(minX, o.x || 0);
+      minY = Math.min(minY, o.y || 0);
+      maxX = Math.max(maxX, (o.x || 0) + (o.w || 300));
+      maxY = Math.max(maxY, (o.y || 0) + (o.h || 300));
+    }
     if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 700; maxY = 360; }
     const pad = 36;
     const vbX = minX - pad, vbY = minY - pad;
     const vbW = Math.max(400, (maxX - minX) + pad * 2);
     const vbH = Math.max(220, (maxY - minY) + pad * 2);
     svgEl.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
+  }
+
+  // 오버레이 (메타 패널 mockup + typewriter)
+  const overlayG = document.getElementById('wfTutOverlay');
+  if (__wfTut.typeTimer) { clearInterval(__wfTut.typeTimer); __wfTut.typeTimer = null; }
+  if (overlayG) {
+    overlayG.innerHTML = '';
+    if (step.overlay && step.overlay.kind === 'repeatMeta') {
+      const o = step.overlay;
+      const ox = o.x, oy = o.y, ow = o.w, oh = o.h;
+      const typedId = 'wfTutTyped_' + idx;
+      overlayG.innerHTML = `
+        <!-- 메타 패널 배경 -->
+        <rect x="${ox}" y="${oy}" width="${ow}" height="${oh}" rx="10" ry="10"
+              fill="#1e1e26" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+        <!-- 섹션 헤더 -->
+        <text x="${ox+16}" y="${oy+26}" font-size="13" font-weight="600" fill="#fafafa">🔁 ${escapeHtml(t('반복 실행'))}</text>
+        <!-- 체크박스 라벨 -->
+        <rect x="${ox+16}" y="${oy+42}" width="14" height="14" rx="3" ry="3" fill="#4ade80"/>
+        <text x="${ox+36}" y="${oy+53}" font-size="11" fill="#fafafa">${escapeHtml(t('반복 실행 활성'))}</text>
+        <!-- 최대 횟수 -->
+        <text x="${ox+16}" y="${oy+82}" font-size="10" fill="rgba(255,255,255,0.5)">${escapeHtml(t('최대 반복 횟수'))}</text>
+        <rect x="${ox+16}" y="${oy+88}" width="${ow-32}" height="28" rx="6" ry="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"/>
+        <text x="${ox+28}" y="${oy+106}" font-size="12" fill="#fafafa">5</text>
+        <!-- 간격 -->
+        <text x="${ox+16}" y="${oy+132}" font-size="10" fill="rgba(255,255,255,0.5)">${escapeHtml(t('반복 사이 대기 (초)'))}</text>
+        <rect x="${ox+16}" y="${oy+138}" width="${ow-32}" height="28" rx="6" ry="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"/>
+        <text x="${ox+28}" y="${oy+156}" font-size="12" fill="#fafafa">0</text>
+        <!-- 피드백 노트 라벨 -->
+        <text x="${ox+16}" y="${oy+182}" font-size="10" fill="rgba(255,255,255,0.5)">${escapeHtml(t('피드백 노트'))}</text>
+        <!-- 피드백 노트 textarea mockup -->
+        <rect x="${ox+16}" y="${oy+188}" width="${ow-32}" height="140" rx="6" ry="6" fill="rgba(255,255,255,0.05)" stroke="rgba(167,139,250,0.4)" stroke-width="1.5"/>
+        <!-- typewriter 텍스트 (foreignObject 로 자동 줄바꿈) -->
+        <foreignObject x="${ox+24}" y="${oy+196}" width="${ow-48}" height="128">
+          <div xmlns="http://www.w3.org/1999/xhtml"
+               id="${typedId}"
+               style="color:#fafafa; font-size:11px; line-height:1.5; font-family:inherit; white-space:pre-wrap; word-break:break-word;"></div>
+        </foreignObject>
+        <!-- 캐럿 -->
+        <text x="${ox+24}" y="${oy+216}" id="${typedId}_caret" font-size="11" fill="#a78bfa">▍</text>
+      `;
+      // typewriter 시작
+      const full = t(step.typewriter || '');
+      let pos = 0;
+      const typedEl = document.getElementById(typedId);
+      if (typedEl) typedEl.textContent = '';
+      __wfTut.typeTimer = setInterval(() => {
+        const el = document.getElementById(typedId);
+        if (!el) { clearInterval(__wfTut.typeTimer); __wfTut.typeTimer = null; return; }
+        pos++;
+        el.textContent = full.slice(0, pos);
+        if (pos >= full.length) {
+          clearInterval(__wfTut.typeTimer); __wfTut.typeTimer = null;
+        }
+      }, 40);
+    }
   }
 
   // 엣지 — stroke-dashoffset 드로잉 (공용 _wfBezier 사용)
