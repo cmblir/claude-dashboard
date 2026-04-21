@@ -3474,6 +3474,32 @@ function _wfTutRender() {
     vpG.setAttribute('transform', `translate(${vp.panX||0},${vp.panY||0}) scale(${vp.scale||1})`);
   }
 
+  // 노드/엣지/커서 bounding box → SVG viewBox 동적 설정. 어떤 장면이라도
+  // 전체 컨텐츠가 한 화면에 들어오고 잘리지 않음.
+  const svgEl = document.getElementById('wfTutSvg');
+  if (svgEl) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    (step.nodes || []).forEach(n => {
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + WF_NODE_W);
+      maxY = Math.max(maxY, n.y + WF_NODE_H);
+    });
+    if (step.cursor) {
+      const cx = step.cursor.x || 0, cy = step.cursor.y || 0;
+      minX = Math.min(minX, cx - 10);
+      minY = Math.min(minY, cy - 10);
+      maxX = Math.max(maxX, cx + 120);
+      maxY = Math.max(maxY, cy + 40);
+    }
+    if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 700; maxY = 360; }
+    const pad = 36;
+    const vbX = minX - pad, vbY = minY - pad;
+    const vbW = Math.max(400, (maxX - minX) + pad * 2);
+    const vbH = Math.max(220, (maxY - minY) + pad * 2);
+    svgEl.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
+  }
+
   // 엣지 — stroke-dashoffset 드로잉 (공용 _wfBezier 사용)
   edgesG.innerHTML = (step.edges || []).map((e, i) => {
     const fromN = step.nodes.find(n => n.id === e.from);
