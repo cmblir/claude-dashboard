@@ -1644,6 +1644,37 @@ function _wfBezier(x1, y1, x2, y2) {
   return `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
 }
 
+// 노드/엣지 선택 하이라이트만 class 토글로 반영 — 전체 re-render 없음
+function _wfSyncSelectionClasses() {
+  document.querySelectorAll('#wfNodes g.wf-node').forEach(el => {
+    el.classList.toggle('selected', el.getAttribute('data-node') === __wf.selectedNodeId);
+  });
+  document.querySelectorAll('#wfEdges path.wf-edge').forEach(el => {
+    el.classList.toggle('selected', el.getAttribute('data-edge') === __wf.selectedEdgeId);
+  });
+}
+
+// 드래그 중 깜빡임 방지 — innerHTML 재작성 대신 움직이는 노드의 transform 과
+// 연관 엣지의 d 속성만 in-place 로 업데이트한다.
+function _wfUpdateNodeTransform(nid) {
+  if (!__wf.current) return;
+  const n = __wf.current.nodes.find(x => x.id === nid);
+  if (!n) return;
+  const g = document.querySelector('#wfNodes g.wf-node[data-node="' + nid + '"]');
+  if (g) g.setAttribute('transform', `translate(${n.x},${n.y})`);
+  (__wf.current.edges || []).forEach(e => {
+    if (e.from !== nid && e.to !== nid) return;
+    const path = document.querySelector('#wfEdges path.wf-edge[data-edge="' + e.id + '"]');
+    if (!path) return;
+    const fromN = __wf.current.nodes.find(x => x.id === e.from);
+    const toN   = __wf.current.nodes.find(x => x.id === e.to);
+    if (!fromN || !toN) return;
+    const p1 = _wfPortPos(fromN, e.fromPort || 'out');
+    const p2 = _wfPortPos(toN, e.toPort || 'in');
+    path.setAttribute('d', _wfBezier(p1.x, p1.y, p2.x, p2.y));
+  });
+}
+
 // ─── 노드/엣지 추가·삭제 ──────────────────────────────────────
 function _wfAddNode(type) {
   if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
@@ -1763,7 +1794,9 @@ function _wfBindCanvas() {
       if (!node) return;
       __wf.selectedNodeId = nid; __wf.selectedEdgeId = null;
       __wf.drag = { kind: 'node', nodeId: nid, origX: node.x, origY: node.y, startX: pt.x, startY: pt.y };
-      _wfRenderCanvas(); _wfRenderInspector();
+      // 전체 re-render 대신 selected 클래스만 토글 (깜빡임 방지)
+      _wfSyncSelectionClasses();
+      _wfRenderInspector();
       if (touch) { try{e.preventDefault();}catch(_){} }
       return;
     }
@@ -1771,14 +1804,16 @@ function _wfBindCanvas() {
     if (target.classList && target.classList.contains('wf-edge')) {
       __wf.selectedEdgeId = target.getAttribute('data-edge');
       __wf.selectedNodeId = null;
-      _wfRenderCanvas(); _wfRenderInspector();
+      _wfSyncSelectionClasses();
+      _wfRenderInspector();
       return;
     }
     // 빈 영역 → 팬 + 선택 해제
     __wf.selectedNodeId = null; __wf.selectedEdgeId = null;
     const view = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
     __wf.drag = { kind: 'pan', startX: e.clientX, startY: e.clientY, origPanX: view.panX||0, origPanY: view.panY||0 };
-    _wfRenderCanvas(); _wfRenderInspector();
+    _wfSyncSelectionClasses();
+    _wfRenderInspector();
     if (touch) { try{e.preventDefault();}catch(_){} }
   }
 
@@ -1790,8 +1825,9 @@ function _wfBindCanvas() {
       if (!n) return;
       n.x = Math.round(__wf.drag.origX + (pt.x - __wf.drag.startX));
       n.y = Math.round(__wf.drag.origY + (pt.y - __wf.drag.startY));
-      _wfRenderCanvas();
-      __wf.dirty = true; _wfUpdateToolbar();
+      // 깜빡임 방지 — 해당 노드 transform + 관련 엣지 d 만 in-place 업데이트
+      _wfUpdateNodeTransform(__wf.drag.nodeId);
+      if (!__wf.dirty) { __wf.dirty = true; _wfUpdateToolbar(); }
       _wfSchedulePatch();
       if (touch) { try{e.preventDefault();}catch(_){} }
     } else if (__wf.drag.kind === 'pan') {
@@ -1883,7 +1919,10 @@ function _wfBindCanvas() {
     const dz = e.deltaY < 0 ? 1.1 : 0.9;
     view.zoom = Math.max(0.4, Math.min(2.5, (view.zoom||1) * dz));
     __wf.current.viewport = view;
-    _wfRenderCanvas();
+    // 뷰포트 transform 만 갱신 (깜빡임 방지)
+    const vp = document.getElementById('wfViewport');
+    if (vp) vp.setAttribute('transform',
+      `translate(${view.panX||0},${view.panY||0}) scale(${view.zoom||1})`);
     _wfSchedulePatch();
   }, { passive: false });
 }
