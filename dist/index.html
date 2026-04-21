@@ -1494,8 +1494,14 @@ function _wfRenderList() {
 }
 
 async function _wfCreateNew() {
-  const name = prompt(t('워크플로우 이름'), 'New workflow');
-  if (!name) return;
+  const name = await promptModal({
+    title: t('새 워크플로우'),
+    message: t('이름을 입력하세요'),
+    placeholder: t('예: README 작성 파이프라인'),
+    defaultValue: 'New workflow',
+    confirmLabel: t('생성'),
+  });
+  if (!name || !name.trim()) return;
   const body = {
     name,
     nodes: [{ id: 'n-start', type: 'start', x: 80, y: 160, title: t('시작') }],
@@ -1515,7 +1521,13 @@ async function _wfCreateNew() {
 }
 
 async function _wfDelete(wfId) {
-  if (!confirm(t('이 워크플로우를 삭제할까요?'))) return;
+  const ok = await confirmModal({
+    title: t('삭제 확인'),
+    message: t('이 워크플로우를 삭제할까요?'),
+    confirmLabel: t('삭제'),
+    danger: true,
+  });
+  if (!ok) return;
   const r = await api('/api/workflows/delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: wfId }),
@@ -2411,8 +2423,12 @@ VIEWS.design = async () => {
 };
 
 async function addDesignDir() {
-  const p = prompt('추가로 스캔할 디렉토리 절대경로 (홈 디렉토리 내):');
-  if (!p) return;
+  const p = await promptModal({
+    title: t('디자인 스캔 디렉토리 추가'),
+    message: t('추가로 스캔할 디렉토리 절대경로 (홈 디렉토리 내):'),
+    placeholder: '~/Design',
+  });
+  if (!p || !p.trim()) return;
   const r = await api('/api/design/add-dir', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ dir: p }),
@@ -3417,7 +3433,12 @@ async function togglePluginFromAgent(pluginKey, enable) {
 }
 
 async function deleteGlobalAgent(id) {
-  if (!confirm(t('전역 에이전트') + ` '${id}' ` + t('삭제?') + ` (~/.claude/agents/${id}.md ` + t('제거') + `)`)) return;
+  const ok = await confirmModal({
+    title: t('전역 에이전트 삭제'),
+    message: `'${id}' — ~/.claude/agents/${id}.md ` + t('파일이 제거됩니다.'),
+    confirmLabel: t('삭제'), danger: true,
+  });
+  if (!ok) return;
   const r = await api('/api/agents/delete', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ id }),
@@ -4021,7 +4042,12 @@ function addHookEntry(s, payload, newSubEntry) {
 async function deleteHook(payload) {
   const {scope, event, groupIdx, subIdx, pluginKey} = payload || {};
   if (scope === 'plugin') {
-    if (!confirm(t('플러그인 훅을 삭제하시겠습니까?') + ` (${pluginKey} → ${event}[${groupIdx}/${subIdx}])\n` + t('플러그인 업데이트 시 복원될 수 있습니다.'))) return;
+    const ok = await confirmModal({
+      title: t('플러그인 훅 삭제'),
+      message: t('플러그인 훅을 삭제하시겠습니까?') + ` (${pluginKey} → ${event}[${groupIdx}/${subIdx}]) — ` + t('플러그인 업데이트 시 복원될 수 있습니다.'),
+      confirmLabel: t('삭제'), danger: true,
+    });
+    if (!ok) return;
     const r = await api('/api/hooks/plugin/update', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ pluginKey, event, groupIdx, subIdx, op:'delete' }),
@@ -4029,7 +4055,7 @@ async function deleteHook(payload) {
     toast(r.ok ? '플러그인 훅 삭제됨' : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
     return;
   }
-  if (!confirm(t('이 훅을 삭제할까요?'))) return;
+  if (!await confirmModal({ title: t('훅 삭제'), message: t('이 훅을 삭제할까요?'), confirmLabel: t('삭제'), danger: true })) return;
   const s = await api('/api/settings');
   if (!s.hooks || !s.hooks[event]) return;
   const group = s.hooks[event][groupIdx];
@@ -4126,8 +4152,12 @@ async function quickAddPerm(kind) {
   inp.value = '';
 }
 async function addPermission(kind) {
-  const v = prompt(`${kind==='allow'?'허용':'차단'} 규칙을 입력하세요 (예: Bash(git status:*))`);
-  if (!v) return;
+  const v = await promptModal({
+    title: kind === 'allow' ? t('허용 규칙 추가') : t('차단 규칙 추가'),
+    message: t('규칙을 입력하세요 (예: Bash(git status:*))'),
+    placeholder: 'Bash(git status:*)',
+  });
+  if (!v || !v.trim()) return;
   await setPermAndSave(kind, 'add', v.trim());
 }
 async function removePermission(kind, i) {
@@ -4288,14 +4318,24 @@ async function installMcp(id) {
 }
 
 async function removeMcp(name) {
-  if (!confirm(t('MCP 서버') + ` '${name}' ` + t('을 제거할까요?') + ` (~/.claude.json ` + t('에서 삭제') + `)`)) return;
+  const ok = await confirmModal({
+    title: t('MCP 서버 제거'),
+    message: `'${name}' — ~/.claude.json ` + t('에서 제거됩니다.'),
+    confirmLabel: t('제거'), danger: true,
+  });
+  if (!ok) return;
   const r = await api('/api/mcp/remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
   if (r.ok) toast(`'${name}' 제거됨`, 'ok');
   else toast(r.error||'실패', 'err');
 }
 
 async function removeProjectMcp(cwd, name) {
-  if (!confirm(t('프로젝트 MCP') + ` '${name}' ` + t('을 제거할까요?') + `\n${cwd}/.mcp.json ` + t('에서 삭제됩니다.'))) return;
+  const ok = await confirmModal({
+    title: t('프로젝트 MCP 제거'),
+    message: `'${name}' — ${cwd}/.mcp.json ` + t('에서 삭제됩니다.'),
+    confirmLabel: t('제거'), danger: true,
+  });
+  if (!ok) return;
   const r = await api('/api/mcp/project/remove', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ cwd, name }),
@@ -5436,7 +5476,12 @@ async function paEdit(name) {
   });
 }
 async function paDelete(name) {
-  if (!confirm(`'${name}' ` + t('에이전트를 삭제할까요?') + ` (.claude/agents/${name}.md ` + t('제거') + `)`)) return;
+  const ok = await confirmModal({
+    title: t('에이전트 삭제'),
+    message: `'${name}' — .claude/agents/${name}.md ` + t('파일이 제거됩니다.'),
+    confirmLabel: t('삭제'), danger: true,
+  });
+  if (!ok) return;
   const cwd = window.__paCwd || '';
   const r = await api('/api/project-agents/delete', {
     method:'POST', headers:{'Content-Type':'application/json'},
@@ -5858,7 +5903,12 @@ async function addMarketplace() {
   if (r.ok) { toast('추가됨', 'ok'); renderView(); } else toast(r.error||'실패', 'err');
 }
 async function removeMarketplace(name) {
-  if (!confirm(`'${name}' ` + t('마켓플레이스를 제거할까요?'))) return;
+  const ok = await confirmModal({
+    title: t('마켓플레이스 제거'),
+    message: `'${name}' ` + t('마켓플레이스를 제거할까요?'),
+    confirmLabel: t('제거'), danger: true,
+  });
+  if (!ok) return;
   const r = await api('/api/marketplaces/remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
   if (r.ok) { toast('제거됨', 'ok'); renderView(); } else toast(r.error||'실패', 'err');
 }
@@ -6042,7 +6092,12 @@ function editOutputStyle(existing) {
 }
 
 async function deleteOutputStyle(id) {
-  if (!confirm(`'${id}' ` + t('출력 스타일을 삭제할까요?'))) return;
+  const ok = await confirmModal({
+    title: t('출력 스타일 삭제'),
+    message: `'${id}' ` + t('출력 스타일을 삭제할까요?'),
+    confirmLabel: t('삭제'), danger: true,
+  });
+  if (!ok) return;
   const r = await api('/api/output-styles/delete', {
     method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }),
   });
@@ -6583,7 +6638,7 @@ async function toggleTaskStatus(sessionId, t) {
 }
 
 async function deleteTask(sessionId, id) {
-  if (!confirm(t('TODO 를 삭제할까요?'))) return;
+  if (!await confirmModal({ title: t('TODO 삭제'), message: t('TODO 를 삭제할까요?'), confirmLabel: t('삭제'), danger: true })) return;
   const r = await api('/api/tasks/delete', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ sessionId, id }),
@@ -6655,7 +6710,7 @@ VIEWS.team = async () => {
         <div class="flex gap-2 mt-3">
           <button class="btn text-xs" onclick="openCliStatusModal()">⚙️ ${t('플랜 설정')}</button>
           <button class="btn text-xs" onclick="(async()=>{
-            if(!confirm(t('정말 로그아웃 하시겠습니까?')))return;
+            if(!await confirmModal({title:t('로그아웃'),message:t('정말 로그아웃 하시겠습니까?'),confirmLabel:t('로그아웃'),danger:true}))return;
             const r=await api('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
             if(r.ok){toast('로그아웃 되었습니다','ok');setTimeout(()=>location.reload(),800);}
             else toast(r.error||'실패','err');
@@ -6759,6 +6814,92 @@ function showModalLoading(msg) {
 function closeModal() {
   document.getElementById('modal-root').innerHTML = '';
   if (typeof _mascotLeaveModal === 'function') _mascotLeaveModal();
+}
+
+// 맥 스타일 커스텀 프롬프트 — 브라우저 기본 prompt() 대체
+// resolve 값: 문자열(확인) 또는 null(취소/닫기)
+function promptModal({ title, message, placeholder, defaultValue, confirmLabel, cancelLabel, multiline }) {
+  return new Promise((resolve) => {
+    const mid = 'pm-' + Math.random().toString(36).slice(2, 8);
+    const inputTag = multiline
+      ? `<textarea id="${mid}-input" class="input w-full" rows="4" placeholder="${escapeHtml(placeholder||'')}">${escapeHtml(defaultValue||'')}</textarea>`
+      : `<input id="${mid}-input" class="input w-full" placeholder="${escapeHtml(placeholder||'')}" value="${escapeHtml(defaultValue||'')}">`;
+    showModal(`
+      <div class="p-5" style="max-width:480px;">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-base font-semibold">${escapeHtml(title || t('입력'))}</h3>
+          <button class="btn text-xs" onclick="__pmResolve('${mid}', null)">✕</button>
+        </div>
+        ${message ? `<div class="text-sm text-[var(--text-mute)] mb-3">${escapeHtml(message)}</div>` : ''}
+        ${inputTag}
+        <div class="flex justify-end gap-2 mt-4">
+          <button class="btn text-sm" onclick="__pmResolve('${mid}', null)">${escapeHtml(cancelLabel || t('취소'))}</button>
+          <button class="btn-primary btn text-sm" onclick="__pmResolve('${mid}', 'ok')">${escapeHtml(confirmLabel || t('확인'))}</button>
+        </div>
+      </div>
+    `, { keepMascot: true });
+    window.__pmResolve = (id, kind) => {
+      if (id !== mid) return;
+      const el = document.getElementById(mid + '-input');
+      const val = el ? el.value : null;
+      closeModal();
+      resolve(kind === 'ok' ? (val || '') : null);
+    };
+    // 자동 포커스 + Enter = 확인 (multiline 이 아닐 때만)
+    setTimeout(() => {
+      const el = document.getElementById(mid + '-input');
+      if (!el) return;
+      el.focus(); el.select && el.select();
+      if (!multiline) {
+        el.onkeydown = (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); window.__pmResolve(mid, 'ok'); }
+          if (e.key === 'Escape') { e.preventDefault(); window.__pmResolve(mid, null); }
+        };
+      } else {
+        el.onkeydown = (e) => {
+          if (e.key === 'Escape') { e.preventDefault(); window.__pmResolve(mid, null); }
+        };
+      }
+    }, 30);
+  });
+}
+
+// 맥 스타일 커스텀 확인 — 브라우저 기본 confirm() 대체
+// resolve 값: true(확인) 또는 false(취소)
+function confirmModal({ title, message, confirmLabel, cancelLabel, danger }) {
+  return new Promise((resolve) => {
+    const mid = 'cm-' + Math.random().toString(36).slice(2, 8);
+    const btnCls = danger ? 'btn text-sm' : 'btn-primary btn text-sm';
+    const btnStyle = danger ? 'style="background:rgba(248,113,113,0.18);color:#fca5a5;border-color:rgba(248,113,113,0.4);"' : '';
+    showModal(`
+      <div class="p-5" style="max-width:480px;">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-base font-semibold">${escapeHtml(title || t('확인'))}</h3>
+          <button class="btn text-xs" onclick="__cmResolve('${mid}', false)">✕</button>
+        </div>
+        <div class="text-sm text-[var(--text-mute)] mb-5">${escapeHtml(message || '')}</div>
+        <div class="flex justify-end gap-2">
+          <button class="btn text-sm" onclick="__cmResolve('${mid}', false)">${escapeHtml(cancelLabel || t('취소'))}</button>
+          <button class="${btnCls}" ${btnStyle} onclick="__cmResolve('${mid}', true)">${escapeHtml(confirmLabel || t('확인'))}</button>
+        </div>
+      </div>
+    `, { keepMascot: true });
+    window.__cmResolve = (id, v) => {
+      if (id !== mid) return;
+      closeModal();
+      resolve(!!v);
+    };
+    // Enter = 확인 / Esc = 취소
+    setTimeout(() => {
+      const root = document.getElementById('modal-root');
+      if (!root) return;
+      const handler = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); window.__cmResolve(mid, true); document.removeEventListener('keydown', handler); }
+        else if (e.key === 'Escape') { e.preventDefault(); window.__cmResolve(mid, false); document.removeEventListener('keydown', handler); }
+      };
+      document.addEventListener('keydown', handler);
+    }, 30);
+  });
 }
 function showEditModal({ title, raw, save, readOnly }) {
   const ro = !!readOnly;
@@ -6934,7 +7075,7 @@ async function doSwitchLogin() {
 }
 
 async function doLogoutOnly() {
-  if (!confirm(t('정말 로그아웃 하시겠습니까?'))) return;
+  if (!await confirmModal({ title: t('로그아웃'), message: t('정말 로그아웃 하시겠습니까?'), confirmLabel: t('로그아웃'), danger: true })) return;
   try {
     const r = await api('/api/auth/logout', {
       method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({})
