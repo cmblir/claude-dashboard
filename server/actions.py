@@ -153,9 +153,12 @@ def api_chat(body: dict) -> dict:
 
     full_prompt = "\n".join(prompt_parts)
 
+    # 챗봇은 간단한 JSON 라우팅이므로 저비용 Haiku 로 고정.
+    # CHAT_MODEL 환경변수로 오버라이드 가능 (예: 고품질 필요 시 sonnet).
+    chat_model = os.environ.get("CHAT_MODEL", "haiku")
     try:
         proc = subprocess.run(
-            [claude_bin, "-p", full_prompt, "--output-format", "json"],
+            [claude_bin, "-p", full_prompt, "--model", chat_model, "--output-format", "json"],
             capture_output=True, text=True, timeout=30,
         )
     except subprocess.TimeoutExpired:
@@ -249,9 +252,12 @@ def handle_chat_stream(handler: "Handler", body: dict) -> None:
         except Exception:
             pass
 
+    # 스트리밍 챗도 동일하게 Haiku 사용 (CHAT_MODEL env 로 오버라이드)
+    chat_model = os.environ.get("CHAT_MODEL", "haiku")
     try:
         proc = subprocess.Popen(
-            [claude_bin, "-p", full_prompt, "--output-format", "stream-json",
+            [claude_bin, "-p", full_prompt, "--model", chat_model,
+             "--output-format", "stream-json",
              "--verbose", "--include-partial-messages"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
