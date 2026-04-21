@@ -1424,12 +1424,7 @@ VIEWS.workflows = async () => {
             <span id="wfDirty" class="text-[10px] text-[var(--text-dim)]"></span>
           </div>
           <div class="flex-1"></div>
-          <button class="btn text-xs" onclick="_wfAddNode('start')" title="${t('시작 노드')}">🚀</button>
-          <button class="btn text-xs" onclick="_wfAddNode('session')" title="${t('세션 노드')}">🗂️</button>
-          <button class="btn text-xs" onclick="_wfAddNode('subagent')" title="${t('서브에이전트 노드')}">🤝</button>
-          <button class="btn text-xs" onclick="_wfAddNode('aggregate')" title="${t('취합 노드')}">🧩</button>
-          <button class="btn text-xs" onclick="_wfAddNode('branch')" title="${t('분기 노드')}">🔀</button>
-          <button class="btn text-xs" onclick="_wfAddNode('output')" title="${t('결과 노드')}">📤</button>
+          <button class="btn-primary btn text-xs" onclick="_wfOpenNodeEditor(null)" title="${t('새 노드 추가')}">＋ ${t('노드 추가')}</button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
           <button class="btn text-xs" onclick="_wfShowRuns()" title="${t('실행 이력')}">📜 ${t('이력')}</button>
           <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn">💾 ${t('저장')}</button>
@@ -1943,6 +1938,13 @@ function _wfBindCanvas() {
     if (Date.now() - __wf.lastTouchTs < 500) return;
     onDown(e, false);
   });
+  // 노드 더블클릭 → 에디터 창 (우측 인스펙터 '편집' 버튼과 동일)
+  svg.addEventListener('dblclick', (e) => {
+    const g = e.target.closest && e.target.closest('.wf-node');
+    if (!g) return;
+    const nid = g.getAttribute('data-node');
+    if (nid) _wfOpenNodeEditor(nid);
+  });
   document.addEventListener('mousemove', (e) => {
     if (!__wf.drag) return;
     onMove(e, false);
@@ -2033,33 +2035,280 @@ function _wfRenderInspector() {
     host.innerHTML = `<div class="text-xs text-[var(--text-dim)] text-center py-8">${t('워크플로우를 선택하세요')}</div>`;
     return;
   }
-  // 워크플로우 메타 섹션
+  // 워크플로우 메타 섹션 (항상 표시)
   const meta = `
     <div class="mb-4">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('이름')}</label>
+      <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('워크플로우 메타')}</div>
+      <label class="text-[10px] text-[var(--text-dim)]">${t('이름')}</label>
       <input class="input w-full mt-1" value="${escapeHtml(__wf.current.name||'')}" oninput="__wf.current.name=this.value;__wf.dirty=true;_wfUpdateToolbar();_wfRenderList();">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('설명')}</label>
+      <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('설명')}</label>
       <textarea class="input w-full mt-1" rows="2" oninput="__wf.current.description=this.value;__wf.dirty=true;_wfUpdateToolbar();">${escapeHtml(__wf.current.description||'')}</textarea>
     </div>
   `;
-  if (!__wf.selectedNodeId) {
-    host.innerHTML = meta + `<div class="text-xs text-[var(--text-dim)] text-center py-4">${t('노드를 클릭하면 편집 폼이 표시됩니다')}</div>`;
+  // 선택된 노드가 있으면 요약 + 편집/삭제 버튼
+  let nodeBlock = '';
+  if (__wf.selectedNodeId) {
+    const n = __wf.current.nodes.find(x => x.id === __wf.selectedNodeId);
+    if (n) {
+      const typeMeta = WF_TYPE_MAP[n.type] || WF_TYPE_MAP.session;
+      const d = n.data || {};
+      const preview = (n.type === 'session' || n.type === 'subagent')
+        ? `@${escapeHtml(d.assignee||'auto')} · ${escapeHtml((d.subject||'').slice(0,60) || t('(업무 없음)'))}`
+        : escapeHtml(typeMeta.label);
+      nodeBlock = `
+        <div class="border-t border-[var(--border)] pt-3">
+          <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('선택된 노드')}</div>
+          <div class="card p-3 mb-2" style="background:rgba(255,255,255,0.03);">
+            <div class="flex items-center gap-2 mb-1">
+              <span style="font-size:1.2rem;">${typeMeta.icon}</span>
+              <div class="text-sm font-semibold truncate">${escapeHtml(n.title||typeMeta.label)}</div>
+            </div>
+            <div class="text-[11px] text-[var(--text-mute)]">${preview}</div>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <button class="btn-primary btn text-xs flex-1" onclick="_wfOpenNodeEditor('${n.id}')">✏️ ${t('편집')}</button>
+            <button class="btn text-xs" onclick="_wfDeleteSelectedNode()" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);">🗑️</button>
+          </div>
+        </div>
+      `;
+    }
+  } else {
+    nodeBlock = `<div class="border-t border-[var(--border)] pt-3 text-xs text-[var(--text-dim)] text-center py-4">
+      ${t('상단 ＋ 노드 추가 를 누르거나 기존 노드를 더블클릭해 편집하세요')}
+    </div>`;
+  }
+  host.innerHTML = meta + nodeBlock;
+}
+
+// ─── 노드 에디터 — 맥 스타일 플로팅 창 ───────────────────────
+// nid 가 null 이면 "새 노드" 모드, 있으면 편집 모드.
+// 창 DOM 자체에 draft 를 붙여 여러 창 동시 열기 허용 (미래 확장).
+function _wfOpenNodeEditor(nid) {
+  if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
+  const isNew = !nid;
+  let draft;
+  if (isNew) {
+    draft = {
+      id: 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      type: null, x: 0, y: 0, title: '', data: {},
+    };
+  } else {
+    const existing = __wf.current.nodes.find(n => n.id === nid);
+    if (!existing) return;
+    draft = JSON.parse(JSON.stringify(existing));
+  }
+  // 같은 노드 편집창이 이미 열려 있으면 포커스만
+  const winId = 'wfNodeWin-' + draft.id;
+  const ex = document.getElementById(winId);
+  if (ex) {
+    ex.style.zIndex = ++_winMgr.zIndex;
+    ex.classList.remove('feat-win-minimized');
     return;
   }
-  const n = __wf.current.nodes.find(x => x.id === __wf.selectedNodeId);
-  if (!n) { host.innerHTML = meta; return; }
-  const typeMeta = WF_TYPE_MAP[n.type] || WF_TYPE_MAP.session;
-  host.innerHTML = meta + `
-    <div class="border-t border-[var(--border)] pt-3">
-      <div class="flex items-center justify-between mb-2">
-        <div class="text-sm font-semibold">${typeMeta.icon} ${escapeHtml(typeMeta.label)}</div>
-        <button class="text-[10px] text-red-400 hover:text-red-500" onclick="_wfDeleteSelectedNode()">🗑️ ${t('삭제')}</button>
+  const w = document.createElement('div');
+  w.id = winId;
+  w.className = 'feat-win';
+  w.style.zIndex = ++_winMgr.zIndex;
+  // 중앙 근처 + 여러 개 띄우면 살짝 계단식
+  const offset = _winMgr.openIds.size * 24;
+  w.style.left = (Math.max(100, window.innerWidth / 2 - 240) + offset) + 'px';
+  w.style.top = (80 + offset) + 'px';
+  w.style.width = '480px';
+  w.style.maxHeight = '82vh';
+  w._wfDraft = draft;
+  w._wfIsNew = isNew;
+  _winMgr.openIds.add(winId);
+  w.innerHTML = `
+    <div class="feat-win-title">
+      <div class="feat-win-lights">
+        <button class="feat-light feat-light-close" title="${t('닫기')}" onclick="_wfCloseNodeEditor('${winId}')"></button>
+        <button class="feat-light feat-light-min" title="${t('내리기')}" onclick="document.getElementById('${winId}').classList.toggle('feat-win-minimized')"></button>
+        <button class="feat-light feat-light-max" title="${t('펼치기')}" onclick="_wfMaxNodeEditor('${winId}')"></button>
       </div>
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('제목')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(n.title||'')}" oninput="_wfNodeSet('${n.id}','title',this.value)">
-      ${_wfInspectorBody(n)}
+      <div class="feat-win-title-text" id="${winId}-title">${isNew ? '✨ ' + t('새 노드') : '✏️ ' + t('노드 편집')}</div>
+    </div>
+    <div class="feat-win-body" style="padding:0;display:flex;flex-direction:column;">
+      <div id="${winId}-cat" style="padding:14px 16px 8px 16px;"></div>
+      <div id="${winId}-form" style="flex:1;padding:0 16px 8px 16px;overflow-y:auto;"></div>
+      <div class="flex justify-end gap-2 p-3 border-t border-[var(--border)]" style="flex-shrink:0;">
+        <button class="btn text-sm" onclick="_wfCloseNodeEditor('${winId}')">${t('취소')}</button>
+        ${!isNew ? `<button class="btn text-sm" onclick="_wfDeleteFromEditor('${winId}')" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);">🗑️ ${t('삭제')}</button>` : ''}
+        <button class="btn-primary btn text-sm" onclick="_wfSaveNodeEditor('${winId}')">💾 ${t('저장')}</button>
+      </div>
     </div>
   `;
+  document.body.appendChild(w);
+  try { _makeDraggable(w); } catch (e) {}
+  _translateDOM(w);
+  _wfRenderEditorBody(winId);
+}
+
+function _wfCloseNodeEditor(winId) {
+  const w = document.getElementById(winId);
+  if (w) w.remove();
+  _winMgr.openIds.delete(winId);
+}
+
+function _wfMaxNodeEditor(winId) {
+  const w = document.getElementById(winId);
+  if (!w) return;
+  const isMax = w.classList.toggle('feat-win-maxed');
+  if (isMax) {
+    w.style.left = '5vw'; w.style.top = '5vh';
+    w.style.width = '90vw'; w.style.maxHeight = '90vh';
+  } else {
+    w.style.width = '480px'; w.style.maxHeight = '82vh';
+    w.style.left = Math.max(80, window.innerWidth/2 - 240) + 'px';
+    w.style.top = '80px';
+  }
+}
+
+function _wfPickNodeType(winId, type) {
+  const w = document.getElementById(winId);
+  if (!w) return;
+  const draft = w._wfDraft;
+  if (draft.type === type) return;
+  draft.type = type;
+  // 타입별 기본 data 세팅
+  if (type === 'session' || type === 'subagent') {
+    draft.data = { subject:'', description:'', assignee:'sonnet-4.6', agentRole:'', cwd:'', inputsMode:'concat' };
+  } else if (type === 'branch')    draft.data = { condition:'' };
+  else if (type === 'aggregate') draft.data = { mode:'concat' };
+  else if (type === 'output')    draft.data = { exportTo:'' };
+  else draft.data = {};
+  if (!draft.title) draft.title = WF_TYPE_MAP[type].label;
+  _wfRenderEditorBody(winId);
+}
+
+function _wfRenderEditorBody(winId) {
+  const w = document.getElementById(winId);
+  if (!w) return;
+  const draft = w._wfDraft;
+  const catHost  = document.getElementById(winId + '-cat');
+  const formHost = document.getElementById(winId + '-form');
+  if (!catHost || !formHost) return;
+
+  catHost.innerHTML = `
+    <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('카테고리')}</div>
+    <div class="grid grid-cols-3 gap-2">
+      ${WF_NODE_TYPES.map(tp => `
+        <button class="btn text-[11px] ${draft.type === tp.id ? 'btn-active' : ''}"
+                onclick="_wfPickNodeType('${winId}','${tp.id}')"
+                style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;">
+          <div style="font-size:1.4rem;line-height:1;">${tp.icon}</div>
+          <div style="font-size:11px;">${t(tp.label)}</div>
+        </button>`).join('')}
+    </div>
+  `;
+
+  if (!draft.type) {
+    formHost.innerHTML = `<div class="text-xs text-[var(--text-dim)] text-center py-8">${t('위에서 카테고리를 먼저 선택하세요')}</div>`;
+    return;
+  }
+
+  // 공통: 제목
+  const d = draft.data || {};
+  let body = `
+    <div class="pt-3 border-t border-[var(--border)] mt-2">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block mb-1">${t('제목')}</label>
+      <input class="input w-full" value="${escapeHtml(draft.title||'')}" oninput="_wfDraftSet('${winId}','title',this.value)">
+    </div>
+  `;
+  if (draft.type === 'session' || draft.type === 'subagent') {
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('업무 (subject)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.subject||'')}" oninput="_wfDraftSetData('${winId}','subject',this.value)" placeholder="${t('이 세션이 수행할 업무 한 줄')}">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('설명 (description)')}</label>
+      <textarea class="input w-full mt-1" rows="4" oninput="_wfDraftSetData('${winId}','description',this.value)" placeholder="${t('상세 지시·제약·출력 형식')}">${escapeHtml(d.description||'')}</textarea>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('모델')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','assignee',this.value)">
+        ${['opus-4.7','sonnet-4.6','haiku-4.5'].map(m => `<option value="${m}" ${d.assignee===m?'selected':''}>${m}</option>`).join('')}
+      </select>
+      ${draft.type === 'subagent' ? `
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('에이전트 역할')}</label>
+        <input class="input w-full mt-1" value="${escapeHtml(d.agentRole||'')}" oninput="_wfDraftSetData('${winId}','agentRole',this.value)" placeholder="researcher / writer / reviewer …">
+      ` : ''}
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('작업 디렉토리 (cwd)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.cwd||'')}" oninput="_wfDraftSetData('${winId}','cwd',this.value)" placeholder="~/projects/my-app">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('입력 합치기 모드')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','inputsMode',this.value)">
+        <option value="concat" ${d.inputsMode==='concat'?'selected':''}>${t('이어붙이기 (concat)')}</option>
+        <option value="first"  ${d.inputsMode==='first'?'selected':''}>${t('첫 입력만 (first)')}</option>
+        <option value="json"   ${d.inputsMode==='json'?'selected':''}>${t('JSON 배열 (json)')}</option>
+      </select>
+    `;
+  } else if (draft.type === 'branch') {
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('조건 (입력에 포함되면 Y 포트 활성)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.condition||'')}" oninput="_wfDraftSetData('${winId}','condition',this.value)" placeholder="success">
+    `;
+  } else if (draft.type === 'aggregate') {
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('합치기 모드')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','mode',this.value)">
+        <option value="concat" ${d.mode==='concat'?'selected':''}>${t('텍스트 concat')}</option>
+        <option value="json"   ${d.mode==='json'?'selected':''}>${t('JSON 배열')}</option>
+      </select>
+    `;
+  } else if (draft.type === 'output') {
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('파일로 저장 (선택, ~/ 하위만)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.exportTo||'')}" oninput="_wfDraftSetData('${winId}','exportTo',this.value)" placeholder="~/workflow-output.md">
+    `;
+  } else if (draft.type === 'start') {
+    body += `<div class="text-xs text-[var(--text-dim)] mt-4">${t('시작 노드는 추가 입력이 없습니다. 워크플로우 진입점이 됩니다.')}</div>`;
+  }
+  formHost.innerHTML = body;
+}
+
+function _wfDraftSet(winId, field, value) {
+  const w = document.getElementById(winId);
+  if (!w) return;
+  w._wfDraft[field] = value;
+}
+function _wfDraftSetData(winId, field, value) {
+  const w = document.getElementById(winId);
+  if (!w) return;
+  w._wfDraft.data = w._wfDraft.data || {};
+  w._wfDraft.data[field] = value;
+}
+
+function _wfSaveNodeEditor(winId) {
+  const w = document.getElementById(winId);
+  if (!w || !__wf.current) return;
+  const draft = w._wfDraft;
+  if (!draft.type) { toast(t('카테고리를 선택하세요'), 'warn'); return; }
+  if (w._wfIsNew) {
+    // 캔버스 중앙에 좌표 계산
+    const view = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
+    const host = document.getElementById('wfCanvasHost');
+    const rect = host ? host.getBoundingClientRect() : { width:600, height:400 };
+    draft.x = Math.round((rect.width/2 - (view.panX||0)) / (view.zoom||1) - WF_NODE_W/2);
+    draft.y = Math.round((rect.height/2 - (view.panY||0)) / (view.zoom||1) - WF_NODE_H/2);
+    __wf.current.nodes.push(draft);
+    __wf.selectedNodeId = draft.id;
+    toast(t('노드 추가됨'), 'ok');
+  } else {
+    const idx = __wf.current.nodes.findIndex(n => n.id === draft.id);
+    if (idx >= 0) __wf.current.nodes[idx] = draft;
+    toast(t('저장됨'), 'ok');
+  }
+  __wf.dirty = true;
+  _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
+  _wfCloseNodeEditor(winId);
+}
+
+function _wfDeleteFromEditor(winId) {
+  const w = document.getElementById(winId);
+  if (!w || !__wf.current) return;
+  const nid = w._wfDraft.id;
+  __wf.current.nodes = __wf.current.nodes.filter(n => n.id !== nid);
+  __wf.current.edges = __wf.current.edges.filter(e => e.from !== nid && e.to !== nid);
+  if (__wf.selectedNodeId === nid) __wf.selectedNodeId = null;
+  __wf.dirty = true;
+  _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
+  _wfCloseNodeEditor(winId);
+  toast(t('삭제됨'), 'ok');
 }
 
 function _wfInspectorBody(n) {
