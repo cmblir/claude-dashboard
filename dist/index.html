@@ -1431,6 +1431,7 @@ VIEWS.workflows = async () => {
           <button class="btn text-xs" onclick="_wfAddNode('branch')" title="${t('분기 노드')}">🔀</button>
           <button class="btn text-xs" onclick="_wfAddNode('output')" title="${t('결과 노드')}">📤</button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
+          <button class="btn text-xs" onclick="_wfShowRuns()" title="${t('실행 이력')}">📜 ${t('이력')}</button>
           <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn">💾 ${t('저장')}</button>
           <button class="btn-primary btn text-xs" onclick="_wfRun()" id="wfRunBtn">▶ ${t('실행')}</button>
         </div>
@@ -1634,12 +1635,21 @@ function _wfRenderNode(n) {
   } else if (meta.portOut) {
     portsOut = `<circle class="wf-port" cx="${WF_NODE_W}" cy="${WF_NODE_H/2}" r="6" data-port="out" data-node="${n.id}"></circle>`;
   }
+  // 세션/서브에이전트 노드에는 우상단에 터미널 spawn 아이콘 표시
+  const spawnBtn = (n.type === 'session' || n.type === 'subagent')
+    ? `
+      <g class="wf-node-spawn" data-spawn="${n.id}" transform="translate(${WF_NODE_W - 26},6)" style="cursor:pointer;">
+        <title>${t('새 Claude 세션 spawn')}</title>
+        <rect width="20" height="20" rx="6" ry="6" fill="rgba(217,119,87,0.18)" stroke="rgba(217,119,87,0.45)"></rect>
+        <text x="10" y="15" text-anchor="middle" font-size="12" pointer-events="none">🖥️</text>
+      </g>` : '';
   return `
     <g class="wf-node${sel}" data-node="${n.id}" transform="translate(${n.x},${n.y})">
       <rect class="wf-node-body" width="${WF_NODE_W}" height="${WF_NODE_H}" rx="12" ry="12"></rect>
       <text class="wf-node-icon" x="14" y="30">${meta.icon}</text>
       <text class="wf-node-title" x="40" y="28">${escapeHtml(n.title || meta.label)}</text>
       ${sub}
+      ${spawnBtn}
       ${portIn}${portsOut}
     </g>
   `;
@@ -1825,6 +1835,14 @@ function _wfBindCanvas() {
     if (!__wf.current) return;
     const pt = svgPt(e);
     const target = e.target;
+    // spawn 아이콘 클릭 → 새 Claude 세션 spawn (드래그 시작 X)
+    const spawnG = target.closest && target.closest('.wf-node-spawn');
+    if (spawnG) {
+      const nid = spawnG.getAttribute('data-spawn');
+      if (touch) { try{e.preventDefault();}catch(_){} }
+      _wfSpawnSession(nid);
+      return;
+    }
     // 포트 클릭 → 엣지 드래프트
     if (target.classList && target.classList.contains('wf-port')) {
       const port = target.getAttribute('data-port');
@@ -2227,6 +2245,43 @@ async function _wfSpawnSession(nid) {
   });
   if (!r.ok) { toast(r.error||t('세션 생성 실패'), 'err'); return; }
   toast(t('Claude 세션 시작됨'), 'ok');
+}
+
+async function _wfShowRuns() {
+  if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
+  const r = await api('/api/workflows/runs?wfId=' + encodeURIComponent(__wf.current.id));
+  if (!r.ok) { toast(r.error||t('로드 실패'), 'err'); return; }
+  const runs = r.runs || [];
+  const statusIcon = { ok:'✅', err:'❌', running:'⏳' };
+  const rows = runs.length ? runs.map(x => `
+    <div class="wf-list-item" onclick="_wfOpenRun('${x.id}')">
+      <div class="flex items-center justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="text-sm">${statusIcon[x.status]||'•'} <span class="text-[10px] text-[var(--text-dim)]">${x.id}</span></div>
+          <div class="text-[11px] text-[var(--text-dim)] mt-1">
+            ${fmtRel(x.startedAt)} · ${x.nodeCount} ${t('노드')} · ${fmtDur(x.durationMs)}
+          </div>
+          ${x.error ? `<div class="text-[11px] text-red-400 mt-1">⚠ ${escapeHtml(x.error)}</div>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('') : `<div class="empty card p-4">${t('실행 이력 없음')}</div>`;
+  showModal(`
+    <div class="p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold">📜 ${t('실행 이력')} — ${escapeHtml(__wf.current.name||'')}</h3>
+        <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+      </div>
+      <div class="text-xs text-[var(--text-dim)] mb-2">${t('최근 50건. 클릭하면 상세 결과')}</div>
+      <div class="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">${rows}</div>
+    </div>
+  `, { narrow: true });
+}
+
+async function _wfOpenRun(runId) {
+  const s = await api('/api/workflows/run-status?runId=' + encodeURIComponent(runId));
+  if (!s.ok) { toast(s.error||t('로드 실패'), 'err'); return; }
+  _wfShowRunResult(s.run || {});
 }
 
 // ────────────────────────────────────────────────────────────────

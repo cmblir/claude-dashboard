@@ -42,7 +42,8 @@ from .guide import api_guide_onboarding, api_guide_toolkit
 from .hooks import api_plugin_hook_update, get_hooks
 from .workflows import (
     api_workflow_delete, api_workflow_get, api_workflow_patch, api_workflow_run,
-    api_workflow_run_status, api_workflow_save, api_workflows_list,
+    api_workflow_run_status, api_workflow_runs_list, api_workflow_save,
+    api_workflows_list,
 )
 from .logger import log
 from .mcp import (
@@ -139,6 +140,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/guide/onboarding": lambda q: api_guide_onboarding(),
     "/api/workflows/list": lambda q: api_workflows_list(q),
     "/api/workflows/run-status": api_workflow_run_status,
+    "/api/workflows/runs": api_workflow_runs_list,
 }
 
 
