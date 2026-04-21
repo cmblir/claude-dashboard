@@ -1467,7 +1467,7 @@ VIEWS.workflows = async () => {
             <button class="btn text-xs" id="wfInspectorToggle" onclick="_wfToggleInspector()" title="${t('메타 패널 보이기/가리기')}">📋 ${t('메타')}</button>
           </div>
           <div class="wf-floating">
-            <button class="btn text-xs" onclick="_wfFitView()" title="${t('화면에 맞춤')}">🎯 ${t('맞춤')}</button>
+            <button class="btn text-xs" onclick="_wfFitView()" title="${t('자동 정렬 + 화면 맞춤')}">🎯 ${t('맞춤')}</button>
           </div>
           <svg id="wfCanvas" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -1737,8 +1737,72 @@ function _wfBezier(x1, y1, x2, y2) {
   return `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
 }
 
+// DAG 토폴로지 레이어 기반으로 노드 위치를 자동 정렬.
+// 같은 레이어(진입 거리 동일)끼리 세로로 균등 배치 → 엣지 교차 최소화.
+function _wfBeautifyLayout() {
+  if (!__wf.current) return false;
+  const nodes = __wf.current.nodes || [];
+  const edges = __wf.current.edges || [];
+  if (!nodes.length) return false;
+
+  const incoming = {}, outgoing = {};
+  nodes.forEach(n => { incoming[n.id] = []; outgoing[n.id] = []; });
+  edges.forEach(e => {
+    if (incoming[e.to])   incoming[e.to].push(e.from);
+    if (outgoing[e.from]) outgoing[e.from].push(e.to);
+  });
+
+  // Longest-path layering (Kahn's 기반 + layer = max(incoming.layer)+1)
+  const layer = {};
+  const indeg = {};
+  nodes.forEach(n => { indeg[n.id] = incoming[n.id].length; });
+  const queue = [];
+  nodes.forEach(n => { if (indeg[n.id] === 0) { layer[n.id] = 0; queue.push(n.id); } });
+  while (queue.length) {
+    const u = queue.shift();
+    (outgoing[u] || []).forEach(v => {
+      const candidate = layer[u] + 1;
+      if (layer[v] === undefined || candidate > layer[v]) layer[v] = candidate;
+      indeg[v]--;
+      if (indeg[v] === 0) queue.push(v);
+    });
+  }
+  // 사이클에 포함된 노드는 기본 0
+  nodes.forEach(n => { if (layer[n.id] === undefined) layer[n.id] = 0; });
+
+  // 레이어별로 그룹화
+  const byLayer = {};
+  nodes.forEach(n => {
+    (byLayer[layer[n.id]] = byLayer[layer[n.id]] || []).push(n);
+  });
+  // 같은 레이어 내에서는 기존 y 순서 유지 (안정성)
+  Object.values(byLayer).forEach(list => list.sort((a, b) => a.y - b.y));
+
+  // 배치 파라미터
+  const GAP_X = WF_NODE_W + 60;  // 180 + 60 = 240
+  const GAP_Y = WF_NODE_H + 56;  // 64 + 56 = 120
+  const ORIGIN_X = 60, ORIGIN_Y = 60;
+
+  Object.keys(byLayer)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .forEach(L => {
+      const list = byLayer[L];
+      // 세로 중앙 정렬: layer 전체 높이 = list.length × GAP_Y
+      const totalH = list.length * GAP_Y;
+      // 모든 레이어의 최대 layer-height 중 가장 큰 값에 맞춰 상단 정렬은 복잡 →
+      // 간단하게 ORIGIN_Y 부터 시작
+      list.forEach((n, i) => {
+        n.x = ORIGIN_X + L * GAP_X;
+        n.y = ORIGIN_Y + i * GAP_Y;
+      });
+    });
+  __wf.dirty = true;
+  return true;
+}
+
 // 모든 노드 bounding box 를 캔버스에 맞춰 pan/zoom 을 계산해 적용.
-// 노드 개수·위치에 따라 정확히 보이는 영역이 정해지도록 한다.
+// + 자동 정렬(beautify) — 여기저기 흩어진 노드를 DAG 레이어 기반으로 정돈.
 function _wfFitView() {
   if (!__wf.current) return;
   const nodes = __wf.current.nodes || [];
@@ -1751,6 +1815,10 @@ function _wfFitView() {
     if (vp0) vp0.setAttribute('transform', 'translate(0,0) scale(1)');
     return;
   }
+  // 1) 자동 정렬
+  _wfBeautifyLayout();
+  _wfRenderCanvas();
+  // 2) bounding box 계산 + pan/zoom 맞춤
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   nodes.forEach(n => {
     minX = Math.min(minX, n.x);
@@ -1771,6 +1839,8 @@ function _wfFitView() {
   const vp = document.getElementById('wfViewport');
   if (vp) vp.setAttribute('transform', `translate(${panX},${panY}) scale(${zoom})`);
   _wfSchedulePatch();
+  _wfUpdateToolbar();
+  toast(t('자동 정렬 + 화면 맞춤'), 'ok');
 }
 
 // 노드/엣지 선택 하이라이트만 class 토글로 반영 — 전체 re-render 없음
@@ -2766,7 +2836,7 @@ function _wfShowTutorial() {
           radial-gradient(circle at 1px 1px,rgba(255,255,255,0.06) 1px,transparent 0);
           background-size:20px 20px;">
         <svg id="wfTutSvg" xmlns="http://www.w3.org/2000/svg"
-             viewBox="0 0 700 360" preserveAspectRatio="xMidYMid meet"
+             viewBox="-20 20 900 340" preserveAspectRatio="xMidYMid meet"
              style="width:100%;height:100%;display:block;">
           <defs>
             <marker id="wfTutArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
