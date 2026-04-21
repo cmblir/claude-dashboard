@@ -40,6 +40,7 @@ from .features import (
 )
 from .guide import api_guide_onboarding, api_guide_toolkit
 from .hooks import api_plugin_hook_update, get_hooks
+from .version import api_version_info
 from .workflows import (
     api_workflow_delete, api_workflow_get, api_workflow_patch, api_workflow_run,
     api_workflow_run_status, api_workflow_runs_list, api_workflow_save,
@@ -144,6 +145,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/run-status": api_workflow_run_status,
     "/api/workflows/runs": api_workflow_runs_list,
     "/api/workflows/templates/list": lambda q: api_workflow_templates_list(q),
+    "/api/version": lambda q: api_version_info(),
 }
 
 

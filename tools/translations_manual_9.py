@@ -303,6 +303,8 @@ NEW_EN = {
     "활성": "Enabled",
     "반복 실행 활성": "Enable repeat",
     "피드백 노트": "Feedback note",
+    "버전 정보": "Version",
+    "최근 변경 이력 (CHANGELOG.md)": "Recent changes (CHANGELOG.md)",
     "이 결과를 기반으로 다음 스프린트 업무를 프론트/백엔드 형식으로 기획해줘. 실현 가능성과 우선순위를 명확히.":
         "Based on this result, plan the next sprint tasks in the Frontend/Backend format. Clarify feasibility and priorities.",
     "실행 완료 후 결과를 피드백 노드의 입력으로 주입하며 반복. DAG 는 수정 없이 같은 흐름을 여러 번 돌림.":
@@ -644,6 +646,8 @@ NEW_ZH = {
     "활성": "启用",
     "반복 실행 활성": "启用重复执行",
     "피드백 노트": "反馈备注",
+    "버전 정보": "版本信息",
+    "최근 변경 이력 (CHANGELOG.md)": "近期变更 (CHANGELOG.md)",
     "이 결과를 기반으로 다음 스프린트 업무를 프론트/백엔드 형식으로 기획해줘. 실현 가능성과 우선순위를 명확히.":
         "基于此结果，按前端/后端格式规划下一冲刺的任务，明确可行性与优先级。",
     "실행 완료 후 결과를 피드백 노드의 입력으로 주입하며 반복. DAG 는 수정 없이 같은 흐름을 여러 번 돌림.":

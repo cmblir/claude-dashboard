@@ -478,6 +478,7 @@
     <button id="btn-latest-features" class="btn w-full justify-center text-[12px]" title="Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가">
       <span>📡</span><span>최신 정보 로딩</span>
     </button>
+    <div id="appVersion" class="text-center text-[10px] text-[var(--text-dim)] cursor-pointer hover:text-[var(--text-mute)]" onclick="_showVersionModal()" title="버전 정보 / 변경 이력"></div>
   </div>
 </aside>
 
@@ -8473,7 +8474,38 @@ async function reindex(force=false) {
 // ────────────────────────────────────────────────────────────────
 // BOOT
 // ────────────────────────────────────────────────────────────────
+function _showVersionModal() {
+  const v = window.__appVersionInfo || { version: '-', changelog: '' };
+  const cl = (v.changelog || '').trim();
+  // marked 가 있으면 마크다운 렌더, 없으면 pre
+  let body;
+  if (typeof marked !== 'undefined' && marked.parse) {
+    body = `<div class="text-sm leading-relaxed" style="color:var(--text-mute);">${marked.parse(cl)}</div>`;
+  } else {
+    body = `<pre class="text-[11px] whitespace-pre-wrap">${escapeHtml(cl)}</pre>`;
+  }
+  showModal(`
+    <div class="p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold">📦 ${t('버전 정보')} <span class="text-[11px] text-[var(--text-dim)] ml-2">v${escapeHtml(v.version)}</span></h3>
+        <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+      </div>
+      <div class="text-xs text-[var(--text-dim)] mb-2">${t('최근 변경 이력 (CHANGELOG.md)')}</div>
+      <div class="max-h-[60vh] overflow-y-auto">${body}</div>
+    </div>
+  `, { narrow: true });
+}
+
 async function loadCliFoot() {
+  // 사이드바 하단 버전 chip 업데이트 (한 번만 로드하고 캐시)
+  try {
+    const v = await api('/api/version');
+    const el = document.getElementById('appVersion');
+    if (el && v && v.version) {
+      window.__appVersionInfo = v;
+      el.textContent = 'v' + v.version;
+    }
+  } catch (e) { /* silent */ }
   try {
     const auth = await api('/api/auth/status');
     const cliOk = auth.cliInstalled;
