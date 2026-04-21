@@ -255,6 +255,10 @@
   .wf-edge-draft { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; fill: none; pointer-events: none; opacity: 0.7; }
   .wf-dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; display: inline-block; margin-right: 4px; }
   .wf-ok-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; display: inline-block; margin-right: 4px; }
+  /* 캔버스 내부 플로팅 컨트롤 (n8n 스타일) */
+  .wf-floating { position: absolute; right: 12px; bottom: 12px; z-index: 5; display: flex; gap: 6px; }
+  .wf-floating .btn { background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(4px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+  .wf-floating .btn:hover { background: var(--card-hi); }
 
   @media (max-width: 900px) {
     #wfRoot { flex-direction: column; height: auto; min-height: 0; max-height: none; }
@@ -1408,10 +1412,8 @@ VIEWS.workflows = async () => {
     ${viewHeader('🔀 워크플로우', '세션 노드를 DAG 로 연결해 업무 흐름 설계. 포트를 드래그해 화살표로 연결.', 'workflows')}
     <div id="wfRoot">
       <div id="wfList" class="card">
-        <div class="flex items-center gap-2 mb-2">
-          <input id="wfSearch" class="input flex-1" placeholder="${t('검색…')}" style="font-size:13px;">
-          <button class="btn-primary btn text-xs" onclick="_wfCreateNew()">＋ ${t('새 워크플로우')}</button>
-        </div>
+        <button class="btn-primary btn text-sm w-full mb-2" style="justify-content:center;" onclick="_wfCreateNew()">＋ ${t('새 워크플로우')}</button>
+        <input id="wfSearch" class="input w-full mb-2" placeholder="${t('검색…')}" style="font-size:13px;">
         <div id="wfListItems" class="flex flex-col gap-1"></div>
       </div>
 
@@ -1429,11 +1431,13 @@ VIEWS.workflows = async () => {
           <button class="btn text-xs" onclick="_wfAddNode('branch')" title="${t('분기 노드')}">🔀</button>
           <button class="btn text-xs" onclick="_wfAddNode('output')" title="${t('결과 노드')}">📤</button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
-          <button class="btn text-xs" onclick="_wfFitView()" title="${t('화면에 맞춤')}">🎯 ${t('맞춤')}</button>
           <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn">💾 ${t('저장')}</button>
           <button class="btn-primary btn text-xs" onclick="_wfRun()" id="wfRunBtn">▶ ${t('실행')}</button>
         </div>
         <div id="wfCanvasHost">
+          <div class="wf-floating">
+            <button class="btn text-xs" onclick="_wfFitView()" title="${t('화면에 맞춤')}">🎯 ${t('맞춤')}</button>
+          </div>
           <svg id="wfCanvas" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <marker id="wfArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
