@@ -214,7 +214,7 @@
   .onboard-done { opacity: 0.78; }
 
   /* ─── 워크플로우 에디터 (n8n 스타일) ─── */
-  #wfRoot { display: flex; gap: 10px; height: calc(100vh - 140px); min-height: 480px; }
+  #wfRoot { display: flex; gap: 10px; height: calc(100vh - 160px); min-height: 340px; max-height: calc(100vh - 140px); }
   #wfList { width: 260px; flex-shrink: 0; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
   #wfCanvasWrap { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; }
   #wfToolbar { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; background: var(--card); border-radius: 12px 12px 0 0; }
@@ -255,9 +255,9 @@
   .wf-ok-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; display: inline-block; margin-right: 4px; }
 
   @media (max-width: 900px) {
-    #wfRoot { flex-direction: column; height: auto; }
-    #wfList, #wfInspector { width: 100%; max-height: 260px; }
-    #wfCanvasWrap { height: 60vh; min-height: 360px; }
+    #wfRoot { flex-direction: column; height: auto; min-height: 0; max-height: none; }
+    #wfList, #wfInspector { width: 100%; max-height: 220px; }
+    #wfCanvasWrap { height: 55vh; min-height: 240px; }
   }
   .grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
   .empty { text-align: center; padding: 3rem 1rem; color: var(--text-dim); }
@@ -1427,6 +1427,7 @@ VIEWS.workflows = async () => {
           <button class="btn text-xs" onclick="_wfAddNode('branch')" title="${t('분기 노드')}">🔀</button>
           <button class="btn text-xs" onclick="_wfAddNode('output')" title="${t('결과 노드')}">📤</button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
+          <button class="btn text-xs" onclick="_wfFitView()" title="${t('화면에 맞춤')}">🎯 ${t('맞춤')}</button>
           <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn">💾 ${t('저장')}</button>
           <button class="btn-primary btn text-xs" onclick="_wfRun()" id="wfRunBtn">▶ ${t('실행')}</button>
         </div>
@@ -1559,6 +1560,13 @@ async function _wfOpen(wfId) {
   _wfRenderCanvas();
   _wfRenderInspector();
   _wfUpdateToolbar();
+  // 저장된 viewport 가 기본값이면 자동으로 노드들이 화면에 들어오게 맞춤
+  const v = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
+  const isDefault = (Math.abs(v.panX) < 1 && Math.abs(v.panY) < 1 && Math.abs((v.zoom||1) - 1) < 0.01);
+  if (isDefault && (__wf.current.nodes || []).length) {
+    // host DOM 이 아직 레이아웃 확정 전일 수 있으므로 next frame 에 호출
+    requestAnimationFrame(() => _wfFitView());
+  }
 }
 
 function _wfUpdateToolbar() {
@@ -1645,6 +1653,42 @@ function _wfRenderEdge(e) {
 function _wfBezier(x1, y1, x2, y2) {
   const dx = Math.max(60, Math.abs(x2 - x1) * 0.4);
   return `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+}
+
+// 모든 노드 bounding box 를 캔버스에 맞춰 pan/zoom 을 계산해 적용.
+// 노드 개수·위치에 따라 정확히 보이는 영역이 정해지도록 한다.
+function _wfFitView() {
+  if (!__wf.current) return;
+  const nodes = __wf.current.nodes || [];
+  const host = document.getElementById('wfCanvasHost');
+  if (!host) return;
+  const rect = host.getBoundingClientRect();
+  if (!nodes.length) {
+    __wf.current.viewport = { panX: 0, panY: 0, zoom: 1 };
+    const vp0 = document.getElementById('wfViewport');
+    if (vp0) vp0.setAttribute('transform', 'translate(0,0) scale(1)');
+    return;
+  }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach(n => {
+    minX = Math.min(minX, n.x);
+    minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + WF_NODE_W);
+    maxY = Math.max(maxY, n.y + WF_NODE_H);
+  });
+  const pad = 48;
+  const contentW = (maxX - minX) + pad * 2;
+  const contentH = (maxY - minY) + pad * 2;
+  const scaleRaw = Math.min(rect.width / contentW, rect.height / contentH);
+  const zoom = Math.max(0.4, Math.min(1.6, scaleRaw));
+  const contentCX = (minX + maxX) / 2;
+  const contentCY = (minY + maxY) / 2;
+  const panX = rect.width / 2 - contentCX * zoom;
+  const panY = rect.height / 2 - contentCY * zoom;
+  __wf.current.viewport = { panX, panY, zoom };
+  const vp = document.getElementById('wfViewport');
+  if (vp) vp.setAttribute('transform', `translate(${panX},${panY}) scale(${zoom})`);
+  _wfSchedulePatch();
 }
 
 // 노드/엣지 선택 하이라이트만 class 토글로 반영 — 전체 re-render 없음
