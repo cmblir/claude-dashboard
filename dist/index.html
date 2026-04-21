@@ -3030,7 +3030,7 @@ const WF_TUT_STEPS = [
       { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer', status:'running' },
       { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
       { id:'d', type:'branch',    x:480, y:200, title:'분기' },
-      { id:'o', type:'output',    x:40,  y:200, title:'결과' },
+      { id:'o', type:'output',    x:640, y:130, title:'결과' },
     ],
     edges: [
       { from:'s', to:'a' }, { from:'a', to:'b' },
@@ -3048,7 +3048,7 @@ const WF_TUT_STEPS = [
       { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer', status:'ok' },
       { id:'c', type:'aggregate', x:260, y:200, title:'취합',   status:'ok' },
       { id:'d', type:'branch',    x:480, y:200, title:'분기',   status:'ok' },
-      { id:'o', type:'output',    x:40,  y:200, title:'결과',   status:'ok' },
+      { id:'o', type:'output',    x:640, y:130, title:'결과',   status:'ok' },
     ],
     edges: [
       { from:'s', to:'a' }, { from:'a', to:'b' },
@@ -3056,6 +3056,76 @@ const WF_TUT_STEPS = [
       { from:'d', to:'o' },
     ],
     cursor: { x: 300, y: 100 },
+  },
+  {
+    title: '10. 🎭 세션 하네스 — 페르소나 · 허용 도구',
+    caption: '노드를 선택해 우측 패널을 열면 🎭 세션 하네스 섹션에서 시스템 프롬프트(페르소나) · 추가 지시 · 허용/차단 도구를 직접 설정. 각 세션이 고유 역할로 claude CLI 호출.',
+    nodes: [
+      { id:'s', type:'start',     x:40,  y:40,  title:'시작' },
+      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6' },
+      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer' },
+      { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
+      { id:'d', type:'branch',    x:480, y:200, title:'분기' },
+      { id:'o', type:'output',    x:640, y:130, title:'결과' },
+    ],
+    edges: [
+      { from:'s', to:'a' }, { from:'a', to:'b' },
+      { from:'b', to:'c' }, { from:'c', to:'d' },
+      { from:'d', to:'o' },
+    ],
+    cursor: { x: 560, y: 40, click: true, label: '🎭 페르소나' },
+  },
+  {
+    title: '11. 🖥️ 터미널 새 창에서 대화형 spawn',
+    caption: '세션 노드 우상단 🖥️ 아이콘 → Terminal 새 창에서 claude 실행. 노드에 설정된 페르소나·허용 도구·resume 모두 CLI 플래그로 전달되어 바로 대화형 세션 시작.',
+    nodes: [
+      { id:'s', type:'start',     x:40,  y:40,  title:'시작' },
+      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6' },
+      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer' },
+      { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
+      { id:'d', type:'branch',    x:480, y:200, title:'분기' },
+      { id:'o', type:'output',    x:640, y:130, title:'결과' },
+    ],
+    edges: [
+      { from:'s', to:'a' }, { from:'a', to:'b' },
+      { from:'b', to:'c' }, { from:'c', to:'d' },
+      { from:'d', to:'o' },
+    ],
+    cursor: { x: 428, y: 46, click: true, label: '🖥️ spawn' },
+  },
+  {
+    title: '12. 🔄 session_id 이어쓰기로 재개',
+    caption: '실행 결과 모달의 session_id 를 📋 복사하거나 ↪ 이어쓰기 로 다른 노드 resume 필드에 적용. 다음 실행 시 claude --resume 으로 같은 컨텍스트에서 이어서 대화.',
+    nodes: [
+      { id:'s', type:'start',     x:40,  y:40,  title:'시작',   status:'ok' },
+      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6', status:'ok' },
+      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer', status:'running' },
+      { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
+      { id:'d', type:'branch',    x:480, y:200, title:'분기' },
+      { id:'o', type:'output',    x:640, y:130, title:'결과' },
+    ],
+    edges: [
+      { from:'s', to:'a' }, { from:'a', to:'b' },
+      { from:'b', to:'c' }, { from:'c', to:'d' },
+      { from:'d', to:'o' },
+    ],
+    cursor: { x: 420, y: 72, label: '🔄 resume' },
+  },
+  {
+    title: '13. 📋 템플릿 — 팀 개발 등 원클릭 시작',
+    caption: '툴바 📋 템플릿 버튼에서 팀 개발 · 리서치 파이프라인 · 병렬 3 작업 프리셋을 선택하면 페르소나까지 채워진 완성 DAG 가 한 번에 생성.',
+    nodes: [
+      { id:'s',  type:'start',     x:40,  y:130, title:'시작' },
+      { id:'l1', type:'session',   x:260, y:130, title:'리드', sub:'@team-lead' },
+      { id:'fe', type:'subagent',  x:480, y:40,  title:'프론트', sub:'@frontend-dev' },
+      { id:'be', type:'subagent',  x:480, y:220, title:'백엔드', sub:'@backend-dev' },
+      { id:'ag', type:'aggregate', x:700, y:130, title:'취합' },
+    ],
+    edges: [
+      { from:'s',  to:'l1' }, { from:'l1', to:'fe' }, { from:'l1', to:'be' },
+      { from:'fe', to:'ag' }, { from:'be', to:'ag' },
+    ],
+    cursor: { x: 440, y: -16, click: true, label: '📋 템플릿' },
   },
 ];
 
@@ -3232,10 +3302,14 @@ function _wfTutRender() {
   }).join('');
 
   // 노드 (fade in + stagger) + 포트 2개 (in 보라, out 주황)
+  // 모든 SVG 텍스트는 t() 로 번역 적용 — EN/ZH 모드에서 한국어 잔존 방지
   nodesG.innerHTML = (step.nodes || []).map((n, i) => {
     const meta = WF_TYPE_MAP[n.type] || WF_TYPE_MAP.session;
     const statusAttr = n.status ? ` data-status="${n.status}"` : '';
-    const sub = n.sub || t(meta.label);
+    const titleRaw = n.title || meta.label;
+    const subRaw   = n.sub  || meta.label;
+    const title = t(titleRaw);
+    const sub   = subRaw.startsWith('@') ? subRaw : t(subRaw);  // @sonnet-4.6 같은 값은 원문 유지
     const portIn  = meta.portIn  ? `<circle class="wf-tut-port-in"  cx="0" cy="${WF_NODE_H/2}" r="5"></circle>` : '';
     const portOut = meta.portOut ? `<circle class="wf-tut-port-out" cx="${WF_NODE_W}" cy="${WF_NODE_H/2}" r="5"></circle>` : '';
     return `
@@ -3243,17 +3317,17 @@ function _wfTutRender() {
          style="animation-delay: ${(i*0.15).toFixed(2)}s;">
         <rect class="wf-node-body" width="${WF_NODE_W}" height="${WF_NODE_H}" rx="12" ry="12"></rect>
         <text class="wf-node-icon" x="14" y="30">${meta.icon}</text>
-        <text class="wf-node-title" x="40" y="28">${escapeHtml(n.title || meta.label)}</text>
+        <text class="wf-node-title" x="40" y="28">${escapeHtml(title)}</text>
         <text class="wf-node-sub"   x="40" y="48">${escapeHtml(sub)}</text>
         ${portIn}${portOut}
       </g>`;
   }).join('');
 
-  // 커서 이동 + 라벨
+  // 커서 이동 + 라벨 (라벨도 t() 로 번역)
   if (cursorG && step.cursor) {
     const cx = step.cursor.x || 0, cy = step.cursor.y || 0;
     cursorG.setAttribute('transform', `translate(${cx},${cy})`);
-    if (cursorLabel) cursorLabel.textContent = step.cursor.label || '';
+    if (cursorLabel) cursorLabel.textContent = step.cursor.label ? t(step.cursor.label) : '';
     // click 이펙트
     if (step.cursor.click && clickFx) {
       clickFx.innerHTML = `<circle class="wf-tut-ripple" cx="${cx}" cy="${cy}" r="0" fill="none" stroke="#fff" stroke-width="3"></circle>`;

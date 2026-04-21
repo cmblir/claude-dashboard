@@ -96,6 +96,30 @@ NEW_EN = {
     "＋ 노드": "＋ Add",
     "🎯 맞춤": "🎯 Fit",
     "▶ 실행": "▶ Run",
+    # 튜토리얼 노드 title / sub 값 (SVG 내부 t() 적용용)
+    "리서치": "Research",
+    "작성": "Writing",
+    "리드": "Lead",
+    "프론트": "Frontend",
+    "백엔드": "Backend",
+    # 튜토리얼 커서 라벨
+    "🎭 페르소나": "🎭 Persona",
+    "🖥️ spawn": "🖥️ Spawn",
+    "🔄 resume": "🔄 Resume",
+    "📋 템플릿": "📋 Templates",
+    # 신규 튜토리얼 장면 10–13
+    "10. 🎭 세션 하네스 — 페르소나 · 허용 도구": "10. 🎭 Session harness — persona · allowed tools",
+    "노드를 선택해 우측 패널을 열면 🎭 세션 하네스 섹션에서 시스템 프롬프트(페르소나) · 추가 지시 · 허용/차단 도구를 직접 설정. 각 세션이 고유 역할로 claude CLI 호출.":
+        "Select a node and open the right panel → the 🎭 Session harness section lets you set system prompt (persona), append instructions, and allowed/disallowed tools. Each session calls the claude CLI with its own role.",
+    "11. 🖥️ 터미널 새 창에서 대화형 spawn": "11. 🖥️ Spawn an interactive Terminal",
+    "세션 노드 우상단 🖥️ 아이콘 → Terminal 새 창에서 claude 실행. 노드에 설정된 페르소나·허용 도구·resume 모두 CLI 플래그로 전달되어 바로 대화형 세션 시작.":
+        "🖥️ icon at a session node's top-right → opens Terminal with claude. The node's persona · allowed tools · resume are all forwarded as CLI flags so the interactive session starts with full context.",
+    "12. 🔄 session_id 이어쓰기로 재개": "12. 🔄 Continue a session by session_id",
+    "실행 결과 모달의 session_id 를 📋 복사하거나 ↪ 이어쓰기 로 다른 노드 resume 필드에 적용. 다음 실행 시 claude --resume 으로 같은 컨텍스트에서 이어서 대화.":
+        "Copy a session_id from the run result modal (📋) or use ↪ Resume to paste it into another node's resume field. On next run, claude --resume continues with the same context.",
+    "13. 📋 템플릿 — 팀 개발 등 원클릭 시작": "13. 📋 Templates — one-click team dev & more",
+    "툴바 📋 템플릿 버튼에서 팀 개발 · 리서치 파이프라인 · 병렬 3 작업 프리셋을 선택하면 페르소나까지 채워진 완성 DAG 가 한 번에 생성.":
+        "The 📋 Templates button offers presets — Team dev, Research pipeline, Parallel 3 tasks. Pick one and a fully-wired DAG (with personas filled in) appears instantly.",
     "메타": "Meta",
     "메타 패널 보이기/가리기": "Show/hide meta panel",
     "가리기": "Hide",
@@ -326,6 +350,27 @@ NEW_ZH = {
     "＋ 노드": "＋ 节点",
     "🎯 맞춤": "🎯 适配",
     "▶ 실행": "▶ 运行",
+    "리서치": "研究",
+    "작성": "撰写",
+    "리드": "Lead",
+    "프론트": "前端",
+    "백엔드": "后端",
+    "🎭 페르소나": "🎭 人设",
+    "🖥️ spawn": "🖥️ 启动",
+    "🔄 resume": "🔄 继续",
+    "📋 템플릿": "📋 模板",
+    "10. 🎭 세션 하네스 — 페르소나 · 허용 도구": "10. 🎭 会话配置 — 人设 · 允许工具",
+    "노드를 선택해 우측 패널을 열면 🎭 세션 하네스 섹션에서 시스템 프롬프트(페르소나) · 추가 지시 · 허용/차단 도구를 직접 설정. 각 세션이 고유 역할로 claude CLI 호출.":
+        "选中节点并打开右侧面板，在 🎭 会话配置 中设置系统提示词（人设）· 追加指令 · 允许/禁止工具。每个会话以独立角色调用 claude CLI。",
+    "11. 🖥️ 터미널 새 창에서 대화형 spawn": "11. 🖥️ 在终端新窗口启动交互会话",
+    "세션 노드 우상단 🖥️ 아이콘 → Terminal 새 창에서 claude 실행. 노드에 설정된 페르소나·허용 도구·resume 모두 CLI 플래그로 전달되어 바로 대화형 세션 시작.":
+        "点击会话节点右上角 🖥️ → 在 Terminal 新窗口启动 claude。节点上设置的人设、允许工具、resume 都通过 CLI 标志传递，立即开始交互会话。",
+    "12. 🔄 session_id 이어쓰기로 재개": "12. 🔄 通过 session_id 继续会话",
+    "실행 결과 모달의 session_id 를 📋 복사하거나 ↪ 이어쓰기 로 다른 노드 resume 필드에 적용. 다음 실행 시 claude --resume 으로 같은 컨텍스트에서 이어서 대화.":
+        "从运行结果弹窗复制 session_id（📋）或使用 ↪ 继续 将其写入其他节点的 resume 字段。下次运行 claude --resume 将在相同上下文中继续对话。",
+    "13. 📋 템플릿 — 팀 개발 등 원클릭 시작": "13. 📋 模板 — 团队开发等一键生成",
+    "툴바 📋 템플릿 버튼에서 팀 개발 · 리서치 파이프라인 · 병렬 3 작업 프리셋을 선택하면 페르소나까지 채워진 완성 DAG 가 한 번에 생성.":
+        "工具栏的 📋 模板按钮提供预设：团队开发、研究流水线、并行 3 任务。选择后一次性生成包含人设的完整 DAG。",
     "메타": "元数据",
     "메타 패널 보이기/가리기": "显示/隐藏元数据面板",
     "가리기": "隐藏",
