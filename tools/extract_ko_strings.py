@@ -123,7 +123,9 @@ def extract():
     # server/*.py 에서 UI 노출되는 Korean 라벨만 가려낸다.
     # 정책: 길이 ≤ 50 & 개행 없음 & 모듈별 UI-whitelist 에 등장한 경우만.
     # (전체 스캔은 prompt 템플릿·로그 메시지까지 포함해 over-inclusive)
-    _UI_MODULES = {"agents.py", "system.py", "device.py", "features.py"}
+    # features.py 는 AI eval prompt 템플릿이 많아 over-inclusive — 제외.
+    # 대신 features.py 내 UI-emit 된 note/formula/suggest 는 수동 사전에 등록.
+    _UI_MODULES = {"agents.py", "system.py", "device.py", "commands.py", "projects.py", "mcp.py"}
     if SERVER_DIR.exists():
         for py in sorted(SERVER_DIR.rglob("*.py")):
             if py.name not in _UI_MODULES:
