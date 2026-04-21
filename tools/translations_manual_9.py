@@ -60,6 +60,29 @@ NEW_EN = {
     "내리기": "Minimize",
     "펼치기": "Expand",
     "카테고리별 설명": "What each category means",
+    "사용법": "How it works",
+    "사용법 보기": "Show how it works",
+    "워크플로우 사용법": "Workflow walkthrough",
+    "이전": "Previous",
+    "다음": "Next",
+    "1. 새 워크플로우 생성": "1. Create a new workflow",
+    "좌측 사이드바의 ＋ 버튼으로 새 워크플로우를 만들면 빈 캔버스가 열립니다. 여기가 우리가 업무 흐름을 설계할 무대.":
+        "Click ＋ in the left sidebar to create a new workflow — an empty canvas opens. This is where you design the task flow.",
+    "2. 🚀 시작 노드 추가": "2. Add a 🚀 Start node",
+    "상단 툴바의 ＋ 노드 추가 → 창에서 🚀 시작 카테고리 선택. 워크플로우의 진입점이 되는 노드.":
+        "Toolbar ＋ Add node → pick 🚀 Start in the window. This is the entry point of the workflow.",
+    "3. 🗂️ 세션 노드로 업무 정의": "3. Define a task with a 🗂️ Session node",
+    "＋ 노드 추가 → 🗂️ 세션. 제목과 업무(subject)를 입력. 예: \"경쟁 제품 3개 분석\". 이 노드가 실행되면 claude -p 로 작업을 처리.":
+        "＋ Add node → 🗂️ Session. Fill in title and subject — e.g. \"Analyze 3 competitors\". When it runs, claude -p handles the task.",
+    "4. 포트 드래그로 화살표 연결": "4. Connect with a port drag",
+    "노드 우측의 주황 포트를 다음 노드 좌측 보라 포트로 드래그. 베지어 곡선 + 방향 화살표가 자동으로 그려짐.":
+        "Drag the orange port on a node's right to the purple port on the next node. A bezier curve with an arrow is drawn automatically.",
+    "5. 결과 노드로 마무리 + ▶ 실행": "5. Finish with an Output node + ▶ Run",
+    "📤 결과 노드를 추가하고 연결. ▶ 실행 누르면 DAG 를 토폴로지 순서로 자동 실행. 각 노드가 실행 중에는 보라색 펄스.":
+        "Add a 📤 Output node and connect. Hitting ▶ Run executes the DAG in topological order. Running nodes pulse in purple.",
+    "6. 완료 → 결과 모달 / 터미널": "6. Done → result modal / Terminal",
+    "완료된 노드는 녹색 테두리. 결과 모달에 노드별 출력 미리보기. 세션 노드 우상단 🖥️ 아이콘으로 Terminal 새 창에서 대화형 세션도 시작 가능.":
+        "Completed nodes get a green border. The result modal shows a preview per node. A session node's 🖥️ icon also launches an interactive Terminal session in a new window.",
     "메타": "Meta",
     "메타 패널 보이기/가리기": "Show/hide meta panel",
     "가리기": "Hide",
@@ -216,6 +239,29 @@ NEW_ZH = {
     "내리기": "最小化",
     "펼치기": "展开",
     "카테고리별 설명": "各类别说明",
+    "사용법": "用法",
+    "사용법 보기": "查看用法",
+    "워크플로우 사용법": "工作流演示",
+    "이전": "上一步",
+    "다음": "下一步",
+    "1. 새 워크플로우 생성": "1. 创建新工作流",
+    "좌측 사이드바의 ＋ 버튼으로 새 워크플로우를 만들면 빈 캔버스가 열립니다. 여기가 우리가 업무 흐름을 설계할 무대.":
+        "点击左侧 ＋ 创建新工作流 — 打开空白画布。这里就是设计任务流程的舞台。",
+    "2. 🚀 시작 노드 추가": "2. 添加 🚀 起始节点",
+    "상단 툴바의 ＋ 노드 추가 → 창에서 🚀 시작 카테고리 선택. 워크플로우의 진입점이 되는 노드.":
+        "上方工具栏 ＋ 添加节点 → 在窗口中选择 🚀 起始类别。这是工作流的入口。",
+    "3. 🗂️ 세션 노드로 업무 정의": "3. 用 🗂️ 会话节点定义任务",
+    "＋ 노드 추가 → 🗂️ 세션. 제목과 업무(subject)를 입력. 예: \"경쟁 제품 3개 분석\". 이 노드가 실행되면 claude -p 로 작업을 처리.":
+        "＋ 添加节点 → 🗂️ 会话。填写标题和任务 (subject)。示例：\"分析 3 个竞品\"。运行时通过 claude -p 处理任务。",
+    "4. 포트 드래그로 화살표 연결": "4. 拖动端口连接箭头",
+    "노드 우측의 주황 포트를 다음 노드 좌측 보라 포트로 드래그. 베지어 곡선 + 방향 화살표가 자동으로 그려짐.":
+        "将节点右侧的橙色端口拖到下一节点左侧的紫色端口。自动绘制贝塞尔曲线和方向箭头。",
+    "5. 결과 노드로 마무리 + ▶ 실행": "5. 用结果节点收尾 + ▶ 运行",
+    "📤 결과 노드를 추가하고 연결. ▶ 실행 누르면 DAG 를 토폴로지 순서로 자동 실행. 각 노드가 실행 중에는 보라색 펄스.":
+        "添加 📤 结果节点并连接。点击 ▶ 运行，按拓扑顺序自动执行 DAG。运行中节点显示紫色脉冲。",
+    "6. 완료 → 결과 모달 / 터미널": "6. 完成 → 结果弹窗 / 终端",
+    "완료된 노드는 녹색 테두리. 결과 모달에 노드별 출력 미리보기. 세션 노드 우상단 🖥️ 아이콘으로 Terminal 새 창에서 대화형 세션도 시작 가능.":
+        "已完成节点呈绿色边框。结果弹窗展示各节点输出预览。点击会话节点右上角 🖥️ 图标还可在 Terminal 新窗口启动交互会话。",
     "메타": "元数据",
     "메타 패널 보이기/가리기": "显示/隐藏元数据面板",
     "가리기": "隐藏",
