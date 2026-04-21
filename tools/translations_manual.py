@@ -40,6 +40,11 @@ try:
 except Exception:
     _NEW_EN_6, _NEW_ZH_6 = {}, {}
 
+try:
+    from translations_manual_7 import NEW_EN as _NEW_EN_7, NEW_ZH as _NEW_ZH_7
+except Exception:
+    _NEW_EN_7, _NEW_ZH_7 = {}, {}
+
 # ── 구조화 키 → 한국어 라벨 ──
 MANUAL_KO: dict[str, str] = {
     "settings.theme": "테마",
@@ -426,6 +431,12 @@ for _k, _v in _NEW_ZH_5.items():
 for _k, _v in _NEW_EN_6.items():
     MANUAL_EN.setdefault(_k, _v)
 for _k, _v in _NEW_ZH_6.items():
+    MANUAL_ZH.setdefault(_k, _v)
+
+# Features 탭 BUILTIN_NEW_FEATURES (server/features.py 하드코딩 카탈로그)
+for _k, _v in _NEW_EN_7.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH_7.items():
     MANUAL_ZH.setdefault(_k, _v)
 
 # ── 번역 검수 권장 항목 ──
