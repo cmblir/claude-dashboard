@@ -675,3 +675,35 @@ def api_workflow_run_status(query: dict) -> dict:
     if not (isinstance(rid, str) and _RUN_ID_RE.match(rid)):
         return {"ok": False, "error": "invalid runId"}
     return _run_status_snapshot(rid)
+
+
+def api_workflow_runs_list(query: dict) -> dict:
+    """GET /api/workflows/runs?wfId=... — 해당 워크플로우의 runs 리스트 (최신순).
+
+    요약 필드만 반환. 상세는 run-status 로 재조회.
+    """
+    wfId = None
+    if isinstance(query, dict):
+        v = query.get("wfId")
+        if isinstance(v, list) and v:
+            wfId = v[0]
+        elif isinstance(v, str):
+            wfId = v
+    if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
+        return {"ok": False, "error": "invalid wfId"}
+    store = _load_all()
+    out = []
+    for rid, r in (store.get("runs") or {}).items():
+        if r.get("workflowId") != wfId:
+            continue
+        out.append({
+            "id": rid,
+            "status": r.get("status"),
+            "startedAt": r.get("startedAt", 0),
+            "finishedAt": r.get("finishedAt", 0),
+            "durationMs": max(0, (r.get("finishedAt") or 0) - (r.get("startedAt") or 0)),
+            "nodeCount": len(r.get("nodeResults") or {}),
+            "error": r.get("error"),
+        })
+    out.sort(key=lambda x: x["startedAt"], reverse=True)
+    return {"ok": True, "runs": out[:50]}  # 최근 50개 제한
