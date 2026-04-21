@@ -1,6 +1,6 @@
 {
   "source": "dist/index.html",
-  "total": 1408,
+  "total": 1413,
   "items": [
     {
       "text": "'{name}' 가 {mcp_file} 에 없음",
@@ -622,7 +622,7 @@
       "text": "CLI 상태 확인",
       "count": 1,
       "sample_lines": [
-        9295
+        9346
       ],
       "in_existing_en_dict": false
     },
@@ -2339,6 +2339,14 @@
       "in_existing_en_dict": false
     },
     {
+      "text": "⚡ 거의 다 왔어요!",
+      "count": 1,
+      "sample_lines": [
+        9077
+      ],
+      "in_existing_en_dict": false
+    },
+    {
       "text": "⚡ 빌트인",
       "count": 1,
       "sample_lines": [
@@ -2966,7 +2974,7 @@
       "sample_lines": [
         2302,
         6985,
-        9313
+        9364
       ],
       "in_existing_en_dict": false
     },
@@ -3590,7 +3598,7 @@
       "text": "대시보드 도우미와 대화",
       "count": 1,
       "sample_lines": [
-        9294
+        9345
       ],
       "in_existing_en_dict": false
     },
@@ -3949,7 +3957,7 @@
       "text": "로그인 상태 / 플랜 확인",
       "count": 1,
       "sample_lines": [
-        9295
+        9346
       ],
       "in_existing_en_dict": false
     },
@@ -5122,7 +5130,7 @@
       "count": 2,
       "sample_lines": [
         701,
-        9296
+        9347
       ],
       "in_existing_en_dict": false
     },
@@ -5164,7 +5172,7 @@
       "text": "서버 연결 실패",
       "count": 1,
       "sample_lines": [
-        9392
+        9443
       ],
       "in_existing_en_dict": false
     },
@@ -5332,7 +5340,7 @@
       "text": "세션 DB 새로고침",
       "count": 1,
       "sample_lines": [
-        9293
+        9344
       ],
       "in_existing_en_dict": false
     },
@@ -5411,7 +5419,7 @@
       "count": 2,
       "sample_lines": [
         38,
-        9293
+        9344
       ],
       "in_existing_en_dict": false
     },
@@ -5794,7 +5802,7 @@
       "sample_lines": [
         173,
         243,
-        9324
+        9375
       ],
       "in_existing_en_dict": false
     },
@@ -5835,7 +5843,7 @@
       "count": 2,
       "sample_lines": [
         999,
-        9324
+        9375
       ],
       "in_existing_en_dict": false
     },
@@ -6309,7 +6317,7 @@
       "text": "연결 오류",
       "count": 1,
       "sample_lines": [
-        9184
+        9233
       ],
       "in_existing_en_dict": false
     },
@@ -6914,7 +6922,7 @@
       "text": "이동",
       "count": 1,
       "sample_lines": [
-        9324
+        9375
       ],
       "in_existing_en_dict": false
     },
@@ -7357,6 +7365,14 @@
       "count": 1,
       "sample_lines": [
         2322
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "잠시만요~! 결과를 불러오고 있어요",
+      "count": 1,
+      "sample_lines": [
+        9074
       ],
       "in_existing_en_dict": false
     },
@@ -7957,7 +7973,7 @@
       "text": "챗봇 열기",
       "count": 1,
       "sample_lines": [
-        9294
+        9345
       ],
       "in_existing_en_dict": false
     },
@@ -8638,7 +8654,7 @@
       "text": "탭 이동, 기능 검색…",
       "count": 1,
       "sample_lines": [
-        9217
+        9268
       ],
       "in_existing_en_dict": false
     },
@@ -8670,9 +8686,9 @@
       "text": "탭으로 이동",
       "count": 3,
       "sample_lines": [
-        9107,
-        9158,
-        9179
+        9151,
+        9206,
+        9228
       ],
       "in_existing_en_dict": false
     },
@@ -9684,7 +9700,7 @@
       "text": "현재 뷰 다시 로드",
       "count": 1,
       "sample_lines": [
-        9296
+        9347
       ],
       "in_existing_en_dict": false
     },
@@ -10218,6 +10234,14 @@
       "in_existing_en_dict": false
     },
     {
+      "text": "🎯 정리해서 알려드릴게요",
+      "count": 1,
+      "sample_lines": [
+        9078
+      ],
+      "in_existing_en_dict": false
+    },
+    {
       "text": "🏆 최고 세션",
       "count": 1,
       "sample_lines": [
@@ -10250,6 +10274,14 @@
       "count": 1,
       "sample_lines": [
         6699
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "💡 관련 탭을 찾고 있어요",
+      "count": 1,
+      "sample_lines": [
+        9076
       ],
       "in_existing_en_dict": false
     },
@@ -10786,7 +10818,7 @@
       "text": "🔍 검색",
       "count": 1,
       "sample_lines": [
-        9211
+        9262
       ],
       "in_existing_en_dict": false
     },
@@ -11093,6 +11125,14 @@
       "text": "🛡️ 운영 / 모니터링",
       "count": 0,
       "sample_lines": [],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "🤔 좋은 답을 고르는 중…",
+      "count": 1,
+      "sample_lines": [
+        9075
+      ],
       "in_existing_en_dict": false
     },
     {
