@@ -259,6 +259,11 @@
   .wf-floating { position: absolute; right: 12px; bottom: 12px; z-index: 5; display: flex; gap: 6px; }
   .wf-floating .btn { background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(4px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
   .wf-floating .btn:hover { background: var(--card-hi); }
+  /* 인스펙터 접기 */
+  #wfInspector.wf-collapsed { display: none; }
+  .wf-floating-right { position: absolute; right: 12px; top: 12px; z-index: 5; }
+  .wf-floating-right .btn { background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(4px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+  .wf-floating-right .btn:hover { background: var(--card-hi); }
 
   @media (max-width: 900px) {
     #wfRoot { flex-direction: column; height: auto; min-height: 0; max-height: none; }
@@ -1386,12 +1391,18 @@ const __wf = {
 };
 
 const WF_NODE_TYPES = [
-  { id: 'start',     icon: '🚀', label: '시작', portIn: false, portOut: true },
-  { id: 'session',   icon: '🗂️', label: '세션', portIn: true,  portOut: true },
-  { id: 'subagent',  icon: '🤝', label: '서브에이전트', portIn: true, portOut: true },
-  { id: 'aggregate', icon: '🧩', label: '취합', portIn: true, portOut: true },
-  { id: 'branch',    icon: '🔀', label: '분기', portIn: true, portOut: true },  // out_y/out_n 포트
-  { id: 'output',    icon: '📤', label: '결과', portIn: true,  portOut: false },
+  { id: 'start',     icon: '🚀', label: '시작', portIn: false, portOut: true,
+    desc: 'DAG 의 진입점. 입력 없음 — 워크플로우의 시작점. 각 워크플로우에 1개만 두는 것이 일반적.' },
+  { id: 'session',   icon: '🗂️', label: '세션', portIn: true,  portOut: true,
+    desc: '가상 Claude 세션. subject(업무) · description(상세) · 모델 · cwd 를 설정하면 실행 시 claude -p 로 자동 실행되거나, 노드의 🖥️ 버튼으로 Terminal 새 창에서 대화형으로 열 수 있음.' },
+  { id: 'subagent',  icon: '🤝', label: '서브에이전트', portIn: true, portOut: true,
+    desc: '특정 역할(researcher · writer · reviewer 등)을 부여한 전문 세션. session 과 동일하지만 agentRole 필드로 페르소나를 명시해 전문성을 강화.' },
+  { id: 'aggregate', icon: '🧩', label: '취합', portIn: true, portOut: true,
+    desc: '여러 입력을 하나로 합치는 노드. concat(텍스트 이어붙이기) 또는 json(배열) 모드. 병렬로 수집한 결과를 하나로 모을 때 사용.' },
+  { id: 'branch',    icon: '🔀', label: '분기', portIn: true, portOut: true,
+    desc: '조건에 따라 Y / N 두 포트 중 하나만 활성화. 조건 문자열이 입력에 포함되면 Y, 아니면 N 으로 흐름이 분기.' },
+  { id: 'output',    icon: '📤', label: '결과', portIn: true,  portOut: false,
+    desc: '워크플로우의 종착지. 이전 노드의 출력을 최종 결과로 저장. exportTo 에 경로(~/ 하위) 지정 시 파일로 저장됨.' },
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 const WF_NODE_W = 180, WF_NODE_H = 64;
@@ -1431,6 +1442,9 @@ VIEWS.workflows = async () => {
           <button class="btn-primary btn text-xs" onclick="_wfRun()" id="wfRunBtn">▶ ${t('실행')}</button>
         </div>
         <div id="wfCanvasHost">
+          <div class="wf-floating-right">
+            <button class="btn text-xs" id="wfInspectorToggle" onclick="_wfToggleInspector()" title="${t('메타 패널 보이기/가리기')}">📋 ${t('메타')}</button>
+          </div>
           <div class="wf-floating">
             <button class="btn text-xs" onclick="_wfFitView()" title="${t('화면에 맞춤')}">🎯 ${t('맞춤')}</button>
           </div>
@@ -1450,6 +1464,10 @@ VIEWS.workflows = async () => {
       </div>
 
       <div id="wfInspector" class="card">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xs font-semibold">📋 ${t('워크플로우 메타')}</div>
+          <button class="btn text-[10px]" onclick="_wfToggleInspector()" title="${t('가리기')}">→</button>
+        </div>
         <div id="wfInspectorBody">
           <div class="text-xs text-[var(--text-dim)] text-center py-8">${t('노드를 선택하면 편집 패널이 표시됩니다')}</div>
         </div>
@@ -1460,6 +1478,7 @@ VIEWS.workflows = async () => {
 
 AFTER.workflows = async () => {
   _wfRenderList();
+  _wfApplyInspectorState();
   // 검색 바인딩
   const se = document.getElementById('wfSearch');
   if (se) se.oninput = (e) => { __wf.search = e.target.value.toLowerCase(); _wfRenderList(); };
@@ -1569,6 +1588,24 @@ async function _wfOpen(wfId) {
     // host DOM 이 아직 레이아웃 확정 전일 수 있으므로 next frame 에 호출
     requestAnimationFrame(() => _wfFitView());
   }
+}
+
+function _wfToggleInspector() {
+  const el = document.getElementById('wfInspector');
+  if (!el) return;
+  const collapsed = el.classList.toggle('wf-collapsed');
+  try { localStorage.setItem('wfInspectorCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+  // 토글 버튼 라벨 업데이트
+  const tog = document.getElementById('wfInspectorToggle');
+  if (tog) tog.innerHTML = collapsed ? `📋 ${t('메타')}` : `📋 ${t('메타')}`;
+}
+
+function _wfApplyInspectorState() {
+  const el = document.getElementById('wfInspector');
+  if (!el) return;
+  let collapsed = false;
+  try { collapsed = localStorage.getItem('wfInspectorCollapsed') === '1'; } catch (e) {}
+  el.classList.toggle('wf-collapsed', collapsed);
 }
 
 function _wfUpdateToolbar() {
@@ -2194,6 +2231,7 @@ function _wfRenderEditorBody(winId) {
       ${WF_NODE_TYPES.map(tp => `
         <button class="btn text-[11px] ${draft.type === tp.id ? 'btn-active' : ''}"
                 onclick="_wfPickNodeType('${winId}','${tp.id}')"
+                title="${escapeHtml(t(tp.desc))}"
                 style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;">
           <div style="font-size:1.4rem;line-height:1;">${tp.icon}</div>
           <div style="font-size:11px;">${t(tp.label)}</div>
@@ -2202,14 +2240,39 @@ function _wfRenderEditorBody(winId) {
   `;
 
   if (!draft.type) {
-    formHost.innerHTML = `<div class="text-xs text-[var(--text-dim)] text-center py-8">${t('위에서 카테고리를 먼저 선택하세요')}</div>`;
+    formHost.innerHTML = `
+      <div class="text-xs text-[var(--text-dim)] text-center py-4">${t('위에서 카테고리를 먼저 선택하세요')}</div>
+      <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-4 mb-2">${t('카테고리별 설명')}</div>
+      <div class="flex flex-col gap-2">
+        ${WF_NODE_TYPES.map(tp => `
+          <div class="card p-3" style="background:rgba(255,255,255,0.02);">
+            <div class="flex items-center gap-2 mb-1">
+              <span style="font-size:1.1rem;">${tp.icon}</span>
+              <span class="text-sm font-semibold">${t(tp.label)}</span>
+            </div>
+            <div class="text-[11px] text-[var(--text-mute)] leading-relaxed">${escapeHtml(t(tp.desc))}</div>
+          </div>`).join('')}
+      </div>
+    `;
     return;
   }
 
-  // 공통: 제목
+  // 선택된 타입 설명 카드
+  const typeMeta = WF_TYPE_MAP[draft.type];
+  const descCard = typeMeta && typeMeta.desc ? `
+    <div class="card p-3 mb-3" style="background:rgba(167,139,250,0.06);border-color:rgba(167,139,250,0.25);">
+      <div class="flex items-center gap-2 mb-1">
+        <span style="font-size:1.1rem;">${typeMeta.icon}</span>
+        <span class="text-sm font-semibold">${t(typeMeta.label)}</span>
+      </div>
+      <div class="text-[11px] text-[var(--text-mute)] leading-relaxed">${escapeHtml(t(typeMeta.desc))}</div>
+    </div>
+  ` : '';
+
+  // 공통: 제목 (설명 카드 먼저)
   const d = draft.data || {};
-  let body = `
-    <div class="pt-3 border-t border-[var(--border)] mt-2">
+  let body = descCard + `
+    <div class="pt-3 border-t border-[var(--border)] mt-1">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block mb-1">${t('제목')}</label>
       <input class="input w-full" value="${escapeHtml(draft.title||'')}" oninput="_wfDraftSet('${winId}','title',this.value)">
     </div>

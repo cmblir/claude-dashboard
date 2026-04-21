@@ -59,6 +59,22 @@ NEW_EN = {
         "The start node takes no input — it is just the workflow entry point.",
     "내리기": "Minimize",
     "펼치기": "Expand",
+    "카테고리별 설명": "What each category means",
+    "메타": "Meta",
+    "메타 패널 보이기/가리기": "Show/hide meta panel",
+    "가리기": "Hide",
+    "DAG 의 진입점. 입력 없음 — 워크플로우의 시작점. 각 워크플로우에 1개만 두는 것이 일반적.":
+        "Entry point of the DAG. No input — where the workflow begins. Usually one per workflow.",
+    "가상 Claude 세션. subject(업무) · description(상세) · 모델 · cwd 를 설정하면 실행 시 claude -p 로 자동 실행되거나, 노드의 🖥️ 버튼으로 Terminal 새 창에서 대화형으로 열 수 있음.":
+        "Virtual Claude session. Configure subject · description · model · cwd — runs via claude -p on Run, or opens an interactive Terminal window via the node's 🖥️ button.",
+    "특정 역할(researcher · writer · reviewer 등)을 부여한 전문 세션. session 과 동일하지만 agentRole 필드로 페르소나를 명시해 전문성을 강화.":
+        "Specialized session with a specific role (researcher · writer · reviewer, etc.). Same as session but uses agentRole to pin a persona.",
+    "여러 입력을 하나로 합치는 노드. concat(텍스트 이어붙이기) 또는 json(배열) 모드. 병렬로 수집한 결과를 하나로 모을 때 사용.":
+        "Merges multiple inputs into one. concat (text join) or json (array) mode. Use to combine parallel results.",
+    "조건에 따라 Y / N 두 포트 중 하나만 활성화. 조건 문자열이 입력에 포함되면 Y, 아니면 N 으로 흐름이 분기.":
+        "Activates only Y or N port based on condition. If the condition string is present in the input, Y fires; otherwise N.",
+    "워크플로우의 종착지. 이전 노드의 출력을 최종 결과로 저장. exportTo 에 경로(~/ 하위) 지정 시 파일로 저장됨.":
+        "Final destination of the workflow. Saves the previous node's output. If exportTo is set (under ~/), also writes to a file.",
     "변경사항 있음": "Unsaved changes",
     "생성됨": "Created",
     "삭제됨": "Deleted",
@@ -199,6 +215,22 @@ NEW_ZH = {
         "起始节点无额外输入，仅作为工作流入口。",
     "내리기": "最小化",
     "펼치기": "展开",
+    "카테고리별 설명": "各类别说明",
+    "메타": "元数据",
+    "메타 패널 보이기/가리기": "显示/隐藏元数据面板",
+    "가리기": "隐藏",
+    "DAG 의 진입점. 입력 없음 — 워크플로우의 시작점. 각 워크플로우에 1개만 두는 것이 일반적.":
+        "DAG 的入口。无输入 — 工作流起点。通常每个工作流只保留一个。",
+    "가상 Claude 세션. subject(업무) · description(상세) · 모델 · cwd 를 설정하면 실행 시 claude -p 로 자동 실행되거나, 노드의 🖥️ 버튼으로 Terminal 새 창에서 대화형으로 열 수 있음.":
+        "虚拟 Claude 会话。设置 subject · description · 模型 · cwd；运行时通过 claude -p 自动执行，或点击节点 🖥️ 在 Terminal 新窗口中交互打开。",
+    "특정 역할(researcher · writer · reviewer 등)을 부여한 전문 세션. session 과 동일하지만 agentRole 필드로 페르소나를 명시해 전문성을 강화.":
+        "具有特定角色（researcher · writer · reviewer 等）的专用会话。与 session 相同，但通过 agentRole 指定角色强化专业性。",
+    "여러 입력을 하나로 합치는 노드. concat(텍스트 이어붙이기) 또는 json(배열) 모드. 병렬로 수집한 결과를 하나로 모을 때 사용.":
+        "将多个输入合并为一个的节点。支持 concat（文本拼接）或 json（数组）模式。用于汇总并行结果。",
+    "조건에 따라 Y / N 두 포트 중 하나만 활성화. 조건 문자열이 입력에 포함되면 Y, 아니면 N 으로 흐름이 분기.":
+        "根据条件仅激活 Y 或 N 端口之一。输入包含条件字符串则走 Y，否则走 N。",
+    "워크플로우의 종착지. 이전 노드의 출력을 최종 결과로 저장. exportTo 에 경로(~/ 하위) 지정 시 파일로 저장됨.":
+        "工作流终点。保存上一节点输出为最终结果。若设置 exportTo 路径（~/ 下）则同时写入文件。",
     "변경사항 있음": "有未保存更改",
     "생성됨": "已创建",
     "삭제됨": "已删除",
