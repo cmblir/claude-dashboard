@@ -137,7 +137,7 @@
   .chat-bubble-user { background: var(--grad); color: #0a0a0f; border-radius: 14px 14px 4px 14px; padding: 8px 12px; max-width: 85%; font-size: 0.82rem; line-height: 1.45; word-break: break-word; }
   .chat-bubble-bot { background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 14px 14px 14px 4px; padding: 8px 12px; max-width: 85%; font-size: 0.82rem; line-height: 1.45; color: var(--text); word-break: break-word; }
   /* claude mascot */
-  #claudeMascot { cursor: grab; user-select: none; pointer-events: auto; will-change: left, top; }
+  #claudeMascot { cursor: grab; user-select: none; pointer-events: auto; will-change: left, top; touch-action: none; -webkit-tap-highlight-color: transparent; }
   #claudeMascot:active { cursor: grabbing; }
   #claudeMascot:hover { filter: drop-shadow(0 0 14px rgba(224,124,76,0.7)); }
   #claudeMascot svg { transition: transform 0.15s; }
@@ -333,15 +333,22 @@
     .modal { max-height: 96vh !important; border-radius: 12px !important; }
     .modal-wide { height: 96vh !important; max-height: 96vh !important; }
 
-    /* 신기능 창 — 화면 거의 전체 */
+    /* 신기능 창 / 챗 윈도우 — 화면 거의 전체 */
     .feat-win {
       width: calc(100vw - 16px) !important;
       max-width: calc(100vw - 16px) !important;
       left: 8px !important;
       top: 8px !important;
+      right: auto !important;
+      bottom: auto !important;
+      height: auto !important;
       max-height: calc(100vh - 16px) !important;
       resize: none !important;
     }
+    .feat-win-title { touch-action: none; cursor: move; }
+
+    /* 마스코트 — 모바일에서 기본 터치 타겟 보장 + 초기 위치 안전 */
+    #claudeMascot { width: 64px !important; height: 58px !important; }
 
     /* Chip / 버튼 터치 타겟 */
     .btn, .btn-primary, .btn-ghost { min-height: 36px; }
@@ -6654,6 +6661,7 @@ let _mascotDragMoved = false;
 let _mascotWanderTimer = null;
 let _mascotBubbleTimer = null;
 let _mascotOnChat = false; // 챗창 위에 있는 상태
+let _mascotLastTouchTs = 0; // touch 이후 합성 mouse 이벤트 억제용
 let _mascotChatBounceTimer = null;
 
 function _initMascot() {
@@ -6661,10 +6669,10 @@ function _initMascot() {
   if (!el) return;
   let startX, startY, origL, origT;
 
-  // 드래그 (mouse)
+  // 드래그 (mouse) — 터치 직후의 합성(synthetic) 마우스 이벤트는 무시
   el.addEventListener('mousedown', (e) => {
-    // 모달 위 바운스 중에는 드래그/클릭 무시 (pointer-events:none 추가 안전장치)
     if (_mascotOnModal) return;
+    if (Date.now() - _mascotLastTouchTs < 500) return; // 합성 이벤트 억제
     e.preventDefault();
     _mascotDragging = true;
     _mascotDragMoved = false;
@@ -6693,29 +6701,52 @@ function _initMascot() {
     }
   });
 
-  // 드래그 (touch)
+  // 드래그 (touch) — passive:false 로 해서 스크롤/합성 이벤트 억제
   el.addEventListener('touchstart', (e) => {
     if (_mascotOnModal) return;
+    _mascotLastTouchTs = Date.now();
     const t = e.touches[0];
     _mascotDragging = true; _mascotDragMoved = false;
     _stopMascotWander();
     startX = t.clientX; startY = t.clientY;
     const r = el.getBoundingClientRect();
     origL = r.left; origT = r.top;
-  }, { passive: true });
+    try { e.preventDefault(); } catch (_) {}
+  }, { passive: false });
   document.addEventListener('touchmove', (e) => {
     if (!_mascotDragging) return;
+    _mascotLastTouchTs = Date.now();
     const t = e.touches[0];
     const dx = t.clientX - startX, dy = t.clientY - startY;
     if (Math.abs(dx) > 4 || Math.abs(dy) > 4) _mascotDragMoved = true;
-    el.style.left = (origL + dx) + 'px'; el.style.top = (origT + dy) + 'px';
+    // 화면 경계 내로 클램프 — 모바일에서 화면 밖 이탈 방지
+    const maxL = window.innerWidth - (el.offsetWidth || 70);
+    const maxT = window.innerHeight - (el.offsetHeight || 63);
+    el.style.left = Math.max(0, Math.min(origL + dx, maxL)) + 'px';
+    el.style.top  = Math.max(0, Math.min(origT + dy, maxT)) + 'px';
     el.style.right = 'auto'; el.style.bottom = 'auto';
-  }, { passive: true });
-  document.addEventListener('touchend', () => {
+    if (dx < -2) el.classList.add('facing-left');
+    else if (dx > 2) el.classList.remove('facing-left');
+    try { e.preventDefault(); } catch (_) {}
+  }, { passive: false });
+  document.addEventListener('touchend', (e) => {
     if (!_mascotDragging) return;
+    _mascotLastTouchTs = Date.now();
     _mascotDragging = false;
-    if (!_mascotDragMoved) toggleChat();
-    else _startMascotWander();
+    if (!_mascotDragMoved) {
+      toggleChat();
+      // 합성 mouse 이벤트가 click/mousedown/mouseup 로 연달아 발행되어
+      // toggleChat 이 재호출되는 것을 막는다.
+      try { e.preventDefault(); } catch (_) {}
+    } else {
+      _startMascotWander();
+    }
+  }, { passive: false });
+  // 안전장치: 마스코트 위에서 발생한 click 합성 이벤트도 차단
+  el.addEventListener('click', (e) => {
+    if (Date.now() - _mascotLastTouchTs < 500) {
+      e.preventDefault(); e.stopPropagation();
+    }
   });
 
   // 초기 위치 설정
@@ -6936,26 +6967,39 @@ function toggleChat() {
   } else {
     // 열기 — 말풍선 숨기기
     if (bubble) bubble.style.display = 'none';
-    // 챗 창을 마스코트 위치 근처에 배치
-    const mr = mascot.getBoundingClientRect();
-    const chatW = 420, chatH = 480;
-    let chatLeft = mr.left + mr.width / 2 - chatW / 2;
-    let chatTop = mr.top + 60;
-    // 화면 밖으로 안 나가게
-    chatLeft = Math.max(8, Math.min(chatLeft, window.innerWidth - chatW - 8));
-    chatTop = Math.max(8, Math.min(chatTop, window.innerHeight - chatH - 8));
-    win.style.left = chatLeft + 'px';
-    win.style.top = chatTop + 'px';
-    win.style.right = 'auto'; win.style.bottom = 'auto';
+    const isMobile = window.matchMedia('(max-width: 900px)').matches;
+    if (isMobile) {
+      // 모바일: 화면 전체 고정 시트 — inline 값이 CSS !important 를 방해하지 않도록 클리어
+      win.style.left = ''; win.style.top = ''; win.style.right = ''; win.style.bottom = '';
+      win.style.width = ''; win.style.height = ''; win.style.maxHeight = '';
+    } else {
+      // 데스크톱: 마스코트 위치 근처에 배치
+      const mr = mascot.getBoundingClientRect();
+      const chatW = 420, chatH = 480;
+      let chatLeft = mr.left + mr.width / 2 - chatW / 2;
+      let chatTop = mr.top + 60;
+      chatLeft = Math.max(8, Math.min(chatLeft, window.innerWidth - chatW - 8));
+      chatTop = Math.max(8, Math.min(chatTop, window.innerHeight - chatH - 8));
+      win.style.left = chatLeft + 'px';
+      win.style.top = chatTop + 'px';
+      win.style.right = 'auto'; win.style.bottom = 'auto';
+      win.style.width = '420px';
+      win.style.maxHeight = 'min(600px,80vh)';
+    }
     win.style.display = 'flex';
     win.classList.remove('chat-win-exit');
     win.classList.add('chat-win-enter');
     _chatOpen = true;
-    setTimeout(() => document.getElementById('chatInput').focus(), 100);
+    // iOS 자동 줌/포커스 화면 튐 방지를 위해 모바일은 포커스 지연 길게 + 조건부
+    const focusDelay = isMobile ? 350 : 100;
+    setTimeout(() => {
+      const inp = document.getElementById('chatInput');
+      if (inp && !isMobile) inp.focus();
+    }, focusDelay);
     const msgs = document.getElementById('chatMessages');
     msgs.scrollTop = msgs.scrollHeight;
-    // 마스코트를 챗창 위로 점프
-    setTimeout(() => _mascotJumpOnChat(), 150);
+    // 마스코트를 챗창 위로 점프 — 모바일에서는 UI 가리니 스킵
+    if (!isMobile) setTimeout(() => _mascotJumpOnChat(), 150);
   }
 }
 
