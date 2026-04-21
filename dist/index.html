@@ -2416,6 +2416,48 @@ function _wfRenderEditorBody(winId) {
         <option value="first"  ${d.inputsMode==='first'?'selected':''}>${t('첫 입력만 (first)')}</option>
         <option value="json"   ${d.inputsMode==='json'?'selected':''}>${t('JSON 배열 (json)')}</option>
       </select>
+
+      <div class="mt-4 pt-3 border-t border-[var(--border)]">
+        <div class="text-[11px] font-semibold mb-1">🎭 ${t('세션 하네스')}</div>
+        <div class="text-[10px] text-[var(--text-dim)] mb-2">${t('페르소나·CLAUDE.md 스타일 지시·허용 도구 등 claude CLI 에 직접 전달될 설정.')}</div>
+
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('시스템 프롬프트 (페르소나)')}</label>
+        <textarea class="input w-full mt-1" rows="4"
+          placeholder="${t('예: 너는 10년차 시니어 백엔드 엔지니어다. Node.js·PostgreSQL 전문. 보안과 성능을 우선시한다.')}"
+          oninput="_wfDraftSetData('${winId}','systemPrompt',this.value)">${escapeHtml(d.systemPrompt||'')}</textarea>
+
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('추가 시스템 프롬프트 (기본에 덧붙임)')}</label>
+        <textarea class="input w-full mt-1" rows="2"
+          placeholder="${t('기본 claude 프롬프트에 추가할 규약·제약')}"
+          oninput="_wfDraftSetData('${winId}','appendSystemPrompt',this.value)">${escapeHtml(d.appendSystemPrompt||'')}</textarea>
+
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('허용 도구 (쉼표 구분)')}</label>
+        <input class="input w-full mt-1" value="${escapeHtml(d.allowedTools||'')}"
+          placeholder="Bash(git:*),Read,Edit"
+          oninput="_wfDraftSetData('${winId}','allowedTools',this.value)">
+
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('차단 도구 (쉼표 구분)')}</label>
+        <input class="input w-full mt-1" value="${escapeHtml(d.disallowedTools||'')}"
+          placeholder="Bash(rm:*),Bash(curl:*)"
+          oninput="_wfDraftSetData('${winId}','disallowedTools',this.value)">
+
+        <div class="mt-3 p-2 rounded" style="background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.2);">
+          <div class="text-[11px] font-semibold mb-1">🔄 ${t('이전 세션 이어서 (resume)')}</div>
+          <label class="flex items-center gap-2 text-[11px]">
+            <input type="checkbox" ${d.continueFromPrev?'checked':''}
+              onchange="_wfDraftSetData('${winId}','continueFromPrev',this.checked)">
+            <span>${t('연결된 이전 노드의 session_id 자동 이어받기')}</span>
+          </label>
+          <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('또는 session_id 직접 입력')}</label>
+          <input class="input w-full mt-1" value="${escapeHtml(d.resumeSessionId||'')}"
+            placeholder="abc123-..."
+            oninput="_wfDraftSetData('${winId}','resumeSessionId',this.value)">
+          ${(d.lastRun && d.lastRun.sessionId) ? `
+            <div class="text-[10px] text-[var(--text-dim)] mt-2">
+              ${t('마지막 실행 session_id')}: <code style="color:#c4b5fd;">${escapeHtml(d.lastRun.sessionId)}</code>
+            </div>` : ''}
+        </div>
+      </div>
     `;
   } else if (draft.type === 'branch') {
     body += `
@@ -2640,6 +2682,14 @@ function _wfShowRunResult(run) {
     const icon = (WF_TYPE_MAP[node.type]||{}).icon || '•';
     const preview = (r.output||'').slice(0, 500);
     const err = r.error ? `<div class="text-[11px] text-red-400 mt-1">⚠ ${escapeHtml(r.error)}</div>` : '';
+    const sid = r.sessionId || '';
+    const sidRow = sid ? `
+      <div class="mt-2 pt-2 border-t border-[var(--border)] flex items-center gap-2">
+        <span class="text-[10px] text-[var(--text-dim)]">session_id</span>
+        <code class="text-[10px] flex-1 truncate" style="color:#c4b5fd;">${escapeHtml(sid)}</code>
+        <button class="btn text-[10px]" onclick="_copyToClipboard(this, ${JSON.stringify(sid).replace(/"/g,'&quot;')})">📋</button>
+        <button class="btn text-[10px]" onclick="_wfUseAsResume('${nid}', ${JSON.stringify(sid).replace(/"/g,'&quot;')})" title="${t('다른 노드의 resume 필드에 붙여넣기')}">↪ ${t('이어쓰기')}</button>
+      </div>` : '';
     return `<div class="card p-3">
       <div class="flex items-center justify-between mb-1">
         <div class="text-xs font-semibold">${icon} ${escapeHtml(node.title||nid)} <span class="text-[10px] text-[var(--text-dim)]">(${r.status})</span></div>
@@ -2647,6 +2697,7 @@ function _wfShowRunResult(run) {
       </div>
       ${preview ? `<pre class="text-[11px] whitespace-pre-wrap break-words" style="max-height:160px;overflow-y:auto;">${escapeHtml(preview)}</pre>` : ''}
       ${err}
+      ${sidRow}
     </div>`;
   }).join('');
   showModal(`
@@ -2661,6 +2712,34 @@ function _wfShowRunResult(run) {
   `);
 }
 
+async function _wfUseAsResume(sourceNid, sessionId) {
+  if (!__wf.current) return;
+  // 다른 세션/서브에이전트 노드 목록 제시
+  const candidates = (__wf.current.nodes || []).filter(n =>
+    (n.type === 'session' || n.type === 'subagent') && n.id !== sourceNid);
+  if (!candidates.length) { toast(t('적용할 노드가 없습니다'), 'warn'); return; }
+  const optionsText = candidates.map((n, i) =>
+    `${i+1}. ${n.title || n.type} (${n.id})`).join('\n');
+  const pick = await promptModal({
+    title: t('resume 대상 노드'),
+    message: t('이 session_id 를 어떤 노드의 resume 필드에 넣을까요? 번호 입력:') + '\n' + optionsText,
+    placeholder: '1',
+  });
+  if (!pick) return;
+  const idx = parseInt(pick, 10) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= candidates.length) { toast(t('잘못된 번호'), 'err'); return; }
+  const target = candidates[idx];
+  target.data = target.data || {};
+  target.data.resumeSessionId = sessionId;
+  __wf.dirty = true;
+  toast(`'${target.title}' ` + t('에 session_id 적용됨'), 'ok');
+  _wfUpdateToolbar();
+  closeModal();
+  // 인스펙터 오픈
+  __wf.selectedNodeId = target.id;
+  _wfRenderInspector();
+}
+
 async function _wfSpawnSession(nid) {
   if (!__wf.current) return;
   const n = __wf.current.nodes.find(x => x.id === nid);
@@ -2668,9 +2747,17 @@ async function _wfSpawnSession(nid) {
   const d = n.data || {};
   const cwd = d.cwd || '~';
   const prompt = [d.subject, d.description].filter(Boolean).join('\n\n');
+  const body = {
+    cwd, prompt,
+    systemPrompt:        d.systemPrompt || '',
+    appendSystemPrompt:  d.appendSystemPrompt || '',
+    allowedTools:        d.allowedTools || '',
+    disallowedTools:     d.disallowedTools || '',
+    resumeSessionId:     d.resumeSessionId || '',
+  };
   const r = await api('/api/session/spawn', {
     method: 'POST', headers: { 'Content-Type':'application/json' },
-    body: JSON.stringify({ cwd, prompt }),
+    body: JSON.stringify(body),
   });
   if (!r.ok) { toast(r.error||t('세션 생성 실패'), 'err'); return; }
   toast(t('Claude 세션 시작됨'), 'ok');
@@ -2694,22 +2781,26 @@ const WF_TEMPLATES = [
           subject: '이번 스프린트 목표와 업무 분담',
           description: '아래 형식으로 답하라.\n\n# 프론트\n(프론트엔드에게 전달할 구체적 업무 지시)\n\n# 백엔드\n(백엔드에게 전달할 구체적 업무 지시)',
           assignee: 'opus-4.7', agentRole: 'team-lead', cwd: '~', inputsMode: 'concat',
+          systemPrompt: '너는 스프린트를 이끄는 테크 리드다. 요구사항을 명확한 실행 단위로 분해해 프론트·백엔드 팀에게 분배한다. 모호함을 남기지 말고 수용 기준까지 명시하라.',
         }},
         { id:'n-fe', type:'subagent',  x:520, y:60,  title:'프론트엔드', data:{
           subject: '프론트엔드 구현',
           description: '리드 지시 중 프론트 섹션만 구현. React + TypeScript 기준. 완료된 파일 경로·핵심 변경 요약 반환.',
           assignee: 'sonnet-4.6', agentRole: 'frontend-dev', cwd: '~', inputsMode: 'first',
+          systemPrompt: '너는 React + TypeScript + Tailwind 에 능숙한 시니어 프론트엔드 개발자다. 접근성·성능·타입 안전성을 우선시한다. 입력에서 프론트 관련 업무만 실행하고, 백엔드 섹션은 무시한다.',
         }},
         { id:'n-be', type:'subagent',  x:520, y:300, title:'백엔드', data:{
           subject: '백엔드 구현',
           description: '리드 지시 중 백엔드 섹션만 구현. API · DB · 테스트까지. 완료된 파일 경로·핵심 변경 요약 반환.',
           assignee: 'sonnet-4.6', agentRole: 'backend-dev', cwd: '~', inputsMode: 'first',
+          systemPrompt: '너는 Node.js · PostgreSQL · REST/GraphQL 에 능숙한 시니어 백엔드 개발자다. 보안·확장성·테스트 커버리지를 우선시한다. 입력에서 백엔드 관련 업무만 실행하고, 프론트 섹션은 무시한다.',
         }},
         { id:'n-agg', type:'aggregate', x:780, y:180, title:'결과 취합', data:{ mode: 'concat' }},
         { id:'n-l2',  type:'session',   x:1040, y:180, title:'리드 리뷰 + 다음 기획', data:{
           subject: '스프린트 리뷰 및 다음 스프린트 계획',
           description: '두 결과를 보고 1) 문제/개선, 2) 다음 스프린트 업무 분담(다시 프론트·백엔드 섹션) 을 생성. 같은 포맷 유지.',
           assignee: 'opus-4.7', agentRole: 'team-lead', cwd: '~', inputsMode: 'concat',
+          systemPrompt: '너는 스프린트를 이끄는 테크 리드다. 이전 스프린트 결과를 비판적으로 평가하고, 리스크를 식별하며, 다음 스프린트의 업무 분담을 명확히 작성한다.',
         }},
         { id:'n-o',   type:'output',    x:1300, y:180, title:'최종 결과', data:{} },
       ],

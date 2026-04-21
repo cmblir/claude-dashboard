@@ -324,12 +324,22 @@ def _applescript_escape(s: str) -> str:
     return s.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def api_session_spawn(body: dict) -> dict:
-    """새 Terminal 창을 열고 `claude [prompt]` 실행. macOS 전용.
+def _sh_quote(s: str) -> str:
+    """single-quoted 쉘 이스케이프. 내부 ' 는 '\\'' 로 분리."""
+    return "'" + s.replace("'", "'\\''") + "'"
 
-    body: { cwd: "~/path", prompt?: "optional first message" }
-    - cwd 는 홈 디렉토리 하위만 허용
-    - claude 바이너리가 PATH 에 없으면 터미널에서 실행되긴 하지만 에러 보고 X
+
+def api_session_spawn(body: dict) -> dict:
+    """새 Terminal 창을 열고 `claude [옵션] [prompt]` 실행. macOS 전용.
+
+    body:
+      cwd:                 "~/path"   (홈 하위)
+      prompt:              "first message"     (선택)
+      systemPrompt:        "..."      (--system-prompt)
+      appendSystemPrompt:  "..."      (--append-system-prompt)
+      allowedTools:        "Bash,..." (--allowed-tools)
+      disallowedTools:     "..."      (--disallowed-tools)
+      resumeSessionId:     "..."      (--resume)
     """
     if not isinstance(body, dict):
         return {"ok": False, "error": "bad body"}
@@ -345,13 +355,21 @@ def api_session_spawn(body: dict) -> dict:
         return {"ok": False, "error": "cwd not found"}
 
     prompt = (body.get("prompt") or "").strip()
-    claude_bin = shutil.which("claude") or "claude"  # fallback: 터미널이 PATH 로 찾음
+    sys_prompt = (body.get("systemPrompt") or "").strip()
+    app_prompt = (body.get("appendSystemPrompt") or "").strip()
+    allowed = (body.get("allowedTools") or "").strip()
+    disallowed = (body.get("disallowedTools") or "").strip()
+    resume_id = (body.get("resumeSessionId") or "").strip()
+    claude_bin = shutil.which("claude") or "claude"
 
-    # 셸 명령: cd "<cwd>" && claude "<prompt>" (prompt 없으면 그냥 claude)
-    if prompt:
-        shell_cmd = f'cd "{abs_cwd}" && {claude_bin} "{prompt}"'
-    else:
-        shell_cmd = f'cd "{abs_cwd}" && {claude_bin}'
+    parts = [claude_bin]
+    if sys_prompt: parts += ["--system-prompt", _sh_quote(sys_prompt)]
+    if app_prompt: parts += ["--append-system-prompt", _sh_quote(app_prompt)]
+    if allowed:    parts += ["--allowed-tools", _sh_quote(allowed)]
+    if disallowed: parts += ["--disallowed-tools", _sh_quote(disallowed)]
+    if resume_id:  parts += ["--resume", _sh_quote(resume_id)]
+    if prompt:     parts += [_sh_quote(prompt)]
+    shell_cmd = f'cd {_sh_quote(abs_cwd)} && ' + " ".join(parts)
 
     script = f'''
 tell application "Terminal"

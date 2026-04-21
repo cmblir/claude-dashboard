@@ -141,13 +141,21 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
             "cwd":         _clamp_str(d.get("cwd"), 500),
             "inputsMode":  d.get("inputsMode") if d.get("inputsMode") in _INPUT_MODES else "concat",
             "tags":        [_clamp_str(t, 40) for t in (d.get("tags") or []) if isinstance(t, str)][:10],
+            # 세션 하네스 (persona · CLAUDE.md 스타일 지시 · tools · resume)
+            "systemPrompt":       _clamp_str(d.get("systemPrompt"), 8000),
+            "appendSystemPrompt": _clamp_str(d.get("appendSystemPrompt"), 4000),
+            "allowedTools":       _clamp_str(d.get("allowedTools"), 500),
+            "disallowedTools":    _clamp_str(d.get("disallowedTools"), 500),
+            "resumeSessionId":    _clamp_str(d.get("resumeSessionId"), 80),
+            # 연결 노드의 session_id 를 자동으로 --resume 으로 이어받기
+            "continueFromPrev":   bool(d.get("continueFromPrev")),
             "sessionRef":  {
                 "mode":      _clamp_str((d.get("sessionRef") or {}).get("mode"), 20) or "spawn",
                 "sessionId": _clamp_str((d.get("sessionRef") or {}).get("sessionId"), 80),
                 "pid":       (d.get("sessionRef") or {}).get("pid"),
             },
             "lastRun": d.get("lastRun") if isinstance(d.get("lastRun"), dict) else {
-                "status": "idle", "output": None, "durationMs": 0, "startedAt": 0
+                "status": "idle", "output": None, "sessionId": "", "durationMs": 0, "startedAt": 0
             },
         }
     elif ntype == "branch":
@@ -396,20 +404,24 @@ def _run_status_snapshot(runId: str) -> dict:
     return {"ok": True, "run": r}
 
 
-def _execute_node(node: dict, inputs: list[str]) -> dict:
+def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | None = None) -> dict:
     """단일 노드 실행. 동기. (subject/description + inputs) → stdout.
 
-    반환: {status:"ok|err", output:str, durationMs:int, error?:str}
+    prev_session_ids: 이 노드로 들어오는 엣지의 from 노드들의 lastRun.sessionId 리스트.
+    continueFromPrev 가 켜지면 그 중 첫 번째(있으면)를 --resume 에 넘긴다.
+
+    반환: {status:"ok|err", output:str, sessionId:str, durationMs:int, error?:str}
     """
     ntype = node["type"]
     data = node.get("data") or {}
+    prev_session_ids = prev_session_ids or []
     t0 = int(time.time() * 1000)
 
     def _elapsed() -> int:
         return int(time.time() * 1000) - t0
 
     if ntype == "start":
-        return {"status": "ok", "output": "", "durationMs": _elapsed()}
+        return {"status": "ok", "output": "", "durationMs": _elapsed(), "sessionId": ""}
 
     if ntype == "aggregate":
         mode = data.get("mode", "concat")
@@ -417,21 +429,19 @@ def _execute_node(node: dict, inputs: list[str]) -> dict:
             output = json.dumps(inputs, ensure_ascii=False)
         else:
             output = "\n---\n".join(inputs)
-        return {"status": "ok", "output": output, "durationMs": _elapsed()}
+        return {"status": "ok", "output": output, "durationMs": _elapsed(), "sessionId": ""}
 
     if ntype == "branch":
         cond = (data.get("condition") or "").strip().lower()
         prev = (inputs[0] if inputs else "").lower()
-        # 단순 substring 매칭. 안전 위해 eval X.
         matched = bool(cond) and cond in prev
         out_port = "out_y" if matched else "out_n"
         return {
-            "status": "ok", "output": prev, "durationMs": _elapsed(),
-            "_branch": out_port,  # runner 가 읽어 제외 포트 처리
+            "status": "ok", "output": prev, "durationMs": _elapsed(), "sessionId": "",
+            "_branch": out_port,
         }
 
     if ntype == "output":
-        # 마지막 결과는 첫 입력을 그대로 보존 + optional export
         final = inputs[0] if inputs else ""
         exp_raw = data.get("exportTo") or ""
         if exp_raw:
@@ -442,15 +452,16 @@ def _execute_node(node: dict, inputs: list[str]) -> dict:
                     _safe_write(Path(under), final)
                 except Exception as e:
                     return {"status": "err", "output": "", "durationMs": _elapsed(), "error": f"export failed: {e}"}
-        return {"status": "ok", "output": final, "durationMs": _elapsed()}
+        return {"status": "ok", "output": final, "durationMs": _elapsed(), "sessionId": ""}
 
-    # session / subagent — `claude -p` 호출
+    # ── session / subagent — `claude -p` 호출 ──
     prompt_parts = []
     if data.get("subject"):
         prompt_parts.append(data["subject"])
     if data.get("description"):
         prompt_parts.append(data["description"])
-    if data.get("agentRole"):
+    if data.get("agentRole") and not data.get("systemPrompt"):
+        # systemPrompt 가 있으면 거기서 역할을 설명하므로 중복 방지
         prompt_parts.append(f"(역할: {data['agentRole']})")
     if inputs:
         mode = data.get("inputsMode", "concat")
@@ -471,7 +482,32 @@ def _execute_node(node: dict, inputs: list[str]) -> dict:
     cwd_raw = data.get("cwd") or str(Path.home())
     cwd_safe = _under_home(cwd_raw) or str(Path.home())
 
+    # resume 대상 session_id 결정:
+    # 1) 노드에 명시된 resumeSessionId 최우선
+    # 2) continueFromPrev 가 켜졌고 이전 노드 중 session_id 를 가진 것이 있으면 그걸 사용
+    resume_id = (data.get("resumeSessionId") or "").strip()
+    if not resume_id and data.get("continueFromPrev"):
+        for sid in prev_session_ids:
+            if sid:
+                resume_id = sid
+                break
+
     cmd = [claude_bin, "-p", prompt, "--output-format", "json"]
+    sys_prompt = (data.get("systemPrompt") or "").strip()
+    if sys_prompt:
+        cmd += ["--system-prompt", sys_prompt]
+    app_prompt = (data.get("appendSystemPrompt") or "").strip()
+    if app_prompt:
+        cmd += ["--append-system-prompt", app_prompt]
+    allowed = (data.get("allowedTools") or "").strip()
+    if allowed:
+        cmd += ["--allowed-tools", allowed]
+    disallowed = (data.get("disallowedTools") or "").strip()
+    if disallowed:
+        cmd += ["--disallowed-tools", disallowed]
+    if resume_id:
+        cmd += ["--resume", resume_id]
+
     try:
         r = subprocess.run(
             cmd, cwd=cwd_safe, capture_output=True, text=True,
@@ -487,17 +523,17 @@ def _execute_node(node: dict, inputs: list[str]) -> dict:
         return {"status": "err", "output": "", "durationMs": _elapsed(),
                 "error": (r.stderr or "").strip()[:1000] or f"exit {r.returncode}"}
 
-    # Claude CLI 는 --output-format json 시 {"result": "...", "session_id":"...", ...} 같은 구조.
-    # 파싱 실패 시 stdout 전체를 output 으로.
     stdout = r.stdout or ""
     output = stdout
+    session_id = ""
     try:
         parsed = json.loads(stdout)
         if isinstance(parsed, dict):
             output = parsed.get("result") or parsed.get("content") or stdout
+            session_id = (parsed.get("session_id") or parsed.get("sessionId") or "")
     except Exception:
         pass
-    return {"status": "ok", "output": output, "durationMs": _elapsed()}
+    return {"status": "ok", "output": output, "sessionId": session_id, "durationMs": _elapsed()}
 
 
 def _run_workflow_background(wfId: str, runId: str) -> None:
@@ -575,9 +611,14 @@ def _run_workflow_background(wfId: str, runId: str) -> None:
                     s["runs"][runId]["currentNodeId"] = nid
                     s["runs"][runId]["nodeResults"][nid] = {"status": "running"}
                     _dump_all(s)
-            # 실행
+            # 실행 — 이전 노드의 session_id 수집해 전달 (continueFromPrev 용)
+            prev_sids = []
+            for (src_id, _) in in_items:
+                src = results.get(src_id)
+                if src and src.get("sessionId"):
+                    prev_sids.append(src["sessionId"])
             node = node_by_id[nid]
-            res = _execute_node(node, input_strs)
+            res = _execute_node(node, input_strs, prev_sids)
             results[nid] = res
             # branch 의 비활성 포트로 이어진 downstream 을 disabled 에 표시
             if node.get("type") == "branch" and "_branch" in res:
@@ -600,13 +641,14 @@ def _run_workflow_background(wfId: str, runId: str) -> None:
                         s["runs"][runId]["finishedAt"] = int(time.time()*1000)
                         _dump_all(s)
                 return
-            # 성공 기록
+            # 성공 기록 (session_id 도 함께 저장 — 다음 resume 에 사용)
             with _LOCK:
                 s = _load_all()
                 if runId in s["runs"]:
                     s["runs"][runId]["nodeResults"][nid] = {
                         "status": "ok",
                         "output": (res.get("output") or "")[:4000],
+                        "sessionId": res.get("sessionId") or "",
                         "durationMs": res.get("durationMs", 0),
                     }
                     _dump_all(s)

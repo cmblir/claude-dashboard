@@ -172,6 +172,28 @@ NEW_EN = {
     "자주 쓰는 DAG 패턴을 원클릭으로 만듭니다. 생성 후 노드별 업무 내용을 자유롭게 수정하세요.":
         "One-click common DAG patterns. Edit each node's task after creation.",
     "템플릿에서 생성됨": "Created from template",
+    "세션 하네스": "Session harness",
+    "페르소나·CLAUDE.md 스타일 지시·허용 도구 등 claude CLI 에 직접 전달될 설정.":
+        "Persona, CLAUDE.md-style rules, allowed tools — passed directly to the claude CLI.",
+    "시스템 프롬프트 (페르소나)": "System prompt (persona)",
+    "예: 너는 10년차 시니어 백엔드 엔지니어다. Node.js·PostgreSQL 전문. 보안과 성능을 우선시한다.":
+        "e.g. You are a senior backend engineer with 10y experience. Specialty: Node.js & PostgreSQL. Prioritize security and performance.",
+    "추가 시스템 프롬프트 (기본에 덧붙임)": "Append system prompt (added to default)",
+    "기본 claude 프롬프트에 추가할 규약·제약": "Rules/constraints appended to the default claude prompt",
+    "허용 도구 (쉼표 구분)": "Allowed tools (comma-separated)",
+    "차단 도구 (쉼표 구분)": "Disallowed tools (comma-separated)",
+    "이전 세션 이어서 (resume)": "Resume previous session",
+    "연결된 이전 노드의 session_id 자동 이어받기": "Auto-inherit session_id from the connected previous node",
+    "또는 session_id 직접 입력": "Or paste a session_id directly",
+    "마지막 실행 session_id": "Last run session_id",
+    "이어쓰기": "Resume",
+    "다른 노드의 resume 필드에 붙여넣기": "Paste into another node's resume field",
+    "resume 대상 노드": "Resume target node",
+    "이 session_id 를 어떤 노드의 resume 필드에 넣을까요? 번호 입력:":
+        "Which node's resume field should receive this session_id? Enter number:",
+    "적용할 노드가 없습니다": "No node available",
+    "잘못된 번호": "Invalid number",
+    "에 session_id 적용됨": "— session_id applied",
     "팀 개발 (리드 + 프론트 + 백엔드)": "Team dev (Lead + Frontend + Backend)",
     "리드가 스프린트 업무를 분배 → 프론트·백엔드가 병렬 작업 → 둘 다 완료되면 리드가 리뷰 + 다음 스프린트 기획.":
         "Lead distributes sprint tasks → Frontend & Backend work in parallel → when both are done, Lead reviews and plans the next sprint.",
@@ -380,6 +402,28 @@ NEW_ZH = {
     "자주 쓰는 DAG 패턴을 원클릭으로 만듭니다. 생성 후 노드별 업무 내용을 자유롭게 수정하세요.":
         "一键创建常用 DAG 模式。创建后可自由修改每个节点的任务。",
     "템플릿에서 생성됨": "已从模板创建",
+    "세션 하네스": "会话配置",
+    "페르소나·CLAUDE.md 스타일 지시·허용 도구 등 claude CLI 에 직접 전달될 설정.":
+        "人设、CLAUDE.md 风格指令、允许的工具等 — 直接传递给 claude CLI。",
+    "시스템 프롬프트 (페르소나)": "系统提示词（人设）",
+    "예: 너는 10년차 시니어 백엔드 엔지니어다. Node.js·PostgreSQL 전문. 보안과 성능을 우선시한다.":
+        "例：你是 10 年经验的资深后端工程师。专长 Node.js 与 PostgreSQL。优先考虑安全与性能。",
+    "추가 시스템 프롬프트 (기본에 덧붙임)": "追加系统提示词（附加到默认）",
+    "기본 claude 프롬프트에 추가할 규약·제약": "在默认 claude 提示词上追加的规则/约束",
+    "허용 도구 (쉼표 구분)": "允许的工具（逗号分隔）",
+    "차단 도구 (쉼표 구분)": "禁止的工具（逗号分隔）",
+    "이전 세션 이어서 (resume)": "继续之前的会话 (resume)",
+    "연결된 이전 노드의 session_id 자동 이어받기": "自动继承上游节点的 session_id",
+    "또는 session_id 직접 입력": "或直接粘贴 session_id",
+    "마지막 실행 session_id": "上次运行的 session_id",
+    "이어쓰기": "继续",
+    "다른 노드의 resume 필드에 붙여넣기": "粘贴到其他节点的 resume 字段",
+    "resume 대상 노드": "resume 目标节点",
+    "이 session_id 를 어떤 노드의 resume 필드에 넣을까요? 번호 입력:":
+        "将此 session_id 写入哪个节点的 resume？请输入序号：",
+    "적용할 노드가 없습니다": "无可用节点",
+    "잘못된 번호": "无效序号",
+    "에 session_id 적용됨": " — 已应用 session_id",
     "팀 개발 (리드 + 프론트 + 백엔드)": "团队开发（Lead + 前端 + 后端）",
     "리드가 스프린트 업무를 분배 → 프론트·백엔드가 병렬 작업 → 둘 다 완료되면 리드가 리뷰 + 다음 스프린트 기획.":
         "Lead 分配冲刺任务 → 前端、后端并行 → 双方完成后 Lead 复盘并规划下一个冲刺。",
