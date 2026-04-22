@@ -330,3 +330,228 @@ def _guess_category(name: str) -> str:
     if any(k in lower for k in ("llava", "vision", "bakllava")):
         return "vision"
     return "llm"
+
+
+# ═══════════════════════════════════════════
+#  Ollama Serve 자동 시작 + 주소 자동 연결
+# ═══════════════════════════════════════════
+
+_OLLAMA_SERVE_PROC: Optional[subprocess.Popen] = None
+_OLLAMA_SERVE_LOG: list[str] = []       # 최근 50줄 로그 보관
+_OLLAMA_SERVE_STATUS = {
+    "running": False,
+    "pid": None,
+    "host": "",
+    "startedAt": 0,
+    "error": "",
+}
+
+
+def _is_ollama_reachable(host: str = "") -> bool:
+    """Ollama API가 응답하는지 확인."""
+    h = host or _ollama_host()
+    try:
+        req = urllib.request.Request(f"{h}/api/tags")
+        with urllib.request.urlopen(req, timeout=3):
+            return True
+    except Exception:
+        return False
+
+
+def api_ollama_serve_start(body: dict | None = None) -> dict:
+    """ollama serve 를 백그라운드 프로세스로 시작.
+
+    이미 실행 중이면 기존 연결 정보 반환.
+    시작 후 stdout/stderr 에서 주소를 파싱하여 자동 연결.
+
+    body: {host?: "0.0.0.0:11434"} — 포트/호스트 오버라이드 (선택)
+    """
+    global _OLLAMA_SERVE_PROC
+
+    # 이미 Ollama가 실행 중인지 먼저 확인
+    host = _ollama_host()
+    if _is_ollama_reachable(host):
+        _OLLAMA_SERVE_STATUS["running"] = True
+        _OLLAMA_SERVE_STATUS["host"] = host
+        _update_provider_host(host)
+        return {
+            "ok": True,
+            "status": "already_running",
+            "host": host,
+            "message": f"Ollama 이미 실행 중 ({host})",
+            "error_key": "",
+        }
+
+    # CLI 확인
+    b = _ollama_bin()
+    if not b:
+        return {
+            "ok": False,
+            "error": "ollama CLI 가 설치되어 있지 않습니다. https://ollama.com 에서 설치하세요.",
+            "error_key": "err_ollama_not_installed",
+        }
+
+    # 이전 프로세스 정리
+    if _OLLAMA_SERVE_PROC and _OLLAMA_SERVE_PROC.poll() is None:
+        try:
+            _OLLAMA_SERVE_PROC.terminate()
+            _OLLAMA_SERVE_PROC.wait(timeout=5)
+        except Exception:
+            pass
+
+    # 커스텀 호스트/포트
+    env = dict(os.environ)
+    custom_host = ""
+    if isinstance(body, dict) and body.get("host"):
+        custom_host = body["host"].strip()
+        env["OLLAMA_HOST"] = custom_host
+
+    # ollama serve 시작
+    try:
+        _OLLAMA_SERVE_PROC = subprocess.Popen(
+            [b, "serve"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # stderr → stdout 합침
+            text=True,
+            env=env,
+            start_new_session=True,  # 부모 프로세스 종료 시에도 유지
+        )
+    except Exception as e:
+        _OLLAMA_SERVE_STATUS["error"] = str(e)
+        return {"ok": False, "error": f"ollama serve 시작 실패: {e}", "error_key": "err_ollama_serve_failed"}
+
+    _OLLAMA_SERVE_STATUS["pid"] = _OLLAMA_SERVE_PROC.pid
+    _OLLAMA_SERVE_STATUS["startedAt"] = int(time.time() * 1000)
+    _OLLAMA_SERVE_STATUS["error"] = ""
+    _OLLAMA_SERVE_LOG.clear()
+
+    # 백그라운드에서 stdout 읽으면서 주소 파싱 + 연결 대기
+    detected_host = {"value": ""}
+
+    def _read_output():
+        proc = _OLLAMA_SERVE_PROC
+        if not proc or not proc.stdout:
+            return
+        for line in proc.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            _OLLAMA_SERVE_LOG.append(line)
+            if len(_OLLAMA_SERVE_LOG) > 50:
+                _OLLAMA_SERVE_LOG.pop(0)
+            log.info("[ollama] %s", line)
+            # 주소 파싱: "Listening on 127.0.0.1:11434" 또는 "listening on [::]:11434"
+            m = re.search(r"[Ll]istening on\s+(\S+)", line)
+            if m:
+                addr = m.group(1)
+                # [::]:11434 → http://localhost:11434
+                if addr.startswith("[::]:"):
+                    port = addr.split(":")[-1]
+                    addr = f"127.0.0.1:{port}"
+                if not addr.startswith("http"):
+                    addr = f"http://{addr}"
+                detected_host["value"] = addr
+                _OLLAMA_SERVE_STATUS["host"] = addr
+                _OLLAMA_SERVE_STATUS["running"] = True
+                _update_provider_host(addr)
+                log.info("ollama serve detected at: %s", addr)
+
+    threading.Thread(target=_read_output, daemon=True).start()
+
+    # 최대 10초 대기하면서 연결 확인
+    target_host = custom_host or "http://127.0.0.1:11434"
+    for _ in range(20):  # 0.5초 × 20 = 10초
+        time.sleep(0.5)
+        actual = detected_host["value"] or target_host
+        if _is_ollama_reachable(actual):
+            _OLLAMA_SERVE_STATUS["running"] = True
+            _OLLAMA_SERVE_STATUS["host"] = actual
+            _update_provider_host(actual)
+            return {
+                "ok": True,
+                "status": "started",
+                "host": actual,
+                "pid": _OLLAMA_SERVE_PROC.pid,
+                "message": f"Ollama 시작됨 ({actual})",
+            }
+
+    # 10초 내 연결 안 됨 — 프로세스 상태 확인
+    if _OLLAMA_SERVE_PROC.poll() is not None:
+        err = "\n".join(_OLLAMA_SERVE_LOG[-5:])
+        _OLLAMA_SERVE_STATUS["running"] = False
+        _OLLAMA_SERVE_STATUS["error"] = err
+        return {
+            "ok": False,
+            "error": f"ollama serve 가 즉시 종료됨: {err}",
+            "error_key": "err_ollama_serve_exited",
+            "log": _OLLAMA_SERVE_LOG[-10:],
+        }
+
+    # 프로세스는 살아있지만 아직 응답 없음
+    return {
+        "ok": True,
+        "status": "starting",
+        "host": target_host,
+        "pid": _OLLAMA_SERVE_PROC.pid,
+        "message": "Ollama 시작 중... 잠시 후 연결을 다시 확인하세요.",
+        "log": _OLLAMA_SERVE_LOG[-10:],
+    }
+
+
+def api_ollama_serve_stop(body: dict | None = None) -> dict:
+    """ollama serve 프로세스 종료."""
+    global _OLLAMA_SERVE_PROC
+    if not _OLLAMA_SERVE_PROC:
+        return {"ok": True, "status": "not_running", "message": "실행 중인 ollama serve 가 없습니다."}
+
+    pid = _OLLAMA_SERVE_PROC.pid
+    try:
+        _OLLAMA_SERVE_PROC.terminate()
+        _OLLAMA_SERVE_PROC.wait(timeout=10)
+    except Exception as e:
+        try:
+            _OLLAMA_SERVE_PROC.kill()
+        except Exception:
+            pass
+        return {"ok": True, "status": "killed", "pid": pid, "message": f"강제 종료됨: {e}"}
+
+    _OLLAMA_SERVE_STATUS["running"] = False
+    _OLLAMA_SERVE_STATUS["pid"] = None
+    _OLLAMA_SERVE_PROC = None
+    return {"ok": True, "status": "stopped", "pid": pid, "message": "Ollama 종료됨"}
+
+
+def api_ollama_serve_status(query: dict | None = None) -> dict:
+    """ollama serve 현재 상태."""
+    host = _OLLAMA_SERVE_STATUS.get("host") or _ollama_host()
+    reachable = _is_ollama_reachable(host)
+
+    # 프로세스 상태 확인
+    proc_alive = False
+    if _OLLAMA_SERVE_PROC:
+        proc_alive = _OLLAMA_SERVE_PROC.poll() is None
+
+    return {
+        "ok": True,
+        "running": reachable,
+        "processAlive": proc_alive,
+        "host": host,
+        "pid": _OLLAMA_SERVE_STATUS.get("pid"),
+        "startedAt": _OLLAMA_SERVE_STATUS.get("startedAt", 0),
+        "error": _OLLAMA_SERVE_STATUS.get("error", ""),
+        "log": _OLLAMA_SERVE_LOG[-20:],
+        "managedByDashboard": proc_alive,
+    }
+
+
+def _update_provider_host(host: str) -> None:
+    """감지된 Ollama 호스트를 프로바이더 레지스트리에 반영."""
+    try:
+        from .ai_providers import get_registry
+        reg = get_registry()
+        p = reg.get("ollama-api")
+        if p and hasattr(p, "_base_url"):
+            p._base_url = host
+            log.info("ollama-api provider host updated: %s", host)
+    except Exception as e:
+        log.warning("failed to update ollama-api host: %s", e)

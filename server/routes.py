@@ -65,6 +65,7 @@ from .ai_providers import list_providers_by_capability
 from .ollama_hub import (
     api_ollama_models, api_ollama_catalog, api_ollama_pull,
     api_ollama_pull_status, api_ollama_delete, api_ollama_model_info,
+    api_ollama_serve_start, api_ollama_serve_stop, api_ollama_serve_status,
 )
 
 
@@ -182,6 +183,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/ollama/catalog": api_ollama_catalog,
     "/api/ollama/pull-status": api_ollama_pull_status,
     "/api/ollama/info": api_ollama_model_info,
+    "/api/ollama/serve/status": lambda q: api_ollama_serve_status(),
 }
 
 
@@ -261,6 +263,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/ai-providers/usage-alert/set": api_usage_alert_set,
     "/api/ollama/pull": api_ollama_pull,
     "/api/ollama/delete": api_ollama_delete,
+    "/api/ollama/serve/start": api_ollama_serve_start,
+    "/api/ollama/serve/stop": api_ollama_serve_stop,
     "/api/ai-providers/default-model": api_set_default_model,
 }
 
