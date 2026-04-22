@@ -92,6 +92,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "기본 도구 3종 (get_weather / calculator / web_search mock).",
         ["tool use", "function calling", "tool_result", "tool_use", "도구 호출",
          "function call"]),
+    ("batchJobs",     "work",
+        "Batch API 관리 — 대용량 프롬프트 배치 제출·상태 폴링·결과 JSONL 다운로드. "
+        "예시 2종 (Q&A 10건 / 요약 5건), 최대 1000건/batch.",
+        ["batch", "메시지 배치", "message batches", "대량 요청", "jsonl",
+         "일괄 처리"]),
 
     # ── 설정 & 구성 ─────────────────────────────────
     ("hooks",         "config",   "이벤트 훅 설정",
@@ -171,6 +176,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                    "zh": "扩展思维实验室 — 可视化 Opus/Sonnet 思维块,带 budget 滑块"},
     "toolUseLab": {"en": "Tool Use Playground — define tools, trigger tool_use, feed tool_result across multi-turn chains",
                   "zh": "工具使用实验室 — 定义工具,触发 tool_use,多轮传递 tool_result"},
+    "batchJobs": {"en": "Batch Jobs — submit large Message Batches, poll status, download JSONL results",
+                 "zh": "批量任务 — 提交大批量 Message Batches,轮询状态,下载 JSONL 结果"},
     "hooks": {"en": "Event hooks", "zh": "事件钩子"},
     "permissions": {"en": "Tool permissions", "zh": "工具权限"},
     "mcp": {"en": "MCP Connectors", "zh": "MCP 连接器"},
