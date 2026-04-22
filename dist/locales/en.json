@@ -2620,5 +2620,16 @@
   "단축키 도움말 표시": "Show shortcut help",
   "선택 노드/엣지 삭제": "Delete selected node/edge",
   "되돌릴 작업이 없습니다": "Nothing to undo",
-  "노드 복사됨": "Node copied"
+  "노드 복사됨": "Node copied",
+  "Ollama 시작": "Start Ollama",
+  "정지": "Stop",
+  "실행 중": "Running",
+  "미실행": "Not Running",
+  "시작 중...": "Starting...",
+  "Ollama 시작됨": "Ollama started",
+  "Ollama 정지됨": "Ollama stopped",
+  "Ollama를 정지하시겠습니까?": "Stop Ollama?",
+  "err_ollama_not_installed": "ollama CLI is not installed. Install from https://ollama.com",
+  "err_ollama_serve_failed": "Failed to start ollama serve",
+  "err_ollama_serve_exited": "ollama serve exited immediately"
 }

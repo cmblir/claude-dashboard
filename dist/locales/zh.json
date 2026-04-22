@@ -2620,5 +2620,16 @@
   "단축키 도움말 표시": "显示快捷键帮助",
   "선택 노드/엣지 삭제": "删除选中节点/边",
   "되돌릴 작업이 없습니다": "没有可撤销的操作",
-  "노드 복사됨": "节点已复制"
+  "노드 복사됨": "节点已复制",
+  "Ollama 시작": "启动 Ollama",
+  "정지": "停止",
+  "실행 중": "运行中",
+  "미실행": "未运行",
+  "시작 중...": "启动中...",
+  "Ollama 시작됨": "Ollama 已启动",
+  "Ollama 정지됨": "Ollama 已停止",
+  "Ollama를 정지하시겠습니까?": "确定停止 Ollama？",
+  "err_ollama_not_installed": "未安装 ollama CLI。请从 https://ollama.com 安装。",
+  "err_ollama_serve_failed": "启动 ollama serve 失败",
+  "err_ollama_serve_exited": "ollama serve 立即退出"
 }

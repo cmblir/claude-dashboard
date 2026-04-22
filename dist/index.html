@@ -8575,6 +8575,25 @@ VIEWS.aiProviders = async () => {
       </div>
     </div>
 
+    <!-- Ollama Serve 상태 바 -->
+    <div class="card p-4 mb-4" id="ollamaServeBar">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span id="ollamaServeDot" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--text-dim);flex-shrink:0;"></span>
+          <div>
+            <span class="text-sm font-semibold" style="color:var(--text)">Ollama Serve</span>
+            <span id="ollamaServeHost" class="text-xs ml-2" style="color:var(--text-dim)"></span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="ollamaServeMsg" class="text-xs" style="color:var(--text-mute)"></span>
+          <button class="btn btn-sm btn-primary" id="ollamaServeStartBtn" onclick="_ollamaServeStart()">${t('Ollama 시작')}</button>
+          <button class="btn btn-sm" id="ollamaServeStopBtn" onclick="_ollamaServeStop()" style="display:none;color:var(--err)">${t('정지')}</button>
+        </div>
+      </div>
+      <div id="ollamaServeLog" class="mt-2" style="display:none;max-height:120px;overflow-y:auto;font-family:monospace;font-size:11px;background:var(--code-bg);border-radius:6px;padding:8px;color:var(--text-dim)"></div>
+    </div>
+
     <!-- Ollama 모델 허브 (Task 1) -->
     <div class="card p-6 mb-6">
       <div class="flex items-center justify-between mb-4">
@@ -8732,6 +8751,7 @@ AFTER.aiProviders = async () => {
   await window.initCostCharts();
   _aiRefreshHealth();
   _loadUsageAlertStatus();
+  _ollamaServeCheckStatus();
   _ollamaLoadCatalog();
   _ollamaLoadInstalled();
 };
@@ -9092,6 +9112,75 @@ let _ollamaCatalogData = [];
 let _ollamaInstalledData = [];
 let _ollamaCurrentCat = 'all';
 let _ollamaPullTimers = {};
+
+// ── Ollama Serve 관리 ──
+async function _ollamaServeCheckStatus() {
+  const dot = document.getElementById('ollamaServeDot');
+  const hostEl = document.getElementById('ollamaServeHost');
+  const msgEl = document.getElementById('ollamaServeMsg');
+  const startBtn = document.getElementById('ollamaServeStartBtn');
+  const stopBtn = document.getElementById('ollamaServeStopBtn');
+  if (!dot) return;
+  try {
+    const s = await api('/api/ollama/serve/status');
+    if (s.running) {
+      dot.style.background = 'var(--ok)';
+      hostEl.textContent = s.host || '';
+      msgEl.textContent = t('실행 중');
+      startBtn.style.display = 'none';
+      stopBtn.style.display = s.managedByDashboard ? '' : 'none';
+    } else {
+      dot.style.background = 'var(--err)';
+      hostEl.textContent = '';
+      msgEl.textContent = t('미실행');
+      startBtn.style.display = '';
+      stopBtn.style.display = 'none';
+    }
+    // 로그 표시
+    if (s.log && s.log.length) {
+      const logEl = document.getElementById('ollamaServeLog');
+      if (logEl) {
+        logEl.style.display = '';
+        logEl.textContent = s.log.join('\n');
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+    }
+  } catch(e) {
+    dot.style.background = 'var(--text-dim)';
+    msgEl.textContent = t('상태 확인 실패');
+  }
+}
+
+async function _ollamaServeStart() {
+  const msgEl = document.getElementById('ollamaServeMsg');
+  if (msgEl) msgEl.textContent = t('시작 중...');
+  const startBtn = document.getElementById('ollamaServeStartBtn');
+  if (startBtn) startBtn.disabled = true;
+  try {
+    const r = await api('/api/ollama/serve/start', { method: 'POST', body: '{}' });
+    if (r.ok) {
+      toast(r.message || t('Ollama 시작됨'), 'ok');
+      _ollamaServeCheckStatus();
+      // 프로바이더 헬스도 새로고침
+      if (typeof _aiRefreshHealth === 'function') _aiRefreshHealth();
+    } else {
+      toast(errMsg(r), 'err');
+    }
+  } catch(e) {
+    toast(String(e), 'err');
+  }
+  if (startBtn) startBtn.disabled = false;
+}
+
+async function _ollamaServeStop() {
+  const ok = await confirmModal(t('Ollama를 정지하시겠습니까?'));
+  if (!ok) return;
+  try {
+    const r = await api('/api/ollama/serve/stop', { method: 'POST', body: '{}' });
+    toast(r.message || t('Ollama 정지됨'), 'ok');
+    _ollamaServeCheckStatus();
+  } catch(e) { toast(String(e), 'err'); }
+}
 
 function _ollamaSwitchTab(tab) {
   const catalogView = document.getElementById('ollamaCatalogView');

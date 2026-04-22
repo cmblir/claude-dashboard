@@ -2620,5 +2620,16 @@
   "단축키 도움말 표시": "단축키 도움말 표시",
   "선택 노드/엣지 삭제": "선택 노드/엣지 삭제",
   "되돌릴 작업이 없습니다": "되돌릴 작업이 없습니다",
-  "노드 복사됨": "노드 복사됨"
+  "노드 복사됨": "노드 복사됨",
+  "Ollama 시작": "Ollama 시작",
+  "정지": "정지",
+  "실행 중": "실행 중",
+  "미실행": "미실행",
+  "시작 중...": "시작 중...",
+  "Ollama 시작됨": "Ollama 시작됨",
+  "Ollama 정지됨": "Ollama 정지됨",
+  "Ollama를 정지하시겠습니까?": "Ollama를 정지하시겠습니까?",
+  "err_ollama_not_installed": "ollama CLI 가 설치되어 있지 않습니다. https://ollama.com 에서 설치하세요.",
+  "err_ollama_serve_failed": "ollama serve 시작 실패",
+  "err_ollama_serve_exited": "ollama serve 가 즉시 종료됨"
 }
