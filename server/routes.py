@@ -43,7 +43,8 @@ from .hooks import api_plugin_hook_update, get_hooks
 from .version import api_version_info
 from .workflows import (
     api_workflow_delete, api_workflow_export, api_workflow_get,
-    api_workflow_import, api_workflow_patch, api_workflow_run,
+    api_workflow_history, api_workflow_import, api_workflow_patch,
+    api_workflow_restore, api_workflow_run,
     api_workflow_run_status, api_workflow_runs_list, api_workflow_save,
     api_workflow_schedule_list, api_workflow_schedule_set,
     api_workflow_stats,
@@ -169,6 +170,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/templates/list": lambda q: api_workflow_templates_list(q),
     "/api/workflows/schedules": lambda q: api_workflow_schedule_list(),
     "/api/workflows/stats": lambda q: api_workflow_stats(),
+    "/api/workflows/history": api_workflow_history,
     "/api/version": lambda q: api_version_info(),
     "/api/ai-providers/list": lambda q: api_providers_list(),
     "/api/ai-providers/costs": lambda q: api_workflow_costs_summary(),
@@ -244,6 +246,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/export": api_workflow_export,
     "/api/workflows/import": api_workflow_import,
     "/api/workflows/schedule/set": api_workflow_schedule_set,
+    "/api/workflows/restore": api_workflow_restore,
     "/api/session/spawn": api_session_spawn,
     "/api/ai-providers/test": api_provider_test,
     "/api/ai-providers/compare": api_provider_compare,

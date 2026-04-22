@@ -11,6 +11,20 @@
 
 ---
 
+## [1.9.0] — 2026-04-22
+
+### Added — 멀티 AI 오케스트라 Phase 9
+- 📜 **워크플로우 버전 히스토리** — 저장 시 이전 버전 자동 보관 (최근 20개). Inspector에서 버전 목록 + 복원 버튼
+- 📋 **빌트인 템플릿 5종** — 멀티 AI 비교, RAG 파이프라인, 코드 리뷰, 데이터 ETL, 재시도 워크플로우
+- 🧙 **프로바이더 설정 위자드** — 3단계 가이드 (프로바이더 선택 → 연결 설정 → 테스트). localStorage "다시 보지 않기"
+- 🏷️ **템플릿 갤러리 강화** — 카테고리 필터 (analysis/ai/dev/data/pattern/custom), 빌트인 배지, 삭제 불가 표시
+- 🌍 **i18n +56개 키** — 2,599개 × 3언어, **누락 0**
+
+### Architecture
+- `server/workflows.py` — 저장 시 히스토리 보관, `api_workflow_history()`, `api_workflow_restore()`, `BUILTIN_TEMPLATES` 5종
+- `server/routes.py` — `/api/workflows/history`, `/api/workflows/restore`
+- GET 73 + POST 57 라우트
+
 ## [1.8.0] — 2026-04-22
 
 ### Added — 멀티 AI 오케스트라 Phase 8
