@@ -11,6 +11,24 @@
 
 ---
 
+## [1.2.0] — 2026-04-22
+
+### Added
+- 🎛️ **워크플로우 프로바이더 셀렉터** — 노드 편집 패널에서 프로바이더:모델 드롭다운 선택 (그룹화 + 직접 입력 지원)
+- 💰 **멀티 AI 비용 추적** — DB `workflow_costs` 테이블 + 프로바이더별/일별 집계 API (`/api/ai-providers/costs`)
+- 📡 **워크플로우 실행 SSE 스트림** — `/api/workflows/run-stream?runId=...` SSE 엔드포인트, 실시간 노드 진행률 전송
+- 🔁 **Sub-workflow 노드** — 다른 워크플로우를 노드로 호출, 입력 전달 + 결과 반환 (워크플로우 재사용)
+- 🌐 **HTTP 노드 UI** — URL/메서드/Body/추출경로 편집 패널
+- 🔄 **Transform 노드 UI** — 템플릿/JSON 추출/Regex/결합 4가지 변환 유형 편집
+- 📌 **Variable 노드 UI** — 변수 이름 + 기본값 편집
+- 🔁 **Sub-workflow 노드 UI** — 워크플로우 목록에서 선택 + 입력 전달 체크박스
+
+### Architecture
+- `server/db.py` — `workflow_costs` 테이블 스키마 추가
+- `server/workflows.py` — `_execute_subworkflow_node`, `_record_workflow_cost`, `handle_workflow_run_stream` (SSE)
+- `server/ai_keys.py` — `api_workflow_costs_summary` 집계 API
+- `dist/index.html` — 10개 노드 타입 (4개 신규), 프로바이더 셀렉터, 노드 편집 패널 확장
+
 ## [1.1.0] — 2026-04-22
 
 ### Added

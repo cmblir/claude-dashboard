@@ -89,5 +89,26 @@ def _db_init() -> None:
             tcols = {r["name"] for r in c.execute("PRAGMA table_info(tool_uses)").fetchall()}
             if "turn_tokens" not in tcols:
                 c.execute("ALTER TABLE tool_uses ADD COLUMN turn_tokens INTEGER DEFAULT 0")
+
+            # ── 워크플로우 비용 추적 테이블 ──
+            c.executescript("""
+            CREATE TABLE IF NOT EXISTS workflow_costs (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              run_id TEXT,
+              workflow_id TEXT,
+              node_id TEXT,
+              provider TEXT,
+              model TEXT,
+              tokens_in INTEGER DEFAULT 0,
+              tokens_out INTEGER DEFAULT 0,
+              tokens_total INTEGER DEFAULT 0,
+              cost_usd REAL DEFAULT 0.0,
+              duration_ms INTEGER DEFAULT 0,
+              ts INTEGER,
+              status TEXT DEFAULT 'ok'
+            );
+            CREATE INDEX IF NOT EXISTS idx_wfcost_run ON workflow_costs(run_id);
+            CREATE INDEX IF NOT EXISTS idx_wfcost_provider ON workflow_costs(provider);
+            """)
         except Exception:
             pass
