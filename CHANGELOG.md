@@ -10,8 +10,7 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
-
-## [2.8.0] — 2026-04-23
+## [2.9.0] — 2026-04-23
 
 ### 🏁 Model Benchmark — 신규 탭 (work 그룹)
 
@@ -28,21 +27,18 @@
 
 **Architecture**
 - `server/model_bench.py` 신설 — `api_model_bench_{sets,run}` + `_call_once` + `_PRICING` 테이블
-- `server/routes.py` — 2개 라우트 추가 (`GET sets`, `POST run`)
+- `server/routes.py` — 2개 라우트 추가
 - `server/nav_catalog.py` — `modelBench` 탭 등록 + en/zh desc
-- `dist/index.html` — NAV + `VIEWS.modelBench` (셋 선택 칩 + 모델 체크박스 + 집계 테이블 + 매트릭스)
-- `tools/translations_manual_9.py` — 28 키 × ko/en/zh 추가
+- `dist/index.html` — NAV + `VIEWS.modelBench`
+- `tools/translations_manual_9.py` — 28 키 × ko/en/zh
 
-### 📜 v2.2 ~ v2.8 로드맵 완료
+### 📜 v2.3 ~ v2.9 로드맵 완료
 
-오늘 v2.1.0 → v2.8.0 까지 **7개 Claude API 플레이그라운드 탭**을 연속 릴리스. "클로드 모든 기능의 컨트롤 타워" 컨셉 하에 work 그룹 6 → **13 탭**으로 확장.
-
-추가된 탭 (work 그룹):
-- `promptCache` (v2.2.0) · `thinkingLab` (v2.3.0) · `toolUseLab` (v2.4.0) · `batchJobs` (v2.5.0) · `apiFiles` (v2.6.0) · `visionLab` (v2.7.0) · `modelBench` (v2.8.0)
+2026-04-23 연속 릴리스로 **Claude API 플레이그라운드 7 탭**을 work 그룹에 추가: `promptCache`(v2.3.0) · `thinkingLab`(v2.4.0) · `toolUseLab`(v2.5.0) · `batchJobs`(v2.6.0) · `apiFiles`(v2.7.0) · `visionLab`(v2.8.0) · `modelBench`(v2.9.0). 원격 v2.2.1 위에 rebase 된 결과 버전 번호를 한 칸 shift 했다.
 
 ---
 
-## [2.7.0] — 2026-04-23
+## [2.8.0] — 2026-04-23
 
 ### 👁️ Vision / PDF Lab — 신규 탭 (work 그룹)
 
@@ -56,81 +52,84 @@
 - 총 소요 시간 + 모델 수 요약
 
 **Architecture**
-- `server/vision_lab.py` 신설 — `api_vision_compare`, `api_vision_models` + `_call_one` 단일 모델 호출 유틸
-- `server/routes.py` — 2개 라우트 추가 (`GET models`, `POST compare`)
-- `server/nav_catalog.py` — `visionLab` 탭 등록 + en/zh desc
-- `dist/index.html` — NAV + `VIEWS.visionLab` (파일 선택 카드 + 3-column 결과 그리드)
-- `tools/translations_manual_9.py` — 16 키 × ko/en/zh 추가
+- `server/vision_lab.py` 신설 · `server/routes.py` 라우트 2개 · NAV + `VIEWS.visionLab` · 16 i18n 키 × 3언어
+
+---
+
+## [2.7.0] — 2026-04-23
+
+### 📎 Files API — 신규 탭 (work 그룹)
+
+Anthropic Files API 업로드/목록/삭제 + 메시지 document reference 를 UI 에서 다룬다.
+
+**기능**
+- 브라우저 파일 선택 → base64 전송 → 서버 multipart/form-data → Anthropic 업로드 (최대 30MB)
+- 업로드된 파일 목록 (filename · size · mime · id)
+- 파일 선택 → 모델 선택 → 질문 → `{type:"document", source:{type:"file", file_id}}` 블록으로 질의
+- 개별 삭제 + 삭제 전 확인 모달
+
+**Architecture**
+- `server/api_files.py` 신설 · stdlib multipart POST 유틸 · 라우트 4개 (GET list · POST upload/delete/test)
+- beta header: `anthropic-beta: files-api-2025-04-14`
+- i18n 22 키 × 3언어
 
 ---
 
 ## [2.6.0] — 2026-04-23
 
-### 📎 Files API — 신규 탭 (work 그룹)
+### 📦 Batch Jobs — 신규 탭 (work 그룹)
 
-Anthropic Files API 의 업로드/목록/삭제 + 메시지 document reference 를 UI 에서 다룬다.
+Anthropic Message Batches API 로 대용량 프롬프트 병렬 제출·상태 폴링·JSONL 결과 다운로드.
 
 **기능**
-- 브라우저 파일 선택 → 자동 base64 전송 → 서버에서 multipart/form-data 로 Anthropic 업로드 (최대 30MB)
-- 업로드된 파일 목록 (filename · size · mime · id)
-- 파일 선택 → 모델 선택 → 질문 textarea → 실행 (메시지 content 에 `{type:"document", source:{type:"file", file_id}}` 블록 삽입)
-- 개별 삭제 + 삭제 전 확인 모달
+- 원클릭 예시 2종: Q&A 10건 / 요약 5건
+- 모델 + max_tokens 조절 · 프롬프트 한 줄당 1건 (최대 1000건)
+- 제출 전 **비용 발생 경고** 모달 (confirmModal)
+- 최근 배치 목록 + 상태 + request_counts · JSONL 결과 프리뷰
+- 진행 중 배치 취소 지원
 
 **Architecture**
-- `server/api_files.py` 신설 — `api_files_{list,upload,delete,test}` + stdlib multipart POST 유틸
-- `server/routes.py` — 4개 라우트 추가 (`GET list` · `POST upload/delete/test`)
-- `server/nav_catalog.py` — `apiFiles` 탭 등록 + en/zh desc
-- `dist/index.html` — NAV + `VIEWS.apiFiles` (업로드 카드 + 질문 카드 + 파일 리스트)
-- `tools/translations_manual_9.py` — 22 키 × ko/en/zh 추가
-- beta header: `anthropic-beta: files-api-2025-04-14`
+- `server/batch_jobs.py` 신설 · 라우트 6개 (GET examples/list/get/results · POST create/cancel)
+- beta header: `anthropic-beta: message-batches-2024-09-24`
+- i18n 30 키 × 3언어
 
 ---
 
 ## [2.5.0] — 2026-04-23
 
-### 📦 Batch Jobs — 신규 탭 (work 그룹)
+### 🛠️ Tool Use Playground — 신규 탭 (work 그룹)
 
-Anthropic Message Batches API 를 감싸 대용량 프롬프트 병렬 제출·상태 폴링·결과 다운로드를 제공하는 관리 탭.
+Anthropic Tool Use 의 라운드 트립(user → tool_use → tool_result → next turn)을 수동으로 연습.
 
 **기능**
-- 원클릭 예시 2종: Q&A 10건 / 요약 5건
-- 모델 (Opus 4.7 / Sonnet 4.6 / Haiku 4.5) + max_tokens 조절
-- 프롬프트 한 줄당 1건 입력 (최대 1000건)
-- 제출 전 **비용 발생 경고** 모달 (confirmModal)
-- 최근 배치 목록 + 상태 + request_counts
-- 배치 선택 시 JSONL 결과 미리보기
-- 진행 중 배치 취소 지원
+- 기본 도구 템플릿 3종 원클릭: `get_weather` / `calculator` / `web_search` (mock)
+- tools JSON 배열 직접 편집
+- 대화 버블 (role · text · tool_use · tool_result 구분 색)
+- tool_use 수신 시 인라인 tool_result 입력 폼 → 제출 → 다음 턴 자동 호출
+- "새 대화" 버튼으로 messages 초기화
 
 **Architecture**
-- `server/batch_jobs.py` 신설 — `api_batch_{create,list,get,results,cancel,examples}`
-- `server/routes.py` — 6개 라우트 추가 (`GET examples/list/get/results` · `POST create/cancel`)
-- `server/nav_catalog.py` — `batchJobs` 탭 등록 + en/zh desc
-- `dist/index.html` — NAV + `VIEWS.batchJobs` (배치 리스트 + 결과 프리뷰 카드)
-- `tools/translations_manual_9.py` — 30 키 × ko/en/zh 추가
-- beta header: `anthropic-beta: message-batches-2024-09-24`
+- `server/tool_use_lab.py` 신설 · 라우트 3개 · i18n 13 키 × 3언어
+- 히스토리 `~/.claude-dashboard-tool-use-lab.json`
 
 ---
 
 ## [2.4.0] — 2026-04-23
 
-### 🛠️ Tool Use Playground — 신규 탭 (work 그룹)
+### 🧠 Extended Thinking Lab — 신규 탭 (work 그룹)
 
-Anthropic Tool Use 의 라운드 트립(user → assistant tool_use → user tool_result → assistant)을 수동으로 연습할 수 있는 플레이그라운드.
+Claude Opus 4.7 / Sonnet 4.6 의 Extended Thinking 을 실험하고 thinking block 을 분리 시각화.
 
 **기능**
-- 기본 도구 템플릿 3종 원클릭 추가: `get_weather` / `calculator` / `web_search` (mock)
-- tools JSON 배열을 직접 편집
-- 대화 버블 시각화 (role, text, tool_use, tool_result 구분 색상)
-- tool_use 수신 시 같은 메시지 안에서 바로 tool_result 수동 입력 → 제출 → 다음 턴
-- "새 대화" 버튼으로 messages 배열 초기화
-- 히스토리 최근 20건 (`~/.claude-dashboard-tool-use-lab.json`)
+- 원클릭 예시 3종: 수학 추론 / 코드 디버깅 / 설계 플래닝
+- `budget_tokens` 슬라이더 (1024 ~ 32000, 512 단위)
+- thinking block 과 최종 응답을 **접기/펴기** 로 분리 표시
+- Haiku 선택 시 비지원 경고
+- 히스토리 최근 20건
 
 **Architecture**
-- `server/tool_use_lab.py` 신설 — `api_tool_use_{turn,templates,history}`
-- `server/routes.py` — 3개 라우트 추가 (`GET templates/history`, `POST turn`)
-- `server/nav_catalog.py` — `toolUseLab` 탭 등록 + en/zh desc
-- `dist/index.html` — NAV + `VIEWS.toolUseLab` (대화 버블 + tool_result 인라인 폼)
-- `tools/translations_manual_9.py` — 13 키 × ko/en/zh 추가
+- `server/thinking_lab.py` 신설 · 라우트 4개 (GET examples/history/models · POST test)
+- i18n 16 키 × 3언어
 
 ---
 
@@ -138,21 +137,22 @@ Anthropic Tool Use 의 라운드 트립(user → assistant tool_use → user too
 
 ### 🧊 Prompt Cache Lab — 신규 탭 (work 그룹)
 
-Anthropic Messages API 의 `cache_control` 을 실험/관측하는 전용 플레이그라운드 추가.
+Anthropic Messages API 의 `cache_control` 을 실험/관측하는 전용 플레이그라운드.
 
 **기능**
 - 원클릭 예시 3종: 시스템 프롬프트 캐시 / 대용량 문서 캐시 / 도구 정의 캐시
 - 모델 선택 (Opus 4.7 / Sonnet 4.6 / Haiku 4.5) + max_tokens 조절
 - system / tools / messages JSON 편집기
-- 응답 즉시: input/output/cache_creation/cache_read 토큰 + USD 비용 상세 + 캐시 절감 추정
+- 응답 즉시: input / output / cache_creation / cache_read 토큰 + USD 비용 + 캐시 절감 추정
 - 히스토리 최근 20건 (`~/.claude-dashboard-prompt-cache.json`)
 
 **Architecture**
 - `server/prompt_cache.py` 신설 (297줄) — `api_prompt_cache_test/history/examples` + `_estimate_cost` (3 모델 가격 테이블)
-- `server/routes.py` — 3개 라우트 추가 (`GET /api/prompt-cache/examples`, `/history` · `POST /api/prompt-cache/test`)
-- `server/nav_catalog.py` — `promptCache` 탭 등록 + `TAB_DESC_I18N` en/zh 등록
-- `dist/index.html` — NAV + `VIEWS.promptCache` 추가 (pcRun / pcLoadExample / pcReset / pcSet)
-- `tools/translations_manual_9.py` — 35 키 × ko/en/zh 추가
+- `server/routes.py` — 라우트 3개 (GET examples/history · POST test)
+- `server/nav_catalog.py` — `promptCache` 탭 등록 + en/zh desc
+- `dist/index.html` — NAV + `VIEWS.promptCache`
+- `tools/translations_manual_9.py` — 35 키 × ko/en/zh
+
 
 ## [2.2.1] — 2026-04-22
 
