@@ -47,13 +47,14 @@ from .workflows import (
     api_workflow_run_status, api_workflow_runs_list, api_workflow_save,
     api_workflow_template_delete, api_workflow_template_get,
     api_workflow_template_save, api_workflow_templates_list,
-    api_workflows_list, handle_workflow_run_stream,
+    api_workflow_webhook, api_workflows_list, handle_workflow_run_stream,
 )
 from .ai_keys import (
     api_providers_list, api_provider_test, api_provider_save_key,
     api_provider_delete_key, api_custom_provider_save,
     api_custom_provider_delete, api_fallback_chain_save,
     api_workflow_costs_summary, api_provider_compare,
+    api_provider_health,
 )
 from .ai_providers import list_providers_by_capability
 
@@ -163,6 +164,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/ai-providers/list": lambda q: api_providers_list(),
     "/api/ai-providers/costs": lambda q: api_workflow_costs_summary(),
     "/api/ai-providers/by-capability": lambda q: _ai_providers_by_cap(q),
+    "/api/ai-providers/health": lambda q: api_provider_health(),
 }
 
 
@@ -377,6 +379,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path in ROUTES_POST:
             self._send_json(ROUTES_POST[path](self._read_body())); return
+        # regex POST routes — webhook
+        m = re.match(r"^/api/workflows/webhook/(wf-[0-9]{10,14}-[a-z0-9]{3,6})$", path)
+        if m:
+            self._send_json(api_workflow_webhook(m.group(1), self._read_body())); return
         self._drain()
         self._send_json({"ok": False, "error": "unknown route"}, 404)
 

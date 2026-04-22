@@ -381,12 +381,13 @@ def api_mcp_install(body: dict) -> dict:
     placeholders = _extract_placeholders(install_spec)
     missing = [p["key"] for p in placeholders if not values.get(p["key"])]
     if missing:
-        return {"ok": False, "error": f"필수 값 누락: {', '.join(missing)}",
+        from .errors import err
+        return {"ok": False, "error": f"필수 값 누락: {', '.join(missing)}", "error_key": "err_mcp_values_missing",
                 "placeholders": placeholders}
     install_spec = _substitute_placeholders(install_spec, values)
 
     if not CLAUDE_JSON.exists():
-        return {"ok": False, "error": "~/.claude.json 없음. `claude auth login` 먼저 실행."}
+        return {"ok": False, "error": "~/.claude.json 없음. `claude auth login` 먼저 실행.", "error_key": "err_no_claude_json"}
     try:
         data = json.loads(_safe_read(CLAUDE_JSON, 500000))
     except Exception as e:
@@ -396,7 +397,7 @@ def api_mcp_install(body: dict) -> dict:
         mcp_servers = {}
         data["mcpServers"] = mcp_servers
     if as_name in mcp_servers:
-        return {"ok": False, "error": f"이미 '{as_name}' 이름으로 등록됨 — 다른 이름으로 시도하세요."}
+        return {"ok": False, "error": f"이미 '{as_name}' 이름으로 등록됨 — 다른 이름으로 시도하세요.", "error_key": "err_mcp_already_registered"}
     mcp_servers[as_name] = install_spec
     text = json.dumps(data, indent=2, ensure_ascii=False)
     ok = _safe_write(CLAUDE_JSON, text)
@@ -411,14 +412,14 @@ def api_mcp_remove(body: dict) -> dict:
     if not name:
         return {"ok": False, "error": "name required"}
     if not CLAUDE_JSON.exists():
-        return {"ok": False, "error": "~/.claude.json 없음"}
+        return {"ok": False, "error": "~/.claude.json 없음", "error_key": "err_no_claude_json"}
     try:
         data = json.loads(_safe_read(CLAUDE_JSON, 500000))
     except Exception as e:
         return {"ok": False, "error": str(e)}
     servers = data.get("mcpServers") if isinstance(data, dict) else None
     if not isinstance(servers, dict) or name not in servers:
-        return {"ok": False, "error": f"등록된 MCP 서버가 아닙니다: {name}"}
+        return {"ok": False, "error": f"등록된 MCP 서버가 아닙니다: {name}", "error_key": "err_mcp_not_registered"}
     removed = servers.pop(name)
     ok = _safe_write(CLAUDE_JSON, json.dumps(data, indent=2, ensure_ascii=False))
     if ok:
@@ -433,13 +434,13 @@ def api_mcp_project_remove(body: dict) -> dict:
     cwd = (body.get("cwd") or "").strip()
     name = (body.get("name") or "").strip()
     if not cwd or not name:
-        return {"ok": False, "error": "cwd 와 name 필수"}
+        return {"ok": False, "error": "cwd 와 name 필수", "error_key": "err_mcp_cwd_name_required"}
     abs_cwd = Path(os.path.abspath(os.path.expanduser(cwd)))
     home = Path.home().resolve()
     try:
         abs_cwd.relative_to(home)
     except ValueError:
-        return {"ok": False, "error": "홈 디렉토리 밖 경로 거부"}
+        return {"ok": False, "error": "홈 디렉토리 밖 경로 거부", "error_key": "err_outside_home"}
     mcp_file = abs_cwd / ".mcp.json"
     if not mcp_file.exists():
         return {"ok": False, "error": f"{mcp_file} 없음"}

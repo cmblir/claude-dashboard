@@ -1248,6 +1248,74 @@ def api_workflow_run(body: dict) -> dict:
     return {"ok": True, "runId": runId, "workflowId": wfId}
 
 
+def api_workflow_webhook(wfId: str, body: dict | None = None) -> dict:
+    """외부 Webhook 트리거 — POST /api/workflows/webhook/{wfId}.
+
+    외부 시스템(GitHub Actions, Slack, cron 등)에서 HTTP 호출로 워크플로우 실행.
+    body 의 내용은 start 노드 다음의 첫 session/subagent 노드 입력으로 주입됨.
+
+    body: {input?: "텍스트", metadata?: {...}} (선택)
+    """
+    if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
+        return {"ok": False, "error": "invalid workflow id", "error_key": "err_invalid_id"}
+
+    with _LOCK:
+        store = _load_all()
+        wf = store["workflows"].get(wfId)
+        if not wf:
+            return {"ok": False, "error": "workflow not found", "error_key": "err_workflow_not_found"}
+        cyc = _check_dag(wf.get("nodes", []), wf.get("edges", []))
+        if cyc:
+            return {"ok": False, "error": cyc[0], "error_key": "err_workflow_cycle"}
+        runId = _new_run_id()
+        store["runs"][runId] = {
+            "id": runId,
+            "workflowId": wfId,
+            "status": "running",
+            "startedAt": int(time.time() * 1000),
+            "finishedAt": 0,
+            "currentNodeId": None,
+            "nodeResults": {},
+            "iteration": 0,
+            "error": None,
+            "trigger": "webhook",
+            "webhookInput": (body or {}).get("input", "") if isinstance(body, dict) else "",
+        }
+        _dump_all(store)
+
+    # webhook 입력을 start 다음 노드에 주입
+    webhook_input = ((body or {}).get("input") or "") if isinstance(body, dict) else ""
+    extra_inputs = {}
+    if webhook_input:
+        target_nid = _find_feedback_target(wf.get("nodes", []), wf.get("edges", []))
+        if target_nid:
+            extra_inputs[target_nid] = webhook_input
+
+    def _run():
+        try:
+            nodes = wf.get("nodes", [])
+            edges = wf.get("edges", [])
+            ok, _results, _out = _run_one_iteration(wf, runId, 0, extra_inputs)
+            with _LOCK:
+                s = _load_all()
+                if runId in s["runs"]:
+                    s["runs"][runId]["status"] = "ok" if ok else "err"
+                    s["runs"][runId]["finishedAt"] = int(time.time() * 1000)
+                    _dump_all(s)
+        except Exception as e:
+            log.exception("webhook run failed: %s", e)
+            with _LOCK:
+                s = _load_all()
+                if runId in s["runs"]:
+                    s["runs"][runId]["status"] = "err"
+                    s["runs"][runId]["error"] = str(e)
+                    s["runs"][runId]["finishedAt"] = int(time.time() * 1000)
+                    _dump_all(s)
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"ok": True, "runId": runId, "workflowId": wfId, "trigger": "webhook"}
+
+
 def api_workflow_run_status(query: dict) -> dict:
     """GET /api/workflows/run-status?runId=... — 단일 run 스냅샷."""
     rid = None

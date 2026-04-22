@@ -11,6 +11,23 @@
 
 ---
 
+## [1.5.0] — 2026-04-22
+
+### Added — 멀티 AI 오케스트라 Phase 5
+- 🔗 **Webhook 트리거** (`POST /api/workflows/webhook/{wfId}`) — 외부 시스템(GitHub Actions, Slack, cron 등)에서 HTTP로 워크플로우 실행. 입력 텍스트 주입 지원
+- 🩺 **프로바이더 Health 대시보드** — AI 프로바이더 탭 상단에 실시간 초록/빨강 인디케이터 + "N/M 사용 가능" 요약
+- 🗺️ **워크플로우 미니맵** — 캔버스 우하단 150×100px 조감도. 노드 타입별 색상 점 + 뷰포트 사각형 + 클릭 이동
+- 📋 **Webhook URL 표시** — Inspector에 webhook URL + 클립보드 복사 + curl 예시 코드
+- 🌐 **errMsg() 헬퍼** — `error_key` 기반 프론트 에러 번역 표시. 40+ toast 호출 전환
+- 🔄 **백엔드 에러 i18n 완전 전환** — agents, skills, hooks, mcp, plugins, projects, features, commands, claude_md, actions 모듈 29개 에러에 `error_key` 추가
+
+### Architecture
+- `server/workflows.py` — `api_workflow_webhook()` Webhook 트리거
+- `server/ai_keys.py` — `api_provider_health()` 병렬 헬스체크
+- `server/agents.py`, `skills.py`, `hooks.py`, `mcp.py`, `plugins.py`, `projects.py`, `features.py`, `commands.py`, `claude_md.py`, `actions.py` — `err()` / `error_key` 전환
+- `dist/index.html` — 헬스 바, Webhook URL, 미니맵, errMsg() 헬퍼
+- `dist/locales/*.json` — 2,421개 키 × 3언어, **누락 0**
+
 ## [1.4.0] — 2026-04-22
 
 ### Added — 멀티 AI 오케스트라 Phase 4

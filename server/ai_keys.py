@@ -496,6 +496,31 @@ def api_custom_provider_delete(body: dict) -> dict:
     return delete_custom_provider(pid)
 
 
+def api_provider_health() -> dict:
+    """모든 프로바이더 health check 병렬 실행."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from .ai_providers import get_registry
+
+    reg = get_registry()
+    results = []
+
+    def _check(p):
+        return p.health_check()
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(_check, p): p for p in reg.all_providers()}
+        for future in as_completed(futures):
+            try:
+                results.append(future.result())
+            except Exception as e:
+                p = futures[future]
+                results.append({"provider": p.provider_id, "available": False, "error": str(e)})
+
+    results.sort(key=lambda r: (not r.get("available", False), r.get("provider", "")))
+    available = sum(1 for r in results if r.get("available"))
+    return {"ok": True, "results": results, "total": len(results), "available": available}
+
+
 def api_fallback_chain_save(body: dict) -> dict:
     """폴백 체인 저장. body: {chain: [...]}"""
     chain = (body or {}).get("chain", []) if isinstance(body, dict) else []

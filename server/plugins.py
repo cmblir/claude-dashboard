@@ -207,9 +207,9 @@ def api_marketplace_add(body: dict) -> dict:
     name = (body.get("name") or "").strip()
     url = (body.get("url") or "").strip()
     if not re.match(r"^[a-zA-Z0-9_.-]+$", name):
-        return {"ok": False, "error": "이름은 영숫자/-/_/. 만 허용"}
+        return {"ok": False, "error": "이름은 영숫자/-/_/. 만 허용", "error_key": "err_marketplace_name_invalid"}
     if not url.startswith("http"):
-        return {"ok": False, "error": "git URL 필요"}
+        return {"ok": False, "error": "git URL 필요", "error_key": "err_marketplace_url_required"}
     s = get_settings()
     if not isinstance(s, dict):
         s = {}
@@ -226,7 +226,7 @@ def api_marketplace_remove(body: dict) -> dict:
     s = get_settings()
     extra = s.get("extraKnownMarketplaces") if isinstance(s, dict) else None
     if not isinstance(extra, dict) or name not in extra:
-        return {"ok": False, "error": "등록된 마켓플레이스가 아닙니다"}
+        return {"ok": False, "error": "등록된 마켓플레이스가 아닙니다", "error_key": "err_marketplace_not_found"}
     del extra[name]
     s["extraKnownMarketplaces"] = extra
     return put_settings(s)

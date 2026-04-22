@@ -268,6 +268,14 @@
   .wf-edge-draft { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; fill: none; pointer-events: none; opacity: 0.7; }
   .wf-dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; display: inline-block; margin-right: 4px; }
   .wf-ok-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; display: inline-block; margin-right: 4px; }
+  /* 미니맵 */
+  #wfMinimap {
+    position: absolute; right: 12px; bottom: 48px; z-index: 6;
+    width: 150px; height: 100px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+  }
   /* 캔버스 내부 플로팅 컨트롤 (n8n 스타일) */
   .wf-floating { position: absolute; right: 12px; bottom: 12px; z-index: 5; display: flex; gap: 6px; }
   .wf-floating .btn { background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(4px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
@@ -770,7 +778,10 @@ async function api(path, opts = {}) {
   const r = await fetch(path, opts);
   if (!r.ok && r.status !== 200) {
     let msg = r.status.toString();
-    try { const j = await r.json(); if (j.error) msg = j.error; } catch {}
+    try {
+      const j = await r.json();
+      msg = errMsg(j);
+    } catch {}
     throw new Error(msg);
   }
   const data = await r.json();
@@ -781,6 +792,11 @@ async function api(path, opts = {}) {
     if (ok && !skip) _scheduleAutoReload();
   }
   return data;
+}
+// error_key 기반 i18n 에러 메시지 헬퍼
+function errMsg(r) {
+  if (!r) return 'error';
+  return (r.error_key && t(r.error_key) !== r.error_key) ? t(r.error_key) : (r.error || 'error');
 }
 
 function toast(msg, kind='info') {
@@ -999,7 +1015,7 @@ async function refreshFeatures() {
       method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}),
     });
     closeModal();
-    if (r.error) { toast(r.error, 'err'); return; }
+    if (r.error) { toast(errMsg(r), 'err'); return; }
     const n = (r.features||[]).length;
     toast(n ? `✨ 신기능 ${n}개 발견` : '새로운 기능 없음 (이미 최신)', n?'ok':'info');
     renderView();
@@ -1564,6 +1580,7 @@ VIEWS.workflows = async () => {
               <g id="wfDraft"></g>
             </g>
           </svg>
+          <canvas id="wfMinimap" width="150" height="100"></canvas>
         </div>
       </div>
 
@@ -1640,7 +1657,7 @@ async function _wfCreateNew() {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
   toast(t('생성됨'), 'ok');
   // 목록 새로 불러오고 새 항목 선택
   const list = await api('/api/workflows/list');
@@ -1661,7 +1678,7 @@ async function _wfDelete(wfId) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: wfId }),
   });
-  if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
   toast(t('삭제됨'), 'ok');
   if (__wf.current && __wf.current.id === wfId) {
     __wf.current = null; __wf.selectedNodeId = null;
@@ -1676,7 +1693,7 @@ async function _wfDelete(wfId) {
 
 async function _wfOpen(wfId) {
   const r = await api('/api/workflows/' + wfId);
-  if (!r.ok) { toast(r.error || t('로드 실패'), 'err'); return; }
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
   __wf.current = { id: wfId, ...r.workflow };
   __wf.selectedNodeId = null;
   __wf.selectedEdgeId = null;
@@ -1744,7 +1761,7 @@ function _wfRenderCanvas() {
   const vp = document.getElementById('wfViewport');
   if (!nodesG || !edgesG || !vp) return;
   if (!__wf.current) {
-    nodesG.innerHTML = ''; edgesG.innerHTML = ''; return;
+    nodesG.innerHTML = ''; edgesG.innerHTML = ''; _wfRenderMinimap(); return;
   }
   const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
   vp.setAttribute('transform', `translate(${view.panX},${view.panY}) scale(${view.zoom||1})`);
@@ -1752,7 +1769,106 @@ function _wfRenderCanvas() {
   nodesG.innerHTML = (__wf.current.nodes || []).map(n => _wfRenderNode(n)).join('');
   // 엣지
   edgesG.innerHTML = (__wf.current.edges || []).map(e => _wfRenderEdge(e)).join('');
+  // 미니맵 업데이트
+  _wfRenderMinimap();
 }
+
+// ─── 미니맵 ────────────────────────────────────────────────
+const _WF_MINIMAP_W = 150, _WF_MINIMAP_H = 100;
+const _WF_NODE_COLORS = {
+  start: '#d97757', session: '#d97757', subagent: '#d97757',
+  aggregate: '#c084fc', branch: '#fbbf24', output: '#4ade80',
+  http: '#4ade80', transform: '#c084fc', variable: '#fbbf24',
+  subworkflow: '#7dd3fc', embedding: '#f472b6',
+};
+function _wfRenderMinimap() {
+  const cvs = document.getElementById('wfMinimap');
+  if (!cvs) return;
+  const ctx = cvs.getContext('2d');
+  ctx.clearRect(0, 0, _WF_MINIMAP_W, _WF_MINIMAP_H);
+  if (!__wf.current) return;
+  const nodes = __wf.current.nodes || [];
+  if (!nodes.length) return;
+  // bounding box
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach(n => {
+    minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + WF_NODE_W); maxY = Math.max(maxY, n.y + WF_NODE_H);
+  });
+  const pad = 40;
+  minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+  const rangeX = maxX - minX || 1, rangeY = maxY - minY || 1;
+  const scale = Math.min(_WF_MINIMAP_W / rangeX, _WF_MINIMAP_H / rangeY);
+  const offX = (_WF_MINIMAP_W - rangeX * scale) / 2;
+  const offY = (_WF_MINIMAP_H - rangeY * scale) / 2;
+  function toMini(x, y) { return { mx: offX + (x - minX) * scale, my: offY + (y - minY) * scale }; }
+  // edges
+  ctx.strokeStyle = 'rgba(217,119,87,0.3)';
+  ctx.lineWidth = 0.5;
+  (__wf.current.edges || []).forEach(e => {
+    const fromN = nodes.find(n => n.id === e.from);
+    const toN = nodes.find(n => n.id === e.to);
+    if (!fromN || !toN) return;
+    const a = toMini(fromN.x + WF_NODE_W / 2, fromN.y + WF_NODE_H / 2);
+    const b = toMini(toN.x + WF_NODE_W / 2, toN.y + WF_NODE_H / 2);
+    ctx.beginPath(); ctx.moveTo(a.mx, a.my); ctx.lineTo(b.mx, b.my); ctx.stroke();
+  });
+  // nodes as dots
+  nodes.forEach(n => {
+    const c = toMini(n.x + WF_NODE_W / 2, n.y + WF_NODE_H / 2);
+    ctx.fillStyle = _WF_NODE_COLORS[n.type] || '#d97757';
+    ctx.fillRect(c.mx - 1, c.my - 1, 3, 3);
+  });
+  // viewport rect
+  const host = document.getElementById('wfCanvasHost');
+  if (!host) return;
+  const rect = host.getBoundingClientRect();
+  const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
+  const zoom = view.zoom || 1;
+  // screen coords of top-left/bottom-right in world space
+  const wX0 = (0 - (view.panX || 0)) / zoom;
+  const wY0 = (0 - (view.panY || 0)) / zoom;
+  const wX1 = (rect.width - (view.panX || 0)) / zoom;
+  const wY1 = (rect.height - (view.panY || 0)) / zoom;
+  const vp0 = toMini(wX0, wY0);
+  const vp1 = toMini(wX1, wY1);
+  ctx.strokeStyle = 'rgba(217,119,87,0.6)';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = 'rgba(217,119,87,0.08)';
+  const vw = vp1.mx - vp0.mx, vh = vp1.my - vp0.my;
+  ctx.fillRect(vp0.mx, vp0.my, vw, vh);
+  ctx.strokeRect(vp0.mx, vp0.my, vw, vh);
+
+  // store mapping for click handler
+  cvs._wfMiniData = { minX, minY, rangeX, rangeY, scale, offX, offY };
+}
+// 미니맵 클릭 → 뷰포트 이동
+(function _wfMinimapBindOnce() {
+  document.addEventListener('click', (e) => {
+    const cvs = document.getElementById('wfMinimap');
+    if (!cvs || e.target !== cvs) return;
+    if (!__wf.current || !cvs._wfMiniData) return;
+    const br = cvs.getBoundingClientRect();
+    const mx = e.clientX - br.left, my = e.clientY - br.top;
+    const d = cvs._wfMiniData;
+    // minimap coord → world coord
+    const wx = (mx - d.offX) / d.scale + d.minX;
+    const wy = (my - d.offY) / d.scale + d.minY;
+    const host = document.getElementById('wfCanvasHost');
+    if (!host) return;
+    const rect = host.getBoundingClientRect();
+    const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
+    const zoom = view.zoom || 1;
+    // center the clicked world point on screen
+    view.panX = rect.width / 2 - wx * zoom;
+    view.panY = rect.height / 2 - wy * zoom;
+    __wf.current.viewport = view;
+    const vp = document.getElementById('wfViewport');
+    if (vp) vp.setAttribute('transform', `translate(${view.panX},${view.panY}) scale(${zoom})`);
+    _wfSchedulePatch();
+    _wfRenderMinimap();
+  });
+})();
 
 function _wfPortPos(node, port) {
   // port = 'in' | 'out' | 'out_y' | 'out_n'
@@ -2134,6 +2250,7 @@ function _wfBindCanvas() {
       _wfUpdateNodeTransform(__wf.drag.nodeId);
       if (!__wf.dirty) { __wf.dirty = true; _wfUpdateToolbar(); }
       _wfSchedulePatch();
+      _wfRenderMinimap();
       if (touch) { try{e.preventDefault();}catch(_){} }
     } else if (__wf.drag.kind === 'pan') {
       const dx = e.clientX - __wf.drag.startX;
@@ -2145,6 +2262,7 @@ function _wfBindCanvas() {
       if (vp) vp.setAttribute('transform',
         `translate(${__wf.current.viewport.panX},${__wf.current.viewport.panY}) scale(${__wf.current.viewport.zoom||1})`);
       _wfSchedulePatch();
+      _wfRenderMinimap();
     } else if (__wf.drag.kind === 'edge') {
       __wf.edgeDraft.x2 = pt.x; __wf.edgeDraft.y2 = pt.y;
       _wfDraftRender();
@@ -2236,6 +2354,7 @@ function _wfBindCanvas() {
     if (vp) vp.setAttribute('transform',
       `translate(${view.panX||0},${view.panY||0}) scale(${view.zoom||1})`);
     _wfSchedulePatch();
+    _wfRenderMinimap();
   }, { passive: false });
 }
 
@@ -2287,6 +2406,20 @@ function _wfRenderInspector() {
       <input class="input w-full mt-1" value="${escapeHtml(__wf.current.name||'')}" oninput="__wf.current.name=this.value;__wf.dirty=true;_wfUpdateToolbar();_wfRenderList();">
       <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('설명')}</label>
       <textarea class="input w-full mt-1" rows="2" oninput="__wf.current.description=this.value;__wf.dirty=true;_wfUpdateToolbar();">${escapeHtml(__wf.current.description||'')}</textarea>
+    </div>
+
+    <div class="mb-4 pt-3 border-t border-[var(--border)]">
+      <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">🔗 ${t('Webhook URL')}</div>
+      <div class="flex items-center gap-1 mb-2">
+        <input class="input w-full text-[11px] font-mono" readonly value="http://localhost:8080/api/workflows/webhook/${escapeHtml(__wf.current.id)}" id="wfWebhookUrl" />
+        <button class="btn text-[10px] flex-shrink-0" onclick="navigator.clipboard.writeText(document.getElementById('wfWebhookUrl').value).then(()=>toast(t('복사됨'),'ok')).catch(()=>toast(t('복사 실패'),'err'))" title="${t('복사')}">📋</button>
+      </div>
+      <details class="text-[10px]">
+        <summary class="text-[var(--text-dim)] cursor-pointer select-none">${t('curl 예시')}</summary>
+        <pre class="mt-1 p-2 rounded text-[10px] font-mono overflow-x-auto" style="background:var(--code-bg);color:var(--text-mute);white-space:pre-wrap;word-break:break-all;">curl -X POST http://localhost:8080/api/workflows/webhook/${escapeHtml(__wf.current.id)} \\
+  -H "Content-Type: application/json" \\
+  -d '{"input": "your text"}'</pre>
+      </details>
     </div>
 
     <div class="mb-4 pt-3 border-t border-[var(--border)]">
@@ -2882,7 +3015,7 @@ async function _wfSave() {
     method: 'POST', headers: { 'Content-Type':'application/json' },
     body: JSON.stringify(body),
   });
-  if (!r.ok) { toast(r.error||t('저장 실패'), 'err'); return; }
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
   __wf.dirty = false;
   toast(t('저장됨'), 'ok');
   // 목록 refresh
@@ -2899,7 +3032,7 @@ async function _wfExport() {
       method: 'POST', headers: { 'Content-Type':'application/json' },
       body: JSON.stringify({ id: __wf.current.id }),
     });
-    if (!r.ok) { toast(r.error || t('내보내기 실패'), 'err'); return; }
+    if (!r.ok) { toast(errMsg(r), 'err'); return; }
     const payload = r.export || r;
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2925,7 +3058,7 @@ async function _wfImport(event) {
       method: 'POST', headers: { 'Content-Type':'application/json' },
       body: JSON.stringify(json),
     });
-    if (!r.ok) { toast(r.error || t('가져오기 실패'), 'err'); return; }
+    if (!r.ok) { toast(errMsg(r), 'err'); return; }
     toast(t('가져오기 완료'), 'ok');
     const list = await api('/api/workflows/list');
     __wf.workflows = list.workflows || [];
@@ -2943,7 +3076,7 @@ async function _wfRun() {
     method: 'POST', headers: { 'Content-Type':'application/json' },
     body: JSON.stringify({ id: __wf.current.id }),
   });
-  if (!r.ok) { toast(r.error||t('실행 실패'), 'err'); return; }
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
   toast(t('실행 시작됨'), 'ok');
   __wf.runId = r.runId;
   // 노드 상태 초기화
@@ -3002,7 +3135,7 @@ function _wfStartPolling() {
       if (e.data) {
         try {
           const data = JSON.parse(e.data);
-          toast(data.error || t('실행 오류'), 'err');
+          toast(errMsg(data), 'err');
         } catch(ex) { toast(t('실행 오류'), 'err'); }
         __wf.runId = null;
         _wfStopSSE();
@@ -3139,7 +3272,7 @@ async function _wfSpawnSession(nid) {
     method: 'POST', headers: { 'Content-Type':'application/json' },
     body: JSON.stringify(body),
   });
-  if (!r.ok) { toast(r.error||t('세션 생성 실패'), 'err'); return; }
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
   toast(t('Claude 세션 시작됨'), 'ok');
 }
 
@@ -3316,7 +3449,7 @@ async function _wfUseTemplate(tplId) {
     method: 'POST', headers: { 'Content-Type':'application/json' },
     body: JSON.stringify(body),
   });
-  if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
   toast(t('템플릿에서 생성됨'), 'ok');
   const list = await api('/api/workflows/list');
   __wf.workflows = list.workflows || [];
@@ -3327,7 +3460,7 @@ async function _wfUseTemplate(tplId) {
 
 async function _wfUseCustomTemplate(tplId) {
   const r = await api('/api/workflows/templates/' + encodeURIComponent(tplId));
-  if (!r.ok) { toast(r.error || t('로드 실패'), 'err'); return; }
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
   closeModal();
   const tpl = r.template;
   // 템플릿을 바탕으로 새 워크플로우 생성 (id 제거해서 신규 ID 할당)
@@ -3342,7 +3475,7 @@ async function _wfUseCustomTemplate(tplId) {
     method: 'POST', headers: { 'Content-Type':'application/json' },
     body: JSON.stringify(body),
   });
-  if (!s.ok) { toast(s.error || t('실패'), 'err'); return; }
+  if (!s.ok) { toast(errMsg(s), 'err'); return; }
   toast(t('템플릿에서 생성됨'), 'ok');
   const list = await api('/api/workflows/list');
   __wf.workflows = list.workflows || [];
@@ -3380,7 +3513,7 @@ async function _wfSaveCurrentAsTemplate() {
     method: 'POST', headers: { 'Content-Type':'application/json' },
     body: JSON.stringify(body),
   });
-  if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
   toast(t('커스텀 템플릿 저장됨'), 'ok');
   // 모달 다시 열어 목록 갱신
   closeModal();
@@ -3398,7 +3531,7 @@ async function _wfDeleteCustomTemplate(tplId) {
     method: 'POST', headers: { 'Content-Type':'application/json' },
     body: JSON.stringify({ id: tplId }),
   });
-  if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
   toast(t('삭제됨'), 'ok');
   closeModal();
   setTimeout(() => _wfShowTemplates(), 100);
@@ -3941,7 +4074,7 @@ function _wfTutRender() {
 async function _wfShowRuns() {
   if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
   const r = await api('/api/workflows/runs?wfId=' + encodeURIComponent(__wf.current.id));
-  if (!r.ok) { toast(r.error||t('로드 실패'), 'err'); return; }
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
   const runs = r.runs || [];
   const statusIcon = { ok:'✅', err:'❌', running:'⏳' };
   // 프로바이더 색상 매핑
@@ -4004,7 +4137,7 @@ async function _wfShowRuns() {
 
 async function _wfOpenRun(runId) {
   const s = await api('/api/workflows/run-status?runId=' + encodeURIComponent(runId));
-  if (!s.ok) { toast(s.error||t('로드 실패'), 'err'); return; }
+  if (!s.ok) { toast(errMsg(s), 'err'); return; }
   _wfShowRunResult(s.run || {});
 }
 
@@ -4305,7 +4438,7 @@ async function addDesignDir() {
     body: JSON.stringify({ dir: p }),
   });
   if (r.ok) toast('검색 경로 추가됨', 'ok');
-  else toast(r.error||'실패', 'err');
+  else toast(errMsg(r), 'err');
 }
 
 // AI 종합 평가 탭
@@ -4425,7 +4558,7 @@ async function refreshAiEval() {
       method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ force: true, lang: _curLang }),
     });
     closeModal();
-    if (r.error) { toast(r.error, 'err'); return; }
+    if (r.error) { toast(errMsg(r), 'err'); return; }
     state.data.aiEval = r;
     renderView();
   } catch (e) { closeModal(); toast(e.message, 'err'); }
@@ -4440,7 +4573,7 @@ async function aiRecommendList(kind) {
     const r = await api('/api/feature/recommend', {
       method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ kind, lang: _curLang }),
     });
-    if (r.error) { closeModal(); toast(r.error, 'err'); return; }
+    if (r.error) { closeModal(); toast(errMsg(r), 'err'); return; }
     // proposed 안에서 recommendations 추출
     const proposed = r.proposed || {};
     let recs = proposed.recommendations || [];
@@ -4554,7 +4687,7 @@ async function startFeatureRecommend(kind) {
     const r = await api('/api/feature/recommend', {
       method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ kind, lang: _curLang }),
     });
-    if (r.error) { closeModal(); toast(r.error, 'err'); return; }
+    if (r.error) { closeModal(); toast(errMsg(r), 'err'); return; }
     closeModal();
     openFeatureApplyModal(kind, r);
   } catch (e) { closeModal(); toast(e.message, 'err'); }
@@ -4831,7 +4964,7 @@ async function openSessionDetail(sessionId) {
       api('/api/sessions/tokens/' + sessionId),
       api('/api/sessions/timeline/' + sessionId),
     ]);
-    if (d.error) { closeModal(); toast(d.error, 'err'); return; }
+    if (d.error) { closeModal(); toast(errMsg(d), 'err'); return; }
     renderSessionDetail(d, tok, tl);
   } catch (e) {
     closeModal();
@@ -5300,7 +5433,7 @@ async function togglePluginFromAgent(pluginKey, enable) {
   if (r.ok) {
     toast(`'${pluginKey}' ${enable?'활성화됨':'비활성화됨'}`, 'ok');
     renderView();
-  } else toast(r.error || '실패', 'err');
+  } else toast(errMsg(r), 'err');
 }
 
 async function deleteGlobalAgent(id) {
@@ -5315,7 +5448,7 @@ async function deleteGlobalAgent(id) {
     body: JSON.stringify({ id }),
   });
   if (r.ok) { toast('삭제됨', 'ok'); renderView(); }
-  else toast(r.error || '실패', 'err');
+  else toast(errMsg(r), 'err');
 }
 
 function openCreateAgent() {
@@ -5369,13 +5502,13 @@ function openCreateAgent() {
       body: JSON.stringify({ name, description, model, tools, content }),
     });
     if (r.ok) { toast(`'${r.name}' 생성됨`, 'ok'); closeModal(); renderView(); }
-    else toast(r.error || '실패', 'err');
+    else toast(errMsg(r), 'err');
   };
 }
 
 async function viewAgent(id) {
   const a = await api('/api/agents/' + encodeURIComponent(id));
-  if (a.error) { toast(a.error, 'err'); return; }
+  if (a.error) { toast(errMsg(a), 'err'); return; }
   if (a.readOnly) {
     showModal(`
       <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
@@ -6116,7 +6249,7 @@ async function installMcp(id) {
   const prep = await api('/api/mcp/install/prepare', {
     method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id })
   });
-  if (prep.error) { toast(prep.error, 'err'); return; }
+  if (prep.error) { toast(errMsg(prep), 'err'); return; }
   const placeholders = prep.placeholders || [];
 
   // 2) 모달로 이름 + 각 env 값 입력
@@ -6183,7 +6316,7 @@ async function installMcp(id) {
       toast(`'${r.name}' 설치됨`, 'ok');
       closeModal();
     } else {
-      toast(r.error || '실패', 'err');
+      toast(errMsg(r), 'err');
     }
   };
 }
@@ -6197,7 +6330,7 @@ async function removeMcp(name) {
   if (!ok) return;
   const r = await api('/api/mcp/remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
   if (r.ok) toast(`'${name}' 제거됨`, 'ok');
-  else toast(r.error||'실패', 'err');
+  else toast(errMsg(r), 'err');
 }
 
 async function removeProjectMcp(cwd, name) {
@@ -6212,7 +6345,7 @@ async function removeProjectMcp(cwd, name) {
     body: JSON.stringify({ cwd, name }),
   });
   if (r.ok) toast(`'${name}' 제거됨 (${r.configPath})`, 'ok');
-  else toast(r.error||'실패', 'err');
+  else toast(errMsg(r), 'err');
 }
 
 function renderConnectorGroup(title, list, allowRemove) {
@@ -6583,7 +6716,7 @@ async function startGlobalClaudeMdRecommend() {
     const r = await api('/api/global/claude-md-recommend', {
       method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ lang: _curLang }),
     });
-    if (r.error) { closeModal(); toast(r.error, 'err'); return; }
+    if (r.error) { closeModal(); toast(errMsg(r), 'err'); return; }
     closeModal();
     openDiffApplyModal({
       title: '글로벌 CLAUDE.md 초안',
@@ -6660,7 +6793,7 @@ async function openProjectDetail(cwd) {
       api('/api/project/detail?cwd=' + encodeURIComponent(cwd)),
       api('/api/project/tool-breakdown?cwd=' + encodeURIComponent(cwd)),
     ]);
-    if (d.error) { toast(d.error, 'err'); closeModal(); return; }
+    if (d.error) { toast(errMsg(d), 'err'); closeModal(); return; }
     renderProjectDetail(d);
     renderProjectAgentsSection(tb, d.cwd);
   } catch (e) {
@@ -6840,7 +6973,7 @@ async function openToolBreakdown(cwd) {
   showModalLoading(t('도구 사용 내역 로딩…'));
   try {
     const d = await api('/api/project/tool-breakdown?cwd=' + encodeURIComponent(cwd));
-    if (d.error) { closeModal(); toast(d.error, 'err'); return; }
+    if (d.error) { closeModal(); toast(errMsg(d), 'err'); return; }
     const top = d.tools[0] ? d.tools[0].n : 1;
     const rows = d.tools.map(t => {
       const pct = Math.round((t.n / top) * 100);
@@ -6875,7 +7008,7 @@ async function openAgentBreakdown(cwd) {
   showModalLoading(t('에이전트 위임 내역 로딩…'));
   try {
     const d = await api('/api/project/tool-breakdown?cwd=' + encodeURIComponent(cwd));
-    if (d.error) { closeModal(); toast(d.error, 'err'); return; }
+    if (d.error) { closeModal(); toast(errMsg(d), 'err'); return; }
     const total = d.subagents.reduce((a,b)=>a+b.n, 0);
     showModal(`
       <div class="p-5 border-b border-[var(--border)] flex justify-between items-start">
@@ -7328,7 +7461,7 @@ function paOpenRolePreview(roleId) {
       body: JSON.stringify({ cwd, roleId: role.id, name, description: desc, overwrite }),
     });
     if (r.ok) { toast(`'${r.name}' 설치됨`, 'ok'); closeModal(); renderView(); }
-    else toast(r.error || '실패', 'err');
+    else toast(errMsg(r), 'err');
   };
 }
 
@@ -7359,7 +7492,7 @@ async function paDelete(name) {
     body: JSON.stringify({ cwd, name }),
   });
   if (r.ok) { toast('삭제됨', 'ok'); renderView(); }
-  else toast(r.error || '실패', 'err');
+  else toast(errMsg(r), 'err');
 }
 
 async function setSubagentModel(scope, agentId, model, cwd) {
@@ -7370,7 +7503,7 @@ async function setSubagentModel(scope, agentId, model, cwd) {
       method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
     });
     if (r.ok) { toast(`모델을 '${model}' 로 변경`, 'ok'); renderView(); }
-    else toast(r.error || '실패', 'err');
+    else toast(errMsg(r), 'err');
   } catch (e) { toast('실패: '+e.message, 'err'); }
 }
 
@@ -7394,7 +7527,7 @@ async function openScoreDetail(keyOrObj) {
   showModalLoading(t('점수 상세 계산 중…'));
   try {
     const d = await api('/api/project/score-detail?' + qs.toString());
-    if (d.error) { toast(d.error, 'err'); closeModal(); return; }
+    if (d.error) { toast(errMsg(d), 'err'); closeModal(); return; }
     renderScoreDetail(d);
   } catch (e) {
     closeModal(); toast(e.message, 'err');
@@ -7701,6 +7834,19 @@ VIEWS.aiProviders = async () => {
   return `
     ${viewHeader(t('ai_providers_title','AI 프로바이더'), t('ai_providers_subtitle','Claude · GPT · Gemini · Ollama · Codex 등 멀티 AI 프로바이더 관리'), 'aiProviders')}
 
+    <div id="aiProviderHealthBar" class="card p-4 mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-sm font-semibold" style="color:var(--text)">🩺 ${t('프로바이더 헬스')}</div>
+        <div class="flex items-center gap-2">
+          <span id="aiHealthSummary" class="text-xs" style="color:var(--text-mute)"></span>
+          <button class="btn text-xs" onclick="_aiRefreshHealth()" title="${t('새로고침')}">🔄 ${t('새로고침')}</button>
+        </div>
+      </div>
+      <div id="aiHealthIndicators" class="flex flex-wrap gap-3">
+        <span class="text-xs" style="color:var(--text-dim)">${t('로딩 중...')}</span>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       <div>
         <h3 class="text-lg font-semibold mb-3" style="color:var(--text)" data-i18n="cli_providers">🖥️ CLI 프로바이더 (로컬)</h3>
@@ -7812,7 +7958,62 @@ VIEWS.aiProviders = async () => {
 // AI Providers 뷰 렌더 후 비용 차트 초기화
 AFTER.aiProviders = async () => {
   await window.initCostCharts();
+  _aiRefreshHealth();
 };
+
+// 프로바이더 헬스 체크
+async function _aiRefreshHealth() {
+  const host = document.getElementById('aiHealthIndicators');
+  const summary = document.getElementById('aiHealthSummary');
+  if (!host) return;
+  host.innerHTML = `<span class="text-xs" style="color:var(--text-dim)">${t('로딩 중...')}</span>`;
+  try {
+    const d = await api('/api/ai-providers/health');
+    const items = d.providers || d.health || [];
+    if (!items.length) {
+      host.innerHTML = `<span class="text-xs" style="color:var(--text-dim)">${t('프로바이더 없음')}</span>`;
+      if (summary) summary.textContent = '';
+      return;
+    }
+    const avail = items.filter(p => p.available || p.status === 'available');
+    if (summary) summary.textContent = `${avail.length}/${items.length} ${t('프로바이더 사용 가능')}`;
+    host.innerHTML = items.map(p => {
+      const ok = p.available || p.status === 'available';
+      const dotColor = ok ? 'var(--ok)' : 'var(--err)';
+      const icon = p.icon || '🔌';
+      const name = escapeHtml(p.name || p.id || '');
+      const chipCls = ok ? 'chip chip-ok' : 'chip chip-err';
+      return `<div class="flex items-center gap-1.5">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
+        <span class="text-sm">${icon}</span>
+        <span class="${chipCls} text-[11px]">${name}</span>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    // health 엔드포인트가 없으면 기존 리스트 데이터로 폴백
+    const cached = state.data._aiProviders;
+    if (cached && cached.providers) {
+      const items = cached.providers;
+      const avail = items.filter(p => p.available);
+      if (summary) summary.textContent = `${avail.length}/${items.length} ${t('프로바이더 사용 가능')}`;
+      host.innerHTML = items.map(p => {
+        const ok = p.available;
+        const dotColor = ok ? 'var(--ok)' : 'var(--err)';
+        const icon = p.icon || '🔌';
+        const name = escapeHtml(p.name || p.id || '');
+        const chipCls = ok ? 'chip chip-ok' : 'chip chip-err';
+        return `<div class="flex items-center gap-1.5">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
+          <span class="text-sm">${icon}</span>
+          <span class="${chipCls} text-[11px]">${name}</span>
+        </div>`;
+      }).join('');
+    } else {
+      host.innerHTML = `<span class="text-xs" style="color:var(--err)">${t('헬스 체크 실패')}</span>`;
+      if (summary) summary.textContent = '';
+    }
+  }
+}
 
 // AI Providers 전역 함수
 window.testProvider = async (pid) => {
@@ -7836,7 +8037,7 @@ window.saveApiKey = async (pid) => {
   if (!val || val === '••••••••') { toast(t('enter_api_key','API 키를 입력하세요'), 'warn'); return; }
   const r = await api('/api/ai-providers/save-key', { method: 'POST', body: JSON.stringify({ providerId: pid, apiKey: val }) });
   if (r.ok) { toast(t('api_key_saved','API 키 저장 완료'), 'ok'); renderView(); }
-  else toast(r.error || 'failed', 'err');
+  else toast(errMsg(r), 'err');
 };
 
 window.deleteApiKey = async (pid) => {
@@ -7873,7 +8074,7 @@ window.showAddCustomProviderModal = async () => {
   };
   const r = await api('/api/ai-providers/custom/save', { method: 'POST', body: JSON.stringify(body) });
   if (r.ok) { toast(t('custom_provider_saved','등록 완료'), 'ok'); renderView(); }
-  else toast(r.error || 'failed', 'err');
+  else toast(errMsg(r), 'err');
 };
 
 // ── 비용 차트 인스턴스 캐시 (메모리 누수 방지) ──
@@ -8184,7 +8385,7 @@ async function addMarketplace() {
   const url = document.getElementById('mpUrl').value.trim();
   if (!name || !url) { toast('이름/URL 모두 입력', 'warn'); return; }
   const r = await api('/api/marketplaces/add', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, url }) });
-  if (r.ok) { toast('추가됨', 'ok'); renderView(); } else toast(r.error||'실패', 'err');
+  if (r.ok) { toast('추가됨', 'ok'); renderView(); } else toast(errMsg(r), 'err');
 }
 async function removeMarketplace(name) {
   const ok = await confirmModal({
@@ -8194,7 +8395,7 @@ async function removeMarketplace(name) {
   });
   if (!ok) return;
   const r = await api('/api/marketplaces/remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
-  if (r.ok) { toast('제거됨', 'ok'); renderView(); } else toast(r.error||'실패', 'err');
+  if (r.ok) { toast('제거됨', 'ok'); renderView(); } else toast(errMsg(r), 'err');
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -8371,7 +8572,7 @@ function editOutputStyle(existing) {
       method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, raw }),
     });
     if (r.ok) { toast('저장됨', 'ok'); closeModal(); renderView(); }
-    else toast(r.error||'실패', 'err');
+    else toast(errMsg(r), 'err');
   };
 }
 
@@ -8385,7 +8586,7 @@ async function deleteOutputStyle(id) {
   const r = await api('/api/output-styles/delete', {
     method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }),
   });
-  if (r.ok) { toast('삭제됨', 'ok'); renderView(); } else toast(r.error||'실패', 'err');
+  if (r.ok) { toast('삭제됨', 'ok'); renderView(); } else toast(errMsg(r), 'err');
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -8907,7 +9108,7 @@ function openTaskEditor(sessionId, existing) {
       method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
     });
     if (r.ok) { toast('저장됨', 'ok'); closeModal(); renderView(); }
-    else toast(r.error||'실패', 'err');
+    else toast(errMsg(r), 'err');
   };
 }
 
@@ -8918,7 +9119,7 @@ async function toggleTaskStatus(sessionId, t) {
     body: JSON.stringify({ sessionId, id: t.id, subject: t.subject, description: t.description, activeForm: t.activeForm, status: next }),
   });
   if (r.ok) renderView();
-  else toast(r.error||'실패', 'err');
+  else toast(errMsg(r), 'err');
 }
 
 async function deleteTask(sessionId, id) {
@@ -8928,7 +9129,7 @@ async function deleteTask(sessionId, id) {
     body: JSON.stringify({ sessionId, id }),
   });
   if (r.ok) { toast('삭제됨', 'ok'); renderView(); }
-  else toast(r.error||'실패', 'err');
+  else toast(errMsg(r), 'err');
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -8963,7 +9164,7 @@ VIEWS.team = async () => {
               this.disabled=true;this.innerHTML='⏳ 터미널에서 로그인 중…';
               try{const r=await api('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
               if(r.ok){toast(r.message,'ok');const p=setInterval(async()=>{try{const s=await api('/api/auth/status');if(s.connected){clearInterval(p);toast('로그인 성공!','ok');renderView();}}catch{}},5000);}
-              else{toast(r.error||'실패','err');this.disabled=false;this.innerHTML='🚀 Claude 로그인';}}
+              else{toast(errMsg(r),'err');this.disabled=false;this.innerHTML='🚀 Claude 로그인';}}
               catch(e){toast(e.message,'err');this.disabled=false;this.innerHTML='🚀 Claude 로그인';}
             })()">
             🚀 Claude 로그인
@@ -8997,7 +9198,7 @@ VIEWS.team = async () => {
             if(!await confirmModal({title:t('로그아웃'),message:t('정말 로그아웃 하시겠습니까?'),confirmLabel:t('로그아웃'),danger:true}))return;
             const r=await api('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
             if(r.ok){toast('로그아웃 되었습니다','ok');setTimeout(()=>location.reload(),800);}
-            else toast(r.error||'실패','err');
+            else toast(errMsg(r),'err');
           })()">🚪 ${t('로그아웃')}</button>
         </div>
       </div>
@@ -9309,7 +9510,7 @@ async function triggerLogin() {
       toast(r.message || '터미널을 확인하세요.', 'ok');
       _pollAuthStatus();
     } else {
-      toast(r.error || '로그인 실행 실패', 'err');
+      toast(errMsg(r), 'err');
     }
   } catch (e) { toast(e.message, 'err'); }
 }
@@ -9400,7 +9601,7 @@ async function doLogoutOnly() {
       toast('로그아웃 되었습니다', 'ok');
       closeModal();
       await loadCliFoot();
-    } else toast(r.error || '실패', 'err');
+    } else toast(errMsg(r), 'err');
   } catch (e) { toast(e.message, 'err'); }
 }
 
@@ -9489,7 +9690,7 @@ async function saveClaimedPlan() {
     toast(planId ? '플랜 저장됨' : '플랜 선택 해제됨', 'ok');
     closeModal();
     await loadCliFoot();
-  } else toast(r.error||'실패', 'err');
+  } else toast(errMsg(r), 'err');
 }
 
 document.getElementById('btn-reindex').onclick = () => reindex(false);
@@ -9502,7 +9703,7 @@ document.getElementById('btn-latest-features').onclick = async () => {
     const r = await api('/api/features/refresh', {
       method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}),
     });
-    if (r.error) { toast(r.error, 'err'); return; }
+    if (r.error) { toast(errMsg(r), 'err'); return; }
     const n = (r.features||[]).length;
     toast(n ? `✨ 신기능 ${n}개 발견! 좌측 '🆕 신기능' 탭 확인` : '새로운 기능 없음 (이미 최신)', n?'ok':'info');
     if (state.view === 'features') renderView();

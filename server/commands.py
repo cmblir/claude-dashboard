@@ -250,7 +250,7 @@ JSON 만 출력 / Output JSON only:
         pass
     m = re.search(r'\{[\s\S]*"translations"[\s\S]*\}', response_text)
     if not m:
-        return {"error": "번역 JSON 없음", "raw": response_text[:1500]}
+        return {"error": "번역 JSON 없음", "error_key": "err_translate_no_json", "raw": response_text[:1500]}
     try:
         parsed = json.loads(m.group(0))
         tr = parsed.get("translations", {})
