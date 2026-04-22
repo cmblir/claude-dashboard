@@ -11840,11 +11840,24 @@ window._i18nReady = _loadLocale(_curLang).then(() => {
   _translateDOM(document.body);
   // 런타임에 innerHTML 로 추가되는 동적 컨텐츠 (모달 · 슬롯 등) 를 자동 번역
   if (_curLang !== 'ko' && typeof MutationObserver !== 'undefined') {
+    let _i18nPending = new Set();
+    let _i18nTimer = null;
+    const _i18nFlush = () => {
+      _i18nTimer = null;
+      const nodes = Array.from(_i18nPending);
+      _i18nPending.clear();
+      for (const n of nodes) {
+        if (n.isConnected) _translateDOM(n);
+      }
+    };
     const mo = new MutationObserver(muts => {
       for (const m of muts) {
         for (const node of m.addedNodes) {
-          if (node && node.nodeType === 1) _translateDOM(node);
+          if (node && node.nodeType === 1) _i18nPending.add(node);
         }
+      }
+      if (_i18nPending.size && !_i18nTimer) {
+        _i18nTimer = requestAnimationFrame(_i18nFlush);
       }
     });
     mo.observe(document.body, { childList: true, subtree: true });
