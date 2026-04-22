@@ -1065,7 +1065,7 @@ function renderNav() {
       el.setAttribute('tabindex', '0');
       el.setAttribute('aria-label', n.label + (n.desc ? ' — ' + n.desc : ''));
       el.title = n.label + (n.desc ? ' — ' + n.desc : '');
-      const descHtml = n.desc ? `<div class="nav-desc text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">${escapeHtml(n.desc)}</div>` : '';
+      const descHtml = n.desc ? `<div class="nav-desc text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">${escapeHtml(t(n.desc))}</div>` : '';
       el.innerHTML = `
         <span class="w-5 text-center self-start mt-0.5 flex-shrink-0">${n.icon}</span>
         <div class="nav-label flex-1 min-w-0">
@@ -1735,7 +1735,7 @@ function _wfAssigneeOptions(selectedValue) {
     html += `<optgroup label="${escapeHtml(gLabel)}">`;
     for (const o of opts) {
       const sel = o.value === selectedValue ? 'selected' : '';
-      html += `<option value="${escapeHtml(o.value)}" ${sel}>${escapeHtml(o.label)}${o.note?' — '+escapeHtml(o.note):''}</option>`;
+      html += `<option value="${escapeHtml(o.value)}" ${sel}>${escapeHtml(o.label)}${o.note?' — '+escapeHtml(t(o.note)):''}</option>`;
     }
     html += '</optgroup>';
   }
@@ -8669,7 +8669,7 @@ VIEWS.aiProviders = async () => {
     const keyChip = keyMasked ? `<span class="chip" style="font-family:monospace">${escapeHtml(keyMasked)}</span>` : '';
     const models = (p.models || []).slice(0, 6);
     const modelTags = models.map(m =>
-      `<span class="chip" title="${escapeHtml(m.note || '')}">${escapeHtml(m.label || m.id)}</span>`
+      `<span class="chip" title="${escapeHtml(t(m.note || ''))}">${escapeHtml(m.label || m.id)}</span>`
     ).join(' ');
     const testBtn = avail
       ? `<button class="btn btn-sm" onclick="testProvider('${p.id}')">${t('연결 테스트')}</button>`
@@ -9658,14 +9658,14 @@ async function _ollamaLoadSettings() {
     chatSel.innerHTML = `<option value="">${t('자동 선택 (첫 번째 설치 모델)')}</option>`;
     for (const m of (s.installedChat || [])) {
       const sel = m.id === s.chatModel ? 'selected' : '';
-      chatSel.innerHTML += `<option value="${escapeHtml(m.id)}" ${sel}>${escapeHtml(m.label)}${m.note ? ' — ' + escapeHtml(m.note) : ''}</option>`;
+      chatSel.innerHTML += `<option value="${escapeHtml(m.id)}" ${sel}>${escapeHtml(m.label)}${m.note ? ' — ' + escapeHtml(t(m.note)) : ''}</option>`;
     }
 
     // 임베딩 모델 옵션
     embedSel.innerHTML = `<option value="">${t('자동 선택')}</option>`;
     for (const m of (s.installedEmbed || [])) {
       const sel = m.id === s.embedModel ? 'selected' : '';
-      embedSel.innerHTML += `<option value="${escapeHtml(m.id)}" ${sel}>${escapeHtml(m.label)}${m.note ? ' — ' + escapeHtml(m.note) : ''}</option>`;
+      embedSel.innerHTML += `<option value="${escapeHtml(m.id)}" ${sel}>${escapeHtml(m.label)}${m.note ? ' — ' + escapeHtml(t(m.note)) : ''}</option>`;
     }
 
     // 설치된 모델이 없으면 안내
@@ -10198,7 +10198,7 @@ VIEWS.modelConfig = async () => {
                 <div class="font-semibold text-sm">${escapeHtml(m.label)}</div>
                 <code class="mono text-[10px] text-[var(--text-dim)]">${escapeHtml(m.id)}</code>
               </div>
-              <div class="text-xs text-[var(--text-mute)] mt-1">${escapeHtml(m.note)}</div>
+              <div class="text-xs text-[var(--text-mute)] mt-1">${escapeHtml(t(m.note))}</div>
             </div>`).join('')}
         </div>
       </div>
@@ -11560,7 +11560,7 @@ async function openCliStatusModal() {
   const claimed = auth.claimedPlanId || '';
   const planOptions = [
     `<option value="">— 선택 안 함 —</option>`,
-    ...plans.map(p => `<option value="${p.id}" ${p.id===claimed?'selected':''}>${escapeHtml(p.label)}${p.note?` · ${escapeHtml(p.note)}`:''}</option>`)
+    ...plans.map(p => `<option value="${p.id}" ${p.id===claimed?'selected':''}>${escapeHtml(p.label)}${p.note?` · ${escapeHtml(t(p.note))}`:''}</option>`)
   ].join('');
   showModal(`
     <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
