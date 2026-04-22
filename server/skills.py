@@ -188,7 +188,8 @@ def get_skill(skill_id: str) -> dict:
 
 def put_skill(skill_id: str, body: dict) -> dict:
     if ":" in (skill_id or ""):
-        return {"ok": False, "error": "플러그인 스킬은 편집 불가 (read-only)"}
+        from .errors import err
+        return err("skill_plugin_readonly")
     if not re.match(r"^[a-zA-Z0-9_-]+$", skill_id or ""):
         return {"ok": False, "error": "invalid skill id"}
     raw = body.get("raw", "") if isinstance(body, dict) else ""

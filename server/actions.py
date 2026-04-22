@@ -163,7 +163,7 @@ def api_chat(body: dict) -> dict:
             capture_output=True, text=True, timeout=30,
         )
     except subprocess.TimeoutExpired:
-        return {"error": "응답 시간 초과 (30초)"}
+        return {"error": "응답 시간 초과 (30초)", "error_key": "err_timeout"}
     except Exception as e:
         return {"error": f"CLI 실행 실패: {e}"}
 

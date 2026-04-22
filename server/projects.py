@@ -666,11 +666,12 @@ def api_project_agent_add(body: dict) -> dict:
         return {"ok": False, "error": f"unknown roleId: {role_id}"}
     name = (body.get("name") or role["defaultName"]).strip()
     if not re.match(r"^[a-z0-9][a-z0-9_-]{0,63}$", name):
-        return {"ok": False, "error": "에이전트 이름은 소문자/숫자/-/_ 만 허용"}
+        from .errors import err
+        return err("agent_name_invalid")
     desc_override = body.get("description")
     target = Path(cwd) / ".claude" / "agents" / f"{name}.md"
     if target.exists() and not body.get("overwrite"):
-        return {"ok": False, "error": f"이미 존재: {target.name} (overwrite=true 로 덮어쓰기)"}
+        return {"ok": False, "error": f"이미 존재: {target.name} (overwrite=true 로 덮어쓰기)", "error_key": "err_agent_exists"}
     md = _build_role_md(role, override_name=name, override_desc=desc_override)
     ok = _safe_write(target, md)
     return {"ok": ok, "path": str(target), "name": name}

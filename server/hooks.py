@@ -136,18 +136,20 @@ def api_plugin_hook_update(body: dict) -> dict:
     payload = body.get("payload") or {}
     hf = _plugin_hooks_file(pk)
     if not hf:
-        return {"ok": False, "error": "플러그인 훅 파일을 찾을 수 없음"}
+        from .errors import err
+        return err("hook_file_not_found")
     try:
         raw = _safe_read(hf)
         data = json.loads(raw) if raw else {}
     except Exception as e:
-        return {"ok": False, "error": f"hooks.json 파싱 실패: {e}"}
+        from .errors import err
+        return err("hook_parse_error", detail=str(e))
     if not isinstance(data, dict):
         data = {}
     hooks_obj = data.setdefault("hooks", {})
     items = hooks_obj.get(event)
     if not isinstance(items, list) or not (0 <= int(gi) < len(items)):
-        return {"ok": False, "error": "groupIdx 범위 오류"}
+        return err("hook_index_error", detail="groupIdx")
     group = items[int(gi)]
     si = int(si) if si is not None else -1
 
@@ -155,7 +157,7 @@ def api_plugin_hook_update(body: dict) -> dict:
         if si >= 0 and isinstance(group, dict) and isinstance(group.get("hooks"), list):
             sub = group["hooks"]
             if si >= len(sub):
-                return {"ok": False, "error": "subIdx 범위 오류"}
+                return err("hook_index_error", detail="subIdx")
             sub.pop(si)
             if not sub:
                 items.pop(int(gi))
@@ -187,7 +189,7 @@ def api_plugin_hook_update(body: dict) -> dict:
         if new_event == event:
             if si >= 0 and isinstance(group, dict) and isinstance(group.get("hooks"), list):
                 if si >= len(group["hooks"]):
-                    return {"ok": False, "error": "subIdx 범위 오류"}
+                    return err("hook_index_error", detail="subIdx")
                 if new_matcher is not None:
                     group["matcher"] = new_matcher
                 group["hooks"][si] = new_sub
@@ -218,7 +220,7 @@ def api_plugin_hook_update(body: dict) -> dict:
     try:
         _safe_write(hf, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
     except Exception as e:
-        return {"ok": False, "error": f"저장 실패: {e}"}
+        return err("hook_save_error", detail=str(e))
     return {"ok": True}
 
 

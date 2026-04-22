@@ -132,6 +132,7 @@ def put_settings(body: dict) -> dict:
                 "ok": False,
                 "error": "유효하지 않은 권한 규칙: "
                 + "; ".join(f"{i['rule']} ({i['error']})" for i in remaining[:3]),
+                "error_key": "err_permission_invalid",
             }
         if fixed:
             log.warning("permissions auto-fixed: %s", fixed)

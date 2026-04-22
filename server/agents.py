@@ -275,10 +275,12 @@ def api_agent_create(body: dict) -> dict:
         return {"ok": False, "error": "bad body"}
     name = (body.get("name") or "").strip()
     if not re.match(r"^[a-z0-9][a-z0-9_-]{0,63}$", name):
-        return {"ok": False, "error": "이름은 소문자/숫자/-/_ 만 (첫 글자 영숫자)"}
+        from .errors import err
+        return err("agent_name_invalid")
     target = AGENTS_DIR / f"{name}.md"
     if target.exists() and not body.get("overwrite"):
-        return {"ok": False, "error": "이미 존재 — overwrite=true 로 덮어쓰기"}
+        from .errors import err
+        return err("agent_exists")
     desc = (body.get("description") or "").strip() or "TODO: 이 에이전트의 용도"
     model = (body.get("model") or "inherit").strip()
     tools = body.get("tools") or []
@@ -309,9 +311,11 @@ def api_agent_delete(body: dict) -> dict:
         return {"ok": False, "error": "id required"}
     for b in _BUILTIN_AGENTS:
         if b["id"] == agent_id:
-            return {"ok": False, "error": "builtin agent 는 삭제할 수 없습니다"}
+            from .errors import err
+            return err("agent_builtin_readonly")
     if ":" in agent_id:
-        return {"ok": False, "error": "플러그인 에이전트는 마켓플레이스에서 관리 — 삭제는 플러그인 비활성화로"}
+        from .errors import err
+        return err("agent_plugin_readonly")
     if not re.match(r"^[a-zA-Z0-9_-]+$", agent_id):
         return {"ok": False, "error": "invalid agent id"}
     target = AGENTS_DIR / f"{agent_id}.md"

@@ -1143,9 +1143,9 @@ def api_design_add_dir(body: dict) -> dict:
     try:
         p.relative_to(home)
     except ValueError:
-        return {"ok": False, "error": "홈 디렉토리 밖 경로 거부"}
+        return {"ok": False, "error": "홈 디렉토리 밖 경로 거부", "error_key": "err_outside_home"}
     if not p.is_dir():
-        return {"ok": False, "error": "디렉토리가 아님 또는 존재하지 않음"}
+        return {"ok": False, "error": "디렉토리가 아님 또는 존재하지 않음", "error_key": "err_not_directory"}
     cfg = _load_dash_config()
     arr = cfg.get("designExportDirs") or []
     if str(p) not in arr:
