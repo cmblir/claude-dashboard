@@ -343,6 +343,17 @@ def set_default_model(provider_id: str, model: str) -> dict:
     return {"ok": True, "providerId": provider_id, "model": model}
 
 
+def api_set_default_model(body: dict) -> dict:
+    """POST /api/ai-providers/default-model — body: {providerId, model}"""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    pid = (body.get("providerId") or "").strip()
+    model = (body.get("model") or "").strip()
+    if not pid:
+        return {"ok": False, "error": "providerId required"}
+    return set_default_model(pid, model)
+
+
 # ───────── API 엔드포인트 핸들러 ─────────
 
 def api_providers_list() -> dict:
