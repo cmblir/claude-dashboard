@@ -412,6 +412,13 @@ NEW_EN = {
     ").replace(/[^a-zA-Z0-9가-힣_-]/g": ").replace(/[^a-zA-Z0-9_-]/g",
     "/* 비용 API 미지원 시 조용히 무시 */": "/* silently ignored when cost API is unsupported */",
     "const _KO_RE = /[가-힣]/": "const _KO_RE = /<korean-range>/",
+
+    # settings — 테마 (v2.1.3: 기존 Midnight/Forest/Sunset 하드코딩 → data-i18n 적용)
+    "settings.midnight": "Midnight",
+    "settings.forest": "Forest",
+    "settings.sunset": "Sunset",
+    # 한글 text 키 — runtime text-based 번역 경로 대응 (data-i18n 외 텍스트 노드 스캐너)
+    "미드나잇": "Midnight",
 }
 
 NEW_ZH = {
@@ -820,4 +827,11 @@ NEW_ZH = {
     ").replace(/[^a-zA-Z0-9가-힣_-]/g": ").replace(/[^a-zA-Z0-9_-]/g",
     "/* 비용 API 미지원 시 조용히 무시 */": "/* 不支持成本 API 时静默忽略 */",
     "const _KO_RE = /[가-힣]/": "const _KO_RE = /<korean-range>/",
+
+    # settings — 主题 (v2.1.3)
+    "settings.midnight": "午夜",
+    "settings.forest": "森林",
+    "settings.sunset": "日落",
+    # 한글 text 키 — runtime text-based 번역 경로 대응
+    "미드나잇": "午夜",
 }
