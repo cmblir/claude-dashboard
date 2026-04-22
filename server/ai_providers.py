@@ -712,6 +712,66 @@ class CustomCliProvider(BaseProvider):
             provider=self.provider_id, model=model, duration_ms=duration,
         )
 
+    def embed(
+        self,
+        texts: list[str],
+        *,
+        model: str = "",
+        timeout: int = 60,
+    ) -> EmbeddingResponse:
+        """커스텀 프로바이더 임베딩 — embedCommand 가 설정된 경우에만."""
+        t0 = int(time.time() * 1000)
+        cmd_name = self._embed_command or self._command
+        b = shutil.which(cmd_name)
+        if not b:
+            return EmbeddingResponse(
+                status="err", error=f"{cmd_name} not found in PATH",
+                provider=self.provider_id, duration_ms=int(time.time() * 1000) - t0,
+            )
+
+        tmpl = self._embed_args_template or "{input}"
+        input_text = "\n".join(texts)
+        args_str = tmpl.replace("{input}", input_text)
+        args_str = args_str.replace("{model}", model or "")
+        cmd = [b] + [a for a in args_str.split() if a]
+
+        try:
+            r = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=timeout,
+            )
+        except Exception as e:
+            return EmbeddingResponse(
+                status="err", error=str(e),
+                provider=self.provider_id, duration_ms=int(time.time() * 1000) - t0,
+            )
+
+        duration = int(time.time() * 1000) - t0
+        if r.returncode != 0:
+            return EmbeddingResponse(
+                status="err", error=(r.stderr or "").strip()[:500],
+                provider=self.provider_id, duration_ms=duration,
+            )
+
+        # stdout 에서 JSON 배열 파싱 시도
+        output = (r.stdout or "").strip()
+        embeddings = []
+        try:
+            parsed = json.loads(output)
+            if isinstance(parsed, list) and parsed and isinstance(parsed[0], (list, float, int)):
+                if isinstance(parsed[0], (float, int)):
+                    embeddings = [parsed]  # 단일 벡터
+                else:
+                    embeddings = parsed
+        except Exception:
+            pass
+
+        dims = len(embeddings[0]) if embeddings else 0
+        return EmbeddingResponse(
+            status="ok", embeddings=embeddings,
+            provider=self.provider_id, model=model,
+            dimensions=dims, duration_ms=duration,
+        )
+
 
 # ═══════════════════════════════════════════
 #  API 기반 프로바이더들

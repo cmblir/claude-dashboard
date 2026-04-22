@@ -57,8 +57,13 @@ from .ai_keys import (
     api_custom_provider_delete, api_fallback_chain_save,
     api_workflow_costs_summary, api_provider_compare,
     api_provider_health, api_usage_alert_check, api_usage_alert_set,
+    api_set_default_model,
 )
 from .ai_providers import list_providers_by_capability
+from .ollama_hub import (
+    api_ollama_models, api_ollama_catalog, api_ollama_pull,
+    api_ollama_pull_status, api_ollama_delete, api_ollama_model_info,
+)
 
 
 def _ai_providers_by_cap(query: dict) -> dict:
@@ -170,6 +175,10 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/ai-providers/by-capability": lambda q: _ai_providers_by_cap(q),
     "/api/ai-providers/health": lambda q: api_provider_health(),
     "/api/ai-providers/usage-alert": lambda q: api_usage_alert_check(),
+    "/api/ollama/models": lambda q: api_ollama_models(),
+    "/api/ollama/catalog": api_ollama_catalog,
+    "/api/ollama/pull-status": api_ollama_pull_status,
+    "/api/ollama/info": api_ollama_model_info,
 }
 
 
@@ -244,6 +253,9 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/ai-providers/custom/delete": api_custom_provider_delete,
     "/api/ai-providers/fallback-chain": api_fallback_chain_save,
     "/api/ai-providers/usage-alert/set": api_usage_alert_set,
+    "/api/ollama/pull": api_ollama_pull,
+    "/api/ollama/delete": api_ollama_delete,
+    "/api/ai-providers/default-model": api_set_default_model,
 }
 
 

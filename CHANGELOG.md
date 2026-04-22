@@ -11,6 +11,27 @@
 
 ---
 
+## [1.8.0] — 2026-04-22
+
+### Added — 멀티 AI 오케스트라 Phase 8
+- 🦙 **Ollama 모델 허브** (Open WebUI 스타일) — 23개 모델 카탈로그 (LLM/Code/Embedding/Vision 4개 카테고리)
+  - 모델 검색 + 카테고리 필터
+  - 원클릭 다운로드 (`ollama pull`) + 진행률 바 (2초 폴링)
+  - 모델 삭제 + 상세 정보 (modelfile/parameters/template)
+  - 설치된 모델 테이블 (크기/패밀리/양자화/수정일)
+- ⚙️ **커스텀 프로바이더 완전 관리** — capabilities 배지, 테스트 실행, 편집 모드, embed() 실행 지원
+- 🎯 **프로바이더별 기본 모델 설정** — 드롭다운 선택 + 저장 API
+- 🔧 **CustomCliProvider.embed()** — embedCommand/embedArgsTemplate 로 임베딩 CLI 실행
+- 🌍 **i18n +52개 키** — 2,543개 × 3언어, **누락 0**
+
+### Architecture
+- `server/ollama_hub.py` (신규) — 모델 카탈로그 23종, pull/delete/info/pull-status API
+- `server/ai_providers.py` — CustomCliProvider.embed() 구현
+- `server/ai_keys.py` — api_set_default_model()
+- `server/routes.py` — Ollama 5개 + default-model 1개 = 6개 새 라우트
+- `dist/index.html` — Ollama 허브 UI, 커스텀 프로바이더 편집, 기본 모델 드롭다운
+- GET 72 + POST 56 라우트
+
 ## [1.7.0] — 2026-04-22
 
 ### Added — 멀티 AI 오케스트라 Phase 7

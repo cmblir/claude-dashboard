@@ -481,6 +481,12 @@
     #content header { gap: 0.5rem !important; }
     #content #view { padding: 0.5rem !important; }
   }
+  /* Ollama 모델 허브 */
+  .ollama-cat-filter.active { background: var(--accent) !important; color: #fff !important; }
+  #ollamaCatalogGrid .card { transition: transform 0.15s, box-shadow 0.15s; }
+  #ollamaCatalogGrid .card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+  #ollamaInstalledTable th { text-align: left; white-space: nowrap; }
+  #ollamaInstalledTable td { white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -8027,8 +8033,8 @@ VIEWS.aiProviders = async () => {
   const providerCard = (p) => {
     const avail = p.available;
     const chip = avail
-      ? '<span class="chip chip-ok" data-i18n="available">사용 가능</span>'
-      : '<span class="chip chip-err" data-i18n="unavailable">미설치/미설정</span>';
+      ? '<span class="chip chip-ok" data-i18n="available">' + t('사용 가능') + '</span>'
+      : '<span class="chip chip-err" data-i18n="unavailable">' + t('미설치/미설정') + '</span>';
     const keyMasked = apiKeys[p.id] || '';
     const keyChip = keyMasked ? `<span class="chip" style="font-family:monospace">${escapeHtml(keyMasked)}</span>` : '';
     const models = (p.models || []).slice(0, 6);
@@ -8036,7 +8042,19 @@ VIEWS.aiProviders = async () => {
       `<span class="chip" title="${escapeHtml(m.note || '')}">${escapeHtml(m.label || m.id)}</span>`
     ).join(' ');
     const testBtn = avail
-      ? `<button class="btn btn-sm" onclick="testProvider('${p.id}')" data-i18n="test_connection">연결 테스트</button>`
+      ? `<button class="btn btn-sm" onclick="testProvider('${p.id}')">${t('연결 테스트')}</button>`
+      : '';
+
+    // 기본 모델 드롭다운 (Task 3)
+    const allModels = p.models || [];
+    const defaultModelSelect = allModels.length > 0
+      ? `<div class="flex items-center gap-2 mt-2">
+          <span class="text-xs" style="color:var(--text-dim)">${t('기본 모델')}:</span>
+          <select class="input text-xs py-1 px-2" style="max-width:200px;" onchange="saveDefaultModel('${escapeHtml(p.id)}', this.value)">
+            <option value="">— ${t('선택 안 함')} —</option>
+            ${allModels.map(m => `<option value="${escapeHtml(m.id)}" ${m.isDefault ? 'selected' : ''}>${escapeHtml(m.label || m.id)}</option>`).join('')}
+          </select>
+        </div>`
       : '';
 
     return `<div class="card p-4 mb-3 hover-lift">
@@ -8054,9 +8072,10 @@ VIEWS.aiProviders = async () => {
       </div>
       ${p.homepage ? `<a href="${escapeHtml(p.homepage)}" target="_blank" class="text-xs" style="color:var(--cyan)">${escapeHtml(p.homepage)}</a>` : ''}
       <div class="mt-2 flex flex-wrap gap-1">
-        <span class="text-xs" style="color:var(--text-dim)" data-i18n="models">모델:</span> ${modelTags || '<span class="text-xs" style="color:var(--text-dim)">—</span>'}
+        <span class="text-xs" style="color:var(--text-dim)">${t('모델')}:</span> ${modelTags || '<span class="text-xs" style="color:var(--text-dim)">—</span>'}
       </div>
-      <div class="text-xs mt-1" style="color:var(--text-dim)" data-i18n="model_count_info">${p.modelCount}개 모델</div>
+      <div class="text-xs mt-1" style="color:var(--text-dim)">${p.modelCount}${t('개 모델')}</div>
+      ${defaultModelSelect}
       <div id="testResult-${p.id}" class="mt-2"></div>
     </div>`;
   };
@@ -8081,19 +8100,42 @@ VIEWS.aiProviders = async () => {
     return `<span class="chip">${i + 1}. ${p ? p.icon + ' ' + p.name : pid}</span>`;
   }).join(' → ');
 
-  // 커스텀 프로바이더 목록
-  const customCards = customProviders.map(c => `
-    <div class="card p-3 mb-2">
-      <div class="flex items-center justify-between">
-        <div>
-          <span class="font-semibold">${escapeHtml(c.name || c.id)}</span>
-          <span class="text-xs" style="color:var(--text-dim)"> — ${escapeHtml(c.command)}</span>
+  // 커스텀 프로바이더 목록 (Task 2 — 강화된 카드)
+  const customCards = customProviders.map(c => {
+    const caps = (c.capabilities || ['chat']).map(cap => {
+      const capColors = { chat: 'var(--cyan)', embed: 'var(--ok)', code: 'var(--accent)', vision: 'var(--warn)' };
+      const color = capColors[cap] || 'var(--text-dim)';
+      return `<span class="chip text-[10px]" style="border-color:${color};color:${color}">${escapeHtml(cap)}</span>`;
+    }).join(' ');
+    const cModels = (c.models || []);
+    const modelList = cModels.length > 0
+      ? `<div class="mt-2 flex flex-wrap gap-1">
+          <span class="text-xs" style="color:var(--text-dim)">${t('모델')}:</span>
+          ${cModels.map(m => `<span class="chip text-[10px]">${escapeHtml(typeof m === 'string' ? m : (m.label || m.id))}</span>`).join(' ')}
+        </div>`
+      : '';
+    return `
+    <div class="card p-4 mb-3 hover-lift">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">⚙️</span>
+          <div>
+            <span class="font-semibold" style="color:var(--text)">${escapeHtml(c.name || c.id)}</span>
+            <span class="text-xs" style="color:var(--text-dim)"> — ${escapeHtml(c.command)}</span>
+          </div>
         </div>
-        <button class="btn btn-sm btn-ghost" onclick="deleteCustomProvider('${escapeHtml(c.id)}')" style="color:var(--err)">✕</button>
+        <div class="flex items-center gap-2">
+          ${caps}
+          <button class="btn btn-sm" onclick="testProvider('custom-${escapeHtml(c.id)}')" title="${t('연결 테스트')}">🧪 ${t('테스트')}</button>
+          <button class="btn btn-sm" onclick="showEditCustomProviderModal('${escapeHtml(c.id)}')" title="${t('편집')}">✏️ ${t('편집')}</button>
+          <button class="btn btn-sm btn-ghost" onclick="deleteCustomProvider('${escapeHtml(c.id)}')" style="color:var(--err)" title="${t('삭제')}">✕</button>
+        </div>
       </div>
-      <div class="text-xs mt-1" style="color:var(--text-dim)">args: ${escapeHtml(c.argsTemplate || '')} · models: ${(c.models || []).length}개</div>
-    </div>
-  `).join('');
+      <div class="text-xs" style="color:var(--text-dim)">args: ${escapeHtml(c.argsTemplate || '')} · ${t('모델')}: ${cModels.length}${t('개')}</div>
+      ${modelList}
+      <div id="testResult-custom-${escapeHtml(c.id)}" class="mt-2"></div>
+    </div>`;
+  }).join('');
 
   return `
     ${viewHeader(t('ai_providers_title','AI 프로바이더'), t('ai_providers_subtitle','Claude · GPT · Gemini · Ollama · Codex 등 멀티 AI 프로바이더 관리'), 'aiProviders')}
@@ -8158,6 +8200,82 @@ VIEWS.aiProviders = async () => {
             <tr><td><code>opus-4.7</code></td><td>Claude CLI (기존 호환)</td><td>Opus 4.7</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Ollama 모델 허브 (Task 1) -->
+    <div class="card p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">🦙</span>
+          <div>
+            <h3 class="text-lg font-semibold" style="color:var(--text)">${t('Ollama 모델 허브')}</h3>
+            <p class="text-xs" style="color:var(--text-dim)">${t('로컬 LLM 모델을 탐색하고 관리합니다.')}</p>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-sm" id="ollamaTabCatalog" onclick="_ollamaSwitchTab('catalog')" style="background:var(--accent);color:#fff;">
+            ${t('카탈로그')}
+          </button>
+          <button class="btn btn-sm" id="ollamaTabInstalled" onclick="_ollamaSwitchTab('installed')">
+            ${t('설치된 모델')}
+          </button>
+          <button class="btn btn-sm" onclick="_ollamaRefresh()">🔄</button>
+        </div>
+      </div>
+
+      <!-- 카탈로그 뷰 -->
+      <div id="ollamaCatalogView">
+        <div class="flex flex-wrap gap-2 mb-3">
+          <button class="btn btn-sm ollama-cat-filter active" data-cat="all" onclick="_ollamaFilterCat('all')">${t('전체')}</button>
+          <button class="btn btn-sm ollama-cat-filter" data-cat="llm" onclick="_ollamaFilterCat('llm')">LLM</button>
+          <button class="btn btn-sm ollama-cat-filter" data-cat="code" onclick="_ollamaFilterCat('code')">Code</button>
+          <button class="btn btn-sm ollama-cat-filter" data-cat="embedding" onclick="_ollamaFilterCat('embedding')">Embedding</button>
+          <button class="btn btn-sm ollama-cat-filter" data-cat="vision" onclick="_ollamaFilterCat('vision')">Vision</button>
+        </div>
+        <div class="mb-4">
+          <input type="text" id="ollamaCatalogSearch" class="input w-full text-sm" placeholder="${t('모델 검색...')}" oninput="_ollamaFilterCatalog()" />
+        </div>
+        <div id="ollamaCatalogGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div class="text-sm" style="color:var(--text-dim)">${t('로딩 중...')}</div>
+        </div>
+      </div>
+
+      <!-- 설치된 모델 뷰 -->
+      <div id="ollamaInstalledView" style="display:none;">
+        <div class="overflow-x-auto">
+          <table class="data w-full text-sm" id="ollamaInstalledTable">
+            <thead>
+              <tr>
+                <th>${t('모델 이름')}</th>
+                <th>${t('크기')}</th>
+                <th>${t('패밀리')}</th>
+                <th>${t('파라미터')}</th>
+                <th>${t('양자화')}</th>
+                <th>${t('수정일')}</th>
+                <th>${t('작업')}</th>
+              </tr>
+            </thead>
+            <tbody id="ollamaInstalledBody">
+              <tr><td colspan="7" class="text-center" style="color:var(--text-dim)">${t('로딩 중...')}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 다운로드 진행률 -->
+      <div id="ollamaPullProgress" style="display:none;" class="mt-4">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-sm font-semibold" style="color:var(--text)">${t('다운로드 진행')}</span>
+          <span id="ollamaPullModelName" class="chip text-xs"></span>
+        </div>
+        <div class="w-full rounded-full" style="height:8px;background:var(--border);">
+          <div id="ollamaPullBar" class="rounded-full" style="height:8px;width:0%;background:var(--grad);transition:width 0.3s ease;"></div>
+        </div>
+        <div class="flex justify-between mt-1">
+          <span id="ollamaPullPercent" class="text-xs" style="color:var(--text-mute)">0%</span>
+          <span id="ollamaPullStatus" class="text-xs" style="color:var(--text-dim)">${t('준비 중...')}</span>
+        </div>
       </div>
     </div>
 
@@ -8242,6 +8360,8 @@ AFTER.aiProviders = async () => {
   await window.initCostCharts();
   _aiRefreshHealth();
   _loadUsageAlertStatus();
+  _ollamaLoadCatalog();
+  _ollamaLoadInstalled();
 };
 
 // 프로바이더 헬스 체크
@@ -8384,41 +8504,381 @@ window.saveApiKey = async (pid) => {
 };
 
 window.deleteApiKey = async (pid) => {
-  const ok = await confirmModal(t('delete_api_key_confirm','이 API 키를 삭제하시겠습니까?'));
+  const ok = await confirmModal({ title: t('삭제 확인'), message: t('이 API 키를 삭제하시겠습니까?'), confirmLabel: t('삭제'), danger: true });
   if (!ok) return;
   await api('/api/ai-providers/delete-key', { method: 'POST', body: JSON.stringify({ providerId: pid }) });
   toast(t('api_key_deleted','API 키 삭제 완료'), 'ok'); renderView();
 };
 
 window.deleteCustomProvider = async (pid) => {
-  const ok = await confirmModal(t('delete_custom_provider_confirm','이 커스텀 프로바이더를 삭제하시겠습니까?'));
+  const ok = await confirmModal({ title: t('삭제 확인'), message: t('이 커스텀 프로바이더를 삭제하시겠습니까?'), confirmLabel: t('삭제'), danger: true });
   if (!ok) return;
   await api('/api/ai-providers/custom/delete', { method: 'POST', body: JSON.stringify({ id: pid }) });
-  toast(t('custom_provider_deleted','삭제 완료'), 'ok'); renderView();
+  toast(t('삭제 완료'), 'ok'); renderView();
 };
 
-window.showAddCustomProviderModal = async () => {
-  const html = `
-    <div style="min-width:400px">
-      <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">ID (영문 소문자)</label><input id="cpId" class="input w-full text-sm" placeholder="my-ai" /></div>
-      <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">이름</label><input id="cpName" class="input w-full text-sm" placeholder="My AI Tool" /></div>
-      <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">CLI 명령어</label><input id="cpCmd" class="input w-full text-sm" placeholder="my-ai-cli" /></div>
-      <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">인자 템플릿 (프롬프트={prompt}, 모델={model})</label><input id="cpArgs" class="input w-full text-sm" placeholder="-p {prompt} --model {model}" value="{prompt}" /></div>
-      <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">모델 목록 (쉼표 구분)</label><input id="cpModels" class="input w-full text-sm" placeholder="model-a, model-b" /></div>
-    </div>`;
-  const confirmed = await confirmModal(html, t('add_custom_provider','커스텀 프로바이더 추가'));
-  if (!confirmed) return;
+window.showAddCustomProviderModal = async (editData) => {
+  const isEdit = !!editData;
+  const titleText = isEdit ? t('커스텀 프로바이더 편집') : t('커스텀 프로바이더 추가');
+  const ed = editData || {};
+  showModal(`
+    <div class="p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold" style="color:var(--text)">${escapeHtml(titleText)}</h3>
+        <button class="btn text-xs" onclick="closeModal()">✕</button>
+      </div>
+      <div style="min-width:400px">
+        <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">${t('ID (영문 소문자)')}</label><input id="cpId" class="input w-full text-sm" placeholder="my-ai" value="${escapeHtml(ed.id || '')}" ${isEdit ? 'readonly style="opacity:0.6"' : ''} /></div>
+        <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">${t('이름')}</label><input id="cpName" class="input w-full text-sm" placeholder="My AI Tool" value="${escapeHtml(ed.name || '')}" /></div>
+        <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">${t('CLI 명령어')}</label><input id="cpCmd" class="input w-full text-sm" placeholder="my-ai-cli" value="${escapeHtml(ed.command || '')}" /></div>
+        <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">${t('인자 템플릿')} (${t('프롬프트')}={prompt}, ${t('모델')}={model})</label><input id="cpArgs" class="input w-full text-sm" placeholder="-p {prompt} --model {model}" value="${escapeHtml(ed.argsTemplate || '{prompt}')}" /></div>
+        <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">${t('모델 목록 (쉼표 구분)')}</label><input id="cpModels" class="input w-full text-sm" placeholder="model-a, model-b" value="${escapeHtml((ed.models || []).join(', '))}" /></div>
+        <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">${t('기능 (쉼표 구분: chat, embed, code, vision)')}</label><input id="cpCaps" class="input w-full text-sm" placeholder="chat, code" value="${escapeHtml((ed.capabilities || []).join(', '))}" /></div>
+      </div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button class="btn text-sm" onclick="closeModal()">${t('취소')}</button>
+        <button class="btn-primary btn text-sm" onclick="_saveCustomProviderFromModal()">${isEdit ? t('저장') : t('추가')}</button>
+      </div>
+    </div>
+  `, { keepMascot: true, narrow: true });
+};
+
+window._saveCustomProviderFromModal = async () => {
   const body = {
     id: document.getElementById('cpId')?.value || '',
     name: document.getElementById('cpName')?.value || '',
     command: document.getElementById('cpCmd')?.value || '',
     argsTemplate: document.getElementById('cpArgs')?.value || '{prompt}',
     models: (document.getElementById('cpModels')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
+    capabilities: (document.getElementById('cpCaps')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
   };
+  if (!body.id) { toast(t('ID를 입력하세요'), 'warn'); return; }
+  closeModal();
   const r = await api('/api/ai-providers/custom/save', { method: 'POST', body: JSON.stringify(body) });
-  if (r.ok) { toast(t('custom_provider_saved','등록 완료'), 'ok'); renderView(); }
+  if (r.ok) { toast(t('등록 완료'), 'ok'); renderView(); }
   else toast(errMsg(r), 'err');
 };
+
+// 편집 모드로 커스텀 프로바이더 모달 열기 (Task 2)
+window.showEditCustomProviderModal = async (cpId) => {
+  const cached = state.data._aiProviders;
+  const cp = (cached?.customProviders || []).find(c => c.id === cpId);
+  if (!cp) { toast(t('프로바이더를 찾을 수 없습니다'), 'err'); return; }
+  showAddCustomProviderModal(cp);
+};
+
+// 기본 모델 저장 (Task 3)
+window.saveDefaultModel = async (providerId, modelId) => {
+  try {
+    const r = await api('/api/ai-providers/save-key', {
+      method: 'POST',
+      body: JSON.stringify({ providerId, defaultModel: modelId })
+    });
+    if (r.ok) toast(t('기본 모델 저장 완료'), 'ok');
+    else toast(errMsg(r), 'err');
+  } catch (e) {
+    toast(t('기본 모델 저장 실패') + ': ' + (e.message || e), 'err');
+  }
+};
+
+// ────────────────────────────────────────────────────────────────
+// OLLAMA 모델 허브 (Task 1)
+// ────────────────────────────────────────────────────────────────
+let _ollamaCatalogData = [];
+let _ollamaInstalledData = [];
+let _ollamaCurrentCat = 'all';
+let _ollamaPullTimers = {};
+
+function _ollamaSwitchTab(tab) {
+  const catalogView = document.getElementById('ollamaCatalogView');
+  const installedView = document.getElementById('ollamaInstalledView');
+  const tabCatalog = document.getElementById('ollamaTabCatalog');
+  const tabInstalled = document.getElementById('ollamaTabInstalled');
+  if (!catalogView || !installedView) return;
+
+  if (tab === 'catalog') {
+    catalogView.style.display = '';
+    installedView.style.display = 'none';
+    if (tabCatalog) { tabCatalog.style.background = 'var(--accent)'; tabCatalog.style.color = '#fff'; }
+    if (tabInstalled) { tabInstalled.style.background = ''; tabInstalled.style.color = ''; }
+  } else {
+    catalogView.style.display = 'none';
+    installedView.style.display = '';
+    if (tabInstalled) { tabInstalled.style.background = 'var(--accent)'; tabInstalled.style.color = '#fff'; }
+    if (tabCatalog) { tabCatalog.style.background = ''; tabCatalog.style.color = ''; }
+    _ollamaRenderInstalled();
+  }
+}
+
+async function _ollamaLoadCatalog() {
+  try {
+    const d = await api('/api/ollama/catalog');
+    _ollamaCatalogData = d.models || d.catalog || [];
+    _ollamaRenderCatalog();
+  } catch (e) {
+    const grid = document.getElementById('ollamaCatalogGrid');
+    if (grid) grid.innerHTML = `<div class="text-xs" style="color:var(--text-dim)">${t('Ollama 카탈로그를 불러올 수 없습니다.')} <button class="btn btn-sm" onclick="_ollamaLoadCatalog()">${t('재시도')}</button></div>`;
+  }
+}
+
+async function _ollamaLoadInstalled() {
+  try {
+    const d = await api('/api/ollama/models');
+    _ollamaInstalledData = d.models || [];
+    // 카탈로그에 installed 플래그 갱신
+    const installedNames = new Set(_ollamaInstalledData.map(m => (m.name || m.model || '').replace(/:latest$/, '')));
+    _ollamaCatalogData.forEach(m => {
+      m._installed = installedNames.has(m.name) || installedNames.has(m.id);
+    });
+    _ollamaRenderCatalog();
+  } catch (e) {
+    // installed 로드 실패 — silent
+  }
+}
+
+function _ollamaRefresh() {
+  _ollamaLoadCatalog();
+  _ollamaLoadInstalled();
+}
+window._ollamaRefresh = _ollamaRefresh;
+window._ollamaSwitchTab = _ollamaSwitchTab;
+
+function _ollamaFilterCat(cat) {
+  _ollamaCurrentCat = cat;
+  document.querySelectorAll('.ollama-cat-filter').forEach(btn => {
+    if (btn.dataset.cat === cat) {
+      btn.style.background = 'var(--accent)'; btn.style.color = '#fff';
+      btn.classList.add('active');
+    } else {
+      btn.style.background = ''; btn.style.color = '';
+      btn.classList.remove('active');
+    }
+  });
+  _ollamaRenderCatalog();
+}
+window._ollamaFilterCat = _ollamaFilterCat;
+
+function _ollamaFilterCatalog() {
+  _ollamaRenderCatalog();
+}
+window._ollamaFilterCatalog = _ollamaFilterCatalog;
+
+function _ollamaRenderCatalog() {
+  const grid = document.getElementById('ollamaCatalogGrid');
+  if (!grid) return;
+  const searchVal = (document.getElementById('ollamaCatalogSearch')?.value || '').toLowerCase();
+  let items = _ollamaCatalogData;
+
+  if (_ollamaCurrentCat !== 'all') {
+    items = items.filter(m => {
+      const cat = (m.category || m.type || '').toLowerCase();
+      const tags = (m.tags || []).map(tg => tg.toLowerCase());
+      return cat === _ollamaCurrentCat || tags.includes(_ollamaCurrentCat);
+    });
+  }
+
+  if (searchVal) {
+    items = items.filter(m =>
+      (m.name || '').toLowerCase().includes(searchVal) ||
+      (m.description || '').toLowerCase().includes(searchVal) ||
+      (m.id || '').toLowerCase().includes(searchVal)
+    );
+  }
+
+  if (items.length === 0) {
+    grid.innerHTML = `<div class="text-sm" style="color:var(--text-dim)">${t('일치하는 모델이 없습니다.')}</div>`;
+    return;
+  }
+
+  grid.innerHTML = items.map(m => {
+    const installed = m._installed;
+    const sizeStr = m.size ? _formatBytes(m.size) : (m.sizeLabel || '—');
+    const tags = (m.tags || []).slice(0, 4);
+    const tagChips = tags.map(tg => `<span class="chip text-[10px]">${escapeHtml(tg)}</span>`).join(' ');
+    const statusChip = installed
+      ? `<span class="chip chip-ok text-[10px]">${t('설치됨')}</span>`
+      : `<span class="chip text-[10px]" style="color:var(--text-dim)">${t('미설치')}</span>`;
+    const actionBtn = installed
+      ? `<button class="btn btn-sm text-xs" style="color:var(--err);border-color:rgba(248,113,113,0.3);" onclick="_ollamaDelete('${escapeHtml(m.name || m.id)}')">${t('삭제')}</button>`
+      : `<button class="btn btn-sm btn-primary text-xs" onclick="_ollamaPull('${escapeHtml(m.name || m.id)}')">⬇ ${t('다운로드')}</button>`;
+
+    return `<div class="card p-4 hover-lift" style="display:flex;flex-direction:column;justify-content:space-between;">
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="font-semibold text-sm" style="color:var(--text)">${escapeHtml(m.name || m.id)}</h4>
+          ${statusChip}
+        </div>
+        <p class="text-xs mb-2" style="color:var(--text-mute);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(m.description || '')}</p>
+        <div class="flex flex-wrap gap-1 mb-2">${tagChips}</div>
+        <div class="text-[11px]" style="color:var(--text-dim)">${t('크기')}: ${escapeHtml(sizeStr)}</div>
+      </div>
+      <div class="mt-3 flex justify-end">${actionBtn}</div>
+    </div>`;
+  }).join('');
+}
+
+function _ollamaRenderInstalled() {
+  const tbody = document.getElementById('ollamaInstalledBody');
+  if (!tbody) return;
+
+  if (_ollamaInstalledData.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-sm" style="color:var(--text-dim)">${t('설치된 Ollama 모델이 없습니다.')}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = _ollamaInstalledData.map(m => {
+    const name = m.name || m.model || '—';
+    const size = m.size ? _formatBytes(m.size) : '—';
+    const family = m.details?.family || m.family || '—';
+    const paramSize = m.details?.parameter_size || m.parameter_size || '—';
+    const quant = m.details?.quantization_level || m.quantization_level || '—';
+    const modified = m.modified_at ? new Date(m.modified_at).toLocaleDateString() : '—';
+
+    return `<tr>
+      <td class="font-semibold text-sm" style="color:var(--text)">${escapeHtml(name)}</td>
+      <td class="text-xs">${escapeHtml(size)}</td>
+      <td class="text-xs">${escapeHtml(family)}</td>
+      <td class="text-xs">${escapeHtml(paramSize)}</td>
+      <td class="text-xs">${escapeHtml(quant)}</td>
+      <td class="text-xs">${escapeHtml(modified)}</td>
+      <td>
+        <div class="flex gap-1">
+          <button class="btn btn-sm text-xs" onclick="_ollamaShowInfo('${escapeHtml(name)}')">${t('상세')}</button>
+          <button class="btn btn-sm text-xs" style="color:var(--err);" onclick="_ollamaDelete('${escapeHtml(name)}')">${t('삭제')}</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function _ollamaPull(modelName) {
+  try {
+    const r = await api('/api/ollama/pull', {
+      method: 'POST',
+      body: JSON.stringify({ name: modelName })
+    });
+    const pullId = r.pullId || r.id || modelName;
+
+    // 진행률 UI 표시
+    const progressEl = document.getElementById('ollamaPullProgress');
+    const nameEl = document.getElementById('ollamaPullModelName');
+    const barEl = document.getElementById('ollamaPullBar');
+    const percentEl = document.getElementById('ollamaPullPercent');
+    const statusEl = document.getElementById('ollamaPullStatus');
+
+    if (progressEl) progressEl.style.display = '';
+    if (nameEl) nameEl.textContent = modelName;
+    if (barEl) barEl.style.width = '0%';
+    if (percentEl) percentEl.textContent = '0%';
+    if (statusEl) statusEl.textContent = t('다운로드 시작...');
+
+    toast(t('모델 다운로드를 시작합니다') + ': ' + modelName, 'ok');
+
+    // 2초 간격 폴링
+    if (_ollamaPullTimers[pullId]) clearInterval(_ollamaPullTimers[pullId]);
+    _ollamaPullTimers[pullId] = setInterval(async () => {
+      try {
+        const s = await api('/api/ollama/pull-status?pullId=' + encodeURIComponent(pullId));
+        const pct = Math.min(100, Math.max(0, s.percent || s.progress || 0));
+        const status = s.status || '';
+
+        if (barEl) barEl.style.width = pct + '%';
+        if (percentEl) percentEl.textContent = Math.round(pct) + '%';
+        if (statusEl) statusEl.textContent = status || t('다운로드 중...');
+
+        if (pct >= 100 || status === 'success' || status === 'complete' || s.done) {
+          clearInterval(_ollamaPullTimers[pullId]);
+          delete _ollamaPullTimers[pullId];
+          if (barEl) barEl.style.width = '100%';
+          if (percentEl) percentEl.textContent = '100%';
+          if (statusEl) statusEl.textContent = t('완료');
+          toast(t('모델 다운로드 완료') + ': ' + modelName, 'ok');
+          setTimeout(() => {
+            if (progressEl) progressEl.style.display = 'none';
+            _ollamaRefresh();
+          }, 1500);
+        } else if (s.error) {
+          clearInterval(_ollamaPullTimers[pullId]);
+          delete _ollamaPullTimers[pullId];
+          if (statusEl) statusEl.textContent = t('오류') + ': ' + (s.error || '');
+          toast(t('모델 다운로드 실패') + ': ' + (s.error || ''), 'err');
+        }
+      } catch (e) {
+        clearInterval(_ollamaPullTimers[pullId]);
+        delete _ollamaPullTimers[pullId];
+        if (statusEl) statusEl.textContent = t('상태 확인 실패');
+      }
+    }, 2000);
+  } catch (e) {
+    toast(t('모델 다운로드 요청 실패') + ': ' + (e.message || e), 'err');
+  }
+}
+window._ollamaPull = _ollamaPull;
+
+async function _ollamaDelete(modelName) {
+  const ok = await confirmModal({
+    title: t('모델 삭제'),
+    message: t('이 모델을 삭제하시겠습니까?') + ' — ' + modelName,
+    confirmLabel: t('삭제'),
+    danger: true
+  });
+  if (!ok) return;
+  try {
+    await api('/api/ollama/delete', {
+      method: 'POST',
+      body: JSON.stringify({ name: modelName })
+    });
+    toast(t('모델 삭제 완료') + ': ' + modelName, 'ok');
+    _ollamaRefresh();
+  } catch (e) {
+    toast(t('모델 삭제 실패') + ': ' + (e.message || e), 'err');
+  }
+}
+window._ollamaDelete = _ollamaDelete;
+
+async function _ollamaShowInfo(modelName) {
+  showModalLoading(t('모델 정보를 불러오는 중...'));
+  try {
+    const d = await api('/api/ollama/info?name=' + encodeURIComponent(modelName));
+    const info = d.info || d;
+    const modelfile = info.modelfile || info.Modelfile || '—';
+    const parameters = info.parameters || info.Parameters || '—';
+    const template = info.template || info.Template || '—';
+
+    showModal(`
+      <div class="p-5" style="max-width:700px;">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-base font-semibold" style="color:var(--text)">🦙 ${escapeHtml(modelName)}</h3>
+          <button class="btn text-xs" onclick="closeModal()">✕</button>
+        </div>
+        <div class="mb-4">
+          <h4 class="text-xs font-semibold mb-1" style="color:var(--text-mute)">${t('Modelfile')}</h4>
+          <pre class="text-xs whitespace-pre-wrap break-words" style="max-height:200px;overflow-y:auto;color:var(--text-mute);background:var(--code-bg);padding:12px;border-radius:8px;">${escapeHtml(modelfile)}</pre>
+        </div>
+        <div class="mb-4">
+          <h4 class="text-xs font-semibold mb-1" style="color:var(--text-mute)">${t('파라미터')}</h4>
+          <pre class="text-xs whitespace-pre-wrap break-words" style="max-height:150px;overflow-y:auto;color:var(--text-mute);background:var(--code-bg);padding:12px;border-radius:8px;">${escapeHtml(parameters)}</pre>
+        </div>
+        <div class="mb-4">
+          <h4 class="text-xs font-semibold mb-1" style="color:var(--text-mute)">${t('템플릿')}</h4>
+          <pre class="text-xs whitespace-pre-wrap break-words" style="max-height:150px;overflow-y:auto;color:var(--text-mute);background:var(--code-bg);padding:12px;border-radius:8px;">${escapeHtml(template)}</pre>
+        </div>
+      </div>
+    `);
+  } catch (e) {
+    closeModal();
+    toast(t('모델 정보를 불러올 수 없습니다') + ': ' + (e.message || e), 'err');
+  }
+}
+window._ollamaShowInfo = _ollamaShowInfo;
+
+function _formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
 
 // ── 비용 차트 인스턴스 캐시 (메모리 누수 방지) ──
 let _costTimelineChart = null;
