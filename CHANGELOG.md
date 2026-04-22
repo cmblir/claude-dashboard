@@ -11,6 +11,14 @@
 
 ---
 
+## [2.1.4] — 2026-04-22
+
+### Fixed — 설정 드롭다운 테마 3종 번역 누락
+- `Midnight`/`Forest`/`Sunset` 테마 라벨이 하드코딩 영문으로 박혀 있어 ko/zh 선택 시에도 번역되지 않던 문제 수정.
+- `dist/index.html` 설정 드롭다운 3개 버튼에 `data-i18n="settings.midnight|forest|sunset"` 속성 추가 (KO 기본값: 미드나잇/포레스트/선셋).
+- `tools/translations_manual.py::MANUAL_KO` + `tools/translations_manual_9.py::NEW_EN/NEW_ZH` 에 구조화 키 + 한글-텍스트 키(`미드나잇 → Midnight/午夜`) 동시 등록 → `data-i18n` 경로와 text-node 스캐너 경로 양쪽 대응.
+- 결과: ko/en/zh 각 **2,936 키** · 누락 0 · 한글 잔존 0 (기존 2,932 → +4).
+
 ## [2.1.3] — 2026-04-22
 
 ### Fixed — 워크플로우 탭 UX 정리
