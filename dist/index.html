@@ -2036,11 +2036,13 @@ function _wfRenderCanvas() {
   nodesG.innerHTML = (__wf.current.nodes || []).map(n => _wfRenderNode(n)).join('');
   // 엣지
   edgesG.innerHTML = (__wf.current.edges || []).map(e => _wfRenderEdge(e)).join('');
-  // 노드 검색 필터 반영
-  _wfApplyNodeSearchHighlight();
-  // 미니맵 업데이트
-  _wfRenderMinimap();
+  // 노드 검색 필터 반영 (검색어 있을 때만)
+  if (__wfNodeSearchQuery) _wfApplyNodeSearchHighlight();
+  // 미니맵 업데이트 (debounce — 연속 렌더 시 마지막만)
+  if (_wfMinimapTimer) cancelAnimationFrame(_wfMinimapTimer);
+  _wfMinimapTimer = requestAnimationFrame(() => { _wfMinimapTimer = null; _wfRenderMinimap(); });
 }
+let _wfMinimapTimer = null;
 
 // ─── 노드 검색 필터 ────────────────────────────────────────────
 let __wfNodeSearchQuery = '';
@@ -11850,10 +11852,18 @@ window._i18nReady = _loadLocale(_curLang).then(() => {
         if (n.isConnected) _translateDOM(n);
       }
     };
+    // SVG 캔버스 + 코드 블록은 번역 불필요 — MutationObserver에서 제외
+    const _i18nSkipTags = new Set(['SVG','svg','CODE','code','PRE','pre','SCRIPT','STYLE','CANVAS']);
+    const _i18nSkipIds = new Set(['wfNodes','wfEdges','wfViewport','wfTutNodes','wfTutEdges','wfTutSvg','wfMinimap']);
     const mo = new MutationObserver(muts => {
       for (const m of muts) {
         for (const node of m.addedNodes) {
-          if (node && node.nodeType === 1) _i18nPending.add(node);
+          if (!node || node.nodeType !== 1) continue;
+          if (_i18nSkipTags.has(node.tagName)) continue;
+          if (_i18nSkipIds.has(node.id)) continue;
+          // SVG 내부 요소도 제외
+          if (node.closest && node.closest('svg')) continue;
+          _i18nPending.add(node);
         }
       }
       if (_i18nPending.size && !_i18nTimer) {
