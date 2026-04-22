@@ -350,8 +350,8 @@ tailwind.config = {
   .onboard-done { opacity: 0.78; }
 
   /* ─── 워크플로우 에디터 (n8n 스타일) ─── */
-  /* 높이는 (뷰포트 - 160) 과 680px 중 작은 값으로 cap — 큰 모니터에서도 무한히 늘어나지 않음 */
-  #wfRoot { display: flex; gap: 10px; height: min(calc(100vh - 160px), 680px); min-height: 340px; }
+  /* 뷰포트 높이에서 상단 chrome(헤더·타이틀·통계 패널 ≈ 230px) 을 뺀 공간을 모두 사용 → 스크롤 없이 한눈에 */
+  #wfRoot { display: flex; gap: 10px; height: calc(100vh - 230px); min-height: 420px; }
   #wfList { width: 260px; flex-shrink: 0; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
   #wfCanvasWrap { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; }
   #wfToolbar { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; background: var(--card); border-radius: 12px 12px 0 0; }
@@ -413,13 +413,14 @@ tailwind.config = {
   .wf-edge-draft { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; fill: none; pointer-events: none; opacity: 0.7; }
   .wf-dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; display: inline-block; margin-right: 4px; }
   .wf-ok-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; display: inline-block; margin-right: 4px; }
-  /* 미니맵 */
+  /* 미니맵 — 워크플로우·노드 존재 시에만 표시 (기본은 숨김) */
   #wfMinimap {
     position: absolute; right: 12px; bottom: 48px; z-index: 6;
     width: 150px; height: 100px;
     background: var(--card); border: 1px solid var(--border);
     border-radius: 8px; overflow: hidden; cursor: pointer;
     box-shadow: 0 4px 14px rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+    display: none;
   }
   /* 캔버스 내부 플로팅 컨트롤 (n8n 스타일) */
   .wf-floating { position: absolute; right: 12px; bottom: 12px; z-index: 5; display: flex; gap: 6px; }
@@ -2130,9 +2131,13 @@ function _wfRenderMinimap() {
   if (!cvs) return;
   const ctx = cvs.getContext('2d');
   ctx.clearRect(0, 0, _WF_MINIMAP_W, _WF_MINIMAP_H);
-  if (!__wf.current) return;
-  const nodes = __wf.current.nodes || [];
-  if (!nodes.length) return;
+  // 워크플로우 미선택 또는 노드 없음 → 빈 박스 숨김
+  if (!__wf.current || !(__wf.current.nodes || []).length) {
+    cvs.style.display = 'none';
+    return;
+  }
+  cvs.style.display = '';
+  const nodes = __wf.current.nodes;
   // bounding box
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   nodes.forEach(n => {
