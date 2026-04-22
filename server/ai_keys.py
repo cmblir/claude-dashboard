@@ -214,6 +214,13 @@ def save_custom_provider(body: dict) -> dict:
     if pid in RESERVED:
         return {"ok": False, "error": f"'{pid}' 는 빌트인 프로바이더 — 다른 id 사용"}
 
+    # capabilities: ["chat"], ["embed"], ["chat","embed","code"] 등
+    raw_caps = body.get("capabilities") or ["chat"]
+    if isinstance(raw_caps, str):
+        raw_caps = [c.strip() for c in raw_caps.split(",") if c.strip()]
+    VALID_CAPS = {"chat", "embed", "code", "vision", "reasoning"}
+    caps = [c for c in raw_caps if isinstance(c, str) and c in VALID_CAPS][:5] or ["chat"]
+
     entry = {
         "id": pid,
         "name": (body.get("name") or pid).strip()[:80],
@@ -222,6 +229,9 @@ def save_custom_provider(body: dict) -> dict:
         "models": _sanitize_models(body.get("models")),
         "homepage": (body.get("homepage") or "").strip()[:200],
         "timeout": max(10, min(3600, int(body.get("timeout") or 300))),
+        "capabilities": caps,
+        "embedCommand": (body.get("embedCommand") or "").strip()[:200],
+        "embedArgsTemplate": (body.get("embedArgsTemplate") or "{input}").strip()[:500],
     }
 
     cfg = _load_config()
@@ -351,6 +361,7 @@ def api_providers_list() -> dict:
             "homepage": p.homepage,
             "icon": p.icon,
             "available": available,
+            "capabilities": getattr(p, "capabilities", ["chat"]),
             "modelCount": len(models),
             "models": [m.to_dict() for m in models],
         })

@@ -238,6 +238,17 @@
   .wf-node:active { cursor: grabbing; }
   .wf-node-body { fill: var(--card); stroke: var(--border); stroke-width: 1; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); }
   .wf-node.selected .wf-node-body { stroke: var(--accent); stroke-width: 2; }
+  /* 노드 타입별 색상 구분 */
+  .wf-node[data-type="http"] .wf-node-body { stroke: #4ade80; stroke-width: 1.5; }
+  .wf-node[data-type="http"].selected .wf-node-body { stroke: #4ade80; stroke-width: 2.5; }
+  .wf-node[data-type="transform"] .wf-node-body { stroke: #c084fc; stroke-width: 1.5; }
+  .wf-node[data-type="transform"].selected .wf-node-body { stroke: #c084fc; stroke-width: 2.5; }
+  .wf-node[data-type="variable"] .wf-node-body { stroke: #fbbf24; stroke-width: 1.5; }
+  .wf-node[data-type="variable"].selected .wf-node-body { stroke: #fbbf24; stroke-width: 2.5; }
+  .wf-node[data-type="subworkflow"] .wf-node-body { stroke: #7dd3fc; stroke-width: 1.5; }
+  .wf-node[data-type="subworkflow"].selected .wf-node-body { stroke: #7dd3fc; stroke-width: 2.5; }
+  .wf-node[data-type="session"] .wf-node-body { stroke: var(--accent); stroke-width: 1.5; }
+  .wf-node[data-type="subagent"] .wf-node-body { stroke: var(--accent); stroke-width: 1.5; }
   .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2; animation: wfPulse 1.4s infinite; }
   .wf-node[data-status="ok"] .wf-node-body { stroke: #4ade80; stroke-width: 2; }
   .wf-node[data-status="err"] .wf-node-body { stroke: #f87171; stroke-width: 2; }
@@ -1439,6 +1450,8 @@ const WF_NODE_TYPES = [
     desc: '입력 값을 변수 이름에 바인딩. 후속 노드에서 참조. 기본값 설정 가능.' },
   { id: 'subworkflow', icon: '🔁', label: '서브 워크플로우', portIn: true, portOut: true,
     desc: '다른 워크플로우를 호출하고 결과를 받는 노드. 워크플로우 재사용 가능.' },
+  { id: 'embedding', icon: '🧲', label: '임베딩', portIn: true, portOut: true,
+    desc: '텍스트를 벡터로 변환. Ollama bge-m3, OpenAI text-embedding-3 등 임베딩 모델 사용. RAG/검색 파이프라인 구축용.' },
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 
@@ -1771,7 +1784,7 @@ function _wfRenderNode(n) {
         <text x="10" y="15" text-anchor="middle" font-size="12" pointer-events="none">🖥️</text>
       </g>` : '';
   return `
-    <g class="wf-node${sel}" data-node="${n.id}" transform="translate(${n.x},${n.y})">
+    <g class="wf-node${sel}" data-node="${n.id}" data-type="${n.type}" transform="translate(${n.x},${n.y})">
       <rect class="wf-node-body" width="${WF_NODE_W}" height="${WF_NODE_H}" rx="12" ry="12"></rect>
       <text class="wf-node-icon" x="14" y="30">${meta.icon}</text>
       <text class="wf-node-title" x="40" y="28">${escapeHtml(n.title || meta.label)}</text>
@@ -1972,6 +1985,7 @@ function _wfAddNode(type) {
   else if (type === 'transform') newNode.data = { transformType:'template', template:'{{input}}', jsonPath:'', regexPattern:'', regexReplacement:'', separator:'\\n' };
   else if (type === 'variable') newNode.data = { varName:'var1', defaultValue:'' };
   else if (type === 'subworkflow') newNode.data = { workflowId:'', passInput:true };
+  else if (type === 'embedding') newNode.data = { provider:'ollama-api', model:'bge-m3', outputFormat:'json' };
   __wf.current.nodes.push(newNode);
   __wf.selectedNodeId = nid;
   __wf.dirty = true;
@@ -2454,6 +2468,7 @@ function _wfPickNodeType(winId, type) {
   else if (type === 'transform') draft.data = { transformType:'template', template:'{{input}}', jsonPath:'', regexPattern:'', regexReplacement:'', separator:'\\n' };
   else if (type === 'variable')  draft.data = { varName:'var1', defaultValue:'' };
   else if (type === 'subworkflow') draft.data = { workflowId:'', passInput:true };
+  else if (type === 'embedding') draft.data = { provider:'ollama-api', model:'bge-m3', outputFormat:'json' };
   else draft.data = {};
   if (!draft.title) draft.title = WF_TYPE_MAP[type].label;
   _wfRenderEditorBody(winId);
@@ -2664,6 +2679,30 @@ function _wfRenderEditorBody(winId) {
         ${t('이전 노드 출력을 입력으로 전달')}
       </label>
     `;
+  } else if (draft.type === 'embedding') {
+    // embed capability 가진 프로바이더만 옵션으로
+    const ep = (__wfProviders||{providers:[]}).providers.filter(p => p.available && (p.capabilities||[]).includes('embed'));
+    const provOpts = ep.map(p => {
+      const models = (p.models||[]).filter(m => (m.capabilities||[]).includes('embed'));
+      return models.map(m =>
+        `<option value="${escapeHtml(p.id)}|${escapeHtml(m.id)}" ${d.provider===p.id && d.model===m.id?'selected':''}>${p.icon} ${escapeHtml(p.name)} — ${escapeHtml(m.label||m.id)}</option>`
+      ).join('');
+    }).join('');
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('임베딩 프로바이더 : 모델')}</label>
+      <select class="input w-full mt-1" onchange="const [p,m]=this.value.split('|');_wfDraftSetData('${winId}','provider',p);_wfDraftSetData('${winId}','model',m);">
+        ${provOpts || `<option value="ollama-api|bge-m3">🦙 Ollama — bge-m3</option>`}
+      </select>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('출력 형식')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','outputFormat',this.value)">
+        <option value="json" ${d.outputFormat==='json'?'selected':''}>JSON (벡터 포함)</option>
+        <option value="dimensions" ${d.outputFormat==='dimensions'?'selected':''}>${t('차원 수만')}</option>
+        <option value="raw" ${d.outputFormat==='raw'?'selected':''}>${t('전체 원본')}</option>
+      </select>
+      <div class="text-xs mt-3 p-2 rounded" style="background:var(--code-bg);color:var(--text-dim)">
+        💡 ${t('이전 노드의 텍스트 출력이 임베딩 입력으로 사용됩니다. 여러 입력은 각각 벡터화됩니다.')}
+      </div>
+    `;
   } else if (draft.type === 'start') {
     body += `<div class="text-xs text-[var(--text-dim)] mt-4">${t('시작 노드는 추가 입력이 없습니다. 워크플로우 진입점이 됩니다.')}</div>`;
   }
@@ -2837,7 +2876,86 @@ async function _wfRun() {
   _wfStartPolling();
 }
 
+function _wfApplyRunStatus(run) {
+  const results = run.nodeResults || {};
+  document.querySelectorAll('.wf-node').forEach(el => {
+    const nid = el.getAttribute('data-node');
+    const r = results[nid];
+    if (r) el.setAttribute('data-status', r.status);
+  });
+}
+
+function _wfStopSSE() {
+  if (__wf._sse) { try { __wf._sse.close(); } catch(e){} __wf._sse = null; }
+}
+
 function _wfStartPolling() {
+  // 먼저 SSE 시도, 실패 시 폴링 fallback
+  _wfStopSSE();
+  if (__wf.pollTimer) { clearInterval(__wf.pollTimer); __wf.pollTimer = null; }
+
+  if (!__wf.runId) return;
+
+  try {
+    const sse = new EventSource('/api/workflows/run-stream?runId=' + encodeURIComponent(__wf.runId));
+    __wf._sse = sse;
+
+    sse.addEventListener('status', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        const run = data.run || data;
+        _wfApplyRunStatus(run);
+      } catch(ex) { /* silent */ }
+    });
+
+    sse.addEventListener('done', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        const run = data.run || data;
+        _wfApplyRunStatus(run);
+        _wfShowRunResult(run);
+      } catch(ex) { /* silent */ }
+      __wf.runId = null;
+      _wfStopSSE();
+    });
+
+    sse.addEventListener('error', (e) => {
+      // SSE 프로토콜 에러 이벤트 (커스텀)
+      if (e.data) {
+        try {
+          const data = JSON.parse(e.data);
+          toast(data.error || t('실행 오류'), 'err');
+        } catch(ex) { toast(t('실행 오류'), 'err'); }
+        __wf.runId = null;
+        _wfStopSSE();
+      } else {
+        // 연결 실패 — 폴링 fallback
+        _wfStopSSE();
+        _wfStartPollingFallback();
+      }
+    });
+
+    sse.addEventListener('timeout', (e) => {
+      toast(t('실행 시간 초과'), 'warn');
+      __wf.runId = null;
+      _wfStopSSE();
+    });
+
+    // 연결 실패 시 onerror 로 fallback
+    sse.onerror = () => {
+      if (sse.readyState === EventSource.CLOSED || sse.readyState === EventSource.CONNECTING) {
+        // SSE 불가 — 폴링 fallback
+        _wfStopSSE();
+        if (__wf.runId) _wfStartPollingFallback();
+      }
+    };
+  } catch(e) {
+    // EventSource 생성 자체 실패 — 폴링 fallback
+    _wfStartPollingFallback();
+  }
+}
+
+function _wfStartPollingFallback() {
   if (__wf.pollTimer) { clearInterval(__wf.pollTimer); __wf.pollTimer = null; }
   __wf.pollTimer = setInterval(async () => {
     if (!__wf.runId) { clearInterval(__wf.pollTimer); __wf.pollTimer = null; return; }
@@ -2845,13 +2963,7 @@ function _wfStartPolling() {
       const s = await api('/api/workflows/run-status?runId=' + __wf.runId);
       if (!s.ok) return;
       const run = s.run || {};
-      // 노드별 상태 배지
-      const results = run.nodeResults || {};
-      document.querySelectorAll('.wf-node').forEach(el => {
-        const nid = el.getAttribute('data-node');
-        const r = results[nid];
-        if (r) el.setAttribute('data-status', r.status);
-      });
+      _wfApplyRunStatus(run);
       if (run.status === 'ok' || run.status === 'err') {
         clearInterval(__wf.pollTimer); __wf.pollTimer = null;
         _wfShowRunResult(run);
@@ -7510,7 +7622,7 @@ VIEWS.aiProviders = async () => {
       <button class="btn btn-sm mt-3" onclick="showAddCustomProviderModal()" data-i18n="add_custom_provider">+ 커스텀 프로바이더 추가</button>
     </div>
 
-    <div class="card p-6">
+    <div class="card p-6 mb-6">
       <h3 class="text-lg font-semibold mb-3" style="color:var(--text)" data-i18n="workflow_usage_guide">💡 워크플로우에서 사용법</h3>
       <div class="text-sm" style="color:var(--text-mute)">
         <p class="mb-2" data-i18n="workflow_usage_desc">워크플로우 노드의 <b>Assignee</b> 필드에 <code style="background:var(--code-bg);padding:2px 6px;border-radius:4px">프로바이더:모델</code> 형태로 입력합니다.</p>
@@ -7527,7 +7639,68 @@ VIEWS.aiProviders = async () => {
         </table>
       </div>
     </div>
+
+    <!-- 비용 분석 섹션 -->
+    <div class="card p-6 mb-6">
+      <h3 class="text-lg font-semibold mb-4" style="color:var(--text)" data-i18n="cost_analysis_title">📊 ${t('비용 분석')}</h3>
+      <div id="costSummaryCards" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="card p-4 text-center">
+          <div class="text-xs mb-1" style="color:var(--text-dim)" data-i18n="total_calls">${t('총 호출 수')}</div>
+          <div id="costTotalCalls" class="text-2xl font-bold" style="color:var(--accent)">—</div>
+        </div>
+        <div class="card p-4 text-center">
+          <div class="text-xs mb-1" style="color:var(--text-dim)" data-i18n="total_tokens">${t('총 토큰')}</div>
+          <div id="costTotalTokens" class="text-2xl font-bold" style="color:var(--cyan)">—</div>
+        </div>
+        <div class="card p-4 text-center">
+          <div class="text-xs mb-1" style="color:var(--text-dim)" data-i18n="total_cost_usd">${t('총 비용 (USD)')}</div>
+          <div id="costTotalUSD" class="text-2xl font-bold" style="color:var(--ok)">—</div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <h4 class="text-sm font-semibold mb-2" style="color:var(--text-mute)" data-i18n="daily_cost_timeline">${t('일별 비용 타임라인')}</h4>
+          <div style="position:relative;height:280px;">
+            <canvas id="costTimeline"></canvas>
+          </div>
+        </div>
+        <div>
+          <h4 class="text-sm font-semibold mb-2" style="color:var(--text-mute)" data-i18n="cost_by_provider">${t('프로바이더별 비용 비교')}</h4>
+          <div style="position:relative;height:280px;">
+            <canvas id="costByProvider"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 멀티 AI 비교 모드 -->
+    <div class="card p-6">
+      <h3 class="text-lg font-semibold mb-4" style="color:var(--text)" data-i18n="multi_ai_compare_title">🔬 ${t('멀티 AI 비교')}</h3>
+      <p class="text-xs mb-4" style="color:var(--text-dim)" data-i18n="multi_ai_compare_desc">${t('동일한 프롬프트를 여러 AI 프로바이더에 동시에 보내 결과를 비교합니다.')}</p>
+      <div class="mb-4">
+        <label class="text-xs font-semibold mb-1 block" style="color:var(--text-mute)" data-i18n="compare_prompt">${t('프롬프트')}</label>
+        <textarea id="multiComparePrompt" class="input w-full text-sm" rows="3" placeholder="${t('비교할 프롬프트를 입력하세요...')}" data-i18n-placeholder="compare_prompt_placeholder"></textarea>
+      </div>
+      <div class="mb-4">
+        <label class="text-xs font-semibold mb-2 block" style="color:var(--text-mute)" data-i18n="select_providers">${t('비교할 프로바이더 선택')}</label>
+        <div id="multiCompareProviders" class="flex flex-wrap gap-3">
+          ${providers.filter(p => p.available).map(p => `
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" class="multi-compare-cb" value="${escapeHtml(p.id)}" style="accent-color:var(--accent)" />
+              <span class="text-sm">${p.icon || '🔌'} ${escapeHtml(p.name)}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="runMultiCompare()" data-i18n="run_compare">${t('비교 실행')}</button>
+      <div id="multiCompareResults" class="mt-6"></div>
+    </div>
   `;
+};
+
+// AI Providers 뷰 렌더 후 비용 차트 초기화
+AFTER.aiProviders = async () => {
+  await window.initCostCharts();
 };
 
 // AI Providers 전역 함수
@@ -7590,6 +7763,157 @@ window.showAddCustomProviderModal = async () => {
   const r = await api('/api/ai-providers/custom/save', { method: 'POST', body: JSON.stringify(body) });
   if (r.ok) { toast(t('custom_provider_saved','등록 완료'), 'ok'); renderView(); }
   else toast(r.error || 'failed', 'err');
+};
+
+// ── 비용 차트 인스턴스 캐시 (메모리 누수 방지) ──
+let _costTimelineChart = null;
+let _costByProviderChart = null;
+
+window.initCostCharts = async () => {
+  try {
+    const d = await api('/api/ai-providers/costs');
+    if (!d || !d.ok) return;
+    const costs = d.costs || {};
+    const daily = costs.daily || [];        // [{date, cost, tokens, calls}]
+    const byProvider = costs.byProvider || []; // [{provider, cost, tokens, calls}]
+    const totals = costs.totals || {};      // {totalCalls, totalTokens, totalCostUSD}
+
+    // 요약 카드 업데이트
+    const elCalls = document.getElementById('costTotalCalls');
+    const elTokens = document.getElementById('costTotalTokens');
+    const elUSD = document.getElementById('costTotalUSD');
+    if (elCalls) elCalls.textContent = (totals.totalCalls || 0).toLocaleString();
+    if (elTokens) elTokens.textContent = (totals.totalTokens || 0).toLocaleString();
+    if (elUSD) elUSD.textContent = '$' + (totals.totalCostUSD || 0).toFixed(4);
+
+    // 공통 Chart.js 색상
+    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-mute').trim() || '#a0a0a8';
+    const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || 'rgba(255,255,255,0.07)';
+
+    // 일별 비용 타임라인 (라인 차트)
+    const ctxTimeline = document.getElementById('costTimeline');
+    if (ctxTimeline) {
+      if (_costTimelineChart) { _costTimelineChart.destroy(); _costTimelineChart = null; }
+      _costTimelineChart = new Chart(ctxTimeline, {
+        type: 'line',
+        data: {
+          labels: daily.map(d => d.date),
+          datasets: [{
+            label: t('비용 (USD)'),
+            data: daily.map(d => d.cost || 0),
+            borderColor: '#d97757',
+            backgroundColor: 'rgba(217,119,87,0.15)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 3,
+            pointBackgroundColor: '#d97757',
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: textColor, font: { size: 11 } } },
+            tooltip: { callbacks: { label: ctx => '$' + (ctx.parsed.y || 0).toFixed(4) } },
+          },
+          scales: {
+            x: { ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor } },
+            y: { ticks: { color: textColor, font: { size: 10 }, callback: v => '$' + v.toFixed(2) }, grid: { color: gridColor } },
+          }
+        }
+      });
+    }
+
+    // 프로바이더별 비용 비교 (도넛 차트)
+    const ctxProvider = document.getElementById('costByProvider');
+    if (ctxProvider) {
+      if (_costByProviderChart) { _costByProviderChart.destroy(); _costByProviderChart = null; }
+      const providerColors = ['#d97757','#7dd3fc','#4ade80','#c084fc','#fbbf24','#f87171','#a78bfa','#38bdf8'];
+      _costByProviderChart = new Chart(ctxProvider, {
+        type: 'doughnut',
+        data: {
+          labels: byProvider.map(p => p.provider),
+          datasets: [{
+            data: byProvider.map(p => p.cost || 0),
+            backgroundColor: byProvider.map((_, i) => providerColors[i % providerColors.length]),
+            borderColor: 'transparent',
+            borderWidth: 2,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'right', labels: { color: textColor, font: { size: 11 }, padding: 12 } },
+            tooltip: { callbacks: { label: ctx => ctx.label + ': $' + (ctx.parsed || 0).toFixed(4) } },
+          }
+        }
+      });
+    }
+  } catch(e) { /* 비용 API 미지원 시 조용히 무시 */ }
+};
+
+// ── 멀티 AI 비교 모드 ──
+window.runMultiCompare = async () => {
+  const prompt = (document.getElementById('multiComparePrompt')?.value || '').trim();
+  if (!prompt) { toast(t('프롬프트를 입력하세요'), 'warn'); return; }
+  const cbs = document.querySelectorAll('.multi-compare-cb:checked');
+  const selectedIds = Array.from(cbs).map(cb => cb.value);
+  if (!selectedIds.length) { toast(t('프로바이더를 선택하세요'), 'warn'); return; }
+
+  const resultsEl = document.getElementById('multiCompareResults');
+  if (!resultsEl) return;
+  resultsEl.innerHTML = `<div class="text-sm" style="color:var(--text-dim)">${t('비교 실행 중...')} (${selectedIds.length} ${t('프로바이더')})</div>`;
+
+  // 모든 프로바이더에 동시에 요청
+  const promises = selectedIds.map(async (pid) => {
+    const start = Date.now();
+    try {
+      const r = await api('/api/ai-providers/test', {
+        method: 'POST',
+        body: JSON.stringify({ providerId: pid, prompt }),
+      });
+      const elapsed = Date.now() - start;
+      const resp = r.response || {};
+      return {
+        providerId: pid,
+        ok: !!r.ok,
+        output: resp.output || r.error || t('응답 없음'),
+        duration: resp.duration_ms || elapsed,
+        tokens: resp.tokens || 0,
+        error: r.ok ? null : (r.error || resp.error || t('실패')),
+      };
+    } catch(e) {
+      return { providerId: pid, ok: false, output: '', duration: Date.now() - start, tokens: 0, error: String(e) };
+    }
+  });
+
+  const results = await Promise.allSettled(promises);
+  const providers = (state.data._aiProviders?.providers) || [];
+
+  const cards = results.map(r => {
+    const v = r.status === 'fulfilled' ? r.value : { providerId: '?', ok: false, output: '', duration: 0, tokens: 0, error: t('요청 실패') };
+    const p = providers.find(x => x.id === v.providerId) || {};
+    const statusChip = v.ok
+      ? '<span class="chip chip-ok text-xs">' + t('성공') + '</span>'
+      : '<span class="chip chip-err text-xs">' + t('실패') + '</span>';
+    return `
+      <div class="card p-4 flex-1 min-w-[260px]">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">${p.icon || '🔌'}</span>
+            <span class="font-semibold text-sm" style="color:var(--text)">${escapeHtml(p.name || v.providerId)}</span>
+          </div>
+          ${statusChip}
+        </div>
+        <div class="flex gap-3 mb-2">
+          <span class="chip text-xs">${v.duration}ms</span>
+          <span class="chip text-xs">${(v.tokens || 0).toLocaleString()} ${t('토큰')}</span>
+        </div>
+        ${v.error ? `<div class="text-xs mb-2" style="color:var(--err)">${escapeHtml(v.error)}</div>` : ''}
+        <pre class="text-xs whitespace-pre-wrap break-words" style="max-height:200px;overflow-y:auto;color:var(--text-mute);background:var(--code-bg);padding:8px;border-radius:8px;">${escapeHtml((v.output || '').substring(0, 2000))}</pre>
+      </div>`;
+  }).join('');
+
+  resultsEl.innerHTML = `<div class="flex flex-wrap gap-4">${cards}</div>`;
 };
 
 // ENV CONFIG
