@@ -195,8 +195,13 @@
   table.data td { padding: 0.65rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
   table.data tr:hover td { background: var(--card-hi); }
   .link-row { cursor: pointer; }
-  .input { width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.88rem; }
+  .input { width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.88rem; -webkit-appearance: none; }
   .input:focus { outline: none; border-color: var(--accent); }
+  /* number/password/text 등 모든 input 타입에 다크 테마 강제 */
+  input.input, select.input { background: rgba(255,255,255,0.04) !important; color: var(--text) !important; color-scheme: dark; }
+  input.input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px rgba(10,10,10,1) inset !important; -webkit-text-fill-color: var(--text) !important; }
+  body.theme-light input.input, body.theme-light select.input { background: rgba(255,255,255,0.7) !important; color: var(--text) !important; color-scheme: light; }
+  body.theme-light input.input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px rgba(245,245,240,1) inset !important; }
   textarea.input { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.8rem; line-height: 1.55; }
   .kbd { display: inline-block; padding: 0.1rem 0.45rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; background: rgba(255,255,255,0.05); font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; }
   .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(4px); z-index: 50; display: grid; place-items: center; padding: 24px; }
@@ -8828,14 +8833,17 @@ VIEWS.aiProviders = async () => {
 };
 
 // AI Providers 뷰 렌더 후 비용 차트 초기화
-AFTER.aiProviders = async () => {
-  await window.initCostCharts();
-  _aiRefreshHealth();
-  _loadUsageAlertStatus();
-  _ollamaServeCheckStatus();
-  _ollamaLoadSettings();
-  _ollamaLoadCatalog();
-  _ollamaLoadInstalled();
+AFTER.aiProviders = () => {
+  // 모든 초기화를 병렬 실행 (await 블로킹 제거 → 체감 속도 대폭 개선)
+  Promise.allSettled([
+    window.initCostCharts(),
+    _aiRefreshHealth(),
+    _loadUsageAlertStatus(),
+    _ollamaServeCheckStatus(),
+    _ollamaLoadSettings(),
+    _ollamaLoadCatalog(),
+    _ollamaLoadInstalled(),
+  ]).catch(() => {});
 };
 
 // 프로바이더 헬스 체크
@@ -8854,22 +8862,20 @@ async function _aiRefreshHealth() {
     }
     const avail = items.filter(p => p.available || p.status === 'available');
     if (summary) summary.textContent = `${avail.length}/${items.length} ${t('프로바이더 사용 가능')}`;
-    // 프로바이더 목록에서 호스트 정보 매칭
-    const provList = (state.data._aiProviders||{}).providers||[];
-    const provMap = Object.fromEntries(provList.map(p=>[p.id,p]));
     host.innerHTML = items.map(p => {
       const ok = p.available || p.status === 'available';
       const dotColor = ok ? 'var(--ok)' : 'var(--err)';
-      const icon = p.icon || (provMap[p.provider]||{}).icon || '🔌';
+      const icon = p.icon || '🔌';
       const name = escapeHtml(p.name || p.provider || p.id || '');
       const chipCls = ok ? 'chip chip-ok' : 'chip chip-err';
-      const prov = provMap[p.provider] || {};
-      const hostInfo = ok && prov.homepage ? `<span class="text-[9px]" style="color:var(--text-dim)">${escapeHtml(prov.homepage.replace('https://',''))}</span>` : '';
-      return `<div class="flex items-center gap-1.5" title="${escapeHtml(p.provider||'')}">
+      const ep = p.endpoint || '';
+      const epShort = ep.replace('https://','').replace('http://','').replace(/\/.*$/,'');
+      const epHtml = ok && epShort ? `<span class="text-[9px]" style="color:var(--cyan);font-family:monospace">${escapeHtml(epShort)}</span>` : '';
+      return `<div class="flex items-center gap-1.5" title="${escapeHtml(ep||p.provider||'')}">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
         <span class="text-sm">${icon}</span>
         <span class="${chipCls} text-[11px]">${name}</span>
-        ${hostInfo}
+        ${epHtml}
       </div>`;
     }).join('');
   } catch (e) {

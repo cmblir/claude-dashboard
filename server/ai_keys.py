@@ -583,15 +583,32 @@ def api_custom_provider_delete(body: dict) -> dict:
 
 
 def api_provider_health() -> dict:
-    """모든 프로바이더 health check 병렬 실행."""
+    """모든 프로바이더 health check 병렬 실행 — 포트/엔드포인트 정보 포함."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from .ai_providers import get_registry
+    import os, shutil
 
     reg = get_registry()
     results = []
 
     def _check(p):
-        return p.health_check()
+        h = p.health_check()
+        # endpoint/port 정보 추가
+        h["name"] = p.provider_name
+        h["icon"] = p.icon
+        h["type"] = p.provider_type
+        if hasattr(p, "_base_url"):
+            h["endpoint"] = p._base_url
+        elif hasattr(p, "_host") and callable(p._host):
+            h["endpoint"] = p._host()
+        elif p.provider_id == "claude-cli":
+            cli = shutil.which("claude") or ""
+            h["endpoint"] = cli if cli else ""
+        elif hasattr(p, "_bin") and callable(p._bin):
+            h["endpoint"] = p._bin() or ""
+        elif p.provider_type == "api":
+            h["endpoint"] = p.homepage
+        return h
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         futures = {pool.submit(_check, p): p for p in reg.all_providers()}
@@ -600,7 +617,8 @@ def api_provider_health() -> dict:
                 results.append(future.result())
             except Exception as e:
                 p = futures[future]
-                results.append({"provider": p.provider_id, "available": False, "error": str(e)})
+                results.append({"provider": p.provider_id, "name": p.provider_name,
+                                "icon": p.icon, "available": False, "error": str(e)})
 
     results.sort(key=lambda r: (not r.get("available", False), r.get("provider", "")))
     available = sum(1 for r in results if r.get("available"))
