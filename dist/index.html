@@ -11747,7 +11747,6 @@ function _translateDOM(root) {
     _domTranslateCache[_curLang] = { keys, patterns: _buildKeyPatterns(keys) };
   }
   const { keys, patterns } = _domTranslateCache[_curLang];
-  if (!keys.length) return;
 
   const applyAll = (txt) => {
     for (const { k, short, pat } of patterns) {
@@ -11761,32 +11760,48 @@ function _translateDOM(root) {
     return txt;
   };
 
-  // 속성 먼저
-  root.querySelectorAll('[placeholder],[title],[alt],[aria-label]').forEach(el => {
-    ['placeholder','title','alt','aria-label'].forEach(attr => {
-      const v = el.getAttribute(attr);
-      if (v && _KO_RE.test(v)) {
-        const nv = applyAll(v);
-        if (nv !== v) el.setAttribute(attr, nv);
-      }
-    });
+  // ── 1단계: data-i18n 속성 직접 처리 (영문 키 + 한글 키 모두) ──
+  root.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (key && dict[key]) {
+      el.textContent = dict[key];
+    }
+  });
+  root.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (key && dict[key]) {
+      el.setAttribute('placeholder', dict[key]);
+    }
   });
 
-  // 텍스트 노드 수집 · 교체
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-  let node;
-  while (node = walker.nextNode()) {
-    const t = node.textContent;
-    if (!t || !_KO_RE.test(t) || !t.trim()) continue;
-    const trimmed = t.trim();
-    // 1) 전체 일치 우선
-    if (dict[trimmed]) {
-      node.textContent = t.replace(trimmed, dict[trimmed]);
-      continue;
+  // ── 2단계: 한글 텍스트 속성 치환 ──
+  if (keys.length) {
+    root.querySelectorAll('[placeholder],[title],[alt],[aria-label]').forEach(el => {
+      ['placeholder','title','alt','aria-label'].forEach(attr => {
+        const v = el.getAttribute(attr);
+        if (v && _KO_RE.test(v)) {
+          const nv = applyAll(v);
+          if (nv !== v) el.setAttribute(attr, nv);
+        }
+      });
+    });
+
+    // ── 3단계: 텍스트 노드 수집 · 교체 ──
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    while (node = walker.nextNode()) {
+      const t = node.textContent;
+      if (!t || !_KO_RE.test(t) || !t.trim()) continue;
+      const trimmed = t.trim();
+      // 1) 전체 일치 우선
+      if (dict[trimmed]) {
+        node.textContent = t.replace(trimmed, dict[trimmed]);
+        continue;
+      }
+      // 2) 패턴 순차 적용 (긴 키 우선 + 짧은 키는 Hangul boundary 보호)
+      const next = applyAll(t);
+      if (next !== t) node.textContent = next;
     }
-    // 2) 패턴 순차 적용 (긴 키 우선 + 짧은 키는 Hangul boundary 보호)
-    const next = applyAll(t);
-    if (next !== t) node.textContent = next;
   }
 }
 // t() 번역 함수 — 한국어 원문을 키로 사용, 현재 언어의 번역 반환
