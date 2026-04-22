@@ -657,6 +657,8 @@ const NAV = [
   { id: 'sessions',    icon: '🗂️', label: '세션 히스토리',      group: 'main', docUrl: DOCS_BASE+'interactive-mode' },
   { id: 'workflows',   icon: '🔀', label: '워크플로우', group: 'work',
     desc: '세션 노드를 DAG 로 연결해 업무 흐름 설계' },
+  { id: 'aiProviders', icon: '🧠', label: 'AI 프로바이더',
+    group: 'work', desc: 'Claude/GPT/Gemini/Ollama/Codex 멀티 AI — API 키 · CLI 감지 · 폴백 체인 · 연결 테스트' },
   { id: 'agents',      icon: '🤝', label: '에이전트 & 그래프',  group: 'work', docUrl: DOCS_BASE+'sub-agents' },
   { id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'work',
     desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE+'sub-agents' },
@@ -7264,6 +7266,207 @@ async function appendToClaudeMd(recId) {
 }
 
 // ────────────────────────────────────────────────────────────────
+// AI PROVIDERS — 멀티 AI 프로바이더 설정
+// ────────────────────────────────────────────────────────────────
+VIEWS.aiProviders = async () => {
+  const d = await api('/api/ai-providers/list');
+  state.data._aiProviders = d;
+  const providers = d.providers || [];
+  const apiKeys = d.apiKeys || {};
+  const customProviders = d.customProviders || [];
+  const fallbackChain = d.fallbackChain || [];
+
+  const cliProviders = providers.filter(p => p.type === 'cli');
+  const apiProviders = providers.filter(p => p.type === 'api');
+
+  const providerCard = (p) => {
+    const avail = p.available;
+    const chip = avail
+      ? '<span class="chip chip-ok" data-i18n="available">사용 가능</span>'
+      : '<span class="chip chip-err" data-i18n="unavailable">미설치/미설정</span>';
+    const keyMasked = apiKeys[p.id] || '';
+    const keyChip = keyMasked ? `<span class="chip" style="font-family:monospace">${escapeHtml(keyMasked)}</span>` : '';
+    const models = (p.models || []).slice(0, 6);
+    const modelTags = models.map(m =>
+      `<span class="chip" title="${escapeHtml(m.note || '')}">${escapeHtml(m.label || m.id)}</span>`
+    ).join(' ');
+    const testBtn = avail
+      ? `<button class="btn btn-sm" onclick="testProvider('${p.id}')" data-i18n="test_connection">연결 테스트</button>`
+      : '';
+
+    return `<div class="card p-4 mb-3 hover-lift">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">${p.icon || '🔌'}</span>
+          <div>
+            <h4 class="font-semibold" style="color:var(--text)">${escapeHtml(p.name)}</h4>
+            <span class="text-xs" style="color:var(--text-dim)">${escapeHtml(p.id)} · ${p.type.toUpperCase()}</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          ${chip} ${keyChip} ${testBtn}
+        </div>
+      </div>
+      ${p.homepage ? `<a href="${escapeHtml(p.homepage)}" target="_blank" class="text-xs" style="color:var(--cyan)">${escapeHtml(p.homepage)}</a>` : ''}
+      <div class="mt-2 flex flex-wrap gap-1">
+        <span class="text-xs" style="color:var(--text-dim)" data-i18n="models">모델:</span> ${modelTags || '<span class="text-xs" style="color:var(--text-dim)">—</span>'}
+      </div>
+      <div class="text-xs mt-1" style="color:var(--text-dim)" data-i18n="model_count_info">${p.modelCount}개 모델</div>
+      <div id="testResult-${p.id}" class="mt-2"></div>
+    </div>`;
+  };
+
+  // API 키 설정 폼
+  const apiKeyForms = apiProviders.map(p => {
+    const hasKey = !!apiKeys[p.id];
+    return `<div class="flex items-center gap-2 mb-2">
+      <span class="text-sm w-40">${p.icon} ${escapeHtml(p.name)}</span>
+      <input type="password" id="apiKey-${p.id}" class="input flex-1 text-sm"
+        placeholder="${p.id === 'openai-api' ? 'sk-...' : p.id === 'gemini-api' ? 'AIza...' : 'API key'}"
+        value="${hasKey ? '••••••••' : ''}"
+        data-i18n-placeholder="api_key_placeholder" />
+      <button class="btn btn-sm btn-primary" onclick="saveApiKey('${p.id}')" data-i18n="save">저장</button>
+      ${hasKey ? `<button class="btn btn-sm btn-ghost" onclick="deleteApiKey('${p.id}')" style="color:var(--err)" data-i18n="delete">삭제</button>` : ''}
+    </div>`;
+  }).join('');
+
+  // 폴백 체인
+  const chainItems = fallbackChain.map((pid, i) => {
+    const p = providers.find(x => x.id === pid);
+    return `<span class="chip">${i + 1}. ${p ? p.icon + ' ' + p.name : pid}</span>`;
+  }).join(' → ');
+
+  // 커스텀 프로바이더 목록
+  const customCards = customProviders.map(c => `
+    <div class="card p-3 mb-2">
+      <div class="flex items-center justify-between">
+        <div>
+          <span class="font-semibold">${escapeHtml(c.name || c.id)}</span>
+          <span class="text-xs" style="color:var(--text-dim)"> — ${escapeHtml(c.command)}</span>
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="deleteCustomProvider('${escapeHtml(c.id)}')" style="color:var(--err)">✕</button>
+      </div>
+      <div class="text-xs mt-1" style="color:var(--text-dim)">args: ${escapeHtml(c.argsTemplate || '')} · models: ${(c.models || []).length}개</div>
+    </div>
+  `).join('');
+
+  return `
+    ${viewHeader(t('ai_providers_title','AI 프로바이더'), t('ai_providers_subtitle','Claude · GPT · Gemini · Ollama · Codex 등 멀티 AI 프로바이더 관리'), 'aiProviders')}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div>
+        <h3 class="text-lg font-semibold mb-3" style="color:var(--text)" data-i18n="cli_providers">🖥️ CLI 프로바이더 (로컬)</h3>
+        <p class="text-xs mb-3" style="color:var(--text-dim)" data-i18n="cli_providers_desc">로컬에 설치된 CLI 도구를 자동 감지합니다. 워크플로우 노드에서 선택 가능.</p>
+        ${cliProviders.map(providerCard).join('')}
+      </div>
+      <div>
+        <h3 class="text-lg font-semibold mb-3" style="color:var(--text)" data-i18n="api_providers">☁️ API 프로바이더</h3>
+        <p class="text-xs mb-3" style="color:var(--text-dim)" data-i18n="api_providers_desc">API 키를 설정하면 워크플로우에서 사용 가능합니다.</p>
+        ${apiProviders.map(providerCard).join('')}
+      </div>
+    </div>
+
+    <div class="card p-6 mb-6">
+      <h3 class="text-lg font-semibold mb-3" style="color:var(--text)" data-i18n="api_key_settings">🔑 API 키 설정</h3>
+      <p class="text-xs mb-4" style="color:var(--text-dim)" data-i18n="api_key_desc">환경 변수(OPENAI_API_KEY 등)가 이미 설정되어 있으면 자동 감지됩니다. 여기서 추가로 설정할 수 있습니다.</p>
+      ${apiKeyForms}
+    </div>
+
+    <div class="card p-6 mb-6">
+      <h3 class="text-lg font-semibold mb-3" style="color:var(--text)" data-i18n="fallback_chain">🔄 폴백 체인</h3>
+      <p class="text-xs mb-3" style="color:var(--text-dim)" data-i18n="fallback_chain_desc">워크플로우 노드가 실패하면 다음 프로바이더로 자동 전환됩니다.</p>
+      <div class="mb-3">${chainItems || '<span style="color:var(--text-dim)">미설정</span>'}</div>
+    </div>
+
+    <div class="card p-6 mb-6">
+      <h3 class="text-lg font-semibold mb-3" style="color:var(--text)" data-i18n="custom_providers">⚙️ 커스텀 CLI 프로바이더</h3>
+      <p class="text-xs mb-3" style="color:var(--text-dim)" data-i18n="custom_providers_desc">임의의 CLI 도구를 AI 프로바이더로 등록합니다. 워크플로우 노드의 assignee 에서 사용 가능.</p>
+      ${customCards || `<p class="text-sm" style="color:var(--text-dim)" data-i18n="no_custom_providers">등록된 커스텀 프로바이더가 없습니다.</p>`}
+      <button class="btn btn-sm mt-3" onclick="showAddCustomProviderModal()" data-i18n="add_custom_provider">+ 커스텀 프로바이더 추가</button>
+    </div>
+
+    <div class="card p-6">
+      <h3 class="text-lg font-semibold mb-3" style="color:var(--text)" data-i18n="workflow_usage_guide">💡 워크플로우에서 사용법</h3>
+      <div class="text-sm" style="color:var(--text-mute)">
+        <p class="mb-2" data-i18n="workflow_usage_desc">워크플로우 노드의 <b>Assignee</b> 필드에 <code style="background:var(--code-bg);padding:2px 6px;border-radius:4px">프로바이더:모델</code> 형태로 입력합니다.</p>
+        <table class="data w-full text-xs">
+          <thead><tr><th>Assignee</th><th data-i18n="provider_col">프로바이더</th><th data-i18n="model_col">모델</th></tr></thead>
+          <tbody>
+            <tr><td><code>claude:opus</code></td><td>Claude CLI</td><td>Opus 4.7</td></tr>
+            <tr><td><code>openai:gpt-4.1</code></td><td>OpenAI API</td><td>GPT-4.1</td></tr>
+            <tr><td><code>gemini:2.5-pro</code></td><td>Gemini CLI/API</td><td>Gemini 2.5 Pro</td></tr>
+            <tr><td><code>ollama:llama3.1</code></td><td>Ollama</td><td>Llama 3.1</td></tr>
+            <tr><td><code>codex:o4-mini</code></td><td>Codex CLI</td><td>o4-mini</td></tr>
+            <tr><td><code>opus-4.7</code></td><td>Claude CLI (기존 호환)</td><td>Opus 4.7</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+};
+
+// AI Providers 전역 함수
+window.testProvider = async (pid) => {
+  const el = document.getElementById('testResult-' + pid);
+  if (el) el.innerHTML = '<span class="text-xs" style="color:var(--text-dim)">테스트 중...</span>';
+  try {
+    const r = await api('/api/ai-providers/test', { method: 'POST', body: JSON.stringify({ providerId: pid }) });
+    if (r.ok) {
+      const resp = r.response || {};
+      el.innerHTML = `<div class="text-xs" style="color:var(--ok)">✓ 성공 (${resp.duration_ms || 0}ms) — ${escapeHtml((resp.output || '').substring(0, 100))}</div>`;
+    } else {
+      el.innerHTML = `<div class="text-xs" style="color:var(--err)">✗ ${escapeHtml(r.error || (r.response||{}).error || '실패')}</div>`;
+    }
+  } catch (e) { if (el) el.innerHTML = `<div class="text-xs" style="color:var(--err)">✗ ${escapeHtml(String(e))}</div>`; }
+};
+
+window.saveApiKey = async (pid) => {
+  const inp = document.getElementById('apiKey-' + pid);
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (!val || val === '••••••••') { toast(t('enter_api_key','API 키를 입력하세요'), 'warn'); return; }
+  const r = await api('/api/ai-providers/save-key', { method: 'POST', body: JSON.stringify({ providerId: pid, apiKey: val }) });
+  if (r.ok) { toast(t('api_key_saved','API 키 저장 완료'), 'ok'); renderView(); }
+  else toast(r.error || 'failed', 'err');
+};
+
+window.deleteApiKey = async (pid) => {
+  const ok = await confirmModal(t('delete_api_key_confirm','이 API 키를 삭제하시겠습니까?'));
+  if (!ok) return;
+  await api('/api/ai-providers/delete-key', { method: 'POST', body: JSON.stringify({ providerId: pid }) });
+  toast(t('api_key_deleted','API 키 삭제 완료'), 'ok'); renderView();
+};
+
+window.deleteCustomProvider = async (pid) => {
+  const ok = await confirmModal(t('delete_custom_provider_confirm','이 커스텀 프로바이더를 삭제하시겠습니까?'));
+  if (!ok) return;
+  await api('/api/ai-providers/custom/delete', { method: 'POST', body: JSON.stringify({ id: pid }) });
+  toast(t('custom_provider_deleted','삭제 완료'), 'ok'); renderView();
+};
+
+window.showAddCustomProviderModal = async () => {
+  const html = `
+    <div style="min-width:400px">
+      <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">ID (영문 소문자)</label><input id="cpId" class="input w-full text-sm" placeholder="my-ai" /></div>
+      <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">이름</label><input id="cpName" class="input w-full text-sm" placeholder="My AI Tool" /></div>
+      <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">CLI 명령어</label><input id="cpCmd" class="input w-full text-sm" placeholder="my-ai-cli" /></div>
+      <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">인자 템플릿 (프롬프트={prompt}, 모델={model})</label><input id="cpArgs" class="input w-full text-sm" placeholder="-p {prompt} --model {model}" value="{prompt}" /></div>
+      <div class="mb-3"><label class="text-xs" style="color:var(--text-mute)">모델 목록 (쉼표 구분)</label><input id="cpModels" class="input w-full text-sm" placeholder="model-a, model-b" /></div>
+    </div>`;
+  const confirmed = await confirmModal(html, t('add_custom_provider','커스텀 프로바이더 추가'));
+  if (!confirmed) return;
+  const body = {
+    id: document.getElementById('cpId')?.value || '',
+    name: document.getElementById('cpName')?.value || '',
+    command: document.getElementById('cpCmd')?.value || '',
+    argsTemplate: document.getElementById('cpArgs')?.value || '{prompt}',
+    models: (document.getElementById('cpModels')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
+  };
+  const r = await api('/api/ai-providers/custom/save', { method: 'POST', body: JSON.stringify(body) });
+  if (r.ok) { toast(t('custom_provider_saved','등록 완료'), 'ok'); renderView(); }
+  else toast(r.error || 'failed', 'err');
+};
+
 // ENV CONFIG
 // ────────────────────────────────────────────────────────────────
 VIEWS.envConfig = async () => {
