@@ -408,6 +408,64 @@ def api_provider_test(body: dict) -> dict:
     }
 
 
+def api_provider_compare(body: dict) -> dict:
+    """멀티 AI 비교 — 동일 프롬프트를 여러 프로바이더에 병렬 전송.
+
+    body: {prompt, systemPrompt?, providers: [{providerId, model?}], timeout?}
+    반환: {ok, results: [{providerId, model, status, output, duration_ms, tokens_in, tokens_out, cost_usd, error?}]}
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from .ai_providers import get_registry
+
+    reg = get_registry()
+    prompt = (body.get("prompt") or "").strip()
+    sys_prompt = (body.get("systemPrompt") or "").strip()
+    targets = body.get("providers") or []
+    timeout = min(120, max(10, int(body.get("timeout") or 60)))
+
+    if not prompt:
+        return {"ok": False, "error": "prompt required"}
+    if not targets or not isinstance(targets, list):
+        return {"ok": False, "error": "providers list required"}
+
+    def _run_one(target: dict) -> dict:
+        pid = (target.get("providerId") or "").strip()
+        model = (target.get("model") or "").strip()
+        p = reg.get(pid)
+        if not p:
+            return {"providerId": pid, "status": "err", "error": f"unknown: {pid}"}
+        if not p.is_available():
+            return {"providerId": pid, "status": "err", "error": "not available"}
+        resp = p.execute(prompt, system_prompt=sys_prompt, model=model, timeout=timeout)
+        return {
+            "providerId": pid,
+            "model": resp.model,
+            "status": resp.status,
+            "output": (resp.output or "")[:4000],
+            "duration_ms": resp.duration_ms,
+            "tokens_in": resp.tokens_in,
+            "tokens_out": resp.tokens_out,
+            "cost_usd": resp.cost_usd,
+            "error": resp.error if resp.status == "err" else "",
+        }
+
+    results = []
+    max_w = min(6, len(targets))
+    with ThreadPoolExecutor(max_workers=max_w) as pool:
+        futures = {pool.submit(_run_one, t): t for t in targets[:10]}
+        for future in as_completed(futures):
+            try:
+                results.append(future.result())
+            except Exception as e:
+                t = futures[future]
+                results.append({"providerId": t.get("providerId", "?"), "status": "err", "error": str(e)})
+
+    return {"ok": True, "results": results, "prompt": prompt[:200]}
+
+
 def api_provider_save_key(body: dict) -> dict:
     """API 키 저장. body: {providerId, apiKey, baseUrl?}"""
     if not isinstance(body, dict):

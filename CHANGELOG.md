@@ -11,6 +11,26 @@
 
 ---
 
+## [1.4.0] — 2026-04-22
+
+### Added — 멀티 AI 오케스트라 Phase 4
+- 🔬 **멀티 AI 비교 전용 API** (`POST /api/ai-providers/compare`) — 여러 프로바이더에 동일 프롬프트 병렬 전송, 결과 일괄 반환
+- 📦 **워크플로우 Export/Import** — JSON 파일로 내보내기/가져오기 (`POST /api/workflows/export`, `/import`). 툴바에 Export/Import 버튼
+- 🔎 **노드 Inspector 프로바이더 정보** — 실행 결과 있는 노드 선택 시 프로바이더 아이콘, 모델, 소요 시간, 토큰, 비용 칩 표시
+- 📊 **실행 이력 강화** — run 항목에 프로바이더별 색상 태그 + 집계 ("Claude ×3, GPT ×1"), duration 읽기 좋은 형태
+- 🎨 **embedding 노드 캔버스 색상** — 분홍 `#f472b6`
+- 🏗️ **에러 메시지 i18n 시스템** (`server/errors.py`) — 48개 에러 키 정의 + `err()` 헬퍼. 응답에 `error_key` 포함하여 프론트 번역 가능
+- 🌍 **i18n +57개 키** — 48개 에러 키 + 9개 프론트 키 (export/import 등). 2,414개 × 3언어, **누락 0**
+- 🔍 nav_catalog 키워드 확장 — aiProviders 탭에 embedding/비용/비교 키워드 추가
+
+### Architecture
+- `server/errors.py` (신규) — `ERROR_MESSAGES` dict + `err()`/`msg()` 헬퍼
+- `server/ai_keys.py` — `api_provider_compare()` 병렬 비교 API
+- `server/workflows.py` — `api_workflow_export()` / `api_workflow_import()`
+- `server/actions.py` — 에러 메시지 `error_key` 포함 전환 시작
+- `dist/index.html` — Export/Import 버튼, Inspector 프로바이더 칩, 이력 강화, embedding 색상
+- `dist/locales/*.json` — 2,414개 키 × 3언어
+
 ## [1.3.0] — 2026-04-22
 
 ### Added — 멀티 AI 오케스트라 Phase 3

@@ -247,6 +247,8 @@
   .wf-node[data-type="variable"].selected .wf-node-body { stroke: #fbbf24; stroke-width: 2.5; }
   .wf-node[data-type="subworkflow"] .wf-node-body { stroke: #7dd3fc; stroke-width: 1.5; }
   .wf-node[data-type="subworkflow"].selected .wf-node-body { stroke: #7dd3fc; stroke-width: 2.5; }
+  .wf-node[data-type="embedding"] .wf-node-body { stroke: #f472b6; stroke-width: 1.5; }
+  .wf-node[data-type="embedding"].selected .wf-node-body { stroke: #f472b6; stroke-width: 2.5; }
   .wf-node[data-type="session"] .wf-node-body { stroke: var(--accent); stroke-width: 1.5; }
   .wf-node[data-type="subagent"] .wf-node-body { stroke: var(--accent); stroke-width: 1.5; }
   .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2; animation: wfPulse 1.4s infinite; }
@@ -1427,6 +1429,7 @@ const __wf = {
   lastTouchTs: 0,
   pollTimer: null,
   runId: null,
+  lastRunResults: null,
 };
 
 const WF_NODE_TYPES = [
@@ -1538,6 +1541,9 @@ VIEWS.workflows = async () => {
           <button class="btn text-xs" onclick="_wfShowRuns()" title="${t('실행 이력')}">📜 ${t('이력')}</button>
           <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn">💾 ${t('저장')}</button>
           <button class="btn-primary btn text-xs" onclick="_wfRun()" id="wfRunBtn">▶ ${t('실행')}</button>
+          <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
+          <button class="btn text-xs" onclick="_wfExport()" title="${t('JSON 파일로 내보내기')}">📦 ${t('내보내기')}</button>
+          <label class="btn text-xs cursor-pointer" title="${t('JSON 파일에서 가져오기')}">📥 ${t('가져오기')}<input type="file" accept=".json,application/json" style="display:none;" onchange="_wfImport(event)"></label>
         </div>
         <div id="wfCanvasHost">
           <div class="wf-floating-right">
@@ -2337,6 +2343,32 @@ function _wfRenderInspector() {
       const preview = (n.type === 'session' || n.type === 'subagent')
         ? `@${escapeHtml(d.assignee||'auto')} · ${escapeHtml((d.subject||'').slice(0,60) || t('(업무 없음)'))}`
         : escapeHtml(typeMeta.label);
+      // 실행 결과에서 프로바이더/비용 정보 추출
+      let runInfoBlock = '';
+      const nr = (__wf.lastRunResults || {})[n.id];
+      if (nr) {
+        const providerName = nr.provider || nr.providerId || '';
+        const providerIcon = ((__wfProviders||{providers:[]}).providers.find(p => p.id === providerName || p.name === providerName) || {}).icon || '';
+        const model = nr.model || '';
+        const dur = nr.durationMs ? fmtDur(nr.durationMs) : '';
+        const tokens = nr.tokens || nr.tokenCount || (nr.output ? nr.output.length : 0);
+        const cost = nr.cost != null ? ('$' + Number(nr.cost).toFixed(4)) : '';
+        const chips = [
+          providerName ? `<span class="chip text-[10px]">${providerIcon ? providerIcon + ' ' : ''}${escapeHtml(providerName)}</span>` : '',
+          model ? `<span class="chip text-[10px]">${escapeHtml(model)}</span>` : '',
+          dur ? `<span class="chip text-[10px]">⏱ ${dur}</span>` : '',
+          tokens ? `<span class="chip text-[10px]">🔤 ${typeof tokens === 'number' ? tokens.toLocaleString() : tokens}</span>` : '',
+          cost ? `<span class="chip chip-warn text-[10px]">${cost}</span>` : '',
+        ].filter(Boolean).join('');
+        if (chips) {
+          runInfoBlock = `
+            <div class="mt-2 pt-2 border-t border-[var(--border)]">
+              <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${t('실행 결과')}</div>
+              <div class="flex flex-wrap gap-1">${chips}</div>
+            </div>`;
+        }
+      }
+
       nodeBlock = `
         <div class="border-t border-[var(--border)] pt-3">
           <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('선택된 노드')}</div>
@@ -2346,6 +2378,7 @@ function _wfRenderInspector() {
               <div class="text-sm font-semibold truncate">${escapeHtml(n.title||typeMeta.label)}</div>
             </div>
             <div class="text-[11px] text-[var(--text-mute)]">${preview}</div>
+            ${runInfoBlock}
           </div>
           <div class="flex gap-2 flex-wrap">
             <button class="btn-primary btn text-xs flex-1" onclick="_wfOpenNodeEditor('${n.id}')">✏️ ${t('편집')}</button>
@@ -2859,6 +2892,49 @@ async function _wfSave() {
   _wfUpdateToolbar();
 }
 
+async function _wfExport() {
+  if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
+  try {
+    const r = await api('/api/workflows/export', {
+      method: 'POST', headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ id: __wf.current.id }),
+    });
+    if (!r.ok) { toast(r.error || t('내보내기 실패'), 'err'); return; }
+    const payload = r.export || r;
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (__wf.current.name || 'workflow').replace(/[^a-zA-Z0-9가-힣_-]/g, '_') + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast(t('내보내기 완료'), 'ok');
+  } catch (e) { toast(t('내보내기 실패'), 'err'); }
+}
+
+async function _wfImport(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const json = JSON.parse(text);
+    const r = await api('/api/workflows/import', {
+      method: 'POST', headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(json),
+    });
+    if (!r.ok) { toast(r.error || t('가져오기 실패'), 'err'); return; }
+    toast(t('가져오기 완료'), 'ok');
+    const list = await api('/api/workflows/list');
+    __wf.workflows = list.workflows || [];
+    if (r.id) await _wfOpen(r.id);
+    _wfRenderList();
+    _wfUpdateToolbar();
+  } catch (e) { toast(t('JSON 파싱 실패'), 'err'); }
+}
+
 async function _wfRun() {
   if (!__wf.current) return;
   // 저장 먼저
@@ -2878,11 +2954,13 @@ async function _wfRun() {
 
 function _wfApplyRunStatus(run) {
   const results = run.nodeResults || {};
+  __wf.lastRunResults = results;
   document.querySelectorAll('.wf-node').forEach(el => {
     const nid = el.getAttribute('data-node');
     const r = results[nid];
     if (r) el.setAttribute('data-status', r.status);
   });
+  _wfRenderInspector();
 }
 
 function _wfStopSSE() {
@@ -3866,19 +3944,52 @@ async function _wfShowRuns() {
   if (!r.ok) { toast(r.error||t('로드 실패'), 'err'); return; }
   const runs = r.runs || [];
   const statusIcon = { ok:'✅', err:'❌', running:'⏳' };
-  const rows = runs.length ? runs.map(x => `
+  // 프로바이더 색상 매핑
+  const _provColors = { claude:'#d97757', openai:'#10b981', anthropic:'#d97757', ollama:'#7dd3fc', google:'#fbbf24', gemini:'#fbbf24' };
+  function _provColor(name) {
+    const n = (name||'').toLowerCase();
+    for (const [k,v] of Object.entries(_provColors)) { if (n.includes(k)) return v; }
+    return 'var(--text-dim)';
+  }
+  function _runProviderSummary(nr) {
+    if (!nr || typeof nr !== 'object') return '';
+    const counts = {};
+    Object.values(nr).forEach(r => {
+      const p = r.provider || r.providerId || '';
+      if (p) counts[p] = (counts[p]||0) + 1;
+    });
+    if (!Object.keys(counts).length) return '';
+    return Object.entries(counts).map(([p,c]) =>
+      `<span class="chip text-[10px]" style="border-color:${_provColor(p)};color:${_provColor(p)};">${escapeHtml(p)} ×${c}</span>`
+    ).join(' ');
+  }
+  function _fmtDurReadable(ms) {
+    if (!ms) return '—';
+    if (ms < 1000) return ms + 'ms';
+    const s = ms / 1000;
+    if (s < 60) return s.toFixed(1) + 's';
+    const m = Math.floor(s / 60);
+    const rs = Math.round(s % 60);
+    if (m < 60) return m + 'm ' + (rs ? rs + 's' : '');
+    const h = Math.floor(m / 60);
+    return h + 'h ' + (m%60) + 'm';
+  }
+  const rows = runs.length ? runs.map(x => {
+    const provTags = _runProviderSummary(x.nodeResults);
+    return `
     <div class="wf-list-item" onclick="_wfOpenRun('${x.id}')">
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0 flex-1">
           <div class="text-sm">${statusIcon[x.status]||'•'} <span class="text-[10px] text-[var(--text-dim)]">${x.id}</span></div>
           <div class="text-[11px] text-[var(--text-dim)] mt-1">
-            ${fmtRel(x.startedAt)} · ${x.nodeCount} ${t('노드')} · ${fmtDur(x.durationMs)}
+            ${fmtRel(x.startedAt)} · ${x.nodeCount} ${t('노드')} · ${_fmtDurReadable(x.durationMs)}
           </div>
+          ${provTags ? `<div class="flex flex-wrap gap-1 mt-1">${provTags}</div>` : ''}
           ${x.error ? `<div class="text-[11px] text-red-400 mt-1">⚠ ${escapeHtml(x.error)}</div>` : ''}
         </div>
       </div>
-    </div>
-  `).join('') : `<div class="empty card p-4">${t('실행 이력 없음')}</div>`;
+    </div>`;
+  }).join('') : `<div class="empty card p-4">${t('실행 이력 없음')}</div>`;
   showModal(`
     <div class="p-5">
       <div class="flex items-center justify-between mb-3">

@@ -42,7 +42,8 @@ from .guide import api_guide_onboarding, api_guide_toolkit
 from .hooks import api_plugin_hook_update, get_hooks
 from .version import api_version_info
 from .workflows import (
-    api_workflow_delete, api_workflow_get, api_workflow_patch, api_workflow_run,
+    api_workflow_delete, api_workflow_export, api_workflow_get,
+    api_workflow_import, api_workflow_patch, api_workflow_run,
     api_workflow_run_status, api_workflow_runs_list, api_workflow_save,
     api_workflow_template_delete, api_workflow_template_get,
     api_workflow_template_save, api_workflow_templates_list,
@@ -52,7 +53,7 @@ from .ai_keys import (
     api_providers_list, api_provider_test, api_provider_save_key,
     api_provider_delete_key, api_custom_provider_save,
     api_custom_provider_delete, api_fallback_chain_save,
-    api_workflow_costs_summary,
+    api_workflow_costs_summary, api_provider_compare,
 )
 from .ai_providers import list_providers_by_capability
 
@@ -224,8 +225,11 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/run": api_workflow_run,
     "/api/workflows/templates/save": api_workflow_template_save,
     "/api/workflows/templates/delete": api_workflow_template_delete,
+    "/api/workflows/export": api_workflow_export,
+    "/api/workflows/import": api_workflow_import,
     "/api/session/spawn": api_session_spawn,
     "/api/ai-providers/test": api_provider_test,
+    "/api/ai-providers/compare": api_provider_compare,
     "/api/ai-providers/save-key": api_provider_save_key,
     "/api/ai-providers/delete-key": api_provider_delete_key,
     "/api/ai-providers/custom/save": api_custom_provider_save,
