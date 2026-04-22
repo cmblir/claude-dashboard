@@ -48,6 +48,11 @@ from .workflows import (
     api_workflow_template_save, api_workflow_templates_list,
     api_workflows_list,
 )
+from .ai_keys import (
+    api_providers_list, api_provider_test, api_provider_save_key,
+    api_provider_delete_key, api_custom_provider_save,
+    api_custom_provider_delete, api_fallback_chain_save,
+)
 from .logger import log
 from .mcp import (
     api_mcp_catalog, api_mcp_install, api_mcp_install_prepare,
@@ -146,6 +151,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/runs": api_workflow_runs_list,
     "/api/workflows/templates/list": lambda q: api_workflow_templates_list(q),
     "/api/version": lambda q: api_version_info(),
+    "/api/ai-providers/list": lambda q: api_providers_list(),
 }
 
 
@@ -209,6 +215,12 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/templates/save": api_workflow_template_save,
     "/api/workflows/templates/delete": api_workflow_template_delete,
     "/api/session/spawn": api_session_spawn,
+    "/api/ai-providers/test": api_provider_test,
+    "/api/ai-providers/save-key": api_provider_save_key,
+    "/api/ai-providers/delete-key": api_provider_delete_key,
+    "/api/ai-providers/custom/save": api_custom_provider_save,
+    "/api/ai-providers/custom/delete": api_custom_provider_delete,
+    "/api/ai-providers/fallback-chain": api_fallback_chain_save,
 }
 
 

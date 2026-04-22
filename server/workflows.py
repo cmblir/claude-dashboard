@@ -16,6 +16,7 @@ import threading
 import time
 import uuid
 from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Optional
 
@@ -26,7 +27,8 @@ from .utils import _safe_read, _safe_write
 
 # ───────── 상수 ─────────
 
-_NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output"}
+_NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
+               "http", "transform", "variable"}
 _INPUT_MODES = {"concat", "first", "json"}
 _ASSIGNEES = {"opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
@@ -169,6 +171,28 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
     elif ntype == "output":
         exp = d.get("exportTo")
         out["data"] = {"exportTo": _clamp_str(exp, 500)}
+    elif ntype == "http":
+        out["data"] = {
+            "url": _clamp_str(d.get("url"), 2000),
+            "method": _clamp_str(d.get("method"), 10) or "GET",
+            "headers": d.get("headers") if isinstance(d.get("headers"), dict) else {},
+            "body": _clamp_str(d.get("body"), 8000),
+            "extractPath": _clamp_str(d.get("extractPath"), 200),
+        }
+    elif ntype == "transform":
+        out["data"] = {
+            "transformType": _clamp_str(d.get("transformType"), 30) or "template",
+            "template": _clamp_str(d.get("template"), 4000),
+            "jsonPath": _clamp_str(d.get("jsonPath"), 200),
+            "regexPattern": _clamp_str(d.get("regexPattern"), 500),
+            "regexReplacement": _clamp_str(d.get("regexReplacement"), 500),
+            "separator": _clamp_str(d.get("separator"), 20) or "\n",
+        }
+    elif ntype == "variable":
+        out["data"] = {
+            "varName": _clamp_str(d.get("varName"), 60) or "var",
+            "defaultValue": _clamp_str(d.get("defaultValue"), 4000),
+        }
     # start 는 data 비움
     return out
 
@@ -292,6 +316,33 @@ def _topological_order(nodes: list[dict], edges: list[dict]) -> list[str]:
             if indeg[v] == 0:
                 q.append(v)
     return order
+
+
+def _topological_levels(nodes: list[dict], edges: list[dict]) -> list[list[str]]:
+    """Kahn's 알고리즘 level-based 변형 — 같은 level 의 노드들은 병렬 실행 가능.
+
+    반환: [[level0_ids], [level1_ids], ...] 각 level 내 노드는 서로 의존 없음.
+    """
+    ids = [n["id"] for n in nodes]
+    adj: dict[str, list[str]] = defaultdict(list)
+    indeg: dict[str, int] = {nid: 0 for nid in ids}
+    for e in edges:
+        if e["from"] in indeg and e["to"] in indeg:
+            adj[e["from"]].append(e["to"])
+            indeg[e["to"]] += 1
+    q = deque([nid for nid in ids if indeg[nid] == 0])
+    levels: list[list[str]] = []
+    while q:
+        current_level = list(q)
+        levels.append(current_level)
+        next_q: deque = deque()
+        for u in current_level:
+            for v in adj[u]:
+                indeg[v] -= 1
+                if indeg[v] == 0:
+                    next_q.append(v)
+        q = next_q
+    return levels
 
 
 # ───────── ID 생성 ─────────
@@ -436,7 +487,11 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     prev_session_ids: 이 노드로 들어오는 엣지의 from 노드들의 lastRun.sessionId 리스트.
     continueFromPrev 가 켜지면 그 중 첫 번째(있으면)를 --resume 에 넘긴다.
 
-    반환: {status:"ok|err", output:str, sessionId:str, durationMs:int, error?:str}
+    멀티 프로바이더: assignee 필드가 "provider:model" 형태면 해당 프로바이더로 실행.
+    예: "claude:opus", "openai:gpt-4.1", "ollama:llama3.1", "gemini:2.5-pro", "codex:o4-mini"
+    빈 값이거나 기존 형태(opus-4.7 등)면 Claude CLI 로 실행 (완전 호환).
+
+    반환: {status:"ok|err", output:str, sessionId:str, durationMs:int, error?:str, provider?:str}
     """
     ntype = node["type"]
     data = node.get("data") or {}
@@ -480,14 +535,25 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
                     return {"status": "err", "output": "", "durationMs": _elapsed(), "error": f"export failed: {e}"}
         return {"status": "ok", "output": final, "durationMs": _elapsed(), "sessionId": ""}
 
-    # ── session / subagent — `claude -p` 호출 ──
+    # ── HTTP 노드 — 외부 API 호출 ──
+    if ntype == "http":
+        return _execute_http_node(data, inputs, _elapsed)
+
+    # ── Transform 노드 — 텍스트/JSON 변환 ──
+    if ntype == "transform":
+        return _execute_transform_node(data, inputs, _elapsed)
+
+    # ── Variable 노드 — 변수 저장/참조 ──
+    if ntype == "variable":
+        return _execute_variable_node(data, inputs, _elapsed)
+
+    # ── session / subagent — 멀티 프로바이더 실행 ──
     prompt_parts = []
     if data.get("subject"):
         prompt_parts.append(data["subject"])
     if data.get("description"):
         prompt_parts.append(data["description"])
     if data.get("agentRole") and not data.get("systemPrompt"):
-        # systemPrompt 가 있으면 거기서 역할을 설명하므로 중복 방지
         prompt_parts.append(f"(역할: {data['agentRole']})")
     if inputs:
         mode = data.get("inputsMode", "concat")
@@ -500,17 +566,13 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
         prompt_parts.append(joined)
     prompt = "\n\n".join(p for p in prompt_parts if p).strip() or "."
 
-    claude_bin = shutil.which("claude")
-    if not claude_bin:
-        return {"status": "err", "output": "", "durationMs": _elapsed(),
-                "error": "claude CLI not found in PATH"}
-
     cwd_raw = data.get("cwd") or str(Path.home())
     cwd_safe = _under_home(cwd_raw) or str(Path.home())
 
-    # resume 대상 session_id 결정:
-    # 1) 노드에 명시된 resumeSessionId 최우선
-    # 2) continueFromPrev 가 켜졌고 이전 노드 중 session_id 를 가진 것이 있으면 그걸 사용
+    sys_prompt = (data.get("systemPrompt") or "").strip()
+    assignee = (data.get("assignee") or "").strip()
+
+    # resume 대상 session_id 결정
     resume_id = (data.get("resumeSessionId") or "").strip()
     if not resume_id and data.get("continueFromPrev"):
         for sid in prev_session_ids:
@@ -518,48 +580,167 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
                 resume_id = sid
                 break
 
-    cmd = [claude_bin, "-p", prompt, "--output-format", "json"]
-    sys_prompt = (data.get("systemPrompt") or "").strip()
-    if sys_prompt:
-        cmd += ["--system-prompt", sys_prompt]
-    app_prompt = (data.get("appendSystemPrompt") or "").strip()
-    if app_prompt:
-        cmd += ["--append-system-prompt", app_prompt]
-    allowed = (data.get("allowedTools") or "").strip()
-    if allowed:
-        cmd += ["--allowed-tools", allowed]
-    disallowed = (data.get("disallowedTools") or "").strip()
-    if disallowed:
-        cmd += ["--disallowed-tools", disallowed]
-    if resume_id:
-        cmd += ["--resume", resume_id]
+    # ── 프로바이더 결정: assignee 에 ':' 가 있으면 멀티 프로바이더 ──
+    # 기존 호환: 빈 값이거나 "opus-4.7" 같은 Claude alias 는 그대로 Claude CLI
+    is_multi_provider = ":" in assignee and not assignee.startswith("claude-")
 
+    # Claude CLI 전용 옵션 (다른 프로바이더에서는 extra 로 전달)
+    extra = {
+        "appendSystemPrompt": (data.get("appendSystemPrompt") or "").strip(),
+        "allowedTools": (data.get("allowedTools") or "").strip(),
+        "disallowedTools": (data.get("disallowedTools") or "").strip(),
+        "resumeSessionId": resume_id,
+    }
+
+    # 멀티 프로바이더 실행
     try:
-        r = subprocess.run(
-            cmd, cwd=cwd_safe, capture_output=True, text=True,
+        from .ai_providers import execute_with_assignee
+        resp = execute_with_assignee(
+            assignee or "claude-cli",  # 빈 값이면 기존과 동일하게 Claude CLI
+            prompt,
+            system_prompt=sys_prompt,
+            cwd=cwd_safe,
             timeout=_DEFAULT_NODE_TIMEOUT,
+            extra=extra,
+            fallback=True,
         )
-    except subprocess.TimeoutExpired:
-        return {"status": "err", "output": "", "durationMs": _elapsed(),
-                "error": f"timeout after {_DEFAULT_NODE_TIMEOUT}s"}
+        return {
+            "status": resp.status,
+            "output": resp.output,
+            "sessionId": resp.session_id,
+            "durationMs": resp.duration_ms or _elapsed(),
+            "error": resp.error if resp.status == "err" else "",
+            "provider": resp.provider,
+            "model": resp.model,
+            "tokensIn": resp.tokens_in,
+            "tokensOut": resp.tokens_out,
+            "costUsd": resp.cost_usd,
+        }
     except Exception as e:
-        return {"status": "err", "output": "", "durationMs": _elapsed(), "error": str(e)}
-
-    if r.returncode != 0:
+        log.exception("execute_with_assignee failed: %s", e)
         return {"status": "err", "output": "", "durationMs": _elapsed(),
-                "error": (r.stderr or "").strip()[:1000] or f"exit {r.returncode}"}
+                "error": f"provider execution failed: {e}", "sessionId": ""}
 
-    stdout = r.stdout or ""
-    output = stdout
-    session_id = ""
+
+def _execute_http_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """HTTP 노드 실행 — 외부 API 호출."""
+    import urllib.request
+    import urllib.error
+
+    url = (data.get("url") or "").strip()
+    if not url:
+        return {"status": "err", "output": "", "durationMs": _elapsed(), "error": "URL required"}
+
+    method = (data.get("method") or "GET").upper()
+    headers_raw = data.get("headers") or {}
+    body_template = (data.get("body") or "").strip()
+
+    # 입력 텍스트를 body/url 에 주입
+    input_text = inputs[0] if inputs else ""
+    url = url.replace("{{input}}", input_text)
+    body_template = body_template.replace("{{input}}", input_text)
+
+    req_headers = {"Content-Type": "application/json"}
+    if isinstance(headers_raw, dict):
+        req_headers.update(headers_raw)
+
+    req_body = body_template.encode("utf-8") if body_template and method in ("POST", "PUT", "PATCH") else None
+
     try:
-        parsed = json.loads(stdout)
-        if isinstance(parsed, dict):
-            output = parsed.get("result") or parsed.get("content") or stdout
-            session_id = (parsed.get("session_id") or parsed.get("sessionId") or "")
-    except Exception:
-        pass
-    return {"status": "ok", "output": output, "sessionId": session_id, "durationMs": _elapsed()}
+        req = urllib.request.Request(url, data=req_body, headers=req_headers, method=method)
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            response_text = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        err_body = ""
+        try:
+            err_body = e.read().decode("utf-8")[:1000]
+        except Exception:
+            pass
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"HTTP {e.code}: {err_body}", "sessionId": ""}
+    except Exception as e:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": str(e), "sessionId": ""}
+
+    # JSON 응답이면 지정된 경로로 추출
+    extract_path = (data.get("extractPath") or "").strip()
+    output = response_text
+    if extract_path:
+        try:
+            parsed = json.loads(response_text)
+            for key in extract_path.split("."):
+                if isinstance(parsed, dict):
+                    parsed = parsed.get(key, "")
+                elif isinstance(parsed, list) and key.isdigit():
+                    parsed = parsed[int(key)]
+            output = str(parsed) if not isinstance(parsed, str) else parsed
+        except Exception:
+            pass  # 추출 실패하면 원본 반환
+
+    return {"status": "ok", "output": output, "durationMs": _elapsed(), "sessionId": ""}
+
+
+def _execute_transform_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Transform 노드 — 텍스트/JSON 변환."""
+    transform_type = (data.get("transformType") or "template").strip()
+    template = (data.get("template") or "").strip()
+    input_text = inputs[0] if inputs else ""
+
+    if transform_type == "template":
+        # 간단한 템플릿 치환: {{input}}, {{input_json}}, {{input_lines}}
+        output = template.replace("{{input}}", input_text)
+        output = output.replace("{{input_json}}", json.dumps(input_text, ensure_ascii=False))
+        try:
+            lines = input_text.strip().splitlines()
+            output = output.replace("{{input_lines}}", json.dumps(lines, ensure_ascii=False))
+        except Exception:
+            pass
+        return {"status": "ok", "output": output, "durationMs": _elapsed(), "sessionId": ""}
+
+    if transform_type == "json_extract":
+        # JSON 경로 추출
+        path = (data.get("jsonPath") or "").strip()
+        try:
+            parsed = json.loads(input_text)
+            for key in path.split("."):
+                if isinstance(parsed, dict):
+                    parsed = parsed.get(key, "")
+                elif isinstance(parsed, list) and key.isdigit():
+                    parsed = parsed[int(key)]
+            output = json.dumps(parsed, ensure_ascii=False) if not isinstance(parsed, str) else parsed
+        except Exception as e:
+            return {"status": "err", "output": "", "durationMs": _elapsed(),
+                    "error": f"JSON extract failed: {e}", "sessionId": ""}
+        return {"status": "ok", "output": output, "durationMs": _elapsed(), "sessionId": ""}
+
+    if transform_type == "regex":
+        pattern = (data.get("regexPattern") or "").strip()
+        replacement = data.get("regexReplacement", "")
+        try:
+            import re as _re
+            output = _re.sub(pattern, replacement, input_text)
+        except Exception as e:
+            return {"status": "err", "output": "", "durationMs": _elapsed(),
+                    "error": f"regex failed: {e}", "sessionId": ""}
+        return {"status": "ok", "output": output, "durationMs": _elapsed(), "sessionId": ""}
+
+    if transform_type == "concat":
+        # 모든 입력을 결합
+        separator = data.get("separator", "\n")
+        output = separator.join(inputs)
+        return {"status": "ok", "output": output, "durationMs": _elapsed(), "sessionId": ""}
+
+    return {"status": "ok", "output": input_text, "durationMs": _elapsed(), "sessionId": ""}
+
+
+def _execute_variable_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Variable 노드 — 값 저장 (출력으로 전달). 현재는 pass-through."""
+    # variable 노드는 입력을 그대로 출력으로 전달하면서
+    # 워크플로우 상태에 이름을 붙인다 (프론트에서 참조용)
+    var_name = (data.get("varName") or "var").strip()
+    value = inputs[0] if inputs else (data.get("defaultValue") or "")
+    return {"status": "ok", "output": value, "durationMs": _elapsed(),
+            "sessionId": "", "varName": var_name}
 
 
 def _parse_hhmm(s: str) -> Optional[tuple[int, int]]:
@@ -601,10 +782,16 @@ def _find_feedback_target(nodes: list[dict], edges: list[dict]) -> str:
     return ""
 
 
+_MAX_PARALLEL_WORKERS = int(os.environ.get("WORKFLOW_MAX_PARALLEL", "4"))
+
+
 def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                        extra_inputs: dict[str, str] | None = None,
                        total_t0: float | None = None) -> tuple[bool, dict, str]:
-    """한 번의 DAG 실행. (ok, results, final_output) 반환.
+    """한 번의 DAG 실행 — **level-based 병렬 실행**.
+
+    같은 topological level 의 노드들은 서로 의존이 없으므로 ThreadPoolExecutor 로
+    동시에 실행한다. 순차 실행 대비 분기형 워크플로우에서 큰 속도 향상.
 
     - extra_inputs[nid] 가 있으면 해당 노드의 첫 input 으로 prepend (피드백 주입)
     - runs[runId].nodeResults 는 이 iteration 결과로 덮어씀
@@ -612,7 +799,8 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
     """
     nodes = wf.get("nodes", [])
     edges = wf.get("edges", [])
-    order = _topological_order(nodes, edges)
+    levels = _topological_levels(nodes, edges)
+    order = _topological_order(nodes, edges)  # final_output 검색용
     node_by_id = {n["id"]: n for n in nodes}
     inputs_map: dict[str, list[tuple[str, str]]] = defaultdict(list)
     for e in edges:
@@ -631,15 +819,8 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
             s["runs"][runId]["iteration"] = iter_idx
             _dump_all(s)
 
-    for nid in order:
-        if nid in disabled:
-            with _LOCK:
-                s = _load_all()
-                if runId in s["runs"]:
-                    s["runs"][runId]["nodeResults"][nid] = {"status": "skipped"}
-                    _dump_all(s)
-            continue
-        # 입력 수집
+    def _collect_inputs(nid: str) -> list[str]:
+        """노드의 입력 텍스트 수집 (이전 노드 결과에서)."""
         in_items = inputs_map.get(nid, [])
         input_strs: list[str] = []
         for (src_id, src_port) in in_items:
@@ -648,10 +829,30 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                 if "_branch" in src and src["_branch"] != src_port:
                     continue
                 input_strs.append(src.get("output") or "")
-        # 반복 피드백 주입 — 해당 노드에 extra_inputs 가 있으면 맨 앞에 prepend
         if extra.get(nid):
             input_strs.insert(0, extra[nid])
-        # 전체 timeout
+        return input_strs
+
+    def _collect_prev_sids(nid: str) -> list[str]:
+        """이전 노드의 session_id 수집 (resume 용)."""
+        in_items = inputs_map.get(nid, [])
+        prev_sids = []
+        for (src_id, _) in in_items:
+            src = results.get(src_id)
+            if src and src.get("sessionId"):
+                prev_sids.append(src["sessionId"])
+        return prev_sids
+
+    def _run_single_node(nid: str) -> tuple[str, dict]:
+        """단일 노드 실행 (병렬 워커에서 호출)."""
+        node = node_by_id[nid]
+        input_strs = _collect_inputs(nid)
+        prev_sids = _collect_prev_sids(nid)
+        res = _execute_node(node, input_strs, prev_sids)
+        return (nid, res)
+
+    for level in levels:
+        # 전체 timeout 체크
         if time.time() - total_t0 > _DEFAULT_TOTAL_TIMEOUT:
             with _LOCK:
                 s = _load_all()
@@ -661,52 +862,96 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                     s["runs"][runId]["finishedAt"] = int(time.time()*1000)
                     _dump_all(s)
             return (False, results, "")
-        # 진행 상황: running
-        with _LOCK:
-            s = _load_all()
-            if runId in s["runs"]:
-                s["runs"][runId]["currentNodeId"] = nid
-                s["runs"][runId]["nodeResults"][nid] = {"status": "running"}
-                _dump_all(s)
-        # 실행
-        prev_sids = []
-        for (src_id, _) in in_items:
-            src = results.get(src_id)
-            if src and src.get("sessionId"):
-                prev_sids.append(src["sessionId"])
-        node = node_by_id[nid]
-        res = _execute_node(node, input_strs, prev_sids)
-        results[nid] = res
-        if node.get("type") == "branch" and "_branch" in res:
-            active = res["_branch"]
-            for e in edges:
-                if e["from"] == nid and e["fromPort"] != active:
-                    disabled.add(e["to"])
-        if res.get("status") == "err":
+
+        # disabled 노드 제외
+        active_nodes = [nid for nid in level if nid not in disabled]
+        skipped_nodes = [nid for nid in level if nid in disabled]
+
+        # skip 기록
+        for nid in skipped_nodes:
             with _LOCK:
                 s = _load_all()
                 if runId in s["runs"]:
-                    s["runs"][runId]["nodeResults"][nid] = {
-                        "status": "err",
-                        "error": res.get("error", ""),
-                        "durationMs": res.get("durationMs", 0),
-                    }
-                    s["runs"][runId]["status"] = "err"
-                    s["runs"][runId]["error"] = f"node {nid}: {res.get('error','')}"
-                    s["runs"][runId]["finishedAt"] = int(time.time()*1000)
+                    s["runs"][runId]["nodeResults"][nid] = {"status": "skipped"}
                     _dump_all(s)
-            return (False, results, "")
-        # 성공 기록
+
+        if not active_nodes:
+            continue
+
+        # 진행 상황: running 표시
         with _LOCK:
             s = _load_all()
             if runId in s["runs"]:
-                s["runs"][runId]["nodeResults"][nid] = {
-                    "status": "ok",
-                    "output": (res.get("output") or "")[:4000],
-                    "sessionId": res.get("sessionId") or "",
-                    "durationMs": res.get("durationMs", 0),
-                }
+                for nid in active_nodes:
+                    s["runs"][runId]["nodeResults"][nid] = {"status": "running"}
+                s["runs"][runId]["currentNodeId"] = active_nodes[0]
                 _dump_all(s)
+
+        # ── 병렬 실행: 같은 level 의 노드들 ──
+        level_results: dict[str, dict] = {}
+        if len(active_nodes) == 1:
+            # 단일 노드는 스레드풀 오버헤드 없이 직접 실행
+            nid, res = _run_single_node(active_nodes[0])
+            level_results[nid] = res
+        else:
+            # 여러 노드 병렬 실행
+            max_w = min(_MAX_PARALLEL_WORKERS, len(active_nodes))
+            with ThreadPoolExecutor(max_workers=max_w) as pool:
+                futures = {pool.submit(_run_single_node, nid): nid for nid in active_nodes}
+                for future in as_completed(futures):
+                    try:
+                        nid, res = future.result()
+                        level_results[nid] = res
+                    except Exception as e:
+                        nid = futures[future]
+                        level_results[nid] = {
+                            "status": "err", "output": "", "error": str(e),
+                            "durationMs": 0, "sessionId": "",
+                        }
+
+        # 결과 기록 + branch 처리
+        had_error = False
+        for nid, res in level_results.items():
+            results[nid] = res
+            node = node_by_id[nid]
+
+            if node.get("type") == "branch" and "_branch" in res:
+                active_port = res["_branch"]
+                for e in edges:
+                    if e["from"] == nid and e["fromPort"] != active_port:
+                        disabled.add(e["to"])
+
+            if res.get("status") == "err":
+                with _LOCK:
+                    s = _load_all()
+                    if runId in s["runs"]:
+                        s["runs"][runId]["nodeResults"][nid] = {
+                            "status": "err",
+                            "error": res.get("error", ""),
+                            "durationMs": res.get("durationMs", 0),
+                        }
+                        s["runs"][runId]["status"] = "err"
+                        s["runs"][runId]["error"] = f"node {nid}: {res.get('error','')}"
+                        s["runs"][runId]["finishedAt"] = int(time.time()*1000)
+                        _dump_all(s)
+                had_error = True
+                break
+            else:
+                with _LOCK:
+                    s = _load_all()
+                    if runId in s["runs"]:
+                        s["runs"][runId]["nodeResults"][nid] = {
+                            "status": "ok",
+                            "output": (res.get("output") or "")[:4000],
+                            "sessionId": res.get("sessionId") or "",
+                            "durationMs": res.get("durationMs", 0),
+                            "provider": res.get("provider", ""),
+                            "model": res.get("model", ""),
+                        }
+                        _dump_all(s)
+
+        if had_error:
+            return (False, results, "")
 
     # iteration 최종 output 찾기: 마지막 output 노드 → 없으면 DAG 마지막 노드
     final_output = ""

@@ -1,0 +1,433 @@
+"""AI 프로바이더 설정 · API 키 · 커스텀 프로바이더 관리.
+
+`~/.claude-dashboard-ai-providers.json` 에 프로바이더별 설정 저장:
+  - API 키 (각 프로바이더별)
+  - 커스텀 CLI 프로바이더 정의
+  - 폴백 체인 순서
+  - 프로바이더별 기본 모델 오버라이드
+
+이 모듈은 ai_providers.py 에서 import 되어 레지스트리 초기화에 사용된다.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+from pathlib import Path
+from typing import Any
+
+from .config import _env_path
+from .logger import log
+from .utils import _safe_read, _safe_write
+
+
+# ───────── 설정 파일 경로 ─────────
+
+PROVIDERS_CONFIG_PATH = _env_path(
+    "CLAUDE_DASHBOARD_AI_PROVIDERS",
+    Path.home() / ".claude-dashboard-ai-providers.json",
+)
+
+
+# ───────── 로드/저장 ─────────
+
+def _load_config() -> dict:
+    """프로바이더 설정 파일 로드. 없으면 기본 구조 반환."""
+    if not PROVIDERS_CONFIG_PATH.exists():
+        return _default_config()
+    try:
+        data = json.loads(_safe_read(PROVIDERS_CONFIG_PATH))
+        if not isinstance(data, dict):
+            return _default_config()
+        data.setdefault("version", 1)
+        data.setdefault("apiKeys", {})
+        data.setdefault("customProviders", [])
+        data.setdefault("fallbackChain", [])
+        data.setdefault("defaultModels", {})
+        data.setdefault("providerSettings", {})
+        return data
+    except Exception as e:
+        log.warning("ai providers config load failed: %s", e)
+        return _default_config()
+
+
+def _save_config(data: dict) -> bool:
+    """설정 파일 저장 (atomic write)."""
+    try:
+        text = json.dumps(data, ensure_ascii=False, indent=2)
+        return _safe_write(PROVIDERS_CONFIG_PATH, text)
+    except Exception as e:
+        log.error("ai providers config save failed: %s", e)
+        return False
+
+
+def _default_config() -> dict:
+    return {
+        "version": 1,
+        "apiKeys": {},
+        "customProviders": [],
+        "fallbackChain": ["claude-cli", "anthropic-api", "openai-api", "gemini-api"],
+        "defaultModels": {},
+        "providerSettings": {},
+    }
+
+
+# ───────── API 키 관리 ─────────
+
+def load_api_keys() -> dict:
+    """프로바이더별 API 키/설정 반환.
+
+    반환값: {provider_id: api_key_string | {apiKey, baseUrl, ...}}
+    환경 변수 > 설정 파일 우선순위.
+    """
+    cfg = _load_config()
+    keys: dict = {}
+
+    # 설정 파일의 키
+    for pid, val in cfg.get("apiKeys", {}).items():
+        if isinstance(val, str) and val:
+            keys[pid] = val
+        elif isinstance(val, dict) and val.get("apiKey"):
+            keys[pid] = val
+
+    # 환경 변수 오버라이드
+    ENV_MAP = {
+        "openai-api": "OPENAI_API_KEY",
+        "gemini-api": "GEMINI_API_KEY",
+        "anthropic-api": "ANTHROPIC_API_KEY",
+    }
+    for pid, env_key in ENV_MAP.items():
+        env_val = os.environ.get(env_key, "")
+        if env_val:
+            keys[pid] = env_val
+
+    return keys
+
+
+def save_api_key(provider_id: str, api_key: str) -> dict:
+    """단일 프로바이더의 API 키 저장."""
+    if not isinstance(provider_id, str) or not provider_id.strip():
+        return {"ok": False, "error": "provider_id required"}
+    if not re.match(r"^[a-zA-Z0-9_.-]+$", provider_id):
+        return {"ok": False, "error": "invalid provider_id"}
+
+    cfg = _load_config()
+    if api_key:
+        cfg["apiKeys"][provider_id] = api_key
+    else:
+        cfg["apiKeys"].pop(provider_id, None)
+
+    ok = _save_config(cfg)
+    if ok:
+        # 레지스트리 재초기화
+        try:
+            from .ai_providers import reset_registry
+            reset_registry()
+        except Exception:
+            pass
+    return {"ok": ok, "providerId": provider_id}
+
+
+def save_api_key_with_config(provider_id: str, config: dict) -> dict:
+    """API 키 + 추가 설정(baseUrl 등) 저장."""
+    if not isinstance(provider_id, str) or not provider_id.strip():
+        return {"ok": False, "error": "provider_id required"}
+    if not isinstance(config, dict):
+        return {"ok": False, "error": "config must be object"}
+
+    cfg = _load_config()
+    cfg["apiKeys"][provider_id] = {
+        "apiKey": (config.get("apiKey") or "").strip(),
+        "baseUrl": (config.get("baseUrl") or "").strip(),
+    }
+    ok = _save_config(cfg)
+    if ok:
+        try:
+            from .ai_providers import reset_registry
+            reset_registry()
+        except Exception:
+            pass
+    return {"ok": ok, "providerId": provider_id}
+
+
+def delete_api_key(provider_id: str) -> dict:
+    """API 키 삭제."""
+    cfg = _load_config()
+    if provider_id in cfg.get("apiKeys", {}):
+        del cfg["apiKeys"][provider_id]
+        _save_config(cfg)
+        try:
+            from .ai_providers import reset_registry
+            reset_registry()
+        except Exception:
+            pass
+    return {"ok": True, "providerId": provider_id}
+
+
+# ───────── 커스텀 프로바이더 관리 ─────────
+
+def load_custom_providers() -> list:
+    """커스텀 CLI 프로바이더 인스턴스 리스트 반환."""
+    from .ai_providers import CustomCliProvider
+
+    cfg = _load_config()
+    out = []
+    for entry in cfg.get("customProviders", []):
+        if not isinstance(entry, dict):
+            continue
+        if not entry.get("id") or not entry.get("command"):
+            continue
+        try:
+            out.append(CustomCliProvider(entry))
+        except Exception as e:
+            log.warning("custom provider load failed: %s — %s", entry.get("id"), e)
+    return out
+
+
+def save_custom_provider(body: dict) -> dict:
+    """커스텀 CLI 프로바이더 추가/수정.
+
+    body: {
+        id: "my-ai",
+        name: "My AI Tool",
+        command: "my-ai-cli",
+        argsTemplate: "-p {prompt} --model {model}",
+        models: ["model-a", "model-b"],
+        homepage: "https://...",
+        timeout: 300,
+    }
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+
+    pid = (body.get("id") or "").strip()
+    if not re.match(r"^[a-z][a-z0-9_-]{1,40}$", pid):
+        return {"ok": False, "error": "id 는 소문자/숫자/-/_ 만 (2~41자)"}
+
+    command = (body.get("command") or "").strip()
+    if not command:
+        return {"ok": False, "error": "command required"}
+
+    # 빌트인 프로바이더 id 와 충돌 방지
+    RESERVED = {"claude-cli", "ollama", "gemini-cli", "codex", "openai-api",
+                "gemini-api", "anthropic-api", "ollama-api"}
+    if pid in RESERVED:
+        return {"ok": False, "error": f"'{pid}' 는 빌트인 프로바이더 — 다른 id 사용"}
+
+    entry = {
+        "id": pid,
+        "name": (body.get("name") or pid).strip()[:80],
+        "command": command[:200],
+        "argsTemplate": (body.get("argsTemplate") or "{prompt}").strip()[:500],
+        "models": _sanitize_models(body.get("models")),
+        "homepage": (body.get("homepage") or "").strip()[:200],
+        "timeout": max(10, min(3600, int(body.get("timeout") or 300))),
+    }
+
+    cfg = _load_config()
+    customs = cfg.get("customProviders", [])
+    # 기존 항목 업데이트 or 새로 추가
+    replaced = False
+    for i, c in enumerate(customs):
+        if isinstance(c, dict) and c.get("id") == pid:
+            customs[i] = entry
+            replaced = True
+            break
+    if not replaced:
+        customs.append(entry)
+    cfg["customProviders"] = customs
+
+    ok = _save_config(cfg)
+    if ok:
+        try:
+            from .ai_providers import reset_registry
+            reset_registry()
+        except Exception:
+            pass
+    return {"ok": ok, "id": pid, "created": not replaced}
+
+
+def delete_custom_provider(provider_id: str) -> dict:
+    """커스텀 프로바이더 삭제."""
+    cfg = _load_config()
+    customs = cfg.get("customProviders", [])
+    before = len(customs)
+    customs = [c for c in customs if not (isinstance(c, dict) and c.get("id") == provider_id)]
+    if len(customs) == before:
+        return {"ok": False, "error": "not found"}
+    cfg["customProviders"] = customs
+    _save_config(cfg)
+    try:
+        from .ai_providers import reset_registry
+        reset_registry()
+    except Exception:
+        pass
+    return {"ok": True, "id": provider_id}
+
+
+def _sanitize_models(raw: Any) -> list:
+    """모델 목록 sanitize."""
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        return [m.strip() for m in raw.split(",") if m.strip()][:20]
+    if isinstance(raw, list):
+        out = []
+        for m in raw[:20]:
+            if isinstance(m, str):
+                out.append(m.strip()[:80])
+            elif isinstance(m, dict):
+                out.append({
+                    "id": (m.get("id") or "").strip()[:80],
+                    "label": (m.get("label") or m.get("id") or "").strip()[:80],
+                    "contextWindow": int(m.get("contextWindow") or 0),
+                    "priceIn": float(m.get("priceIn") or 0),
+                    "priceOut": float(m.get("priceOut") or 0),
+                    "note": (m.get("note") or "").strip()[:200],
+                })
+        return out
+    return []
+
+
+# ───────── 폴백 체인 관리 ─────────
+
+def get_fallback_chain() -> list[str]:
+    cfg = _load_config()
+    return cfg.get("fallbackChain", [])
+
+
+def set_fallback_chain(chain: list[str]) -> dict:
+    """폴백 체인 순서 설정."""
+    if not isinstance(chain, list):
+        return {"ok": False, "error": "chain must be list"}
+    sanitized = [str(c).strip()[:40] for c in chain if isinstance(c, str) and c.strip()][:10]
+    cfg = _load_config()
+    cfg["fallbackChain"] = sanitized
+    ok = _save_config(cfg)
+    if ok:
+        try:
+            from .ai_providers import get_registry
+            get_registry().set_fallback_chain(sanitized)
+        except Exception:
+            pass
+    return {"ok": ok, "chain": sanitized}
+
+
+# ───────── 기본 모델 관리 ─────────
+
+def get_default_models() -> dict:
+    """프로바이더별 기본 모델 매핑."""
+    cfg = _load_config()
+    return cfg.get("defaultModels", {})
+
+
+def set_default_model(provider_id: str, model: str) -> dict:
+    cfg = _load_config()
+    defaults = cfg.get("defaultModels", {})
+    if model:
+        defaults[provider_id] = model
+    else:
+        defaults.pop(provider_id, None)
+    cfg["defaultModels"] = defaults
+    _save_config(cfg)
+    return {"ok": True, "providerId": provider_id, "model": model}
+
+
+# ───────── API 엔드포인트 핸들러 ─────────
+
+def api_providers_list() -> dict:
+    """전체 프로바이더 목록 + 상태."""
+    from .ai_providers import get_registry
+    reg = get_registry()
+
+    providers = []
+    for p in reg.all_providers():
+        available = p.is_available()
+        models = p.list_models() if available else []
+        providers.append({
+            "id": p.provider_id,
+            "name": p.provider_name,
+            "type": p.provider_type,
+            "homepage": p.homepage,
+            "icon": p.icon,
+            "available": available,
+            "modelCount": len(models),
+            "models": [m.to_dict() for m in models],
+        })
+
+    cfg = _load_config()
+    # API 키 마스킹
+    masked_keys = {}
+    for pid, val in cfg.get("apiKeys", {}).items():
+        key = val if isinstance(val, str) else (val.get("apiKey") or "" if isinstance(val, dict) else "")
+        if key:
+            masked_keys[pid] = key[:6] + "…" + key[-4:] if len(key) > 12 else "••••"
+        else:
+            masked_keys[pid] = ""
+
+    return {
+        "providers": providers,
+        "apiKeys": masked_keys,
+        "customProviders": cfg.get("customProviders", []),
+        "fallbackChain": cfg.get("fallbackChain", []),
+        "defaultModels": cfg.get("defaultModels", {}),
+    }
+
+
+def api_provider_test(body: dict) -> dict:
+    """프로바이더 연결 테스트. body: {providerId, model?, prompt?}"""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+
+    from .ai_providers import get_registry
+    reg = get_registry()
+
+    pid = (body.get("providerId") or "").strip()
+    model = (body.get("model") or "").strip()
+    prompt = (body.get("prompt") or "Say 'Hello! I am working.' in one sentence.").strip()
+
+    p = reg.get(pid)
+    if not p:
+        return {"ok": False, "error": f"unknown provider: {pid}"}
+
+    resp = p.execute(prompt, model=model, timeout=30)
+    return {
+        "ok": resp.status == "ok",
+        "response": resp.to_dict(),
+    }
+
+
+def api_provider_save_key(body: dict) -> dict:
+    """API 키 저장. body: {providerId, apiKey, baseUrl?}"""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    pid = (body.get("providerId") or "").strip()
+    key = (body.get("apiKey") or "").strip()
+    base_url = (body.get("baseUrl") or "").strip()
+
+    if base_url:
+        return save_api_key_with_config(pid, {"apiKey": key, "baseUrl": base_url})
+    return save_api_key(pid, key)
+
+
+def api_provider_delete_key(body: dict) -> dict:
+    """API 키 삭제. body: {providerId}"""
+    pid = (body or {}).get("providerId", "") if isinstance(body, dict) else ""
+    return delete_api_key(pid)
+
+
+def api_custom_provider_save(body: dict) -> dict:
+    """커스텀 프로바이더 저장."""
+    return save_custom_provider(body)
+
+
+def api_custom_provider_delete(body: dict) -> dict:
+    """커스텀 프로바이더 삭제. body: {id}"""
+    pid = (body or {}).get("id", "") if isinstance(body, dict) else ""
+    return delete_custom_provider(pid)
+
+
+def api_fallback_chain_save(body: dict) -> dict:
+    """폴백 체인 저장. body: {chain: [...]}"""
+    chain = (body or {}).get("chain", []) if isinstance(body, dict) else []
+    return set_fallback_chain(chain)
