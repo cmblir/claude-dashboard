@@ -400,7 +400,7 @@ tailwind.config = {
   .wf-node[data-status="ok"] .wf-node-body { stroke: #4ade80; stroke-width: 2; }
   .wf-node[data-status="err"] .wf-node-body { stroke: #f87171; stroke-width: 2; }
   .wf-node[data-status="skipped"] .wf-node-body { stroke: rgba(255,255,255,0.1); stroke-dasharray: 4 4; }
-  @keyframes wfPulse { 0%,100%{filter:drop-shadow(0 0 0 rgba(167,139,250,0))} 50%{filter:drop-shadow(0 0 12px rgba(167,139,250,0.8))} }
+  @keyframes wfPulse { 0%,100%{stroke-opacity:0.5} 50%{stroke-opacity:1} }
   .wf-node-title { fill: var(--text); font-size: 13px; font-weight: 600; pointer-events: none; }
   .wf-node-sub { fill: var(--text-dim); font-size: 10px; pointer-events: none; }
   .wf-node-icon { font-size: 18px; pointer-events: none; }
@@ -434,16 +434,16 @@ tailwind.config = {
     0%   { r: 0;  opacity: 0.9; stroke-width: 3; }
     100% { r: 28; opacity: 0;   stroke-width: 1; }
   }
-  .wf-tut-node-pop { animation: wfTutFadeIn 0.45s ease-out backwards; }
+  .wf-tut-node-pop { animation: none; opacity: 1; }
   #wfTutStage { background: #15151c !important; color: #fff; min-height: 280px; }
   #wfTutStage .wf-node-body { fill: rgba(255,255,255,0.05); stroke: rgba(255,255,255,0.14); stroke-width: 1; }
-  #wfTutStage .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2; animation: wfPulse 1.4s infinite; }
+  #wfTutStage .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2; animation: wfPulse 2s infinite; }
   #wfTutStage .wf-node[data-status="ok"] .wf-node-body { stroke: #4ade80; stroke-width: 2; }
   #wfTutStage .wf-node-title { fill: #fafafa !important; font-weight: 600; }
   #wfTutStage .wf-node-sub { fill: rgba(255,255,255,0.55) !important; }
   #wfTutStage .wf-node-icon { fill: #fff; }
   #wfTutStage text { font-family: inherit; }
-  #wfTutCursor { transition: transform 0.85s cubic-bezier(0.22,1,0.36,1); pointer-events: none; }
+  #wfTutCursor { transition: transform 0.35s ease-out; pointer-events: none; }
   .wf-tut-ripple { animation: wfTutClickRipple 0.7s ease-out both; }
   #wfTutStage .wf-tut-port-in { fill: #a78bfa; stroke: #15151c; stroke-width: 2; }
   #wfTutStage .wf-tut-port-out { fill: #d97757; stroke: #15151c; stroke-width: 2; }
@@ -4820,7 +4820,7 @@ function _wfTutRender() {
   // viewport (맞춤 시연용 scale/pan)
   if (vpG) {
     const vp = step.viewport || { panX: 0, panY: 0, scale: 1 };
-    vpG.style.transition = 'transform 0.9s cubic-bezier(0.22,1,0.36,1)';
+    vpG.style.transition = 'transform 0.35s ease-out';
     vpG.setAttribute('transform', `translate(${vp.panX||0},${vp.panY||0}) scale(${vp.scale||1})`);
   }
 
@@ -4924,7 +4924,7 @@ function _wfTutRender() {
       stroke="#d97757" stroke-width="2" fill="none"
       marker-end="url(#wfTutArrow)"
       pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"
-      style="animation: wfTutDraw 0.9s ease-out ${(i*0.25).toFixed(2)}s forwards;"></path>`;
+      style="animation: wfTutDraw 0.5s ease-out ${(i*0.12).toFixed(2)}s forwards;"></path>`;
   }).join('');
 
   // 노드 (fade in + stagger) + 포트 2개 (in 보라, out 주황)
