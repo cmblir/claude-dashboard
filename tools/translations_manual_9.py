@@ -581,6 +581,35 @@ NEW_EN = {
     "모델 수": "Models",
     "아직 결과가 없습니다": "No results yet",
     "파일을 먼저 선택하세요": "Choose a file first",
+
+    # ── Model Benchmark (v2.8.0) ───────────────────────────────
+    "모델 벤치마크": "Model Benchmark",
+    "사전 정의 프롬프트 셋과 선택한 모델들을 교차 실행해 평균 지연 · 토큰 · 비용을 집계합니다.":
+        "Cross-run predefined prompt sets against selected models and aggregate average latency / tokens / cost.",
+    "프롬프트 셋": "Prompt set",
+    "기본 Q&A": "Basic Q&A",
+    "코드 생성": "Code generation",
+    "추론 / 수학": "Reasoning / Math",
+    "짧은 지식 질문 5개.": "5 short knowledge questions.",
+    "간단한 코드 작성 3종.": "3 simple code-writing tasks.",
+    "논리·수학 문제 3종.": "3 logic / math problems.",
+    "모델 선택": "Model selection",
+    "벤치마크 실행": "Run benchmark",
+    "벤치마크 실행 확인": "Confirm benchmark run",
+    "총 {n} 회 API 호출을 수행합니다 ({p} 프롬프트 × {m} 모델). 계속할까요?":
+        "Will make {n} API calls ({p} prompts × {m} models). Continue?",
+    "프롬프트 셋 없음": "Prompt set missing",
+    "모델을 1개 이상 선택하세요": "Select at least one model",
+    "모델별 집계": "Per-model summary",
+    "성공": "Success",
+    "평균 지연": "Avg latency",
+    "평균 출력 토큰": "Avg output tokens",
+    "총 비용": "Total cost",
+    "개별 응답": "Individual responses",
+    "프롬프트": "Prompt",
+    "지연": "Latency",
+    "비용": "Cost",
+    "JSON 다운로드": "Download JSON",
 }
 
 NEW_ZH = {
@@ -1158,4 +1187,33 @@ NEW_ZH = {
     "모델 수": "模型数",
     "아직 결과가 없습니다": "暂无结果",
     "파일을 먼저 선택하세요": "请先选择文件",
+
+    # ── Model Benchmark (v2.8.0) ───────────────────────────────
+    "모델 벤치마크": "模型基准测试",
+    "사전 정의 프롬프트 셋과 선택한 모델들을 교차 실행해 평균 지연 · 토큰 · 비용을 집계합니다.":
+        "将预定义的提示集与所选模型交叉运行,汇总平均延迟 · 令牌 · 费用。",
+    "프롬프트 셋": "提示集",
+    "기본 Q&A": "基础问答",
+    "코드 생성": "代码生成",
+    "추론 / 수학": "推理 / 数学",
+    "짧은 지식 질문 5개.": "5 个简短知识问题。",
+    "간단한 코드 작성 3종.": "3 个简单代码编写任务。",
+    "논리·수학 문제 3종.": "3 个逻辑/数学问题。",
+    "모델 선택": "模型选择",
+    "벤치마크 실행": "运行基准",
+    "벤치마크 실행 확인": "确认运行基准",
+    "총 {n} 회 API 호출을 수행합니다 ({p} 프롬프트 × {m} 모델). 계속할까요?":
+        "将进行 {n} 次 API 调用({p} 提示 × {m} 模型)。继续?",
+    "프롬프트 셋 없음": "无提示集",
+    "모델을 1개 이상 선택하세요": "请至少选择一个模型",
+    "모델별 집계": "按模型汇总",
+    "성공": "成功",
+    "평균 지연": "平均延迟",
+    "평균 출력 토큰": "平均输出令牌",
+    "총 비용": "总费用",
+    "개별 응답": "单次响应",
+    "프롬프트": "提示",
+    "지연": "延迟",
+    "비용": "费用",
+    "JSON 다운로드": "下载 JSON",
 }

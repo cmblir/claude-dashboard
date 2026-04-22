@@ -11,6 +11,37 @@
 
 ---
 
+## [2.8.0] — 2026-04-23
+
+### 🏁 Model Benchmark — 신규 탭 (work 그룹)
+
+사전 정의 프롬프트 셋 × 선택한 모델들을 교차 실행해 성능·비용을 집계한다.
+
+**기능**
+- 프롬프트 셋 3종: 기본 Q&A(5) / 코드 생성(3) / 추론·수학(3)
+- 모델 3개 체크박스 (Opus 4.7 / Sonnet 4.6 / Haiku 4.5)
+- 실행 전 confirmModal 로 총 호출 수 · 비용 발생 경고
+- ThreadPoolExecutor(max_workers=4) 로 prompt × model 조합 병렬 실행
+- 모델별 집계 표: 성공 건수 · 평균 지연 · 평균 출력 토큰 · 총 비용(USD)
+- 개별 응답 매트릭스 (모델 · 프롬프트 · 응답 미리보기 · 지연 · 비용)
+- JSON 다운로드 버튼
+
+**Architecture**
+- `server/model_bench.py` 신설 — `api_model_bench_{sets,run}` + `_call_once` + `_PRICING` 테이블
+- `server/routes.py` — 2개 라우트 추가 (`GET sets`, `POST run`)
+- `server/nav_catalog.py` — `modelBench` 탭 등록 + en/zh desc
+- `dist/index.html` — NAV + `VIEWS.modelBench` (셋 선택 칩 + 모델 체크박스 + 집계 테이블 + 매트릭스)
+- `tools/translations_manual_9.py` — 28 키 × ko/en/zh 추가
+
+### 📜 v2.2 ~ v2.8 로드맵 완료
+
+오늘 v2.1.0 → v2.8.0 까지 **7개 Claude API 플레이그라운드 탭**을 연속 릴리스. "클로드 모든 기능의 컨트롤 타워" 컨셉 하에 work 그룹 6 → **13 탭**으로 확장.
+
+추가된 탭 (work 그룹):
+- `promptCache` (v2.2.0) · `thinkingLab` (v2.3.0) · `toolUseLab` (v2.4.0) · `batchJobs` (v2.5.0) · `apiFiles` (v2.6.0) · `visionLab` (v2.7.0) · `modelBench` (v2.8.0)
+
+---
+
 ## [2.7.0] — 2026-04-23
 
 ### 👁️ Vision / PDF Lab — 신규 탭 (work 그룹)

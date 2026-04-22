@@ -865,6 +865,9 @@ const NAV = [
   { id: 'visionLab',   icon: '👁️', label: 'Vision / PDF', group: 'work',
     desc: '이미지/PDF → Opus·Sonnet·Haiku 3 모델 병렬 비교',
     docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/vision' },
+  { id: 'modelBench',  icon: '🏁', label: '모델 벤치마크', group: 'work',
+    desc: '프롬프트 셋 × 모델 교차 실행 → 평균 지연/토큰/비용 집계',
+    docUrl: 'https://docs.anthropic.com/en/docs/about-claude/models' },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -7753,6 +7756,199 @@ async function vlRun() {
     if (st) st.textContent = '';
     renderView();
   }
+}
+
+// ────────────────────────────────────────────────────────────────
+// MODEL BENCHMARK (v2.8.0)
+// 프롬프트 셋 × 선택 모델 교차 실행 → 지연/토큰/비용 집계
+// ────────────────────────────────────────────────────────────────
+VIEWS.modelBench = async () => {
+  const data = await api('/api/model-bench/sets');
+  state.data.mb = state.data.mb || {
+    setId: 'basic-qa',
+    modelIds: ['claude-haiku-4-5', 'claude-sonnet-4-6'],
+    maxTokens: 512,
+    results: null,
+    running: false,
+  };
+  const mb = state.data.mb;
+  const sets = data.sets || [];
+  const models = data.models || [];
+  const cur = sets.find(s => s.id === mb.setId) || sets[0];
+
+  const setBtns = sets.map(s =>
+    `<button class="chip ${mb.setId===s.id?'chip-accent':''}" onclick="mbSelectSet('${s.id}')">${t(s.label)}</button>`
+  ).join('');
+
+  const modelChecks = models.map(m => {
+    const checked = mb.modelIds.includes(m.id);
+    return `<label class="flex items-center gap-2 text-[11px] cursor-pointer select-none">
+      <input type="checkbox" ${checked?'checked':''} onchange="mbToggleModel('${m.id}')">
+      <span>${m.label}</span>
+    </label>`;
+  }).join('');
+
+  const summaryRows = mb.results ? Object.entries(mb.results.summary || {}).map(([mid, s]) => {
+    return `<tr class="border-b border-[var(--border)]">
+      <td class="py-1 font-mono">${mid}</td>
+      <td class="py-1 text-right">${s.count}</td>
+      <td class="py-1 text-right">${s.avgMs}ms</td>
+      <td class="py-1 text-right">${s.avgOut}</td>
+      <td class="py-1 text-right font-mono">$${(s.totalCost||0).toFixed(6)}</td>
+    </tr>`;
+  }).join('') : '';
+
+  const matrix = mb.results ? (mb.results.results || []).map(r => {
+    const icon = r.ok ? '✅' : '❌';
+    const body = r.ok ? (r.output || '').slice(0, 140) : (r.error || '');
+    return `<tr class="border-b border-[var(--border)] align-top">
+      <td class="py-2 pr-2 text-[11px] font-mono whitespace-nowrap">${icon} ${r.model||''}</td>
+      <td class="py-2 pr-2 text-[11px]">${_escapeHTML(r.prompt||'').slice(0, 60)}</td>
+      <td class="py-2 pr-2 text-[11px] whitespace-pre-wrap">${_escapeHTML(body)}</td>
+      <td class="py-2 pr-2 text-[11px] text-right font-mono">${r.durationMs||0}ms</td>
+      <td class="py-2 text-[11px] text-right font-mono">${r.ok ? '$' + (r.usdCost||0).toFixed(6) : '-'}</td>
+    </tr>`;
+  }).join('') : '';
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">🏁 ${t('모델 벤치마크')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('사전 정의 프롬프트 셋과 선택한 모델들을 교차 실행해 평균 지연 · 토큰 · 비용을 집계합니다.')}
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div class="space-y-3">
+        <div>
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${t('프롬프트 셋')}</div>
+          <div class="flex gap-1 flex-wrap mb-2">${setBtns}</div>
+          <div class="card p-3 text-[11px]">
+            <div class="font-semibold mb-1">${t(cur?.label||'')}</div>
+            <div class="text-[var(--text-dim)] mb-2">${t(cur?.description||'')}</div>
+            <ol class="list-decimal pl-4 space-y-1">${(cur?.prompts||[]).map(p => `<li>${_escapeHTML(p)}</li>`).join('')}</ol>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${t('모델 선택')}</div>
+          <div class="flex gap-3 flex-wrap">${modelChecks}</div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">max_tokens</label>
+          <input type="text" inputmode="numeric" class="input w-24" value="${mb.maxTokens}"
+                 oninput="mbSet('maxTokens', parseInt((this.value||'').replace(/\\D/g,''))||512)">
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary" onclick="mbRun()" ${mb.running?'disabled':''}>
+            ▶ ${mb.running ? t('실행 중…') : t('벤치마크 실행')}
+          </button>
+          <button class="btn" onclick="mbDownload()" ${mb.results?'':'disabled'}>⬇ ${t('JSON 다운로드')}</button>
+          <span id="mbStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('모델별 집계')}</div>
+          ${mb.results ? `
+            <table class="w-full text-[11px] border-collapse">
+              <thead><tr class="border-b border-[var(--border)]">
+                <th class="text-left py-1">${t('모델')}</th>
+                <th class="text-right py-1">${t('성공')}</th>
+                <th class="text-right py-1">${t('평균 지연')}</th>
+                <th class="text-right py-1">${t('평균 출력 토큰')}</th>
+                <th class="text-right py-1">${t('총 비용')}</th>
+              </tr></thead>
+              <tbody>${summaryRows}</tbody>
+            </table>
+            <div class="text-[10px] text-[var(--text-dim)] mt-2">${t('총 소요')}: ${mb.results.totalDurationMs}ms</div>
+          ` : `<div class="text-[11px] text-[var(--text-dim)]">${t('아직 결과가 없습니다')}</div>`}
+        </div>
+      </div>
+    </div>
+
+    ${mb.results ? `
+      <div class="card p-3">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('개별 응답')} (${(mb.results.results||[]).length})</div>
+        <div class="max-h-96 overflow-auto">
+          <table class="w-full border-collapse">
+            <thead><tr class="border-b border-[var(--border)]">
+              <th class="text-left py-1 text-[11px]">${t('모델')}</th>
+              <th class="text-left py-1 text-[11px]">${t('프롬프트')}</th>
+              <th class="text-left py-1 text-[11px]">${t('응답')}</th>
+              <th class="text-right py-1 text-[11px]">${t('지연')}</th>
+              <th class="text-right py-1 text-[11px]">${t('비용')}</th>
+            </tr></thead>
+            <tbody>${matrix}</tbody>
+          </table>
+        </div>
+      </div>
+    ` : ''}
+  `;
+};
+
+function mbSet(key, val) {
+  state.data.mb = state.data.mb || {};
+  state.data.mb[key] = val;
+}
+function mbSelectSet(id) {
+  mbSet('setId', id);
+  renderView();
+}
+function mbToggleModel(id) {
+  const mb = state.data.mb;
+  const i = mb.modelIds.indexOf(id);
+  if (i >= 0) mb.modelIds.splice(i, 1);
+  else mb.modelIds.push(id);
+  renderView();
+}
+async function mbRun() {
+  const mb = state.data.mb || {};
+  const data = await api('/api/model-bench/sets');
+  const s = (data.sets || []).find(x => x.id === mb.setId);
+  if (!s) { toast(t('프롬프트 셋 없음'), 'err'); return; }
+  if (!mb.modelIds.length) { toast(t('모델을 1개 이상 선택하세요'), 'err'); return; }
+  const n = s.prompts.length * mb.modelIds.length;
+  const ok = await confirmModal({
+    title: t('벤치마크 실행 확인'),
+    message: t('총 {n} 회 API 호출을 수행합니다 ({p} 프롬프트 × {m} 모델). 계속할까요?')
+      .replace('{n}', n).replace('{p}', s.prompts.length).replace('{m}', mb.modelIds.length),
+    confirmLabel: t('실행'),
+  });
+  if (!ok) return;
+
+  mbSet('running', true);
+  const st = document.getElementById('mbStatus');
+  if (st) st.textContent = t('실행 중…');
+  try {
+    const r = await fetch('/api/model-bench/run', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ prompts: s.prompts, models: mb.modelIds, maxTokens: mb.maxTokens }),
+    }).then(x => x.json());
+    mbSet('running', false);
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent=''; renderView(); return; }
+    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (st) st.textContent=''; renderView(); return; }
+    mbSet('results', r);
+    if (st) st.textContent = `${r.totalDurationMs}ms`;
+    renderView();
+  } catch (e) {
+    mbSet('running', false);
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (st) st.textContent = '';
+    renderView();
+  }
+}
+function mbDownload() {
+  const mb = state.data.mb;
+  if (!mb || !mb.results) return;
+  const blob = new Blob([JSON.stringify(mb.results, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `model-bench-${Date.now()}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ────────────────────────────────────────────────────────────────
