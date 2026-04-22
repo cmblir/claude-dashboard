@@ -2552,6 +2552,16 @@ function _wfRenderInspector() {
     </div>
 
     <div class="mb-4 pt-3 border-t border-[var(--border)]">
+      <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">📜 ${t('버전 히스토리')}</div>
+      <details id="wfVersionHistory">
+        <summary class="text-[11px] cursor-pointer select-none" style="color:var(--text-mute);">${t('저장된 버전 목록 보기')}</summary>
+        <div id="wfVersionHistoryBody" class="mt-2">
+          <div class="text-[10px]" style="color:var(--text-dim)">${t('로딩 중...')}</div>
+        </div>
+      </details>
+    </div>
+
+    <div class="mb-4 pt-3 border-t border-[var(--border)]">
       <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">⏰ ${t('Cron 스케줄')}</div>
       <div class="text-[10px] text-[var(--text-dim)] mb-2">
         ${t('cron 표현식으로 워크플로우를 주기적으로 자동 실행합니다.')}
@@ -3553,6 +3563,8 @@ const WF_TEMPLATES = [
   {
     id: 'team-dev',
     icon: '🧑‍💻',
+    category: 'dev',
+    builtin: true,
     title: '팀 개발 (리드 + 프론트 + 백엔드)',
     desc: '리드가 스프린트 업무를 분배 → 프론트·백엔드가 병렬 작업 → 둘 다 완료되면 리드가 리뷰 + 다음 스프린트 기획.',
     build: () => ({
@@ -3601,6 +3613,8 @@ const WF_TEMPLATES = [
   {
     id: 'research',
     icon: '📚',
+    category: 'analysis',
+    builtin: true,
     title: '리서치 파이프라인',
     desc: '리서처가 자료 수집 → 작가가 초안 작성 → 리뷰어가 검토 → 최종 문서.',
     build: () => ({
@@ -3636,6 +3650,8 @@ const WF_TEMPLATES = [
   {
     id: 'parallel-3',
     icon: '⚡',
+    category: 'pattern',
+    builtin: true,
     title: '단순 병렬 3 작업',
     desc: '독립적인 3개 세션이 병렬 실행 → 결과 취합 → 하나의 문서로 출력.',
     build: () => ({
@@ -3662,31 +3678,90 @@ const WF_TEMPLATES = [
   },
 ];
 
+const WF_TPL_CATEGORIES = [
+  { id: 'all',      label: '전체' },
+  { id: 'analysis', label: '분석' },
+  { id: 'ai',       label: 'AI' },
+  { id: 'dev',      label: '개발' },
+  { id: 'data',     label: '데이터' },
+  { id: 'pattern',  label: '패턴' },
+  { id: 'custom',   label: '커스텀' },
+];
+
+let __wfTplFilter = 'all';
+
+function _wfFilterTemplates(cat) {
+  __wfTplFilter = cat;
+  document.querySelectorAll('.wf-tpl-cat-btn').forEach(btn => {
+    btn.classList.toggle('btn-active', btn.dataset.cat === cat);
+  });
+  document.querySelectorAll('.wf-tpl-card').forEach(card => {
+    const cardCat = card.dataset.category || '';
+    card.style.display = (cat === 'all' || cardCat === cat) ? '' : 'none';
+  });
+}
+
 async function _wfShowTemplates() {
   const customList = await api('/api/workflows/templates/list');
   const customTemplates = (customList && customList.templates) || [];
+
+  // Merge server-side builtin flag
+  const allTemplates = [
+    ...WF_TEMPLATES.map(tpl => ({ ...tpl, source: 'builtin' })),
+    ...customTemplates.map(tpl => ({
+      ...tpl,
+      source: tpl.builtin ? 'builtin' : 'custom',
+      category: tpl.category || 'custom',
+    })),
+  ];
+
   const builtInCards = WF_TEMPLATES.map(tpl => `
-    <div class="card p-4 hover-lift" style="cursor:pointer;" onclick="_wfUseTemplate('${tpl.id}')">
+    <div class="card p-4 hover-lift wf-tpl-card" data-category="${escapeHtml(tpl.category || 'pattern')}" style="cursor:pointer;position:relative;" onclick="_wfUseTemplate('${tpl.id}')">
       <div class="flex items-center gap-2 mb-2">
         <span style="font-size:1.5rem;">${tpl.icon}</span>
         <span class="text-sm font-semibold">${escapeHtml(t(tpl.title))}</span>
+        <span class="chip chip-ok text-[9px]" style="font-weight:600;">BUILT-IN</span>
       </div>
-      <div class="text-[11px] text-[var(--text-mute)] leading-relaxed">${escapeHtml(t(tpl.desc))}</div>
+      <div class="text-[11px] text-[var(--text-mute)] leading-relaxed mb-2">${escapeHtml(t(tpl.desc))}</div>
+      <div class="flex items-center gap-2">
+        <span class="chip text-[9px]">${escapeHtml(t(WF_TPL_CATEGORIES.find(c=>c.id===tpl.category)?.label || tpl.category || ''))}</span>
+        <button class="btn-primary btn text-[10px]" onclick="event.stopPropagation();_wfUseTemplate('${tpl.id}')">+ ${t('이 템플릿으로 새 워크플로우 생성')}</button>
+      </div>
     </div>
   `).join('');
-  const customCards = customTemplates.length ? customTemplates.map(tpl => `
-    <div class="card p-4 hover-lift" style="cursor:pointer;position:relative;" onclick="_wfUseCustomTemplate('${tpl.id}')">
-      <button class="btn text-[10px]" style="position:absolute;top:8px;right:8px;color:#fca5a5;"
-              onclick="event.stopPropagation();_wfDeleteCustomTemplate('${tpl.id}')">🗑️</button>
+
+  const customCards = customTemplates.length ? customTemplates.map(tpl => {
+    const isBuiltin = !!tpl.builtin;
+    const cat = tpl.category || 'custom';
+    return `
+    <div class="card p-4 hover-lift wf-tpl-card" data-category="${escapeHtml(cat)}" style="cursor:pointer;position:relative;" onclick="_wfUseCustomTemplate('${tpl.id}')">
+      <div style="position:absolute;top:8px;right:8px;display:flex;gap:4px;">
+        ${isBuiltin
+          ? `<span class="chip chip-ok text-[9px]" style="font-weight:600;">BUILT-IN</span>`
+          : `<button class="btn text-[10px]" style="color:#fca5a5;" onclick="event.stopPropagation();_wfDeleteCustomTemplate('${tpl.id}')">🗑️</button>`
+        }
+      </div>
       <div class="flex items-center gap-2 mb-2">
         <span style="font-size:1.5rem;">${escapeHtml(tpl.icon||'💾')}</span>
         <span class="text-sm font-semibold">${escapeHtml(tpl.name)}</span>
       </div>
       <div class="text-[11px] text-[var(--text-mute)] leading-relaxed mb-1">${escapeHtml(tpl.description || '')}</div>
-      <div class="text-[10px] text-[var(--text-dim)]">${tpl.nodeCount} ${t('노드')} · ${tpl.edgeCount} ${t('연결')}</div>
-    </div>
-  `).join('') : `<div class="card p-4 text-xs text-[var(--text-dim)] text-center">${t('저장된 커스텀 템플릿이 없습니다')}</div>`;
+      <div class="flex items-center justify-between mt-2">
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] text-[var(--text-dim)]">${tpl.nodeCount || 0} ${t('노드')} · ${tpl.edgeCount || 0} ${t('연결')}</span>
+          <span class="chip text-[9px]">${escapeHtml(t(WF_TPL_CATEGORIES.find(c=>c.id===cat)?.label || cat))}</span>
+        </div>
+        <button class="btn-primary btn text-[10px]" onclick="event.stopPropagation();_wfUseCustomTemplate('${tpl.id}')">+ ${t('이 템플릿으로 새 워크플로우 생성')}</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="card p-4 text-xs text-[var(--text-dim)] text-center">${t('저장된 커스텀 템플릿이 없습니다')}</div>`;
+
   const canSaveCurrent = !!(__wf.current && (__wf.current.nodes||[]).length);
+
+  const catFilterBtns = WF_TPL_CATEGORIES.map(c =>
+    `<button class="btn text-[10px] wf-tpl-cat-btn ${__wfTplFilter === c.id ? 'btn-active' : ''}" data-cat="${c.id}" onclick="_wfFilterTemplates('${c.id}')">${escapeHtml(t(c.label))}</button>`
+  ).join('');
+
   showModal(`
     <div class="p-5">
       <div class="flex items-center justify-between mb-3">
@@ -3697,17 +3772,22 @@ async function _wfShowTemplates() {
         ${t('자주 쓰는 DAG 패턴을 원클릭으로 만듭니다. 생성 후 노드별 업무 내용을 자유롭게 수정하세요.')}
       </div>
 
+      <div class="flex flex-wrap gap-2 mb-4">${catFilterBtns}</div>
+
       <div class="text-[11px] uppercase tracking-wider text-[var(--text-dim)] mb-2">${t('기본 템플릿')}</div>
       <div class="flex flex-col gap-2 mb-4">${builtInCards}</div>
 
       <div class="flex items-center justify-between mt-4 mb-2">
         <div class="text-[11px] uppercase tracking-wider text-[var(--text-dim)]">${t('내 커스텀 템플릿')}</div>
         <button class="btn-primary btn text-xs" ${canSaveCurrent?'':'disabled style="opacity:0.5;pointer-events:none;"'}
-                onclick="_wfSaveCurrentAsTemplate()">＋ ${t('현재 워크플로우를 템플릿으로 저장')}</button>
+                onclick="_wfSaveCurrentAsTemplate()">+ ${t('현재 워크플로우를 템플릿으로 저장')}</button>
       </div>
       <div class="flex flex-col gap-2">${customCards}</div>
     </div>
   `, { narrow: true });
+
+  // Apply current filter after modal is rendered
+  setTimeout(() => _wfFilterTemplates(__wfTplFilter), 10);
 }
 
 async function _wfUseTemplate(tplId) {
@@ -3806,6 +3886,67 @@ async function _wfDeleteCustomTemplate(tplId) {
   closeModal();
   setTimeout(() => _wfShowTemplates(), 100);
 }
+
+// ─── 워크플로우 버전 히스토리 ─────────────────────────────────
+async function _wfLoadVersionHistory() {
+  if (!__wf.current) return;
+  const body = document.getElementById('wfVersionHistoryBody');
+  if (!body) return;
+  body.innerHTML = `<div class="text-[10px]" style="color:var(--text-dim)">${t('로딩 중...')}</div>`;
+  try {
+    const r = await api('/api/workflows/history?id=' + encodeURIComponent(__wf.current.id));
+    const versions = (r && r.versions) || [];
+    if (!versions.length) {
+      body.innerHTML = `<div class="text-[10px]" style="color:var(--text-dim)">${t('저장된 버전이 없습니다')}</div>`;
+      return;
+    }
+    body.innerHTML = versions.map(v => `
+      <div class="flex items-center justify-between py-2 border-b border-[var(--border)]" style="gap:6px;">
+        <div class="flex-1 min-w-0">
+          <div class="text-[11px] font-semibold truncate" style="color:var(--text)">${escapeHtml(v.name || t('이름 없음'))}</div>
+          <div class="text-[10px]" style="color:var(--text-dim)">
+            ${new Date(v.savedAt).toLocaleString()} · ${v.nodeCount || 0} ${t('노드')}
+          </div>
+        </div>
+        <button class="btn text-[10px] flex-shrink-0" onclick="_wfRestoreVersion('${escapeHtml(__wf.current.id)}','${escapeHtml(v.savedAt)}')">
+          ↩ ${t('복원')}
+        </button>
+      </div>
+    `).join('');
+  } catch (e) {
+    body.innerHTML = `<div class="text-[10px]" style="color:var(--err)">${t('히스토리 로드 실패')}: ${escapeHtml(String(e))}</div>`;
+  }
+}
+
+async function _wfRestoreVersion(wfId, savedAt) {
+  const ok = await confirmModal({
+    title: t('버전 복원'),
+    message: t('이 버전으로 복원하시겠습니까? 현재 저장되지 않은 변경 사항은 사라집니다.'),
+    confirmLabel: t('복원'), danger: true,
+  });
+  if (!ok) return;
+  try {
+    const r = await api('/api/workflows/restore', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: wfId, savedAt }),
+    });
+    if (!r.ok) { toast(errMsg(r), 'err'); return; }
+    toast(t('버전이 복원되었습니다'), 'ok');
+    await _wfOpen(wfId);
+    _wfRenderList();
+    _wfRenderCanvas();
+    _wfRenderInspector();
+  } catch (e) {
+    toast(t('복원 실패') + ': ' + String(e), 'err');
+  }
+}
+
+// details 토글 시 히스토리 로드
+document.addEventListener('toggle', (e) => {
+  if (e.target.id === 'wfVersionHistory' && e.target.open) {
+    _wfLoadVersionHistory();
+  }
+}, true);
 
 // ─── 인터랙티브 튜토리얼 ─────────────────────────────────────
 // 6 단계로 워크플로우 사용법을 자동 재생. 맥 스타일 feat-win 창에서
@@ -8140,6 +8281,72 @@ VIEWS.aiProviders = async () => {
   return `
     ${viewHeader(t('ai_providers_title','AI 프로바이더'), t('ai_providers_subtitle','Claude · GPT · Gemini · Ollama · Codex 등 멀티 AI 프로바이더 관리'), 'aiProviders')}
 
+    ${localStorage.getItem('providerWizardDismissed') ? '' : `
+    <details id="providerSetupWizard" class="card mb-6" open>
+      <summary class="p-4 cursor-pointer select-none flex items-center justify-between" style="list-style:none;">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🧙</span>
+          <span class="text-sm font-semibold" style="color:var(--text)">${t('AI 프로바이더 설정 위자드')}</span>
+          <span class="chip chip-warn text-[9px]">${t('시작하기')}</span>
+        </div>
+        <span class="text-xs" style="color:var(--text-dim)">▼</span>
+      </summary>
+      <div class="px-5 pb-5">
+        <div class="text-xs mb-4" style="color:var(--text-mute)">${t('사용할 AI 프로바이더를 선택하고 연결을 설정합니다.')}</div>
+
+        <!-- Step 1: Provider Selection -->
+        <div class="mb-4">
+          <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('Step 1:')} ${t('어떤 AI를 사용하시겠습니까?')}</div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="wizardProviderCards">
+            <div class="card p-4 text-center cursor-pointer hover-lift" onclick="_wizardSelectProvider('claude')" data-wiz-provider="claude">
+              <div style="font-size:2rem;">🟠</div>
+              <div class="text-sm font-semibold mt-2" style="color:var(--text)">Claude</div>
+              <div class="text-[10px]" style="color:var(--text-dim)">Anthropic CLI</div>
+            </div>
+            <div class="card p-4 text-center cursor-pointer hover-lift" onclick="_wizardSelectProvider('openai')" data-wiz-provider="openai">
+              <div style="font-size:2rem;">🟢</div>
+              <div class="text-sm font-semibold mt-2" style="color:var(--text)">OpenAI</div>
+              <div class="text-[10px]" style="color:var(--text-dim)">GPT API</div>
+            </div>
+            <div class="card p-4 text-center cursor-pointer hover-lift" onclick="_wizardSelectProvider('gemini')" data-wiz-provider="gemini">
+              <div style="font-size:2rem;">🔵</div>
+              <div class="text-sm font-semibold mt-2" style="color:var(--text)">Gemini</div>
+              <div class="text-[10px]" style="color:var(--text-dim)">Google AI</div>
+            </div>
+            <div class="card p-4 text-center cursor-pointer hover-lift" onclick="_wizardSelectProvider('ollama')" data-wiz-provider="ollama">
+              <div style="font-size:2rem;">🦙</div>
+              <div class="text-sm font-semibold mt-2" style="color:var(--text)">Ollama</div>
+              <div class="text-[10px]" style="color:var(--text-dim)">${t('로컬 LLM')}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Provider-specific config (hidden until selection) -->
+        <div id="wizardStep2" class="mb-4" style="display:none;">
+          <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('Step 2:')} ${t('프로바이더 설정')}</div>
+          <div id="wizardStep2Body" class="card p-4"></div>
+        </div>
+
+        <!-- Step 3: Test connection (hidden until step 2 done) -->
+        <div id="wizardStep3" class="mb-4" style="display:none;">
+          <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('Step 3:')} ${t('연결 테스트')}</div>
+          <div class="flex items-center gap-3">
+            <button class="btn-primary btn text-xs" id="wizardTestBtn" onclick="_wizardTestConnection()">🧪 ${t('연결 테스트')}</button>
+            <span id="wizardTestResult" class="text-xs"></span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-3 border-t border-[var(--border)]">
+          <label class="flex items-center gap-2 text-[11px] cursor-pointer select-none" style="color:var(--text-dim)">
+            <input type="checkbox" onchange="_wizardDismiss(this.checked)">
+            <span>${t('다시 보지 않기')}</span>
+          </label>
+          <button class="btn text-xs" onclick="document.getElementById('providerSetupWizard').removeAttribute('open')">${t('위자드 닫기')}</button>
+        </div>
+      </div>
+    </details>
+    `}
+
     <div id="aiProviderHealthBar" class="card p-4 mb-6">
       <div class="flex items-center justify-between mb-3">
         <div class="text-sm font-semibold" style="color:var(--text)">🩺 ${t('프로바이더 헬스')}</div>
@@ -8479,6 +8686,138 @@ async function _loadUsageAlertStatus() {
 }
 
 // AI Providers 전역 함수
+// ─── 프로바이더 설정 위자드 ──────────────────────────────────
+let __wizardSelectedProvider = null;
+
+window._wizardSelectProvider = (provider) => {
+  __wizardSelectedProvider = provider;
+  // Highlight selected card
+  document.querySelectorAll('#wizardProviderCards .card').forEach(c => {
+    c.style.borderColor = c.dataset.wizProvider === provider ? 'var(--accent)' : '';
+    c.style.borderWidth = c.dataset.wizProvider === provider ? '2px' : '';
+  });
+
+  const step2 = document.getElementById('wizardStep2');
+  const step2Body = document.getElementById('wizardStep2Body');
+  const step3 = document.getElementById('wizardStep3');
+  if (!step2 || !step2Body || !step3) return;
+
+  step2.style.display = '';
+  step3.style.display = '';
+
+  const providerConfigs = {
+    claude: `
+      <div class="flex items-center gap-3 mb-3">
+        <span style="font-size:1.5rem;">🟠</span>
+        <div>
+          <div class="text-sm font-semibold" style="color:var(--text)">Claude</div>
+          <div class="text-xs" style="color:var(--text-mute)">${t('Anthropic Claude Code CLI')}</div>
+        </div>
+      </div>
+      <div class="p-3 rounded-lg" style="background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2);">
+        <div class="text-xs" style="color:var(--ok)">
+          ${t('이미 Claude Code CLI 가 설치되어 있으면 자동 감지됩니다.')}
+        </div>
+        <div class="text-[10px] mt-1" style="color:var(--text-dim)">
+          ${t('설치 확인')}: <code style="background:var(--code-bg);padding:2px 6px;border-radius:4px;">claude --version</code>
+        </div>
+      </div>
+    `,
+    openai: `
+      <div class="flex items-center gap-3 mb-3">
+        <span style="font-size:1.5rem;">🟢</span>
+        <div>
+          <div class="text-sm font-semibold" style="color:var(--text)">OpenAI</div>
+          <div class="text-xs" style="color:var(--text-mute)">${t('GPT API 연결')}</div>
+        </div>
+      </div>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('API 키')}</label>
+      <input type="password" id="wizardApiKey" class="input w-full text-sm" placeholder="sk-..." />
+      <button class="btn-primary btn text-xs mt-2" onclick="_wizardSaveApiKey('openai-api')">${t('API 키 저장')}</button>
+    `,
+    gemini: `
+      <div class="flex items-center gap-3 mb-3">
+        <span style="font-size:1.5rem;">🔵</span>
+        <div>
+          <div class="text-sm font-semibold" style="color:var(--text)">Gemini</div>
+          <div class="text-xs" style="color:var(--text-mute)">${t('Google AI 연결')}</div>
+        </div>
+      </div>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('API 키')}</label>
+      <input type="password" id="wizardApiKey" class="input w-full text-sm" placeholder="AIza..." />
+      <button class="btn-primary btn text-xs mt-2" onclick="_wizardSaveApiKey('gemini-api')">${t('API 키 저장')}</button>
+    `,
+    ollama: `
+      <div class="flex items-center gap-3 mb-3">
+        <span style="font-size:1.5rem;">🦙</span>
+        <div>
+          <div class="text-sm font-semibold" style="color:var(--text)">Ollama</div>
+          <div class="text-xs" style="color:var(--text-mute)">${t('로컬 LLM')}</div>
+        </div>
+      </div>
+      <div class="p-3 rounded-lg mb-3" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);">
+        <div class="text-xs" style="color:var(--warn)">
+          ${t('ollama serve 가 실행 중인지 확인하세요.')}
+        </div>
+        <div class="text-[10px] mt-1" style="color:var(--text-dim)">
+          ${t('확인 명령')}: <code style="background:var(--code-bg);padding:2px 6px;border-radius:4px;">curl http://localhost:11434/api/tags</code>
+        </div>
+      </div>
+      <button class="btn text-xs" onclick="navigate('aiProviders');setTimeout(()=>{const el=document.getElementById('ollamaTabCatalog');if(el)el.click();},200);">
+        🦙 ${t('Ollama 모델 허브로 이동')}
+      </button>
+    `,
+  };
+
+  step2Body.innerHTML = providerConfigs[provider] || '';
+};
+
+window._wizardSaveApiKey = async (providerId) => {
+  const inp = document.getElementById('wizardApiKey');
+  if (!inp || !inp.value.trim()) { toast(t('API 키를 입력하세요'), 'warn'); return; }
+  const r = await api('/api/ai-providers/save-key', {
+    method: 'POST', body: JSON.stringify({ providerId, apiKey: inp.value.trim() }),
+  });
+  if (r.ok) {
+    toast(t('API 키 저장 완료'), 'ok');
+    inp.value = '';
+    inp.placeholder = t('저장됨') + ' ✓';
+    inp.disabled = true;
+  } else {
+    toast(errMsg(r), 'err');
+  }
+};
+
+window._wizardTestConnection = async () => {
+  const result = document.getElementById('wizardTestResult');
+  if (!result) return;
+
+  const providerMap = { claude: 'claude-cli', openai: 'openai-api', gemini: 'gemini-api', ollama: 'ollama' };
+  const pid = providerMap[__wizardSelectedProvider] || __wizardSelectedProvider;
+  if (!pid) { toast(t('프로바이더를 먼저 선택하세요'), 'warn'); return; }
+
+  result.innerHTML = `<span style="color:var(--text-dim)">${t('테스트 중...')}</span>`;
+  try {
+    const r = await api('/api/ai-providers/test', { method: 'POST', body: JSON.stringify({ providerId: pid }) });
+    if (r.ok) {
+      const resp = r.response || {};
+      result.innerHTML = `<span style="color:var(--ok)">✓ ${t('성공')} (${resp.duration_ms || 0}ms)</span>`;
+    } else {
+      result.innerHTML = `<span style="color:var(--err)">✗ ${escapeHtml(r.error || (r.response||{}).error || t('실패'))}</span>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--err)">✗ ${escapeHtml(String(e))}</span>`;
+  }
+};
+
+window._wizardDismiss = (checked) => {
+  if (checked) {
+    localStorage.setItem('providerWizardDismissed', '1');
+  } else {
+    localStorage.removeItem('providerWizardDismissed');
+  }
+};
+
 window.testProvider = async (pid) => {
   const el = document.getElementById('testResult-' + pid);
   if (el) el.innerHTML = '<span class="text-xs" style="color:var(--text-dim)">테스트 중...</span>';

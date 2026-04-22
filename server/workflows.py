@@ -449,6 +449,18 @@ def api_workflow_save(body: dict) -> dict:
         wf_clean["id"] = wfId
         wf_clean["createdAt"] = (store["workflows"].get(wfId) or {}).get("createdAt") or now
         wf_clean["updatedAt"] = now
+        # ── 버전 히스토리 보관 (최근 20개) ──
+        if not is_new and wfId in store["workflows"]:
+            prev = store["workflows"][wfId]
+            history = store.setdefault("history", {}).setdefault(wfId, [])
+            history.append({
+                "savedAt": now,
+                "name": prev.get("name", ""),
+                "nodeCount": len(prev.get("nodes", [])),
+                "edgeCount": len(prev.get("edges", [])),
+                "snapshot": {k: prev[k] for k in ("nodes", "edges", "viewport", "name", "description") if k in prev},
+            })
+            store["history"][wfId] = history[-20:]  # 최근 20개만
         store["workflows"][wfId] = wf_clean
         _dump_all(store)
     return {"ok": True, "id": wfId, "updatedAt": now, "created": is_new}
@@ -1560,20 +1572,134 @@ def _new_tpl_id() -> str:
     return f"tpl-{int(time.time()*1000)}-{uuid.uuid4().hex[:4]}"
 
 
+BUILTIN_TEMPLATES: list[dict] = [
+    {
+        "id": "bt-multi-ai-compare", "name": "멀티 AI 비교", "icon": "🔬", "builtin": True,
+        "description": "동일 프롬프트를 Claude, GPT, Gemini에 동시 전송하여 결과 비교",
+        "category": "analysis",
+        "nodes": [
+            {"id": "n-start", "type": "start", "x": 80, "y": 200, "title": "시작", "data": {}},
+            {"id": "n-claude", "type": "session", "x": 320, "y": 80, "title": "Claude", "data": {"subject": "분석 요청", "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-gpt", "type": "session", "x": 320, "y": 200, "title": "GPT", "data": {"subject": "분석 요청", "assignee": "openai:gpt-4.1-mini", "inputsMode": "concat"}},
+            {"id": "n-gemini", "type": "session", "x": 320, "y": 320, "title": "Gemini", "data": {"subject": "분석 요청", "assignee": "gemini:gemini-2.5-flash", "inputsMode": "concat"}},
+            {"id": "n-merge", "type": "merge", "x": 560, "y": 200, "title": "결과 합류", "data": {"mergeMode": "all"}},
+            {"id": "n-out", "type": "output", "x": 760, "y": 200, "title": "비교 결과", "data": {"exportTo": ""}},
+        ],
+        "edges": [
+            {"id": "e1", "from": "n-start", "to": "n-claude", "fromPort": "out", "toPort": "in"},
+            {"id": "e2", "from": "n-start", "to": "n-gpt", "fromPort": "out", "toPort": "in"},
+            {"id": "e3", "from": "n-start", "to": "n-gemini", "fromPort": "out", "toPort": "in"},
+            {"id": "e4", "from": "n-claude", "to": "n-merge", "fromPort": "out", "toPort": "in"},
+            {"id": "e5", "from": "n-gpt", "to": "n-merge", "fromPort": "out", "toPort": "in"},
+            {"id": "e6", "from": "n-gemini", "to": "n-merge", "fromPort": "out", "toPort": "in"},
+            {"id": "e7", "from": "n-merge", "to": "n-out", "fromPort": "out", "toPort": "in"},
+        ],
+    },
+    {
+        "id": "bt-rag-pipeline", "name": "RAG 파이프라인", "icon": "🔍", "builtin": True,
+        "description": "문서 임베딩 → 검색 → AI 응답 생성 파이프라인",
+        "category": "ai",
+        "nodes": [
+            {"id": "n-start", "type": "start", "x": 80, "y": 160, "title": "시작", "data": {}},
+            {"id": "n-embed", "type": "embedding", "x": 300, "y": 160, "title": "문서 임베딩", "data": {"provider": "ollama-api", "model": "bge-m3", "outputFormat": "json"}},
+            {"id": "n-search", "type": "http", "x": 520, "y": 160, "title": "벡터 검색", "data": {"url": "http://localhost:8000/search", "method": "POST", "body": '{"query": "{{input}}"}', "extractPath": "results"}},
+            {"id": "n-gen", "type": "session", "x": 740, "y": 160, "title": "답변 생성", "data": {"subject": "검색 결과 기반 답변", "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-out", "type": "output", "x": 960, "y": 160, "title": "최종 답변", "data": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": "n-start", "to": "n-embed", "fromPort": "out", "toPort": "in"},
+            {"id": "e2", "from": "n-embed", "to": "n-search", "fromPort": "out", "toPort": "in"},
+            {"id": "e3", "from": "n-search", "to": "n-gen", "fromPort": "out", "toPort": "in"},
+            {"id": "e4", "from": "n-gen", "to": "n-out", "fromPort": "out", "toPort": "in"},
+        ],
+    },
+    {
+        "id": "bt-code-review", "name": "코드 리뷰 파이프라인", "icon": "🔍", "builtin": True,
+        "description": "보안 검사 → 코드 리뷰 → 결과 취합",
+        "category": "dev",
+        "nodes": [
+            {"id": "n-start", "type": "start", "x": 80, "y": 180, "title": "코드 입력", "data": {}},
+            {"id": "n-sec", "type": "subagent", "x": 320, "y": 80, "title": "보안 리뷰", "data": {"subject": "보안 취약점 검사", "agentRole": "security-reviewer", "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-review", "type": "subagent", "x": 320, "y": 280, "title": "코드 리뷰", "data": {"subject": "코드 품질 리뷰", "agentRole": "code-reviewer", "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-agg", "type": "aggregate", "x": 560, "y": 180, "title": "결과 취합", "data": {"mode": "concat"}},
+            {"id": "n-out", "type": "output", "x": 760, "y": 180, "title": "리뷰 보고서", "data": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": "n-start", "to": "n-sec", "fromPort": "out", "toPort": "in"},
+            {"id": "e2", "from": "n-start", "to": "n-review", "fromPort": "out", "toPort": "in"},
+            {"id": "e3", "from": "n-sec", "to": "n-agg", "fromPort": "out", "toPort": "in"},
+            {"id": "e4", "from": "n-review", "to": "n-agg", "fromPort": "out", "toPort": "in"},
+            {"id": "e5", "from": "n-agg", "to": "n-out", "fromPort": "out", "toPort": "in"},
+        ],
+    },
+    {
+        "id": "bt-data-etl", "name": "데이터 ETL", "icon": "📊", "builtin": True,
+        "description": "API 데이터 수집 → 변환 → AI 분석 → 리포트 생성",
+        "category": "data",
+        "nodes": [
+            {"id": "n-start", "type": "start", "x": 80, "y": 160, "title": "시작", "data": {}},
+            {"id": "n-fetch", "type": "http", "x": 280, "y": 160, "title": "데이터 수집", "data": {"url": "", "method": "GET"}},
+            {"id": "n-transform", "type": "transform", "x": 480, "y": 160, "title": "데이터 변환", "data": {"transformType": "json_extract", "jsonPath": "data"}},
+            {"id": "n-analyze", "type": "session", "x": 680, "y": 160, "title": "AI 분석", "data": {"subject": "수집 데이터 분석", "assignee": "claude:sonnet"}},
+            {"id": "n-out", "type": "output", "x": 880, "y": 160, "title": "리포트", "data": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": "n-start", "to": "n-fetch", "fromPort": "out", "toPort": "in"},
+            {"id": "e2", "from": "n-fetch", "to": "n-transform", "fromPort": "out", "toPort": "in"},
+            {"id": "e3", "from": "n-transform", "to": "n-analyze", "fromPort": "out", "toPort": "in"},
+            {"id": "e4", "from": "n-analyze", "to": "n-out", "fromPort": "out", "toPort": "in"},
+        ],
+    },
+    {
+        "id": "bt-retry-robust", "name": "재시도 워크플로우", "icon": "🔁", "builtin": True,
+        "description": "에러 시 자동 재시도 + 실패 핸들링",
+        "category": "pattern",
+        "nodes": [
+            {"id": "n-start", "type": "start", "x": 80, "y": 160, "title": "시작", "data": {}},
+            {"id": "n-retry", "type": "retry", "x": 280, "y": 160, "title": "재시도 설정", "data": {"maxRetries": 3, "backoffMs": 2000, "backoffMultiplier": 2.0}},
+            {"id": "n-work", "type": "session", "x": 480, "y": 160, "title": "작업 실행", "data": {"subject": "API 호출", "assignee": "claude:sonnet"}},
+            {"id": "n-err", "type": "error_handler", "x": 480, "y": 320, "title": "에러 핸들러", "data": {"onError": "default", "defaultOutput": "작업 실패 — 관리자에게 알림"}},
+            {"id": "n-out", "type": "output", "x": 680, "y": 160, "title": "결과", "data": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": "n-start", "to": "n-retry", "fromPort": "out", "toPort": "in"},
+            {"id": "e2", "from": "n-retry", "to": "n-work", "fromPort": "out", "toPort": "in"},
+            {"id": "e3", "from": "n-work", "to": "n-out", "fromPort": "out", "toPort": "in"},
+            {"id": "e4", "from": "n-work", "to": "n-err", "fromPort": "out", "toPort": "in"},
+        ],
+    },
+]
+
+
 def api_workflow_templates_list(query: dict | None = None) -> dict:
     store = _load_all()
     out = []
+    # 빌트인 템플릿
+    for bt in BUILTIN_TEMPLATES:
+        out.append({
+            "id": bt["id"],
+            "name": bt["name"],
+            "description": bt.get("description", ""),
+            "icon": bt.get("icon", "📋"),
+            "category": bt.get("category", "general"),
+            "nodeCount": len(bt.get("nodes", [])),
+            "edgeCount": len(bt.get("edges", [])),
+            "builtin": True,
+            "createdAt": 0,
+        })
+    # 커스텀 템플릿
     for tid, tpl in (store.get("customTemplates") or {}).items():
         out.append({
             "id": tid,
             "name": tpl.get("name", "Untitled"),
             "description": tpl.get("description", ""),
             "icon": tpl.get("icon") or "💾",
+            "category": tpl.get("category", "custom"),
             "nodeCount": len(tpl.get("nodes") or []),
             "edgeCount": len(tpl.get("edges") or []),
+            "builtin": False,
             "createdAt": tpl.get("createdAt", 0),
         })
-    out.sort(key=lambda x: x["createdAt"], reverse=True)
     return {"ok": True, "templates": out}
 
 
@@ -1626,6 +1752,10 @@ def api_workflow_template_delete(body: dict) -> dict:
 
 
 def api_workflow_template_get(tid: str) -> dict:
+    # 빌트인 템플릿 먼저 확인
+    bt = next((t for t in BUILTIN_TEMPLATES if t["id"] == tid), None)
+    if bt:
+        return {"ok": True, "template": bt, "builtin": True}
     if not (isinstance(tid, str) and _TPL_ID_RE.match(tid)):
         return {"ok": False, "error": "invalid id"}
     store = _load_all()
@@ -1808,6 +1938,63 @@ def api_workflow_schedule_set(body: dict) -> dict:
         wf["updatedAt"] = int(time.time() * 1000)
         _dump_all(store)
     return {"ok": True, "id": wfId, "schedule": wf["schedule"]}
+
+
+def api_workflow_history(query: dict) -> dict:
+    """워크플로우 버전 히스토리. GET /api/workflows/history?id=..."""
+    wfId = ((query.get("id", [""])[0] if isinstance(query.get("id"), list) else query.get("id", "")) or "").strip()
+    if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
+        return {"ok": False, "error": "invalid id"}
+    store = _load_all()
+    history = (store.get("history") or {}).get(wfId, [])
+    # snapshot 의 nodes/edges 는 요약만 (전체는 restore 시)
+    summaries = []
+    for h in reversed(history):
+        snap = h.get("snapshot") or {}
+        summaries.append({
+            "savedAt": h.get("savedAt", 0),
+            "name": h.get("name", ""),
+            "nodeCount": h.get("nodeCount", 0),
+            "edgeCount": h.get("edgeCount", 0),
+        })
+    return {"ok": True, "id": wfId, "history": summaries, "count": len(summaries)}
+
+
+def api_workflow_restore(body: dict) -> dict:
+    """히스토리 버전 복원. body: {id, savedAt}"""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    wfId = body.get("id")
+    saved_at = body.get("savedAt")
+    if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
+        return {"ok": False, "error": "invalid id"}
+    with _LOCK:
+        store = _load_all()
+        history = (store.get("history") or {}).get(wfId, [])
+        target = next((h for h in history if h.get("savedAt") == saved_at), None)
+        if not target:
+            return {"ok": False, "error": "version not found"}
+        snap = target.get("snapshot") or {}
+        wf = store["workflows"].get(wfId)
+        if not wf:
+            return {"ok": False, "error": "workflow not found"}
+        # 현재를 히스토리에 보관 후 복원
+        now = int(time.time() * 1000)
+        history.append({
+            "savedAt": now,
+            "name": wf.get("name", ""),
+            "nodeCount": len(wf.get("nodes", [])),
+            "edgeCount": len(wf.get("edges", [])),
+            "snapshot": {k: wf[k] for k in ("nodes", "edges", "viewport", "name", "description") if k in wf},
+        })
+        store.setdefault("history", {})[wfId] = history[-20:]
+        # 복원 적용
+        for k in ("nodes", "edges", "viewport", "name", "description"):
+            if k in snap:
+                wf[k] = snap[k]
+        wf["updatedAt"] = now
+        _dump_all(store)
+    return {"ok": True, "id": wfId, "restoredFrom": saved_at}
 
 
 def api_workflow_stats() -> dict:
