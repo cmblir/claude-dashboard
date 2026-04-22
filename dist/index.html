@@ -859,6 +859,9 @@ const NAV = [
   { id: 'batchJobs',   icon: '📦', label: '배치 작업', group: 'work',
     desc: 'Message Batches API — 대용량 프롬프트 병렬 제출 · JSONL 결과',
     docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/message-batches' },
+  { id: 'apiFiles',    icon: '📎', label: 'Files API', group: 'work',
+    desc: '파일 업로드 · 목록 · 삭제 + 메시지에 document reference',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/files' },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -7462,6 +7465,157 @@ async function bjCancel(id) {
   }).then(x => x.json());
   if (r.ok) toast(t('취소 요청됨'), 'ok'); else toast(r.error || t('취소 실패'), 'err');
   await bjRefresh();
+}
+
+// ────────────────────────────────────────────────────────────────
+// API FILES (v2.6.0) — Anthropic Files API 관리
+// 파일 업로드·목록·삭제 + 업로드한 파일을 메시지 document 로 reference
+// ────────────────────────────────────────────────────────────────
+VIEWS.apiFiles = async () => {
+  const lst = await api('/api/api-files/list');
+  state.data.af = state.data.af || {
+    model: 'claude-sonnet-4-6',
+    prompt: '',
+    selectedFileId: '',
+    lastOutput: null,
+  };
+  const af = state.data.af;
+  const needKey = lst && lst.needKey;
+  const files = (lst && lst.data) || [];
+
+  const fileRows = files.slice(0, 30).map(f => {
+    const sel = af.selectedFileId === f.id;
+    const sz = (f.size_bytes || 0) / 1024;
+    const szStr = sz >= 1024 ? (sz/1024).toFixed(2) + ' MB' : sz.toFixed(1) + ' KB';
+    return `<div class="py-2 border-b border-[var(--border)] ${sel?'bg-[var(--bg-hover)]':''}">
+      <div class="flex justify-between items-center gap-2">
+        <span class="font-mono text-[11px] truncate" title="${f.filename||''}">${f.filename||f.id}</span>
+        <span class="text-[10px] text-[var(--text-dim)] font-mono">${szStr}</span>
+      </div>
+      <div class="text-[10px] text-[var(--text-dim)] mt-1 truncate">${f.id} · ${f.mime_type||'?'}</div>
+      <div class="mt-1 flex gap-1">
+        <button class="btn btn-sm" onclick="afSelect('${f.id}')">${t('선택')}</button>
+        <button class="btn btn-sm btn-danger" onclick="afDelete('${f.id}')">${t('삭제')}</button>
+      </div>
+    </div>`;
+  }).join('') || `<div class="text-[11px] text-[var(--text-dim)]">${t('업로드된 파일이 없습니다')}</div>`;
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">📎 ${t('Files API')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('Anthropic 에 파일을 업로드하고, file_id 를 메시지에 document 로 reference 해서 질문을 던질 수 있습니다.')}
+      </p>
+      ${needKey ? `<div class="mt-2 text-[11px] text-[var(--warn)]">⚠️ ${t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요')}</div>` : ''}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="space-y-3">
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('파일 업로드')}</div>
+          <input type="file" id="afFileInput" class="input" onchange="afUpload()">
+          <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('최대 30MB · PDF / txt / md 권장')}</div>
+          <div id="afUploadStatus" class="text-[11px] mt-2"></div>
+        </div>
+
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('파일로 질문 테스트')}</div>
+          <div class="text-[10px] text-[var(--text-dim)] mb-2">${t('선택된 파일')}: <span class="font-mono">${af.selectedFileId || '-'}</span></div>
+          <select class="input mb-2" onchange="afSet('model', this.value)">
+            <option value="claude-opus-4-7" ${af.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${af.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
+            <option value="claude-haiku-4-5" ${af.model==='claude-haiku-4-5'?'selected':''}>Haiku 4.5</option>
+          </select>
+          <textarea class="input text-[12px]" rows="3" oninput="afSet('prompt', this.value)" placeholder="${t('이 문서의 핵심을 3줄로 요약해줘')}">${_escapeHTML(af.prompt || '')}</textarea>
+          <div class="mt-2 flex items-center gap-2">
+            <button class="btn btn-primary" onclick="afAsk()" ${af.selectedFileId?'':'disabled'}>▶ ${t('질문 실행')}</button>
+            <span id="afAskStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+          </div>
+          ${af.lastOutput ? `<pre class="text-[11px] whitespace-pre-wrap mt-3 max-h-64 overflow-auto">${_escapeHTML(af.lastOutput.output || af.lastOutput.error || '')}</pre>` : ''}
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="card p-3">
+          <div class="flex justify-between items-center mb-2">
+            <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('업로드된 파일')} (${files.length})</div>
+            <button class="btn btn-sm" onclick="renderView()">🔄 ${t('새로고침')}</button>
+          </div>
+          <div class="max-h-[600px] overflow-auto">${fileRows}</div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+function afSet(key, val) {
+  state.data.af = state.data.af || {};
+  state.data.af[key] = val;
+}
+function afSelect(id) {
+  state.data.af = state.data.af || {};
+  state.data.af.selectedFileId = id;
+  renderView();
+}
+async function afDelete(id) {
+  const ok = await confirmModal({ title: t('파일 삭제'), message: t('이 파일을 삭제할까요?'), confirmLabel: t('삭제'), danger: true });
+  if (!ok) return;
+  const r = await fetch('/api/api-files/delete', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id }),
+  }).then(x => x.json());
+  if (r.ok) toast(t('삭제 완료'), 'ok'); else toast(r.error || t('삭제 실패'), 'err');
+  renderView();
+}
+async function afUpload() {
+  const inp = document.getElementById('afFileInput');
+  const st = document.getElementById('afUploadStatus');
+  const f = inp && inp.files && inp.files[0];
+  if (!f) return;
+  if (f.size > 30 * 1024 * 1024) { toast(t('최대 30MB'), 'err'); return; }
+  if (st) st.textContent = t('업로드 중…') + ' (' + Math.round(f.size/1024) + ' KB)';
+  const buf = await f.arrayBuffer();
+  // base64 인코딩
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  const b64 = btoa(bin);
+  try {
+    const r = await fetch('/api/api-files/upload', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ filename: f.name, mime: f.type || 'application/octet-stream', base64: b64 }),
+    }).then(x => x.json());
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent=''; return; }
+    if (!r.ok) { toast(r.error || t('업로드 실패'), 'err'); if (st) st.textContent = '❌ ' + (r.error||''); return; }
+    toast(t('업로드 완료') + ': ' + (r.fileId||''), 'ok');
+    state.data.af = state.data.af || {};
+    state.data.af.selectedFileId = r.fileId;
+    if (st) st.textContent = '✅ ' + (r.fileId||'');
+    renderView();
+  } catch (e) {
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (st) st.textContent = '❌ ' + e.message;
+  }
+}
+async function afAsk() {
+  const af = state.data.af || {};
+  if (!af.selectedFileId) { toast(t('먼저 파일을 선택하세요'), 'err'); return; }
+  if (!(af.prompt||'').trim()) { toast(t('질문을 입력하세요'), 'err'); return; }
+  const st = document.getElementById('afAskStatus');
+  if (st) st.textContent = t('호출 중…');
+  try {
+    const r = await fetch('/api/api-files/test', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ model: af.model, prompt: af.prompt, fileId: af.selectedFileId }),
+    }).then(x => x.json());
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent=''; return; }
+    state.data.af.lastOutput = r.ok ? { output: r.output, durationMs: r.durationMs } : { error: r.error || t('실행 실패') };
+    if (st) st.textContent = r.ok ? `${r.durationMs||0}ms` : '❌';
+    renderView();
+  } catch (e) {
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (st) st.textContent = '';
+  }
 }
 
 // ────────────────────────────────────────────────────────────────
