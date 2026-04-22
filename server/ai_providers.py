@@ -332,7 +332,11 @@ class ClaudeCliProvider(BaseProvider):
 
 
 class OllamaProvider(BaseProvider):
-    """Ollama CLI — 로컬 LLM 실행."""
+    """Ollama (로컬) — HTTP API 사용 (ollama run 은 인터랙티브라 서버에서 사용 불가).
+
+    CLI 설치 여부로 available 판단하되, 실제 실행은 HTTP API (/api/generate).
+    설치된 모델 자동 감지 + 첫 번째 모델을 기본값으로 사용.
+    """
 
     provider_id = "ollama"
     provider_name = "Ollama (로컬)"
@@ -340,31 +344,50 @@ class OllamaProvider(BaseProvider):
     homepage = "https://ollama.com"
     icon = "🦙"
 
+    def _host(self) -> str:
+        return (os.environ.get("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
+
     def _bin(self) -> str:
         return shutil.which("ollama") or ""
 
     def is_available(self) -> bool:
-        return bool(self._bin())
+        # CLI 설치됨 + API 응답 가능
+        if not self._bin():
+            return False
+        try:
+            import urllib.request
+            req = urllib.request.Request(f"{self._host()}/api/tags")
+            with urllib.request.urlopen(req, timeout=3):
+                return True
+        except Exception:
+            return False
+
+    def _first_installed_model(self) -> str:
+        """설치된 첫 번째 chat 모델 반환 (embedding 제외)."""
+        models = self.list_models()
+        for m in models:
+            if CAP_EMBED not in (m.capabilities or []):
+                return m.id
+        return models[0].id if models else ""
 
     def list_models(self) -> list[ModelInfo]:
-        """ollama list 로 설치된 모델 조회."""
-        b = self._bin()
-        if not b:
-            return []
+        """HTTP API 로 설치된 모델 조회."""
         try:
-            r = subprocess.run(
-                [b, "list"], capture_output=True, text=True, timeout=10,
-            )
-            models = []
-            for line in (r.stdout or "").splitlines()[1:]:  # 헤더 스킵
-                parts = line.split()
-                if parts:
-                    name = parts[0]
-                    models.append(ModelInfo(
-                        id=name, label=name, context_window=0,
-                        price_in=0, price_out=0, note="로컬 — 무료",
-                    ))
-            return models
+            import urllib.request
+            req = urllib.request.Request(f"{self._host()}/api/tags")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            out = []
+            embed_hints = {"embed", "bge", "nomic", "e5", "minilm", "gte", "arctic-embed"}
+            for m in data.get("models", []):
+                name = m.get("name", "")
+                is_embed = any(h in name.lower() for h in embed_hints)
+                caps = [CAP_EMBED] if is_embed else [CAP_CHAT]
+                out.append(ModelInfo(
+                    id=name, label=name, note="로컬 — 무료",
+                    capabilities=caps,
+                ))
+            return out
         except Exception:
             return []
 
@@ -378,29 +401,41 @@ class OllamaProvider(BaseProvider):
         timeout: int = 300,
         extra: dict | None = None,
     ) -> AIResponse:
+        """Ollama HTTP API (/api/generate) 로 실행 — 인터랙티브 문제 없음."""
+        import urllib.request
+        import urllib.error
+
         t0 = int(time.time() * 1000)
-        b = self._bin()
-        if not b:
+        if not model:
+            model = self._first_installed_model()
+        if not model:
             return AIResponse(
-                status="err", error="ollama not found in PATH",
+                status="err", error="설치된 Ollama 모델이 없습니다. 모델 허브에서 다운로드하세요.",
                 provider=self.provider_id, duration_ms=int(time.time() * 1000) - t0,
             )
-        if not model:
-            model = "llama3.1"  # 기본 모델
 
-        full_prompt = prompt
+        body_obj = {"model": model, "prompt": prompt, "stream": False}
         if system_prompt:
-            full_prompt = f"[System]\n{system_prompt}\n\n[User]\n{prompt}"
+            body_obj["system"] = system_prompt
 
-        cmd = [b, "run", model, full_prompt]
+        body = json.dumps(body_obj).encode("utf-8")
+        req = urllib.request.Request(
+            f"{self._host()}/api/generate",
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+
         try:
-            r = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=timeout,
-                cwd=cwd or None,
-            )
-        except subprocess.TimeoutExpired:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            err_body = ""
+            try:
+                err_body = e.read().decode("utf-8")[:500]
+            except Exception:
+                pass
             return AIResponse(
-                status="err", error=f"timeout after {timeout}s",
+                status="err", error=f"HTTP {e.code}: {err_body}",
                 provider=self.provider_id, model=model,
                 duration_ms=int(time.time() * 1000) - t0,
             )
@@ -412,16 +447,15 @@ class OllamaProvider(BaseProvider):
             )
 
         duration = int(time.time() * 1000) - t0
-        if r.returncode != 0:
-            return AIResponse(
-                status="err",
-                error=(r.stderr or "").strip()[:1000] or f"exit {r.returncode}",
-                provider=self.provider_id, model=model, duration_ms=duration,
-            )
+        output = data.get("response", "")
+        ti = data.get("prompt_eval_count", 0)
+        to_ = data.get("eval_count", 0)
 
         return AIResponse(
-            status="ok", output=(r.stdout or "").strip(),
-            provider=self.provider_id, model=model, duration_ms=duration,
+            status="ok", output=output,
+            provider=self.provider_id, model=model,
+            tokens_in=ti, tokens_out=to_, tokens_total=ti + to_,
+            duration_ms=duration, raw=data,
         )
 
 
@@ -481,6 +515,7 @@ class GeminiCliProvider(BaseProvider):
             r = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout,
                 cwd=cwd or None,
+                stdin=subprocess.DEVNULL,  # 인터랙티브 모드 방지
             )
         except subprocess.TimeoutExpired:
             return AIResponse(
@@ -1243,7 +1278,11 @@ class OllamaApiProvider(BaseProvider):
         import urllib.error
 
         t0 = int(time.time() * 1000)
-        model = model or "llama3.1"
+        if not model:
+            # 설치된 첫 번째 chat 모델 사용 (embedding 제외)
+            models = self.list_models()
+            chat_models = [m for m in models if CAP_EMBED not in (m.capabilities or [])]
+            model = chat_models[0].id if chat_models else (models[0].id if models else "llama3.1")
         body_obj = {
             "model": model,
             "prompt": prompt,
