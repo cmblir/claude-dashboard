@@ -48,6 +48,9 @@ from .thinking_lab import (
     api_thinking_lab_examples, api_thinking_lab_history,
     api_thinking_lab_models, api_thinking_lab_test,
 )
+from .tool_use_lab import (
+    api_tool_use_history, api_tool_use_templates, api_tool_use_turn,
+)
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -201,6 +204,8 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/thinking-lab/examples": api_thinking_lab_examples,
     "/api/thinking-lab/history": api_thinking_lab_history,
     "/api/thinking-lab/models": api_thinking_lab_models,
+    "/api/tool-use-lab/templates": api_tool_use_templates,
+    "/api/tool-use-lab/history": api_tool_use_history,
 }
 
 
@@ -289,6 +294,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/ai-providers/default-model": api_set_default_model,
     "/api/prompt-cache/test": api_prompt_cache_test,
     "/api/thinking-lab/test": api_thinking_lab_test,
+    "/api/tool-use-lab/turn": api_tool_use_turn,
 }
 
 
