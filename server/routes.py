@@ -483,5 +483,5 @@ _ITEM_GET_ROUTES = [
     (re.compile(r"^/api/skills/([^/]+)$"), get_skill),
     (re.compile(r"^/api/agents/([A-Za-z0-9_.:-]+)$"), get_agent),
     (re.compile(r"^/api/workflows/(wf-[0-9]{10,14}-[a-z0-9]{3,6})$"), api_workflow_get),
-    (re.compile(r"^/api/workflows/templates/(tpl-[0-9]{10,14}-[a-z0-9]{3,6})$"), api_workflow_template_get),
+    (re.compile(r"^/api/workflows/templates/(tpl-[0-9]{10,14}-[a-z0-9]{3,6}|bt-[a-z0-9-]+)$"), api_workflow_template_get),
 ]
