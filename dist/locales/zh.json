@@ -2880,5 +2880,16 @@
   "⏱️ 대기 5s": "⏱️ 等待 5s",
   "🧠 멀티 AI": "🧠 多 AI",
   "🔁 재사용": "🔁 复用",
-  "⏰ Cron/Webhook": "⏰ Cron/Webhook"
+  "⏰ Cron/Webhook": "⏰ Cron/Webhook",
+  "15. 🧠 멀티 AI 프로바이더 — Claude · GPT · Ollama 동시 활용": "15. 🧠 多 AI 供应商 — Claude · GPT · Ollama 同时使用",
+  "16. 🧲 임베딩 + 🌐 HTTP — RAG 파이프라인": "16. 🧲 嵌入 + 🌐 HTTP — RAG 管道",
+  "17. 🔄 Loop + 🔁 Retry + 🛡️ Error Handler": "17. 🔄 Loop + 🔁 Retry + 🛡️ Error Handler",
+  "18. ⏰ Cron + 🔗 Webhook + 📦 Export/Import": "18. ⏰ Cron + 🔗 Webhook + 📦 Export/Import",
+  "노드의 Assignee 를 claude:opus, openai:gpt-4.1, ollama:qwen2.5 등으로 지정하면 각 노드가 다른 AI 로 실행됩니다. 같은 프롬프트를 병렬로 3개 AI 에 보내고 결과를 합치는 멀티 AI 비교 워크플로우.": "将节点的 Assignee 设为 claude:opus、openai:gpt-4.1、ollama:qwen2.5 等，每个节点即可使用不同 AI。将相同提示词并行发送给 3 个 AI 并合并结果 — 多 AI 对比工作流。",
+  "텍스트를 Ollama bge-m3 로 임베딩 → HTTP 노드로 벡터 DB 검색 → AI 가 답변 생성. embedding + http + session 노드를 조합한 RAG(검색 증강 생성) 파이프라인.": "用 Ollama bge-m3 对文本进行嵌入 → HTTP 节点搜索向量数据库 → AI 生成答案。组合 embedding + http + session 节点的 RAG（检索增强生成）管道。",
+  "Loop 노드로 입력을 분할 반복, Retry 로 실패 시 자동 재시도 (exponential backoff), Error Handler 로 에러 시 기본값 반환. 견고한 자동화 파이프라인.": "Loop 节点分割输入并循环；Retry 失败时自动重试（指数退避）；Error Handler 出错时返回默认值。构建稳健的自动化管道。",
+  "Cron 스케줄로 매일 9시 자동 실행 · 외부 시스템에서 Webhook URL 로 트리거 · Export/Import 로 워크플로우 JSON 공유. Ctrl+C/V 로 노드 복사, Ctrl+Z 로 실행 취소.": "Cron 定时每天 9 点自动执行 · 外部系统通过 Webhook URL 触发 · Export/Import 共享工作流 JSON。Ctrl+C/V 复制节点，Ctrl+Z 撤销。",
+  "기본값 반환": "返回默认值",
+  "JSON 추출": "JSON 提取",
+  "분석 파이프라인": "分析管道"
 }
