@@ -789,10 +789,9 @@ const __noReloadPaths = [
   // 워크플로우 에디터는 프론트가 권위 상태를 들고 있으므로 서버 응답 후
   // renderView() 로 뷰를 리셋하면 드래그 중 깜빡임·선택 초기화 발생
   '/api/workflows/', '/api/session/spawn',
-  // AI 프로바이더 — 테스트/비교/헬스는 리로드 불필요
-  '/api/ai-providers/test', '/api/ai-providers/compare', '/api/ai-providers/health',
-  '/api/ai-providers/usage-alert',
-  // Ollama — pull/serve/info 는 인라인 상태 업데이트
+  // AI 프로바이더 — 테스트/비교/헬스/설정 저장은 리로드 불필요
+  '/api/ai-providers/',
+  // Ollama — pull/serve/info/settings 는 인라인 상태 업데이트
   '/api/ollama/',
 ];
 async function api(path, opts = {}) {
@@ -8550,9 +8549,24 @@ VIEWS.aiProviders = async () => {
     </div>
 
     <div class="card p-6 mb-6">
-      <h3 class="text-lg font-semibold mb-3" style="color:var(--text)" data-i18n="fallback_chain">🔄 폴백 체인</h3>
-      <p class="text-xs mb-3" style="color:var(--text-dim)" data-i18n="fallback_chain_desc">워크플로우 노드가 실패하면 다음 프로바이더로 자동 전환됩니다.</p>
-      <div class="mb-3">${chainItems || '<span style="color:var(--text-dim)">미설정</span>'}</div>
+      <h3 class="text-lg font-semibold mb-3" style="color:var(--text)" data-i18n="fallback_chain">🔄 ${t('폴백 체인')}</h3>
+      <p class="text-xs mb-3" style="color:var(--text-dim)">${t('워크플로우 노드가 실패하면 순서대로 다음 프로바이더를 시도합니다. 드래그하거나 체크박스로 편집하세요.')}</p>
+      <div class="mb-3" id="fallbackChainEditor">
+        ${providers.map(p => {
+          const inChain = fallbackChain.includes(p.id);
+          const idx = fallbackChain.indexOf(p.id);
+          return `<label class="flex items-center gap-2 mb-1.5 p-2 rounded hover-lift" style="background:var(--card);border:1px solid var(--border);cursor:pointer;">
+            <input type="checkbox" class="fallback-chain-cb" value="${escapeHtml(p.id)}" ${inChain?'checked':''} data-idx="${idx>=0?idx:99}">
+            <span>${p.icon||'🔌'}</span>
+            <span class="text-sm" style="color:var(--text)">${escapeHtml(p.name)}</span>
+            <span class="text-[10px]" style="color:var(--text-dim)">${escapeHtml(p.id)}</span>
+            ${p.available ? '<span class="chip chip-ok text-[9px]">✓</span>' : '<span class="chip chip-err text-[9px]">✗</span>'}
+            ${inChain ? `<span class="text-[10px] font-bold" style="color:var(--accent)">#${idx+1}</span>` : ''}
+          </label>`;
+        }).join('')}
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="_saveFallbackChain()">${t('폴백 체인 저장')}</button>
+      <span id="fallbackChainMsg" class="text-xs ml-2" style="color:var(--text-mute)"></span>
     </div>
 
     <div class="card p-6 mb-6">
@@ -8563,20 +8577,56 @@ VIEWS.aiProviders = async () => {
     </div>
 
     <div class="card p-6 mb-6">
-      <h3 class="text-lg font-semibold mb-3" style="color:var(--text)" data-i18n="workflow_usage_guide">💡 워크플로우에서 사용법</h3>
+      <h3 class="text-lg font-semibold mb-3" style="color:var(--text)">💡 ${t('워크플로우 & 프로바이더 사용 가이드')}</h3>
       <div class="text-sm" style="color:var(--text-mute)">
-        <p class="mb-2" data-i18n="workflow_usage_desc">워크플로우 노드의 <b>Assignee</b> 필드에 <code style="background:var(--code-bg);padding:2px 6px;border-radius:4px">프로바이더:모델</code> 형태로 입력합니다.</p>
-        <table class="data w-full text-xs">
-          <thead><tr><th>Assignee</th><th data-i18n="provider_col">프로바이더</th><th data-i18n="model_col">모델</th></tr></thead>
+        <p class="mb-3">${t('워크플로우 노드의 Assignee 필드에 프로바이더:모델 형태로 입력합니다.')}</p>
+        <table class="data w-full text-xs mb-4">
+          <thead><tr><th>Assignee</th><th>${t('프로바이더')}</th><th>${t('모델')}</th><th>${t('비고')}</th></tr></thead>
           <tbody>
-            <tr><td><code>claude:opus</code></td><td>Claude CLI</td><td>Opus 4.7</td></tr>
-            <tr><td><code>openai:gpt-4.1</code></td><td>OpenAI API</td><td>GPT-4.1</td></tr>
-            <tr><td><code>gemini:2.5-pro</code></td><td>Gemini CLI/API</td><td>Gemini 2.5 Pro</td></tr>
-            <tr><td><code>ollama:llama3.1</code></td><td>Ollama</td><td>Llama 3.1</td></tr>
-            <tr><td><code>codex:o4-mini</code></td><td>Codex CLI</td><td>o4-mini</td></tr>
-            <tr><td><code>opus-4.7</code></td><td>Claude CLI (기존 호환)</td><td>Opus 4.7</td></tr>
+            <tr><td><code>claude:opus</code></td><td>Claude CLI</td><td>Opus 4.7</td><td>${t('최강 성능')}</td></tr>
+            <tr><td><code>claude:sonnet</code></td><td>Claude CLI</td><td>Sonnet 4.6</td><td>${t('균형형')}</td></tr>
+            <tr><td><code>openai:gpt-4.1</code></td><td>OpenAI API</td><td>GPT-4.1</td><td>${t('API 키 필요')}</td></tr>
+            <tr><td><code>gemini:2.5-pro</code></td><td>Gemini CLI/API</td><td>Gemini 2.5 Pro</td><td>${t('CLI 또는 API 키')}</td></tr>
+            <tr><td><code>ollama:qwen2.5:14b</code></td><td>Ollama</td><td>${t('설치된 모델')}</td><td>${t('로컬 무료')}</td></tr>
+            <tr><td><code>codex:o4-mini</code></td><td>Codex CLI</td><td>o4-mini</td><td>${t('코드 특화')}</td></tr>
           </tbody>
         </table>
+        <details class="mb-3">
+          <summary class="cursor-pointer text-xs font-semibold" style="color:var(--accent)">📦 ${t('16개 노드 타입')}</summary>
+          <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+            <div>🚀 start — ${t('시작')}</div>
+            <div>🗂️ session — ${t('AI 세션')}</div>
+            <div>🤝 subagent — ${t('역할 부여')}</div>
+            <div>🧩 aggregate — ${t('취합')}</div>
+            <div>🔀 branch — ${t('조건 분기')}</div>
+            <div>📤 output — ${t('결과')}</div>
+            <div>🌐 http — ${t('API 호출')}</div>
+            <div>🔄 transform — ${t('데이터 변환')}</div>
+            <div>📌 variable — ${t('변수')}</div>
+            <div>🔁 subworkflow — ${t('서브 워크플로우')}</div>
+            <div>🧲 embedding — ${t('임베딩')}</div>
+            <div>🔄 loop — ${t('반복')}</div>
+            <div>🔁 retry — ${t('재시도')}</div>
+            <div>🛡️ error_handler — ${t('에러 핸들링')}</div>
+            <div>🔀 merge — ${t('병렬 합류')}</div>
+            <div>⏱️ delay — ${t('대기')}</div>
+          </div>
+        </details>
+        <details class="mb-3">
+          <summary class="cursor-pointer text-xs font-semibold" style="color:var(--accent)">⚡ ${t('주요 기능')}</summary>
+          <ul class="mt-2 text-[11px] list-disc pl-4 space-y-1">
+            <li><b>${t('병렬 실행')}</b> — ${t('같은 depth 노드를 동시 실행')}</li>
+            <li><b>SSE ${t('스트림')}</b> — ${t('실행 진행률 실시간 표시')}</li>
+            <li><b>Webhook</b> — ${t('외부 시스템에서 HTTP로 워크플로우 트리거')}</li>
+            <li><b>Cron</b> — ${t('스케줄로 자동 반복 실행')}</li>
+            <li><b>${t('폴백 체인')}</b> — ${t('실패 시 다음 AI로 자동 전환')}</li>
+            <li><b>Export/Import</b> — ${t('JSON으로 워크플로우 공유')}</li>
+            <li><b>${t('버전 히스토리')}</b> — ${t('이전 버전으로 복원 가능')}</li>
+            <li><b>Ctrl+C/V/Z</b> — ${t('복사/붙여넣기/실행취소')}</li>
+            <li><b>${t('빌트인 템플릿')}</b> — ${t('멀티 AI 비교, RAG, 코드 리뷰 등 8종')}</li>
+            <li><b>Ollama ${t('허브')}</b> — ${t('모델 검색/다운로드/삭제 + 엔진 설정')}</li>
+          </ul>
+        </details>
       </div>
     </div>
 
@@ -8796,7 +8846,7 @@ async function _aiRefreshHealth() {
   host.innerHTML = `<span class="text-xs" style="color:var(--text-dim)">${t('로딩 중...')}</span>`;
   try {
     const d = await api('/api/ai-providers/health');
-    const items = d.providers || d.health || [];
+    const items = d.results || d.providers || d.health || [];
     if (!items.length) {
       host.innerHTML = `<span class="text-xs" style="color:var(--text-dim)">${t('프로바이더 없음')}</span>`;
       if (summary) summary.textContent = '';
@@ -8804,16 +8854,22 @@ async function _aiRefreshHealth() {
     }
     const avail = items.filter(p => p.available || p.status === 'available');
     if (summary) summary.textContent = `${avail.length}/${items.length} ${t('프로바이더 사용 가능')}`;
+    // 프로바이더 목록에서 호스트 정보 매칭
+    const provList = (state.data._aiProviders||{}).providers||[];
+    const provMap = Object.fromEntries(provList.map(p=>[p.id,p]));
     host.innerHTML = items.map(p => {
       const ok = p.available || p.status === 'available';
       const dotColor = ok ? 'var(--ok)' : 'var(--err)';
-      const icon = p.icon || '🔌';
-      const name = escapeHtml(p.name || p.id || '');
+      const icon = p.icon || (provMap[p.provider]||{}).icon || '🔌';
+      const name = escapeHtml(p.name || p.provider || p.id || '');
       const chipCls = ok ? 'chip chip-ok' : 'chip chip-err';
-      return `<div class="flex items-center gap-1.5">
+      const prov = provMap[p.provider] || {};
+      const hostInfo = ok && prov.homepage ? `<span class="text-[9px]" style="color:var(--text-dim)">${escapeHtml(prov.homepage.replace('https://',''))}</span>` : '';
+      return `<div class="flex items-center gap-1.5" title="${escapeHtml(p.provider||'')}">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
         <span class="text-sm">${icon}</span>
         <span class="${chipCls} text-[11px]">${name}</span>
+        ${hostInfo}
       </div>`;
     }).join('');
   } catch (e) {
@@ -9047,6 +9103,25 @@ window.testProvider = async (pid) => {
       el.innerHTML = `<div class="text-xs" style="color:var(--err)">✗ ${escapeHtml(r.error || (r.response||{}).error || '실패')}</div>`;
     }
   } catch (e) { if (el) el.innerHTML = `<div class="text-xs" style="color:var(--err)">✗ ${escapeHtml(String(e))}</div>`; }
+};
+
+window._saveFallbackChain = async () => {
+  const cbs = document.querySelectorAll('.fallback-chain-cb:checked');
+  const chain = Array.from(cbs).map(cb => cb.value);
+  const msgEl = document.getElementById('fallbackChainMsg');
+  try {
+    const r = await api('/api/ai-providers/fallback-chain', {
+      method: 'POST', body: JSON.stringify({ chain }),
+    });
+    if (r.ok) {
+      if (msgEl) msgEl.innerHTML = `<span style="color:var(--ok)">✓ ${t('저장됨')} (${chain.length}${t('개')})</span>`;
+      toast(t('폴백 체인이 저장되었습니다'), 'ok');
+    } else {
+      if (msgEl) msgEl.innerHTML = `<span style="color:var(--err)">✗ ${errMsg(r)}</span>`;
+    }
+  } catch(e) {
+    if (msgEl) msgEl.innerHTML = `<span style="color:var(--err)">✗ ${escapeHtml(String(e))}</span>`;
+  }
 };
 
 window.saveApiKey = async (pid) => {
