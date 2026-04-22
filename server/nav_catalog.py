@@ -102,6 +102,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "메시지에 document 로 reference 해서 질문 테스트.",
         ["files api", "파일 업로드", "document reference", "files",
          "file_id"]),
+    ("visionLab",     "work",
+        "Vision / PDF 실험실 — 이미지(PNG/JPG/WebP/GIF) 또는 PDF 를 업로드해 "
+        "Opus / Sonnet / Haiku 3 모델에 병렬 질문 → 응답 나란히 비교.",
+        ["vision", "이미지 인식", "PDF", "멀티모달", "multimodal",
+         "image_url", "비교"]),
 
     # ── 설정 & 구성 ─────────────────────────────────
     ("hooks",         "config",   "이벤트 훅 설정",
@@ -185,6 +190,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                  "zh": "批量任务 — 提交大批量 Message Batches,轮询状态,下载 JSONL 结果"},
     "apiFiles": {"en": "Files API — upload/list/delete files, reference them in messages as documents",
                 "zh": "Files API — 上传/列出/删除文件,并在消息中以 document 形式引用"},
+    "visionLab": {"en": "Vision/PDF Lab — drop an image or PDF, compare Opus/Sonnet/Haiku responses side-by-side",
+                 "zh": "视觉/PDF 实验室 — 拖入图片或 PDF,并排比较 Opus/Sonnet/Haiku 响应"},
     "hooks": {"en": "Event hooks", "zh": "事件钩子"},
     "permissions": {"en": "Tool permissions", "zh": "工具权限"},
     "mcp": {"en": "MCP Connectors", "zh": "MCP 连接器"},

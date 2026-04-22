@@ -58,6 +58,7 @@ from .batch_jobs import (
 from .api_files import (
     api_files_delete, api_files_list, api_files_test, api_files_upload,
 )
+from .vision_lab import api_vision_compare, api_vision_models
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -218,6 +219,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/batch/get": api_batch_get,
     "/api/batch/results": api_batch_results,
     "/api/api-files/list": api_files_list,
+    "/api/vision-lab/models": api_vision_models,
 }
 
 
@@ -312,6 +314,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/api-files/upload": api_files_upload,
     "/api/api-files/delete": api_files_delete,
     "/api/api-files/test": api_files_test,
+    "/api/vision-lab/compare": api_vision_compare,
 }
 
 
