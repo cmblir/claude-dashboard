@@ -102,6 +102,103 @@
   body.theme-light .pulse-dot { background: #16a34a; }
   body.theme-light .empty { color: var(--text-dim); }
   body.theme-light #sidebar-foot { border-color: rgba(0,0,0,0.08); }
+
+  /* ─── Task 4: 커스텀 테마 — midnight / forest / sunset ─── */
+  body.theme-midnight {
+    --bg: #0b0f1a;
+    --bg-soft: #101828;
+    --card: rgba(100,140,255,0.04);
+    --card-hi: rgba(100,140,255,0.08);
+    --border: rgba(100,140,255,0.1);
+    --border-hi: rgba(100,140,255,0.2);
+    --text: #e0e6f0;
+    --text-mute: #8898b8;
+    --text-dim: #5a6a88;
+    --accent: #6b8aff;
+    --accent-2: #4e6ee0;
+    --cyan: #7dd3fc;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --err: #f87171;
+    --grad: linear-gradient(135deg, #6b8aff 0%, #4e6ee0 100%);
+    --grad-soft: linear-gradient(135deg, rgba(107,138,255,0.12), rgba(78,110,224,0.08));
+    --code-bg: rgba(0,0,0,0.35);
+    color-scheme: dark;
+  }
+  body.theme-midnight #sidebar { background: #0e1425 !important; border-color: rgba(100,140,255,0.1); }
+  body.theme-midnight .nav-item.active { background: rgba(107,138,255,0.15) !important; border-color: rgba(107,138,255,0.3) !important; }
+  body.theme-midnight .btn-primary { color: #fff; }
+  body.theme-midnight .chat-bubble-user { color: #fff; }
+
+  body.theme-forest {
+    --bg: #0a1410;
+    --bg-soft: #0f1e16;
+    --card: rgba(80,200,120,0.04);
+    --card-hi: rgba(80,200,120,0.08);
+    --border: rgba(80,200,120,0.1);
+    --border-hi: rgba(80,200,120,0.2);
+    --text: #dff0e4;
+    --text-mute: #88b898;
+    --text-dim: #5a8868;
+    --accent: #50c878;
+    --accent-2: #3aad5e;
+    --cyan: #7dd3fc;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --err: #f87171;
+    --grad: linear-gradient(135deg, #50c878 0%, #3aad5e 100%);
+    --grad-soft: linear-gradient(135deg, rgba(80,200,120,0.12), rgba(58,173,94,0.08));
+    --code-bg: rgba(0,0,0,0.35);
+    color-scheme: dark;
+  }
+  body.theme-forest #sidebar { background: #0d1a14 !important; border-color: rgba(80,200,120,0.1); }
+  body.theme-forest .nav-item.active { background: rgba(80,200,120,0.15) !important; border-color: rgba(80,200,120,0.3) !important; }
+  body.theme-forest .btn-primary { color: #fff; }
+  body.theme-forest .chat-bubble-user { color: #fff; }
+
+  body.theme-sunset {
+    --bg: #1a0f0a;
+    --bg-soft: #241410;
+    --card: rgba(255,150,80,0.04);
+    --card-hi: rgba(255,150,80,0.08);
+    --border: rgba(255,150,80,0.1);
+    --border-hi: rgba(255,150,80,0.2);
+    --text: #f5e0d0;
+    --text-mute: #c8a888;
+    --text-dim: #8a6a50;
+    --accent: #ff9650;
+    --accent-2: #e07830;
+    --cyan: #7dd3fc;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --err: #f87171;
+    --grad: linear-gradient(135deg, #ff9650 0%, #e07830 100%);
+    --grad-soft: linear-gradient(135deg, rgba(255,150,80,0.12), rgba(224,120,48,0.08));
+    --code-bg: rgba(0,0,0,0.35);
+    color-scheme: dark;
+  }
+  body.theme-sunset #sidebar { background: #1e1210 !important; border-color: rgba(255,150,80,0.1); }
+  body.theme-sunset .nav-item.active { background: rgba(255,150,80,0.15) !important; border-color: rgba(255,150,80,0.3) !important; }
+  body.theme-sunset .btn-primary { color: #fff; }
+  body.theme-sunset .chat-bubble-user { color: #fff; }
+
+  /* ─── Task 9: 노드 그룹핑 ─── */
+  .wf-group-box { fill: rgba(167,139,250,0.06); stroke: rgba(167,139,250,0.3); stroke-width: 1.5; stroke-dasharray: 6 3; rx: 16; ry: 16; cursor: move; }
+  .wf-group-box:hover { fill: rgba(167,139,250,0.1); }
+  .wf-group-label { fill: var(--text-mute); font-size: 11px; font-weight: 600; pointer-events: none; }
+  .wf-group-toggle { cursor: pointer; fill: var(--text-mute); font-size: 14px; }
+  .wf-group-toggle:hover { fill: var(--text); }
+  .wf-node.multi-selected .wf-node-body { stroke: #a78bfa; stroke-width: 2.5; stroke-dasharray: 4 2; }
+
+  /* ─── Task 1: 모바일 반응형 — 모달 전체 화면 ─── */
+  @media (max-width: 768px) {
+    .modal-backdrop { padding: 0 !important; }
+    .modal { max-width: 100vw !important; width: 100vw !important; max-height: 100vh !important; height: 100vh !important; border-radius: 0 !important; }
+    .modal-wide { max-width: 100vw !important; width: 100vw !important; height: 100vh !important; max-height: 100vh !important; }
+  }
+
+  /* ─── Task 2: 포커스 트랩 시각 ─── */
+  .modal-backdrop:focus-within .modal { box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 2px var(--accent); }
   *, *::before, *::after { box-sizing: border-box; }
   html { color-scheme: dark; }
   body.theme-light { color-scheme: light; }
@@ -507,17 +604,17 @@
     <div class="brand-text flex-1 min-w-0">
       <div class="font-semibold text-[14px] truncate">Claude Control Center</div>
     </div>
-    <button id="sbToggle" class="btn-ghost btn p-1.5" title="사이드바 접기/펼치기">
+    <button id="sbToggle" class="btn-ghost btn p-1.5" title="사이드바 접기/펼치기" aria-label="사이드바 접기/펼치기">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
   </div>
   <nav id="nav" class="flex-1 overflow-y-auto px-3 pb-3 space-y-1"></nav>
   <div id="sidebar-foot" class="border-t border-[var(--border)] p-3 space-y-2">
     <div id="cliStatus" class="text-[11px]"></div>
-    <button id="btn-reindex" class="btn w-full justify-center text-[12px]">
+    <button id="btn-reindex" class="btn w-full justify-center text-[12px]" aria-label="세션 재인덱스">
       <span>🔄</span><span>세션 재인덱스</span>
     </button>
-    <button id="btn-latest-features" class="btn w-full justify-center text-[12px]" title="Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가">
+    <button id="btn-latest-features" class="btn w-full justify-center text-[12px]" title="Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가" aria-label="최신 정보 로딩">
       <span>📡</span><span>최신 정보 로딩</span>
     </button>
     <div id="appVersion" class="text-center text-[10px] text-[var(--text-dim)] cursor-pointer hover:text-[var(--text-mute)]" onclick="_showVersionModal()" title="버전 정보 / 변경 이력"></div>
@@ -526,7 +623,7 @@
 
 <main id="content" class="ml-[260px] min-h-screen" style="background:var(--bg);">
   <header id="mainHeader" class="sticky top-0 z-20 backdrop-blur-xl border-b border-[var(--border)] px-7 py-3 flex items-center gap-4" style="background:var(--bg-soft);">
-    <button id="navToggle" class="btn-ghost btn" title="사이드바 토글" style="display:none;">
+    <button id="navToggle" class="btn-ghost btn" title="사이드바 토글" aria-label="사이드바 열기/닫기" style="display:none;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
     <div class="flex-1">
@@ -537,16 +634,25 @@
     <div class="flex items-center gap-2">
       <span id="liveStatus" class="chip chip-ok"><span class="pulse-dot"></span><span>연결됨</span></span>
       <div style="position:relative;">
-        <button id="btn-settings" class="btn-ghost btn" title="설정" onclick="toggleSettingsDropdown()">
+        <button id="btn-settings" class="btn-ghost btn" title="설정" aria-label="설정 메뉴 열기" onclick="toggleSettingsDropdown()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
         <div id="settingsDropdown" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:220px;background:var(--bg-soft);border:1px solid var(--border-hi);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.4);overflow:hidden;z-index:45;">
           <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);" data-i18n="settings.theme">테마</div>
           <button class="settings-item" onclick="setTheme('dark')" id="themeOptDark">
-            <span>🌙</span><span data-i18n="settings.dark">다크</span><span class="settings-check" id="checkDark">✓</span>
+            <span>🌙</span><span data-i18n="settings.dark">다크</span><span class="settings-check theme-check" data-theme="dark" id="checkDark">✓</span>
           </button>
           <button class="settings-item" onclick="setTheme('light')" id="themeOptLight">
-            <span>☀️</span><span data-i18n="settings.light">라이트</span><span class="settings-check" id="checkLight" style="display:none;">✓</span>
+            <span>☀️</span><span data-i18n="settings.light">라이트</span><span class="settings-check theme-check" data-theme="light" id="checkLight" style="display:none;">✓</span>
+          </button>
+          <button class="settings-item" onclick="setTheme('midnight')" id="themeOptMidnight">
+            <span>🌌</span><span>Midnight</span><span class="settings-check theme-check" data-theme="midnight" style="display:none;">✓</span>
+          </button>
+          <button class="settings-item" onclick="setTheme('forest')" id="themeOptForest">
+            <span>🌲</span><span>Forest</span><span class="settings-check theme-check" data-theme="forest" style="display:none;">✓</span>
+          </button>
+          <button class="settings-item" onclick="setTheme('sunset')" id="themeOptSunset">
+            <span>🌅</span><span>Sunset</span><span class="settings-check theme-check" data-theme="sunset" style="display:none;">✓</span>
           </button>
           <div style="padding:10px 14px;border-bottom:1px solid var(--border);border-top:1px solid var(--border);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);" data-i18n="settings.language">언어</div>
           <button class="settings-item" onclick="setLang('ko')"><span>🇰🇷</span><span>한국어</span><span class="settings-check lang-check" data-lang="ko">✓</span></button>
@@ -669,7 +775,7 @@
     </div>
     <div style="border-top:1px solid var(--border);padding:10px;display:flex;gap:8px;flex-shrink:0;">
       <input id="chatInput" class="input" style="flex:1;font-size:0.82rem;" placeholder="예: MCP 어디서 설정해?" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}">
-      <button onclick="sendChat()" class="btn-primary btn" style="padding:6px 14px;font-size:0.82rem;">전송</button>
+      <button onclick="sendChat()" class="btn-primary btn" style="padding:6px 14px;font-size:0.82rem;" aria-label="채팅 전송">전송</button>
     </div>
   </div>
 </div>
@@ -875,17 +981,23 @@ function scoreColor(n) {
 // ────────────────────────────────────────────────────────────────
 function renderNav() {
   const nav = document.getElementById('nav');
+  nav.setAttribute('role', 'menu');
+  nav.setAttribute('aria-label', t('메인 네비게이션'));
   nav.innerHTML = '';
   GROUPS.forEach(g => {
     const items = NAV.filter(n => n.group === g.id);
     if (!items.length) return;
     const label = document.createElement('div');
     label.className = 'group-label text-[10px] uppercase tracking-widest text-[var(--text-dim)] px-3 mt-3 mb-1';
+    label.setAttribute('role', 'presentation');
     label.textContent = g.label;
     nav.appendChild(label);
     items.forEach(n => {
       const el = document.createElement('div');
       el.className = 'nav-item' + (state.view === n.id ? ' active' : '');
+      el.setAttribute('role', 'menuitem');
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('aria-label', n.label + (n.desc ? ' — ' + n.desc : ''));
       el.title = n.label + (n.desc ? ' — ' + n.desc : '');
       const descHtml = n.desc ? `<div class="nav-desc text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">${escapeHtml(n.desc)}</div>` : '';
       el.innerHTML = `
@@ -902,6 +1014,7 @@ function renderNav() {
           _syncNavToggleVisibility();
         }
       };
+      el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } };
       nav.appendChild(el);
     });
   });
@@ -1598,11 +1711,13 @@ VIEWS.workflows = async () => {
           <button class="btn-primary btn text-xs" onclick="_wfOpenNodeEditor(null)" title="${t('새 노드 추가')}">＋ ${t('노드 추가')}</button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
           <button class="btn text-xs" onclick="_wfShowRuns()" title="${t('실행 이력')}">📜 ${t('이력')}</button>
-          <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn">💾 ${t('저장')}</button>
-          <button class="btn-primary btn text-xs" onclick="_wfRun()" id="wfRunBtn">▶ ${t('실행')}</button>
+          <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn" aria-label="${t('워크플로우 저장')}">💾 ${t('저장')}</button>
+          <button class="btn-primary btn text-xs" onclick="_wfRun()" id="wfRunBtn" aria-label="${t('워크플로우 실행')}">▶ ${t('실행')}</button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
-          <button class="btn text-xs" onclick="_wfExport()" title="${t('JSON 파일로 내보내기')}">📦 ${t('내보내기')}</button>
+          <button class="btn text-xs" onclick="_wfExport()" title="${t('JSON 파일로 내보내기')}" aria-label="${t('내보내기')}">📦 ${t('내보내기')}</button>
           <label class="btn text-xs cursor-pointer" title="${t('JSON 파일에서 가져오기')}">📥 ${t('가져오기')}<input type="file" accept=".json,application/json" style="display:none;" onchange="_wfImport(event)"></label>
+          <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
+          <button id="wfGroupBtn" class="btn text-xs" onclick="_wfCreateGroup()" title="${t('선택 노드 그룹 만들기 (Shift+클릭)')}" aria-label="${t('그룹 만들기')}" style="display:none;">📦 ${t('그룹')}</button>
         </div>
         <div id="wfCanvasHost">
           <div class="wf-floating-right">
@@ -2434,12 +2549,20 @@ function _wfBindCanvas() {
       // in-port 에서 시작하는 드래그는 무시
       return;
     }
-    // 노드 클릭 → 선택 + 드래그
+    // 노드 클릭 → 선택 + 드래그 (Shift+클릭 = 다중 선택)
     const g = target.closest && target.closest('.wf-node');
     if (g) {
       const nid = g.getAttribute('data-node');
       const node = __wf.current.nodes.find(n => n.id === nid);
       if (!node) return;
+      // Task 9: Shift+클릭 → 다중 선택
+      if (e.shiftKey || (touch && __wfMultiSelected.size > 0)) {
+        _wfToggleMultiSelect(nid);
+        if (touch) { try{e.preventDefault();}catch(_){} }
+        return;
+      }
+      // 다중 선택 클리어
+      if (__wfMultiSelected.size > 0) { __wfMultiSelected.clear(); _wfSyncMultiSelectClasses(); }
       __wf.selectedNodeId = nid; __wf.selectedEdgeId = null;
       _wfPushUndo();
       __wf.drag = { kind: 'node', nodeId: nid, origX: node.x, origY: node.y, startX: pt.x, startY: pt.y };
@@ -2862,8 +2985,8 @@ function _wfRenderInspector() {
             ${runInfoBlock}
           </div>
           <div class="flex gap-2 flex-wrap">
-            <button class="btn-primary btn text-xs flex-1" onclick="_wfOpenNodeEditor('${n.id}')">✏️ ${t('편집')}</button>
-            <button class="btn text-xs" onclick="_wfDeleteSelectedNode()" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);">🗑️</button>
+            <button class="btn-primary btn text-xs flex-1" onclick="_wfOpenNodeEditor('${n.id}')" aria-label="${t('노드 편집')}">✏️ ${t('편집')}</button>
+            <button class="btn text-xs" onclick="_wfDeleteSelectedNode()" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);" aria-label="${t('노드 삭제')}">🗑️</button>
           </div>
         </div>
       `;
@@ -2934,9 +3057,9 @@ function _wfOpenNodeEditor(nid) {
       <div id="${winId}-cat" style="padding:14px 16px 8px 16px;"></div>
       <div id="${winId}-form" style="flex:1;padding:0 16px 8px 16px;overflow-y:auto;"></div>
       <div class="flex justify-end gap-2 p-3 border-t border-[var(--border)]" style="flex-shrink:0;">
-        <button class="btn text-sm" onclick="_wfCloseNodeEditor('${winId}')">${t('취소')}</button>
-        ${!isNew ? `<button class="btn text-sm" onclick="_wfDeleteFromEditor('${winId}')" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);">🗑️ ${t('삭제')}</button>` : ''}
-        <button class="btn-primary btn text-sm" onclick="_wfSaveNodeEditor('${winId}')">💾 ${t('저장')}</button>
+        <button class="btn text-sm" onclick="_wfCloseNodeEditor('${winId}')" aria-label="${t('취소')}">${t('취소')}</button>
+        ${!isNew ? `<button class="btn text-sm" onclick="_wfDeleteFromEditor('${winId}')" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);" aria-label="${t('노드 삭제')}">🗑️ ${t('삭제')}</button>` : ''}
+        <button class="btn-primary btn text-sm" onclick="_wfSaveNodeEditor('${winId}')" aria-label="${t('노드 저장')}">💾 ${t('저장')}</button>
       </div>
     </div>
   `;
@@ -2975,12 +3098,12 @@ function _wfPickNodeType(winId, type) {
   // 타입별 기본 data 세팅
   if (type === 'session' || type === 'subagent') {
     draft.data = { subject:'', description:'', assignee:'sonnet-4.6', agentRole:'', cwd:'', inputsMode:'concat' };
-  } else if (type === 'branch')    draft.data = { condition:'' };
+  } else if (type === 'branch')    draft.data = { condition:'', conditionType:'contains' };
   else if (type === 'aggregate') draft.data = { mode:'concat' };
   else if (type === 'output')    draft.data = { exportTo:'' };
   else if (type === 'http')      draft.data = { url:'', method:'GET', headers:{}, body:'', extractPath:'' };
   else if (type === 'transform') draft.data = { transformType:'template', template:'{{input}}', jsonPath:'', regexPattern:'', regexReplacement:'', separator:'\\n' };
-  else if (type === 'variable')  draft.data = { varName:'var1', defaultValue:'' };
+  else if (type === 'variable')  draft.data = { varName:'var1', defaultValue:'', scope:'global' };
   else if (type === 'subworkflow') draft.data = { workflowId:'', passInput:true };
   else if (type === 'embedding') draft.data = { provider:'ollama-api', model:'bge-m3', outputFormat:'json' };
   else if (type === 'loop') draft.data = { loopType:'for_each', maxIterations:10, separator:'\\n', condition:'' };
@@ -3120,8 +3243,25 @@ function _wfRenderEditorBody(winId) {
     `;
   } else if (draft.type === 'branch') {
     body += `
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('조건 (입력에 포함되면 Y 포트 활성)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.condition||'')}" oninput="_wfDraftSetData('${winId}','condition',this.value)" placeholder="success">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('조건 유형')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','conditionType',this.value)">
+        <option value="contains" ${(d.conditionType||'contains')==='contains'?'selected':''}>${t('포함 (contains)')}</option>
+        <option value="equals" ${d.conditionType==='equals'?'selected':''}>${t('일치 (equals)')}</option>
+        <option value="not_equals" ${d.conditionType==='not_equals'?'selected':''}>${t('불일치 (not_equals)')}</option>
+        <option value="greater" ${d.conditionType==='greater'?'selected':''}>${t('초과 (greater)')}</option>
+        <option value="less" ${d.conditionType==='less'?'selected':''}>${t('미만 (less)')}</option>
+        <option value="regex" ${d.conditionType==='regex'?'selected':''}>${t('정규식 (regex)')}</option>
+        <option value="length_gt" ${d.conditionType==='length_gt'?'selected':''}>${t('길이 초과 (length_gt)')}</option>
+        <option value="length_lt" ${d.conditionType==='length_lt'?'selected':''}>${t('길이 미만 (length_lt)')}</option>
+        <option value="is_empty" ${d.conditionType==='is_empty'?'selected':''}>${t('비어있음 (is_empty)')}</option>
+        <option value="not_empty" ${d.conditionType==='not_empty'?'selected':''}>${t('비어있지 않음 (not_empty)')}</option>
+        <option value="expression" ${d.conditionType==='expression'?'selected':''}>${t('자유 표현식 (expression)')}</option>
+      </select>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('조건 값')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.condition||'')}" oninput="_wfDraftSetData('${winId}','condition',this.value)" placeholder="${(d.conditionType||'contains')==='regex'?'\\\\d+':'success'}">
+      <div class="text-[10px] text-[var(--text-dim)] mt-2 p-2 rounded" style="background:var(--code-bg);">
+        ${t('현재 조건')}: <code>${escapeHtml(d.conditionType||'contains')}</code> → <code>${escapeHtml(d.condition||'('+t('없음')+')')}</code>
+      </div>
     `;
   } else if (draft.type === 'aggregate') {
     body += `
@@ -3181,8 +3321,18 @@ function _wfRenderEditorBody(winId) {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('변수 이름')}</label>
       <input class="input w-full mt-1" value="${escapeHtml(d.varName||'')}" oninput="_wfDraftSetData('${winId}','varName',this.value)" placeholder="result_text">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('스코프')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','scope',this.value)">
+        <option value="global" ${(d.scope||'global')==='global'?'selected':''}>${t('글로벌 (global) — 모든 노드에서 접근')}</option>
+        <option value="local" ${d.scope==='local'?'selected':''}>${t('로컬 (local) — 현재 워크플로우 내')}</option>
+      </select>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('기본값 (입력 없을 때)')}</label>
       <textarea class="input w-full mt-1" rows="2" oninput="_wfDraftSetData('${winId}','defaultValue',this.value)" placeholder="">${escapeHtml(d.defaultValue||'')}</textarea>
+      <div class="mt-3 p-3 rounded" style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.2);">
+        <div class="text-[11px] font-semibold mb-1" style="color:var(--cyan);">💡 ${t('사용법')}</div>
+        <div class="text-[10px] text-[var(--text-mute)]">${t('다른 노드에서')} <code class="font-mono" style="background:var(--code-bg);padding:1px 5px;border-radius:3px;">{{${escapeHtml(d.varName||'var1')}}}</code> ${t('으로 참조할 수 있습니다.')}</div>
+        <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('스코프')}: ${(d.scope||'global')==='global'? t('글로벌 — 워크플로우 전체에서 접근 가능') : t('로컬 — 이 워크플로우 실행 내에서만 유효')}</div>
+      </div>
     `;
   } else if (draft.type === 'subworkflow') {
     const wfOpts = __wf.workflows.filter(w => __wf.current && w.id !== __wf.current.id)
@@ -3549,6 +3699,14 @@ function _wfApplyRunStatus(run) {
     if (r) el.setAttribute('data-status', r.status);
   });
   _wfRenderInspector();
+  // Task 3: 브라우저 Notification — 실행 완료/실패 알림
+  if (run.status === 'ok') {
+    const wfName = (__wf.current && __wf.current.name) || t('워크플로우');
+    _sendBrowserNotification(t('워크플로우 완료'), wfName + ' — ' + t('실행이 성공적으로 완료되었습니다'));
+  } else if (run.status === 'err') {
+    const wfName = (__wf.current && __wf.current.name) || t('워크플로우');
+    _sendBrowserNotification(t('워크플로우 실패'), wfName + ' — ' + (run.error || t('실행 중 오류가 발생했습니다')));
+  }
 }
 
 function _wfStopSSE() {
@@ -4075,8 +4233,16 @@ async function _wfLoadVersionHistory() {
       body.innerHTML = `<div class="text-[10px]" style="color:var(--text-dim)">${t('저장된 버전이 없습니다')}</div>`;
       return;
     }
-    body.innerHTML = versions.map(v => `
+    body.innerHTML = `
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-[10px] text-[var(--text-dim)]">${t('비교할 두 버전을 선택하세요')}:</span>
+        <button class="btn text-[10px]" onclick="_wfDiffVersions()" aria-label="${t('선택된 버전 비교')}">🔍 ${t('비교')}</button>
+      </div>
+    ` + versions.map((v, idx) => `
       <div class="flex items-center justify-between py-2 border-b border-[var(--border)]" style="gap:6px;">
+        <label class="flex items-center gap-1 flex-shrink-0">
+          <input type="checkbox" class="wf-version-compare-cb" data-saved-at="${escapeHtml(v.savedAt)}" data-name="${escapeHtml(v.name||t('이름 없음'))}" data-node-count="${v.nodeCount||0}" style="accent-color:var(--accent);" />
+        </label>
         <div class="flex-1 min-w-0">
           <div class="text-[11px] font-semibold truncate" style="color:var(--text)">${escapeHtml(v.name || t('이름 없음'))}</div>
           <div class="text-[10px]" style="color:var(--text-dim)">
@@ -4925,7 +5091,7 @@ VIEWS.overview = async () => {
         <h3 class="font-semibold text-sm">⚡ ${t('Claude 에게 빠른 AI 추천 받기')}</h3>
         <span class="text-xs text-[var(--text-dim)]">카드 클릭 → Claude CLI 분석 → 좌/우 비교 적용</span>
       </div>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         ${[
           {kind:'hooks', icon:'🪝', label:'훅 추천', note:'SessionStart / PreToolUse 등'},
           {kind:'permissions', icon:'🔐', label:'권한 추천', note:'자주 쓰는 명령 allow/deny'},
@@ -5450,7 +5616,7 @@ VIEWS.analytics = async () => {
       </div>
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
       ${statCard('총 세션', stats.totalSessions, '', `점수 집계 ${stats.scoredSessions} · 짧은 세션 ${stats.totalSessions-stats.scoredSessions} 제외`)}
       ${statCard('평균 스코어', stats.avgScore, scoreColor(stats.avgScore), `도구≥${stats.minToolsForScore||11}회 세션 평균`)}
       ${statCard('도구 총 호출', stats.totalTools)}
@@ -8538,7 +8704,7 @@ VIEWS.aiProviders = async () => {
         <!-- Step 1: Provider Selection -->
         <div class="mb-4">
           <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('Step 1:')} ${t('어떤 AI를 사용하시겠습니까?')}</div>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="wizardProviderCards">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="wizardProviderCards">
             <div class="card p-4 text-center cursor-pointer hover-lift" onclick="_wizardSelectProvider('claude')" data-wiz-provider="claude">
               <div style="font-size:2rem;">🟠</div>
               <div class="text-sm font-semibold mt-2" style="color:var(--text)">Claude</div>
@@ -8665,7 +8831,7 @@ VIEWS.aiProviders = async () => {
         </table>
         <details class="mb-3">
           <summary class="cursor-pointer text-xs font-semibold" style="color:var(--accent)">📦 ${t('16개 노드 타입')}</summary>
-          <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+          <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-[11px]">
             <div>🚀 start — ${t('시작')}</div>
             <div>🗂️ session — ${t('AI 세션')}</div>
             <div>🤝 subagent — ${t('역할 부여')}</div>
@@ -8757,13 +8923,14 @@ VIEWS.aiProviders = async () => {
             <p class="text-xs" style="color:var(--text-dim)">${t('로컬 LLM 모델을 탐색하고 관리합니다.')}</p>
           </div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
           <button class="btn btn-sm" id="ollamaTabCatalog" onclick="_ollamaSwitchTab('catalog')" style="background:var(--accent);color:#fff;">
             ${t('카탈로그')}
           </button>
           <button class="btn btn-sm" id="ollamaTabInstalled" onclick="_ollamaSwitchTab('installed')">
             ${t('설치된 모델')}
           </button>
+          <button class="btn btn-sm btn-primary" onclick="_ollamaOpenModelfileEditor()" aria-label="${t('커스텀 모델 생성')}">✨ ${t('커스텀 모델 생성')}</button>
           <button class="btn btn-sm" onclick="_ollamaRefresh()">🔄</button>
         </div>
       </div>
@@ -8840,7 +9007,7 @@ VIEWS.aiProviders = async () => {
           <div id="costTotalUSD" class="text-2xl font-bold" style="color:var(--ok)">—</div>
         </div>
       </div>
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div>
           <h4 class="text-sm font-semibold mb-2" style="color:var(--text-mute)" data-i18n="daily_cost_timeline">${t('일별 비용 타임라인')}</h4>
           <div style="position:relative;height:280px;">
@@ -8852,6 +9019,13 @@ VIEWS.aiProviders = async () => {
           <div style="position:relative;height:280px;">
             <canvas id="costByProvider"></canvas>
           </div>
+        </div>
+      </div>
+      <!-- Task 8: 프로바이더별 일별 비용 스택 바 차트 -->
+      <div>
+        <h4 class="text-sm font-semibold mb-2" style="color:var(--text-mute)">📊 ${t('프로바이더별 일별 비용 상세')}</h4>
+        <div style="position:relative;height:320px;">
+          <canvas id="costStackedBar"></canvas>
         </div>
       </div>
     </div>
@@ -9026,6 +9200,13 @@ async function _loadUsageAlertStatus() {
     if (tokensInput && d.maxDailyTokens) tokensInput.value = d.maxDailyTokens;
     const fired = d.firedAlerts || [];
     if (fired.length > 0) {
+      // Task 3: 사용량 초과 시 브라우저 Notification 발송
+      fired.forEach(a => {
+        const msg = a.type === 'cost' ? t('비용 한도 초과') : t('토큰 한도 초과');
+        if (typeof _sendBrowserNotification === 'function') {
+          _sendBrowserNotification(t('사용량 알림'), msg + ': ' + (a.message || ''));
+        }
+      });
       banner.innerHTML = `
         <div class="mb-4 p-3 rounded" style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);">
           <div class="flex items-center gap-2 mb-1">
@@ -10487,7 +10668,7 @@ VIEWS.usage = async () => {
         </div>`).join('')}
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
       ${statCard('전체 세션', all.sessions||0)}
       ${statCard('최근 30일', `${fmtTokens(last30.total||0)} (${last30.sessions||0}세션)`, '#d97757')}
       ${statCard('도구 호출 (전체)', (tk.byTool||[]).reduce((a,b)=>a+(b.calls||0),0))}
@@ -10939,16 +11120,23 @@ function showModal(html, opts) {
   const root = document.getElementById('modal-root');
   const wide = opts && opts.wide ? ' modal-wide' : '';
   const narrow = opts && opts.narrow ? ' modal-narrow' : '';
-  root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="modal${wide}${narrow}">${html}</div></div>`;
+  root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="modal${wide}${narrow}" role="dialog" aria-modal="true">${html}</div></div>`;
   _translateDOM(root);
   // 결과 모달이 떴으면 (loading 이 아니면) 마스코트 점프 종료
   if (typeof _mascotLeaveModal === 'function' && !(opts && opts.keepMascot)) _mascotLeaveModal();
+  // 포커스 트랩: 모달 안에서 Tab 키 순환
+  _setupFocusTrap(root.querySelector('.modal'));
 }
 function showModalLoading(msg) {
   showModal(`<div class="p-10 empty"><div class="shimmer h-4 w-48 mx-auto mb-2"></div><div>${escapeHtml(msg)}</div></div>`, { keepMascot: true });
   if (typeof _mascotJumpOnModal === 'function') _mascotJumpOnModal();
 }
 function closeModal() {
+  // 포커스 트랩 해제
+  const modal = document.querySelector('#modal-root .modal');
+  if (modal && modal._focusTrapHandler) {
+    document.removeEventListener('keydown', modal._focusTrapHandler);
+  }
   document.getElementById('modal-root').innerHTML = '';
   if (typeof _mascotLeaveModal === 'function') _mascotLeaveModal();
 }
@@ -11374,34 +11562,44 @@ document.addEventListener('click', (e) => {
 });
 
 // ── 테마 ──
+const _ALL_THEMES = ['dark','light','midnight','forest','sunset'];
 function setTheme(th) {
   // 전환 애니메이션
   document.body.classList.add('theme-switching');
   setTimeout(() => {
-    document.body.classList.remove('theme-dark', 'theme-light');
+    _ALL_THEMES.forEach(t => document.body.classList.remove('theme-' + t));
     document.body.classList.add('theme-' + th);
     // Chart.js 차트가 있으면 텍스트 색상 업데이트
+    const isLight = th === 'light';
     if (window.Chart) {
-      Chart.defaults.color = th === 'light' ? '#555' : '#a0a0a8';
-      Chart.defaults.borderColor = th === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)';
+      Chart.defaults.color = isLight ? '#555' : '#a0a0a8';
+      Chart.defaults.borderColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)';
     }
+    // color-scheme for scrollbars/inputs
+    document.documentElement.style.colorScheme = isLight ? 'light' : 'dark';
   }, 50);
   setTimeout(() => {
     document.body.classList.remove('theme-switching');
     renderView(); // 차트 등 재렌더링
   }, 550);
-  document.getElementById('checkDark').style.display = th === 'dark' ? '' : 'none';
-  document.getElementById('checkLight').style.display = th === 'light' ? '' : 'none';
+  // 테마 체크 표시 동기화
+  document.querySelectorAll('.theme-check').forEach(el => {
+    el.style.display = el.getAttribute('data-theme') === th ? '' : 'none';
+  });
   try { localStorage.setItem('cc-theme', th); } catch {}
 }
 (function _initTheme() {
   try {
     const saved = localStorage.getItem('cc-theme');
-    if (saved === 'light') {
-      document.body.classList.add('theme-light');
-      document.getElementById('checkDark').style.display = 'none';
-      document.getElementById('checkLight').style.display = '';
-      if (window.Chart) { Chart.defaults.color = '#555'; Chart.defaults.borderColor = 'rgba(0,0,0,0.08)'; }
+    if (saved && saved !== 'dark' && _ALL_THEMES.includes(saved)) {
+      _ALL_THEMES.forEach(t => document.body.classList.remove('theme-' + t));
+      document.body.classList.add('theme-' + saved);
+      document.querySelectorAll('.theme-check').forEach(el => {
+        el.style.display = el.getAttribute('data-theme') === saved ? '' : 'none';
+      });
+      if (saved === 'light' && window.Chart) { Chart.defaults.color = '#555'; Chart.defaults.borderColor = 'rgba(0,0,0,0.08)'; }
+      if (saved !== 'light') document.documentElement.style.colorScheme = 'dark';
+      else document.documentElement.style.colorScheme = 'light';
     }
   } catch {}
 })();
@@ -12539,6 +12737,373 @@ document.addEventListener('keydown', e => {
     closeSpotlight();
   }
 });
+
+// ────────────────────────────────────────────────────────────────
+// Task 2: 포커스 트랩 — 모달 내 Tab 키 순환
+// ────────────────────────────────────────────────────────────────
+function _setupFocusTrap(modalEl) {
+  if (!modalEl) return;
+  const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input:not([disabled]), select, [tabindex]:not([tabindex="-1"])';
+  function handleTrap(e) {
+    if (e.key !== 'Tab') return;
+    const focusable = Array.from(modalEl.querySelectorAll(FOCUSABLE)).filter(el => el.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
+  modalEl._focusTrapHandler = handleTrap;
+  document.addEventListener('keydown', handleTrap);
+  // 자동 포커스: 모달 내 첫 포커스 가능 요소
+  requestAnimationFrame(() => {
+    const first = modalEl.querySelector(FOCUSABLE);
+    if (first) first.focus();
+  });
+}
+
+// ────────────────────────────────────────────────────────────────
+// Task 3: 브라우저 Notification
+// ────────────────────────────────────────────────────────────────
+(function _initNotifications() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+})();
+
+function _sendBrowserNotification(title, body) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try { new Notification(title, { body, icon: '/favicon.ico' }); } catch(e) { /* silent */ }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Task 7: Ollama Modelfile 편집 UI
+// ────────────────────────────────────────────────────────────────
+function _ollamaOpenModelfileEditor() {
+  showModal(`
+    <div class="p-5" style="max-width:640px;">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">✨ ${t('커스텀 모델 생성')}</h2>
+        <button class="btn text-xs" onclick="closeModal()" aria-label="${t('닫기')}">✕</button>
+      </div>
+      <div class="text-xs text-[var(--text-mute)] mb-4">${t('Ollama Modelfile 형식으로 커스텀 모델을 정의합니다.')}</div>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block mb-1">${t('모델 이름')}</label>
+      <input id="ollamaModelfileName" class="input w-full mb-3" placeholder="${t('my-custom-model')}" />
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block mb-1">${t('Modelfile 내용')}</label>
+      <textarea id="ollamaModelfileContent" class="input w-full font-mono text-[12px]" rows="14" placeholder="FROM llama3.2
+SYSTEM You are a helpful assistant.
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9"></textarea>
+      <div class="text-[10px] text-[var(--text-dim)] mt-2 mb-3">
+        ${t('주요 지시자')}: <code>FROM</code> (${t('베이스 모델')}), <code>SYSTEM</code> (${t('시스템 프롬프트')}), <code>PARAMETER</code> (${t('파라미터')}), <code>TEMPLATE</code>, <code>ADAPTER</code>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button class="btn text-sm" onclick="closeModal()">${t('취소')}</button>
+        <button class="btn-primary btn text-sm" onclick="_ollamaCreateCustomModel()" aria-label="${t('모델 생성')}">🚀 ${t('모델 생성')}</button>
+      </div>
+    </div>
+  `, { narrow: true });
+}
+
+async function _ollamaCreateCustomModel() {
+  const name = (document.getElementById('ollamaModelfileName')?.value || '').trim();
+  const modelfile = (document.getElementById('ollamaModelfileContent')?.value || '').trim();
+  if (!name) { toast(t('모델 이름을 입력하세요'), 'warn'); return; }
+  if (!modelfile) { toast(t('Modelfile 내용을 입력하세요'), 'warn'); return; }
+  try {
+    closeModal();
+    toast(t('모델 생성 중...'), 'ok');
+    const r = await api('/api/ollama/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, modelfile })
+    });
+    if (r && r.ok !== false) {
+      toast(t('커스텀 모델이 생성되었습니다') + ': ' + name, 'ok');
+      _sendBrowserNotification(t('Ollama 모델 생성 완료'), name);
+      if (typeof _ollamaRefresh === 'function') _ollamaRefresh();
+    } else {
+      toast(errMsg(r) || t('모델 생성 실패'), 'err');
+    }
+  } catch(e) {
+    toast(t('모델 생성 실패') + ': ' + String(e), 'err');
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Task 8: 비용 히스토리 상세 — 프로바이더별 일별 스택 바 차트
+// ────────────────────────────────────────────────────────────────
+let _costStackedBarChart = null;
+
+// initCostCharts 에 추가 호출 — 원본 함수 wrap
+const _origInitCostCharts = window.initCostCharts;
+window.initCostCharts = async function() {
+  if (_origInitCostCharts) await _origInitCostCharts();
+  // 스택 바 차트 추가
+  try {
+    const d = await api('/api/ai-providers/costs');
+    if (!d || !d.ok) return;
+    const costs = d.costs || {};
+    const daily = costs.daily || [];
+    const byProvider = costs.byProvider || [];
+    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-mute').trim() || '#a0a0a8';
+    const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || 'rgba(255,255,255,0.07)';
+    const providerColors = ['#d97757','#7dd3fc','#4ade80','#c084fc','#fbbf24','#f87171','#a78bfa','#38bdf8'];
+    const providerNames = byProvider.map(p => p.provider);
+    const ctxStacked = document.getElementById('costStackedBar');
+    if (!ctxStacked || !providerNames.length || !daily.length) return;
+    if (_costStackedBarChart) { _costStackedBarChart.destroy(); _costStackedBarChart = null; }
+    // 일별 프로바이더별 데이터 구성
+    const datasets = providerNames.map((pName, i) => ({
+      label: pName,
+      data: daily.map(day => {
+        const pd = (day.byProvider || []).find(p => p.provider === pName);
+        return pd ? (pd.cost || 0) : 0;
+      }),
+      backgroundColor: providerColors[i % providerColors.length],
+      borderColor: 'transparent',
+      borderWidth: 1,
+    }));
+    _costStackedBarChart = new Chart(ctxStacked, {
+      type: 'bar',
+      data: { labels: daily.map(d => d.date), datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { color: textColor, font: { size: 11 }, padding: 10 } },
+          tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': $' + (ctx.parsed.y || 0).toFixed(4) } },
+        },
+        scales: {
+          x: { stacked: true, ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor } },
+          y: { stacked: true, ticks: { color: textColor, font: { size: 10 }, callback: v => '$' + v.toFixed(2) }, grid: { color: gridColor } },
+        }
+      }
+    });
+  } catch(e) { /* silent */ }
+};
+
+// ────────────────────────────────────────────────────────────────
+// Task 9: 노드 그룹핑
+// ────────────────────────────────────────────────────────────────
+// 다중 노드 선택 (Shift+클릭)
+if (!window.__wfMultiSelected) window.__wfMultiSelected = new Set();
+if (!window.__wfGroups) window.__wfGroups = []; // [{id, name, nodeIds:[], collapsed: false}]
+
+function _wfToggleMultiSelect(nodeId) {
+  if (__wfMultiSelected.has(nodeId)) __wfMultiSelected.delete(nodeId);
+  else __wfMultiSelected.add(nodeId);
+  _wfSyncMultiSelectClasses();
+}
+
+function _wfSyncMultiSelectClasses() {
+  document.querySelectorAll('#wfNodes .wf-node').forEach(el => {
+    const nid = el.getAttribute('data-node');
+    el.classList.toggle('multi-selected', __wfMultiSelected.has(nid));
+  });
+  // 그룹 만들기 버튼 표시/숨김
+  const groupBtn = document.getElementById('wfGroupBtn');
+  if (groupBtn) groupBtn.style.display = __wfMultiSelected.size >= 2 ? '' : 'none';
+}
+
+function _wfCreateGroup() {
+  if (__wfMultiSelected.size < 2) { toast(t('2개 이상의 노드를 선택하세요'), 'warn'); return; }
+  const gid = 'g-' + Date.now().toString(36);
+  const group = { id: gid, name: t('그룹') + ' ' + (__wfGroups.length + 1), nodeIds: Array.from(__wfMultiSelected), collapsed: false };
+  __wfGroups.push(group);
+  __wfMultiSelected.clear();
+  _wfSyncMultiSelectClasses();
+  _wfRenderCanvas();
+  toast(t('그룹이 생성되었습니다'), 'ok');
+}
+
+function _wfToggleGroupCollapse(gid) {
+  const g = __wfGroups.find(x => x.id === gid);
+  if (!g) return;
+  g.collapsed = !g.collapsed;
+  _wfRenderCanvas();
+}
+
+function _wfRemoveGroup(gid) {
+  __wfGroups = __wfGroups.filter(x => x.id !== gid);
+  _wfRenderCanvas();
+}
+
+// 그룹 렌더링을 기존 _wfRenderCanvas 에 추가
+const _origWfRenderCanvas = _wfRenderCanvas;
+window._wfRenderCanvas = function() {
+  _origWfRenderCanvas();
+  _wfRenderGroups();
+};
+// 전역에서 호출하는 _wfRenderCanvas 재바인딩
+_wfRenderCanvas = window._wfRenderCanvas;
+
+function _wfRenderGroups() {
+  const nodesG = document.getElementById('wfNodes');
+  if (!nodesG || !__wf.current) return;
+  // 기존 그룹 요소 제거
+  nodesG.querySelectorAll('.wf-group').forEach(el => el.remove());
+  __wfGroups.forEach(g => {
+    const nodes = (g.nodeIds || []).map(nid => (__wf.current.nodes||[]).find(n => n.id === nid)).filter(Boolean);
+    if (!nodes.length) return;
+    const pad = 20;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    nodes.forEach(n => {
+      minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + (WF_NODE_W||180)); maxY = Math.max(maxY, n.y + (WF_NODE_H||60));
+    });
+    const gEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    gEl.classList.add('wf-group');
+    gEl.setAttribute('data-group', g.id);
+    // 그룹 박스
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.classList.add('wf-group-box');
+    rect.setAttribute('x', minX - pad); rect.setAttribute('y', minY - pad - 18);
+    rect.setAttribute('width', maxX - minX + pad * 2); rect.setAttribute('height', maxY - minY + pad * 2 + 18);
+    gEl.appendChild(rect);
+    // 그룹 라벨
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.classList.add('wf-group-label');
+    label.setAttribute('x', minX - pad + 8); label.setAttribute('y', minY - pad - 4);
+    label.textContent = g.name + (g.collapsed ? ' [' + t('접힘') + ']' : '');
+    gEl.appendChild(label);
+    // 접기/펴기 토글
+    const toggle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    toggle.classList.add('wf-group-toggle');
+    toggle.setAttribute('x', maxX + pad - 16); toggle.setAttribute('y', minY - pad - 4);
+    toggle.textContent = g.collapsed ? '▶' : '▼';
+    toggle.addEventListener('click', () => _wfToggleGroupCollapse(g.id));
+    gEl.appendChild(toggle);
+    // 삭제 버튼
+    const del = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    del.classList.add('wf-group-toggle');
+    del.setAttribute('x', maxX + pad - 32); del.setAttribute('y', minY - pad - 4);
+    del.textContent = '✕';
+    del.addEventListener('click', () => _wfRemoveGroup(g.id));
+    gEl.appendChild(del);
+    // 접힌 상태면 노드 숨김
+    if (g.collapsed) {
+      g.nodeIds.forEach(nid => {
+        const nodeEl = nodesG.querySelector(`.wf-node[data-node="${nid}"]`);
+        if (nodeEl) nodeEl.style.display = 'none';
+      });
+      // 접힌 박스 높이 축소
+      rect.setAttribute('height', 30);
+    }
+    // prepend (노드 뒤에 표시되도록)
+    nodesG.insertBefore(gEl, nodesG.firstChild);
+  });
+}
+
+// ────────────────────────────────────────────────────────────────
+// Task 10: 워크플로우 diff 시각화
+// ────────────────────────────────────────────────────────────────
+async function _wfDiffVersions() {
+  const cbs = document.querySelectorAll('.wf-version-compare-cb:checked');
+  if (cbs.length !== 2) { toast(t('비교할 두 버전을 선택하세요'), 'warn'); return; }
+  const versions = Array.from(cbs).map(cb => ({
+    savedAt: cb.getAttribute('data-saved-at'),
+    name: cb.getAttribute('data-name'),
+    nodeCount: parseInt(cb.getAttribute('data-node-count') || '0'),
+  }));
+  try {
+    showModalLoading(t('버전 비교 중...'));
+    const [r1, r2] = await Promise.all([
+      api('/api/workflows/history-detail?id=' + encodeURIComponent(__wf.current.id) + '&savedAt=' + encodeURIComponent(versions[0].savedAt)),
+      api('/api/workflows/history-detail?id=' + encodeURIComponent(__wf.current.id) + '&savedAt=' + encodeURIComponent(versions[1].savedAt)),
+    ]);
+    const nodes1 = (r1 && r1.nodes) || [];
+    const nodes2 = (r2 && r2.nodes) || [];
+    const names1 = new Map(nodes1.map(n => [n.id, n.title || n.type || n.id]));
+    const names2 = new Map(nodes2.map(n => [n.id, n.title || n.type || n.id]));
+    const allIds = new Set([...names1.keys(), ...names2.keys()]);
+    const added = [], removed = [], changed = [], unchanged = [];
+    allIds.forEach(id => {
+      const in1 = names1.has(id), in2 = names2.has(id);
+      if (in2 && !in1) added.push({ id, name: names2.get(id) });
+      else if (in1 && !in2) removed.push({ id, name: names1.get(id) });
+      else if (in1 && in2) {
+        const n1 = nodes1.find(n => n.id === id);
+        const n2 = nodes2.find(n => n.id === id);
+        if (JSON.stringify(n1) !== JSON.stringify(n2)) changed.push({ id, name: names1.get(id), name2: names2.get(id) });
+        else unchanged.push({ id, name: names1.get(id) });
+      }
+    });
+    const row = (icon, label, items, color) => items.length ? `
+      <div class="mb-3">
+        <div class="text-xs font-semibold mb-1" style="color:${color}">${icon} ${label} (${items.length})</div>
+        ${items.map(i => `<div class="text-[11px] text-[var(--text-mute)] ml-3">• ${escapeHtml(i.name)}${i.name2 && i.name2 !== i.name ? ' → ' + escapeHtml(i.name2) : ''}</div>`).join('')}
+      </div>` : '';
+    showModal(`
+      <div class="p-5" style="max-width:640px;">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">🔍 ${t('버전 비교')}</h2>
+          <button class="btn text-xs" onclick="closeModal()" aria-label="${t('닫기')}">✕</button>
+        </div>
+        <div class="flex items-center gap-4 mb-4 text-xs text-[var(--text-mute)]">
+          <div class="card p-2 flex-1"><b>A:</b> ${escapeHtml(versions[0].name)} (${versions[0].nodeCount} ${t('노드')})</div>
+          <span>vs</span>
+          <div class="card p-2 flex-1"><b>B:</b> ${escapeHtml(versions[1].name)} (${versions[1].nodeCount} ${t('노드')})</div>
+        </div>
+        <div class="card p-4" style="max-height:50vh;overflow-y:auto;">
+          ${row('➕', t('추가된 노드'), added, 'var(--ok)')}
+          ${row('➖', t('삭제된 노드'), removed, 'var(--err)')}
+          ${row('✏️', t('변경된 노드'), changed, 'var(--warn)')}
+          ${row('✓', t('변경 없음'), unchanged, 'var(--text-dim)')}
+          ${!added.length && !removed.length && !changed.length ? `<div class="text-xs text-center" style="color:var(--text-dim)">${t('두 버전이 동일합니다')}</div>` : ''}
+        </div>
+      </div>
+    `);
+  } catch(e) {
+    showModal(`
+      <div class="p-5">
+        <h2 class="text-lg font-semibold mb-3">🔍 ${t('버전 비교')}</h2>
+        <div class="text-xs text-[var(--text-mute)] mb-3">${t('상세 버전 데이터를 가져올 수 없어 기본 비교를 수행합니다.')}</div>
+        <div class="card p-4">
+          <div class="flex items-center gap-4 mb-2 text-xs text-[var(--text-mute)]">
+            <div><b>A:</b> ${escapeHtml(versions[0].name)} — ${versions[0].nodeCount} ${t('노드')}</div>
+            <span>vs</span>
+            <div><b>B:</b> ${escapeHtml(versions[1].name)} — ${versions[1].nodeCount} ${t('노드')}</div>
+          </div>
+          <div class="text-xs text-[var(--text-mute)]">
+            ${t('노드 수 차이')}: ${Math.abs(versions[0].nodeCount - versions[1].nodeCount)}
+            ${versions[0].nodeCount !== versions[1].nodeCount ? (versions[1].nodeCount > versions[0].nodeCount ? '(' + t('추가') + ')' : '(' + t('삭제') + ')') : '(' + t('동일') + ')'}
+          </div>
+        </div>
+        <div class="flex justify-end mt-4">
+          <button class="btn text-sm" onclick="closeModal()">${t('닫기')}</button>
+        </div>
+      </div>
+    `);
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Task 1: 모바일 반응형 — 768px 이하 사이드바 기본 접힘 + 햄버거
+// ────────────────────────────────────────────────────────────────
+(function _initMobileNav() {
+  function syncNavToggle() {
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const toggle = document.getElementById('navToggle');
+    if (toggle) toggle.style.display = isMobile ? '' : 'none';
+    if (isMobile) {
+      const sb = document.getElementById('sidebar');
+      if (sb && !sb.classList.contains('open')) {
+        // 모바일에서 기본 접힘 상태 보장
+      }
+    }
+  }
+  // _syncNavToggleVisibility 가 이미 있으면 덮어쓰지 않고 기존 것을 호출
+  if (typeof _syncNavToggleVisibility === 'function') {
+    const orig = _syncNavToggleVisibility;
+    window._syncNavToggleVisibility = function() { orig(); syncNavToggle(); };
+  } else {
+    window._syncNavToggleVisibility = syncNavToggle;
+  }
+  window.addEventListener('resize', syncNavToggle);
+  syncNavToggle();
+})();
 
 (async function boot() {
   // 로케일 사전이 준비된 뒤 UI 를 렌더링 — 깜빡임 최소화
