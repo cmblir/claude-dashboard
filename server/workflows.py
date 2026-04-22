@@ -527,6 +527,100 @@ def api_workflow_delete(body: dict) -> dict:
     return {"ok": True, "id": wfId}
 
 
+def api_workflow_clone(body: dict) -> dict:
+    """워크플로우 복제. body: {id}. 새 ID + "(copy)" 이름으로 생성."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    wfId = body.get("id")
+    if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
+        return {"ok": False, "error": "invalid id"}
+    with _LOCK:
+        store = _load_all()
+        wf = store["workflows"].get(wfId)
+        if not wf:
+            return {"ok": False, "error": "not found"}
+        now = int(time.time() * 1000)
+        new_id = _new_wf_id()
+        import copy
+        clone = copy.deepcopy(wf)
+        clone["id"] = new_id
+        clone["name"] = (wf.get("name", "Untitled") + " (copy)")[:120]
+        clone["createdAt"] = now
+        clone["updatedAt"] = now
+        # 스케줄은 복제하지 않음 (중복 실행 방지)
+        clone.pop("schedule", None)
+        store["workflows"][new_id] = clone
+        _dump_all(store)
+    return {"ok": True, "id": new_id, "name": clone["name"]}
+
+
+def api_workflow_node_clipboard(body: dict) -> dict:
+    """노드 그룹 복사/붙여넣기. body: {action:'copy'|'paste', wfId, nodeIds?[], clipboard?}
+
+    copy: 지정 노드 + 연결 엣지를 클립보드 데이터로 반환
+    paste: 클립보드 데이터를 워크플로우에 새 ID로 삽입 (좌표 +40px 오프셋)
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    action = body.get("action")
+    wfId = body.get("wfId")
+
+    if action == "copy":
+        node_ids = body.get("nodeIds") or []
+        if not node_ids:
+            return {"ok": False, "error": "nodeIds required"}
+        store = _load_all()
+        wf = store["workflows"].get(wfId)
+        if not wf:
+            return {"ok": False, "error": "workflow not found"}
+        node_set = set(node_ids)
+        copied_nodes = [n for n in wf.get("nodes", []) if n["id"] in node_set]
+        copied_edges = [e for e in wf.get("edges", []) if e["from"] in node_set and e["to"] in node_set]
+        return {"ok": True, "clipboard": {"nodes": copied_nodes, "edges": copied_edges}}
+
+    if action == "paste":
+        clipboard = body.get("clipboard") or {}
+        nodes = clipboard.get("nodes") or []
+        edges = clipboard.get("edges") or []
+        if not nodes:
+            return {"ok": False, "error": "empty clipboard"}
+        with _LOCK:
+            store = _load_all()
+            wf = store["workflows"].get(wfId)
+            if not wf:
+                return {"ok": False, "error": "workflow not found"}
+            # 새 ID 매핑
+            id_map = {}
+            for n in nodes:
+                old_id = n["id"]
+                new_id = f"n-{uuid.uuid4().hex[:8]}"
+                id_map[old_id] = new_id
+            new_nodes = []
+            for n in nodes:
+                import copy
+                nn = copy.deepcopy(n)
+                nn["id"] = id_map[n["id"]]
+                nn["x"] = nn.get("x", 0) + 40
+                nn["y"] = nn.get("y", 0) + 40
+                new_nodes.append(nn)
+            new_edges = []
+            for e in edges:
+                if e["from"] in id_map and e["to"] in id_map:
+                    import copy
+                    ne = copy.deepcopy(e)
+                    ne["id"] = f"e-{int(time.time()*1000)}-{uuid.uuid4().hex[:4]}"
+                    ne["from"] = id_map[e["from"]]
+                    ne["to"] = id_map[e["to"]]
+                    new_edges.append(ne)
+            wf.setdefault("nodes", []).extend(new_nodes)
+            wf.setdefault("edges", []).extend(new_edges)
+            wf["updatedAt"] = int(time.time() * 1000)
+            _dump_all(store)
+        return {"ok": True, "pastedNodes": [n["id"] for n in new_nodes]}
+
+    return {"ok": False, "error": f"unknown action: {action}"}
+
+
 # ───────── Run 엔진 ─────────
 
 def _run_status_snapshot(runId: str) -> dict:

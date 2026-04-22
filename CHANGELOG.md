@@ -11,6 +11,28 @@
 
 ---
 
+## [2.0.0] — 2026-04-22
+
+### 🎉 v2.0 메이저 릴리스 — 멀티 AI 오케스트라 플랫폼 완성
+
+v1.0.2 → v2.0.0: **+10,800줄, 17개 커밋, 10개 태그**
+
+### Added — Phase 10 (Final)
+- 📋 **워크플로우 복제** — 목록에서 원클릭 clone (`POST /api/workflows/clone`)
+- 📎 **노드 복사/붙여넣기** — `Ctrl+C`/`Ctrl+V` 선택 노드 복사 (+40px 오프셋, 새 ID)
+- ↩️ **실행 취소** — `Ctrl+Z` undo 스택 (최대 30개, 노드/엣지 추가·삭제·이동 추적)
+- ⌨️ **키보드 단축키** — `?` 키로 도움말 모달 (Delete/Ctrl+C/V/Z/S/F/Esc)
+- 🌍 **i18n +22개 키** — 2,622개 × 3언어, **누락 0**
+
+### v1.0.2 → v2.0.0 전체 누적
+- **16개 노드 타입**: start, session, subagent, aggregate, branch, output, http, transform, variable, subworkflow, embedding, loop, retry, error_handler, merge, delay
+- **8개 AI 프로바이더** + 커스텀 무제한: Claude CLI, Ollama, Gemini CLI, Codex + OpenAI API, Gemini API, Anthropic API, Ollama API
+- **Ollama 모델 허브**: 23개 모델 카탈로그, 검색/다운로드/삭제
+- **Embedding**: Ollama bge-m3, OpenAI text-embedding-3, 커스텀
+- **워크플로우 엔진**: 병렬 실행, SSE 스트림, Webhook 트리거, Cron 스케줄러, Export/Import, 버전 히스토리, 빌트인 템플릿 8종
+- **i18n**: ko/en/zh 2,622키, error_key 시스템 49키
+- **API**: GET 73 + POST 59 = 132 라우트
+
 ## [1.9.0] — 2026-04-22
 
 ### Added — 멀티 AI 오케스트라 Phase 9
