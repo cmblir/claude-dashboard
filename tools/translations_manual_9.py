@@ -443,6 +443,32 @@ NEW_EN = {
     "대시보드 서버를 재시작하면 최신 기능이 적용됩니다":
         "Restart the dashboard server to apply the latest features",
 
+    # ── NAV desc (work group v2.3.0~v2.9.0) ────────────────────
+    "Anthropic cache_control 실측 — cache_read / cache_creation 토큰 + 비용 절감":
+        "Measure Anthropic cache_control — cache_read / cache_creation tokens + cost savings",
+    "Opus/Sonnet thinking block 분리 시각화 — budget_tokens 슬라이더":
+        "Separate Opus/Sonnet thinking-block view + budget_tokens slider",
+    "tool schema 정의 → tool_use 수신 → tool_result 피드 멀티 턴":
+        "Define tool schemas → receive tool_use → feed tool_result in multi-turn chains",
+    "Message Batches API — 대용량 프롬프트 병렬 제출 · JSONL 결과":
+        "Message Batches API — submit many prompts in parallel, JSONL results",
+    "파일 업로드 · 목록 · 삭제 + 메시지에 document reference":
+        "Upload · list · delete files + reference them as documents",
+    "이미지/PDF → Opus·Sonnet·Haiku 3 모델 병렬 비교":
+        "Image/PDF → parallel comparison across Opus · Sonnet · Haiku",
+    "프롬프트 셋 × 모델 교차 실행 → 평균 지연/토큰/비용 집계":
+        "Prompt set × models cross run → aggregate latency/tokens/cost",
+
+    # ── extractor noise (fragments from .replace() calls) ──────
+    "건을": "items",
+    "로 제출합니다. Anthropic API 요금이 발생할 수 있습니다. 계속할까요?":
+        "— Anthropic API charges may apply. Continue?",
+    "모델). 계속할까요?": "models). Continue?",
+    "회 API 호출을 수행합니다 (": "API calls (",
+    "프롬프트 ×": "prompts ×",
+    "안녕": "hi",
+    "최대 30MB": "Up to 30MB",
+
     # ── Prompt Cache Lab (v2.3.0) ──────────────────────────────
     "프롬프트 캐시 실험실": "Prompt Cache Lab",
     "시스템 프롬프트 캐시": "System prompt cache",
@@ -1048,6 +1074,32 @@ NEW_ZH = {
     # v2.2.1 — 向导测试反馈
     "대시보드 서버를 재시작하면 최신 기능이 적용됩니다":
         "重启仪表板服务器后将应用最新功能",
+
+    # ── NAV desc (work group v2.3.0~v2.9.0) ────────────────────
+    "Anthropic cache_control 실측 — cache_read / cache_creation 토큰 + 비용 절감":
+        "实测 Anthropic cache_control — cache_read / cache_creation 令牌 + 成本节省",
+    "Opus/Sonnet thinking block 분리 시각화 — budget_tokens 슬라이더":
+        "分离展示 Opus/Sonnet 思维块 + budget_tokens 滑块",
+    "tool schema 정의 → tool_use 수신 → tool_result 피드 멀티 턴":
+        "定义 tool schema → 接收 tool_use → 多轮传递 tool_result",
+    "Message Batches API — 대용량 프롬프트 병렬 제출 · JSONL 결과":
+        "Message Batches API — 并行提交大量提示 · JSONL 结果",
+    "파일 업로드 · 목록 · 삭제 + 메시지에 document reference":
+        "文件上传 · 列表 · 删除 + 在消息中以 document 引用",
+    "이미지/PDF → Opus·Sonnet·Haiku 3 모델 병렬 비교":
+        "图片/PDF → Opus·Sonnet·Haiku 3 模型并行比较",
+    "프롬프트 셋 × 모델 교차 실행 → 평균 지연/토큰/비용 집계":
+        "提示集 × 模型交叉运行 → 汇总平均延迟/令牌/费用",
+
+    # ── extractor noise (片段) ─────────────────────────────────
+    "건을": "条",
+    "로 제출합니다. Anthropic API 요금이 발생할 수 있습니다. 계속할까요?":
+        "— 可能产生 Anthropic API 费用。继续吗?",
+    "모델). 계속할까요?": "模型)。继续吗?",
+    "회 API 호출을 수행합니다 (": "次 API 调用 (",
+    "프롬프트 ×": "提示 ×",
+    "안녕": "你好",
+    "최대 30MB": "最大 30MB",
 
     # ── Prompt Cache Lab (v2.3.0) ──────────────────────────────
     "프롬프트 캐시 실험실": "提示缓存实验室",

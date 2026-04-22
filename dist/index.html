@@ -6838,15 +6838,15 @@ VIEWS.promptCache = async () => {
 
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('system (JSON 배열)')}</label>
-          <textarea class="input font-mono text-[11px]" rows="4" oninput="pcSet('system', this.value)">${_escapeHTML(pc.system)}</textarea>
+          <textarea class="input font-mono text-[11px]" rows="4" oninput="pcSet('system', this.value)">${escapeHtml(pc.system)}</textarea>
         </div>
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('tools (JSON 배열)')}</label>
-          <textarea class="input font-mono text-[11px]" rows="4" oninput="pcSet('tools', this.value)">${_escapeHTML(pc.tools)}</textarea>
+          <textarea class="input font-mono text-[11px]" rows="4" oninput="pcSet('tools', this.value)">${escapeHtml(pc.tools)}</textarea>
         </div>
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('messages (JSON 배열)')}</label>
-          <textarea class="input font-mono text-[11px]" rows="8" oninput="pcSet('messages', this.value)">${_escapeHTML(pc.messages)}</textarea>
+          <textarea class="input font-mono text-[11px]" rows="8" oninput="pcSet('messages', this.value)">${escapeHtml(pc.messages)}</textarea>
         </div>
 
         <div class="flex items-center gap-2">
@@ -6867,7 +6867,7 @@ VIEWS.promptCache = async () => {
         </div>
         <div class="card p-3">
           <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('응답')}</div>
-          <pre class="text-[11px] whitespace-pre-wrap max-h-64 overflow-auto">${last ? _escapeHTML(last.output || (last.error || '(empty)')) : t('아직 실행한 결과가 없습니다')}</pre>
+          <pre class="text-[11px] whitespace-pre-wrap max-h-64 overflow-auto">${last ? escapeHtml(last.output || (last.error || '(empty)')) : t('아직 실행한 결과가 없습니다')}</pre>
         </div>
         <div class="card p-3">
           <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('최근 히스토리')} (${histItems.length})</div>
@@ -6978,7 +6978,7 @@ VIEWS.thinkingLab = async () => {
       <summary class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider cursor-pointer">
         🧠 ${t('Thinking Block')} (${(last.thinkingBlocks||0)} ${t('블록')})
       </summary>
-      <pre class="text-[11px] whitespace-pre-wrap mt-2 max-h-80 overflow-auto text-[var(--text-dim)]">${_escapeHTML(last.thinking)}</pre>
+      <pre class="text-[11px] whitespace-pre-wrap mt-2 max-h-80 overflow-auto text-[var(--text-dim)]">${escapeHtml(last.thinking)}</pre>
     </details>
   ` : '';
 
@@ -7017,7 +7017,7 @@ VIEWS.thinkingLab = async () => {
         </div>
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('프롬프트')}</label>
-          <textarea class="input text-[12px]" rows="10" oninput="tlSet('prompt', this.value)" placeholder="${t('질문을 입력하세요')}">${_escapeHTML(tl.prompt || '')}</textarea>
+          <textarea class="input text-[12px]" rows="10" oninput="tlSet('prompt', this.value)" placeholder="${t('질문을 입력하세요')}">${escapeHtml(tl.prompt || '')}</textarea>
         </div>
         <div class="flex items-center gap-2">
           <button class="btn btn-primary" onclick="tlRun()">▶ ${t('실행')}</button>
@@ -7030,7 +7030,7 @@ VIEWS.thinkingLab = async () => {
         ${thinkingPanel}
         <div class="card p-3">
           <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">💬 ${t('최종 응답')}</div>
-          <pre class="text-[11px] whitespace-pre-wrap max-h-96 overflow-auto">${last ? _escapeHTML(last.output || (last.error || '(empty)')) : t('아직 실행한 결과가 없습니다')}</pre>
+          <pre class="text-[11px] whitespace-pre-wrap max-h-96 overflow-auto">${last ? escapeHtml(last.output || (last.error || '(empty)')) : t('아직 실행한 결과가 없습니다')}</pre>
         </div>
         <div class="card p-3">
           <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('토큰 사용량')}</div>
@@ -7137,12 +7137,12 @@ VIEWS.toolUseLab = async () => {
     const content = Array.isArray(m.content) ? m.content : [{type:'text', text: String(m.content||'')}];
     const parts = content.map((c, ci) => {
       if (c.type === 'text') {
-        return `<div class="text-[12px] whitespace-pre-wrap">${_escapeHTML(c.text||'')}</div>`;
+        return `<div class="text-[12px] whitespace-pre-wrap">${escapeHtml(c.text||'')}</div>`;
       }
       if (c.type === 'tool_use') {
         return `<div class="mt-1 p-2 bg-[var(--bg-alt)] border border-[var(--accent)] rounded text-[11px]">
           <div class="text-[var(--accent)] font-mono mb-1">🛠️ tool_use: ${c.name}</div>
-          <pre class="font-mono text-[11px] whitespace-pre-wrap">${_escapeHTML(JSON.stringify(c.input||{}, null, 2))}</pre>
+          <pre class="font-mono text-[11px] whitespace-pre-wrap">${escapeHtml(JSON.stringify(c.input||{}, null, 2))}</pre>
           <div class="mt-2">
             <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('tool_result 수동 입력')}</label>
             <textarea id="tr_${idx}_${ci}" class="input text-[11px] font-mono" rows="2" placeholder='{"result":"..."}'></textarea>
@@ -7156,7 +7156,7 @@ VIEWS.toolUseLab = async () => {
           : String(c.content || '');
         return `<div class="mt-1 p-2 bg-[var(--bg-alt)] border border-[var(--ok)] rounded text-[11px]">
           <div class="text-[var(--ok)] font-mono mb-1">✓ tool_result (${c.tool_use_id||''})</div>
-          <pre class="font-mono text-[11px] whitespace-pre-wrap">${_escapeHTML(text)}</pre>
+          <pre class="font-mono text-[11px] whitespace-pre-wrap">${escapeHtml(text)}</pre>
         </div>`;
       }
       return `<div class="text-[11px] text-[var(--text-dim)]">[${c.type||'?'}]</div>`;
@@ -7202,12 +7202,12 @@ VIEWS.toolUseLab = async () => {
             <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('tools (JSON 배열)')}</label>
             <div class="flex gap-1 flex-wrap">${tplBtns}</div>
           </div>
-          <textarea class="input font-mono text-[11px]" rows="10" oninput="tuSet('tools', this.value)">${_escapeHTML(tu.tools || '[]')}</textarea>
+          <textarea class="input font-mono text-[11px]" rows="10" oninput="tuSet('tools', this.value)">${escapeHtml(tu.tools || '[]')}</textarea>
         </div>
 
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('사용자 메시지')}</label>
-          <textarea class="input text-[12px]" rows="3" id="tuInput" oninput="tuSet('pendingInput', this.value)" placeholder="${t('Claude 에게 할 질문')}">${_escapeHTML(tu.pendingInput || '')}</textarea>
+          <textarea class="input text-[12px]" rows="3" id="tuInput" oninput="tuSet('pendingInput', this.value)" placeholder="${t('Claude 에게 할 질문')}">${escapeHtml(tu.pendingInput || '')}</textarea>
         </div>
 
         <div class="flex items-center gap-2">
@@ -7347,7 +7347,7 @@ VIEWS.batchJobs = async () => {
 
   const resultsPanel = bj.lastResults ? `
     <div class="text-[11px] text-[var(--text-dim)] mb-1">${t('결과')} ${bj.lastResults.count||0} ${t('건')} · ${bj.selectedBatchId}</div>
-    <pre class="text-[10px] max-h-80 overflow-auto font-mono whitespace-pre-wrap">${_escapeHTML(JSON.stringify(bj.lastResults.items||[], null, 2).slice(0, 8000))}</pre>
+    <pre class="text-[10px] max-h-80 overflow-auto font-mono whitespace-pre-wrap">${escapeHtml(JSON.stringify(bj.lastResults.items||[], null, 2).slice(0, 8000))}</pre>
   ` : `<div class="text-[11px] text-[var(--text-dim)]">${t('배치를 선택해서 결과를 보세요')}</div>`;
 
   return `
@@ -7378,7 +7378,7 @@ VIEWS.batchJobs = async () => {
         </div>
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('프롬프트 (한 줄에 하나)')}</label>
-          <textarea class="input text-[12px] font-mono" rows="10" oninput="bjSet('promptsText', this.value)" placeholder="${t('예: 한국의 수도는?')}">${_escapeHTML(bj.promptsText || '')}</textarea>
+          <textarea class="input text-[12px] font-mono" rows="10" oninput="bjSet('promptsText', this.value)" placeholder="${t('예: 한국의 수도는?')}">${escapeHtml(bj.promptsText || '')}</textarea>
           <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('최대 1000건')}</div>
         </div>
         <div class="flex items-center gap-2">
@@ -7532,12 +7532,12 @@ VIEWS.apiFiles = async () => {
             <option value="claude-sonnet-4-6" ${af.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
             <option value="claude-haiku-4-5" ${af.model==='claude-haiku-4-5'?'selected':''}>Haiku 4.5</option>
           </select>
-          <textarea class="input text-[12px]" rows="3" oninput="afSet('prompt', this.value)" placeholder="${t('이 문서의 핵심을 3줄로 요약해줘')}">${_escapeHTML(af.prompt || '')}</textarea>
+          <textarea class="input text-[12px]" rows="3" oninput="afSet('prompt', this.value)" placeholder="${t('이 문서의 핵심을 3줄로 요약해줘')}">${escapeHtml(af.prompt || '')}</textarea>
           <div class="mt-2 flex items-center gap-2">
             <button class="btn btn-primary" onclick="afAsk()" ${af.selectedFileId?'':'disabled'}>▶ ${t('질문 실행')}</button>
             <span id="afAskStatus" class="text-[11px] text-[var(--text-dim)]"></span>
           </div>
-          ${af.lastOutput ? `<pre class="text-[11px] whitespace-pre-wrap mt-3 max-h-64 overflow-auto">${_escapeHTML(af.lastOutput.output || af.lastOutput.error || '')}</pre>` : ''}
+          ${af.lastOutput ? `<pre class="text-[11px] whitespace-pre-wrap mt-3 max-h-64 overflow-auto">${escapeHtml(af.lastOutput.output || af.lastOutput.error || '')}</pre>` : ''}
         </div>
       </div>
 
@@ -7654,7 +7654,7 @@ VIEWS.visionLab = async () => {
     const usage = r.usage ? `<div class="text-[10px] text-[var(--text-dim)] mt-1">in=${r.usage.input_tokens||0} · out=${r.usage.output_tokens||0}</div>` : '';
     return `<div class="card p-3">
       <div class="text-[11px] font-mono mb-1">${head}</div>
-      <pre class="text-[11px] whitespace-pre-wrap max-h-64 overflow-auto">${_escapeHTML(body)}</pre>
+      <pre class="text-[11px] whitespace-pre-wrap max-h-64 overflow-auto">${escapeHtml(body)}</pre>
       ${usage}
     </div>`;
   }).join('') : '';
@@ -7678,7 +7678,7 @@ VIEWS.visionLab = async () => {
 
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('질문')}</label>
-          <textarea class="input text-[12px]" rows="3" oninput="vlSet('question', this.value)">${_escapeHTML(vl.question || '')}</textarea>
+          <textarea class="input text-[12px]" rows="3" oninput="vlSet('question', this.value)">${escapeHtml(vl.question || '')}</textarea>
         </div>
 
         <div class="flex items-center gap-2">
@@ -7803,8 +7803,8 @@ VIEWS.modelBench = async () => {
     const body = r.ok ? (r.output || '').slice(0, 140) : (r.error || '');
     return `<tr class="border-b border-[var(--border)] align-top">
       <td class="py-2 pr-2 text-[11px] font-mono whitespace-nowrap">${icon} ${r.model||''}</td>
-      <td class="py-2 pr-2 text-[11px]">${_escapeHTML(r.prompt||'').slice(0, 60)}</td>
-      <td class="py-2 pr-2 text-[11px] whitespace-pre-wrap">${_escapeHTML(body)}</td>
+      <td class="py-2 pr-2 text-[11px]">${escapeHtml(r.prompt||'').slice(0, 60)}</td>
+      <td class="py-2 pr-2 text-[11px] whitespace-pre-wrap">${escapeHtml(body)}</td>
       <td class="py-2 pr-2 text-[11px] text-right font-mono">${r.durationMs||0}ms</td>
       <td class="py-2 text-[11px] text-right font-mono">${r.ok ? '$' + (r.usdCost||0).toFixed(6) : '-'}</td>
     </tr>`;
@@ -7826,7 +7826,7 @@ VIEWS.modelBench = async () => {
           <div class="card p-3 text-[11px]">
             <div class="font-semibold mb-1">${t(cur?.label||'')}</div>
             <div class="text-[var(--text-dim)] mb-2">${t(cur?.description||'')}</div>
-            <ol class="list-decimal pl-4 space-y-1">${(cur?.prompts||[]).map(p => `<li>${_escapeHTML(p)}</li>`).join('')}</ol>
+            <ol class="list-decimal pl-4 space-y-1">${(cur?.prompts||[]).map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ol>
           </div>
         </div>
 
