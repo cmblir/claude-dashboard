@@ -44,6 +44,10 @@ from .prompt_cache import (
     api_prompt_cache_examples, api_prompt_cache_history,
     api_prompt_cache_test,
 )
+from .thinking_lab import (
+    api_thinking_lab_examples, api_thinking_lab_history,
+    api_thinking_lab_models, api_thinking_lab_test,
+)
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -194,6 +198,9 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/ollama/settings": lambda q: api_ollama_settings_get(),
     "/api/prompt-cache/examples": api_prompt_cache_examples,
     "/api/prompt-cache/history": api_prompt_cache_history,
+    "/api/thinking-lab/examples": api_thinking_lab_examples,
+    "/api/thinking-lab/history": api_thinking_lab_history,
+    "/api/thinking-lab/models": api_thinking_lab_models,
 }
 
 
@@ -281,6 +288,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/ollama/serve/stop": api_ollama_serve_stop,
     "/api/ai-providers/default-model": api_set_default_model,
     "/api/prompt-cache/test": api_prompt_cache_test,
+    "/api/thinking-lab/test": api_thinking_lab_test,
 }
 
 

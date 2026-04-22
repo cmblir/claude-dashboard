@@ -81,6 +81,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "비용 절감을 실측. 예시 3종(시스템/문서/도구) 원클릭 실행, 히스토리 20건.",
         ["프롬프트 캐시", "prompt cache", "cache_control", "ephemeral",
          "캐시 절감", "cache_read", "cache_creation"]),
+    ("thinkingLab",   "work",
+        "Extended Thinking 실험실 — Opus/Sonnet 의 thinking block 을 분리 시각화. "
+        "budget_tokens 슬라이더, 예시 3종(수학/디버깅/플래닝), 히스토리 20건.",
+        ["extended thinking", "thinking", "reasoning", "추론", "budget_tokens",
+         "thinking block"]),
 
     # ── 설정 & 구성 ─────────────────────────────────
     ("hooks",         "config",   "이벤트 훅 설정",
@@ -156,6 +161,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
     "commands": {"en": "Slash commands", "zh": "斜杠命令"},
     "promptCache": {"en": "Prompt Cache Lab — cache_control + cache_read/creation tokens + cost savings",
                    "zh": "提示缓存实验室 — cache_control + cache_read/creation 令牌 + 成本节约"},
+    "thinkingLab": {"en": "Extended Thinking Lab — visualize Opus/Sonnet thinking blocks with budget slider",
+                   "zh": "扩展思维实验室 — 可视化 Opus/Sonnet 思维块,带 budget 滑块"},
     "hooks": {"en": "Event hooks", "zh": "事件钩子"},
     "permissions": {"en": "Tool permissions", "zh": "工具权限"},
     "mcp": {"en": "MCP Connectors", "zh": "MCP 连接器"},

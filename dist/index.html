@@ -850,6 +850,9 @@ const NAV = [
   { id: 'promptCache', icon: '🧊', label: '프롬프트 캐시 실험실', group: 'work',
     desc: 'Anthropic cache_control 실측 — cache_read / cache_creation 토큰 + 비용 절감',
     docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching' },
+  { id: 'thinkingLab', icon: '🧠', label: 'Extended Thinking', group: 'work',
+    desc: 'Opus/Sonnet thinking block 분리 시각화 — budget_tokens 슬라이더',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking' },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -6906,6 +6909,182 @@ async function pcRun() {
       return;
     }
     state.data.pc.lastResult = r.ok ? { usage: r.usage, cost: r.cost, output: r.output, durationMs: r.durationMs } : { error: r.error || t('실행 실패') };
+    if (st) st.textContent = r.ok ? `${r.durationMs}ms` : '';
+    renderView();
+  } catch (e) {
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (st) st.textContent = '';
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// EXTENDED THINKING LAB (v2.3.0)
+// thinking block 을 분리해서 시각화 · budget_tokens 슬라이더
+// ────────────────────────────────────────────────────────────────
+VIEWS.thinkingLab = async () => {
+  const [ex, hist, ms] = await Promise.all([
+    api('/api/thinking-lab/examples'),
+    api('/api/thinking-lab/history'),
+    api('/api/thinking-lab/models'),
+  ]);
+  state.data.tl = state.data.tl || {
+    model: 'claude-sonnet-4-6',
+    budgetTokens: 4096,
+    maxTokens: 2048,
+    prompt: '',
+    lastResult: null,
+    thinkingOpen: true,
+  };
+  const tl = state.data.tl;
+  const last = tl.lastResult;
+  const items = (hist && hist.items) || [];
+
+  const exBtns = (ex.examples || []).map(e =>
+    `<button class="chip" onclick="tlLoadExample('${e.id}')">${t(e.label)}</button>`
+  ).join('');
+
+  const modelOpts = (ms.models || []).map(m =>
+    `<option value="${m.id}" ${tl.model===m.id?'selected':''} ${m.supported?'':'disabled'}>${m.label}${m.supported?'':' ('+t('비지원')+')'}</option>`
+  ).join('');
+
+  const usage = last && last.usage || {};
+
+  const histList = items.slice(0, 10).map(h => {
+    const tsStr = new Date((h.ts||0)*1000).toLocaleString();
+    const icon = h.status === 'ok' ? '✅' : '❌';
+    return `<div class="text-[11px] py-1 border-b border-[var(--border)] flex justify-between gap-2">
+      <span>${icon} <span class="text-[var(--text-dim)]">${tsStr}</span> · ${h.model||''}</span>
+      <span class="font-mono text-[var(--text-dim)]">budget=${h.budgetTokens||0}</span>
+    </div>`;
+  }).join('') || `<div class="text-[11px] text-[var(--text-dim)]">${t('이력 없음')}</div>`;
+
+  const thinkingPanel = last && last.thinking ? `
+    <details class="card p-3" ${tl.thinkingOpen?'open':''}>
+      <summary class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider cursor-pointer">
+        🧠 ${t('Thinking Block')} (${(last.thinkingBlocks||0)} ${t('블록')})
+      </summary>
+      <pre class="text-[11px] whitespace-pre-wrap mt-2 max-h-80 overflow-auto text-[var(--text-dim)]">${_escapeHTML(last.thinking)}</pre>
+    </details>
+  ` : '';
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">🧠 ${t('Extended Thinking 실험실')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('Opus 4.7 / Sonnet 4.6 의 thinking block 과 최종 응답을 분리 시각화. budget_tokens 로 추론 길이 조절.')}
+      </p>
+    </div>
+
+    <div class="mb-3 flex items-center gap-2 flex-wrap">
+      <span class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('예시')}</span>
+      ${exBtns}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="space-y-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider w-20">${t('모델')}</label>
+          <select class="input flex-1" onchange="tlSet('model', this.value)">${modelOpts}</select>
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider flex justify-between">
+            <span>budget_tokens</span>
+            <span class="font-mono">${tl.budgetTokens}</span>
+          </label>
+          <input type="range" min="1024" max="32000" step="512" value="${tl.budgetTokens}"
+                 oninput="tlSet('budgetTokens', parseInt(this.value)); this.previousElementSibling.lastElementChild.textContent=this.value"
+                 class="w-full">
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider w-20">max_tokens</label>
+          <input type="text" inputmode="numeric" class="input w-32" value="${tl.maxTokens}"
+                 oninput="tlSet('maxTokens', parseInt((this.value||'').replace(/\\D/g,''))||2048)">
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('프롬프트')}</label>
+          <textarea class="input text-[12px]" rows="10" oninput="tlSet('prompt', this.value)" placeholder="${t('질문을 입력하세요')}">${_escapeHTML(tl.prompt || '')}</textarea>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary" onclick="tlRun()">▶ ${t('실행')}</button>
+          <button class="btn" onclick="tlReset()">${t('초기화')}</button>
+          <span id="tlStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        ${thinkingPanel}
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">💬 ${t('최종 응답')}</div>
+          <pre class="text-[11px] whitespace-pre-wrap max-h-96 overflow-auto">${last ? _escapeHTML(last.output || (last.error || '(empty)')) : t('아직 실행한 결과가 없습니다')}</pre>
+        </div>
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('토큰 사용량')}</div>
+          ${last ? `
+            <div class="grid grid-cols-2 gap-2 text-[11px]">
+              <div class="flex justify-between"><span class="text-[var(--text-dim)]">input_tokens</span><span class="font-mono">${usage.input_tokens||0}</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-dim)]">output_tokens</span><span class="font-mono">${usage.output_tokens||0}</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('소요 시간')}</span><span class="font-mono">${last.durationMs||0}ms</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-dim)]">stop_reason</span><span class="font-mono">${last.stopReason||'-'}</span></div>
+            </div>` : `<div class="text-[11px] text-[var(--text-dim)]">${t('아직 실행한 결과가 없습니다')}</div>`}
+        </div>
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('최근 히스토리')} (${items.length})</div>
+          ${histList}
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+function tlSet(key, val) {
+  state.data.tl = state.data.tl || {};
+  state.data.tl[key] = val;
+}
+function tlReset() {
+  state.data.tl = null;
+  renderView();
+}
+async function tlLoadExample(id) {
+  const r = await api('/api/thinking-lab/examples');
+  const e = (r.examples || []).find(x => x.id === id);
+  if (!e) return;
+  state.data.tl = {
+    model: e.model,
+    budgetTokens: e.budgetTokens,
+    maxTokens: e.maxTokens,
+    prompt: e.prompt,
+    lastResult: null,
+    thinkingOpen: true,
+  };
+  renderView();
+}
+async function tlRun() {
+  const st = document.getElementById('tlStatus');
+  if (st) st.textContent = t('호출 중…');
+  const tl = state.data.tl || {};
+  if (!(tl.prompt || '').trim()) {
+    toast(t('프롬프트를 입력하세요'), 'err');
+    if (st) st.textContent = '';
+    return;
+  }
+  try {
+    const r = await fetch('/api/thinking-lab/test', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(tl),
+    }).then(x => x.json());
+    if (r.needKey) {
+      toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err');
+      if (st) st.textContent = '';
+      return;
+    }
+    if (r.unsupported) {
+      toast(t('Extended Thinking 은 Haiku 에서 지원되지 않습니다'), 'err');
+      if (st) st.textContent = '';
+      return;
+    }
+    state.data.tl.lastResult = r.ok
+      ? { thinking: r.thinking, output: r.output, usage: r.usage, durationMs: r.durationMs, thinkingBlocks: r.thinkingBlocks, stopReason: r.stopReason }
+      : { error: r.error || t('실행 실패') };
     if (st) st.textContent = r.ok ? `${r.durationMs}ms` : '';
     renderView();
   } catch (e) {
