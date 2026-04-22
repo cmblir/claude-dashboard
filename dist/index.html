@@ -789,6 +789,11 @@ const __noReloadPaths = [
   // 워크플로우 에디터는 프론트가 권위 상태를 들고 있으므로 서버 응답 후
   // renderView() 로 뷰를 리셋하면 드래그 중 깜빡임·선택 초기화 발생
   '/api/workflows/', '/api/session/spawn',
+  // AI 프로바이더 — 테스트/비교/헬스는 리로드 불필요
+  '/api/ai-providers/test', '/api/ai-providers/compare', '/api/ai-providers/health',
+  '/api/ai-providers/usage-alert',
+  // Ollama — pull/serve/info 는 인라인 상태 업데이트
+  '/api/ollama/',
 ];
 async function api(path, opts = {}) {
   const r = await fetch(path, opts);
@@ -8948,7 +8953,7 @@ window._wizardSelectProvider = (provider) => {
           ${t('확인 명령')}: <code style="background:var(--code-bg);padding:2px 6px;border-radius:4px;">curl http://localhost:11434/api/tags</code>
         </div>
       </div>
-      <button class="btn text-xs" onclick="navigate('aiProviders');setTimeout(()=>{const el=document.getElementById('ollamaTabCatalog');if(el)el.click();},200);">
+      <button class="btn text-xs" onclick="const el=document.getElementById('ollamaTabCatalog');if(el){el.scrollIntoView({behavior:'smooth'});el.click();}else{go('aiProviders');setTimeout(()=>{const e=document.getElementById('ollamaTabCatalog');if(e){e.scrollIntoView({behavior:'smooth'});e.click();}},300);}">
         🦙 ${t('Ollama 모델 허브로 이동')}
       </button>
     `,
