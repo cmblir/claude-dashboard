@@ -354,6 +354,81 @@ def api_set_default_model(body: dict) -> dict:
     return set_default_model(pid, model)
 
 
+# ───────── Ollama 엔진 설정 ─────────
+
+def api_ollama_settings_get() -> dict:
+    """Ollama 기본 채팅 모델 + 임베딩 모델 설정 조회."""
+    cfg = _load_config()
+    ollama_cfg = cfg.get("ollamaSettings") or {}
+
+    # 설치된 모델 목록 가져오기
+    installed_chat = []
+    installed_embed = []
+    try:
+        from .ai_providers import get_registry
+        reg = get_registry()
+        for pid in ("ollama", "ollama-api"):
+            p = reg.get(pid)
+            if p and p.is_available():
+                for m in p.list_models():
+                    caps = m.capabilities or ["chat"]
+                    entry = {"id": m.id, "label": m.label or m.id, "note": m.note}
+                    if "embed" in caps:
+                        if not any(x["id"] == m.id for x in installed_embed):
+                            installed_embed.append(entry)
+                    else:
+                        if not any(x["id"] == m.id for x in installed_chat):
+                            installed_chat.append(entry)
+                break  # 하나만 조회하면 됨
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "chatModel": ollama_cfg.get("chatModel", ""),
+        "embedModel": ollama_cfg.get("embedModel", ""),
+        "installedChat": installed_chat,
+        "installedEmbed": installed_embed,
+    }
+
+
+def api_ollama_settings_save(body: dict) -> dict:
+    """Ollama 기본 채팅/임베딩 모델 저장. body: {chatModel?, embedModel?}"""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+
+    cfg = _load_config()
+    ollama_cfg = cfg.get("ollamaSettings") or {}
+    chat_model = (body.get("chatModel") or "").strip()
+    embed_model = (body.get("embedModel") or "").strip()
+
+    if chat_model:
+        ollama_cfg["chatModel"] = chat_model
+    else:
+        ollama_cfg.pop("chatModel", None)
+    if embed_model:
+        ollama_cfg["embedModel"] = embed_model
+    else:
+        ollama_cfg.pop("embedModel", None)
+
+    cfg["ollamaSettings"] = ollama_cfg
+    ok = _save_config(cfg)
+
+    # 프로바이더 레지스트리에 반영
+    if ok:
+        try:
+            from .ai_providers import get_registry
+            reg = get_registry()
+            # ollama/ollama-api 의 기본 모델 업데이트
+            if chat_model:
+                set_default_model("ollama", chat_model)
+                set_default_model("ollama-api", chat_model)
+        except Exception:
+            pass
+
+    return {"ok": ok, "chatModel": chat_model, "embedModel": embed_model}
+
+
 # ───────── API 엔드포인트 핸들러 ─────────
 
 def api_providers_list() -> dict:
