@@ -563,6 +563,24 @@ NEW_EN = {
     "삭제 실패": "Delete failed",
     "먼저 파일을 선택하세요": "Select a file first",
     "질문을 입력하세요": "Enter a question",
+
+    # ── Vision / PDF Lab (v2.7.0) ──────────────────────────────
+    "Vision / PDF 실험실": "Vision / PDF Lab",
+    "이미지(PNG/JPG/WebP/GIF) 또는 PDF 를 올리고 같은 질문을 Opus / Sonnet / Haiku 3 모델에 병렬 전송 → 응답을 나란히 비교합니다.":
+        "Drop an image (PNG/JPG/WebP/GIF) or PDF and ask the same question to Opus / Sonnet / Haiku in parallel. Compare responses side by side.",
+    "파일 선택": "Choose file",
+    "이미지 또는 PDF 를 선택하세요": "Choose an image or a PDF",
+    "최대 10MB": "Up to 10MB",
+    "이 파일의 내용을 설명해줘.": "Describe the contents of this file.",
+    "질문": "Question",
+    "3 모델 병렬 실행": "Run 3 models in parallel",
+    "실행 중…": "Running…",
+    "3 모델 병렬 호출 중…": "Calling 3 models in parallel…",
+    "결과 요약": "Result summary",
+    "총 소요": "Total elapsed",
+    "모델 수": "Models",
+    "아직 결과가 없습니다": "No results yet",
+    "파일을 먼저 선택하세요": "Choose a file first",
 }
 
 NEW_ZH = {
@@ -1122,4 +1140,22 @@ NEW_ZH = {
     "삭제 실패": "删除失败",
     "먼저 파일을 선택하세요": "请先选择文件",
     "질문을 입력하세요": "请输入问题",
+
+    # ── Vision / PDF Lab (v2.7.0) ──────────────────────────────
+    "Vision / PDF 실험실": "视觉 / PDF 实验室",
+    "이미지(PNG/JPG/WebP/GIF) 또는 PDF 를 올리고 같은 질문을 Opus / Sonnet / Haiku 3 모델에 병렬 전송 → 응답을 나란히 비교합니다.":
+        "拖入图片（PNG/JPG/WebP/GIF）或 PDF,向 Opus / Sonnet / Haiku 三个模型并行提相同问题,并排比较响应。",
+    "파일 선택": "选择文件",
+    "이미지 또는 PDF 를 선택하세요": "请选择图片或 PDF",
+    "최대 10MB": "最大 10MB",
+    "이 파일의 내용을 설명해줘.": "请描述此文件的内容。",
+    "질문": "问题",
+    "3 모델 병렬 실행": "3 模型并行运行",
+    "실행 중…": "运行中…",
+    "3 모델 병렬 호출 중…": "并行调用 3 个模型…",
+    "결과 요약": "结果摘要",
+    "총 소요": "总耗时",
+    "모델 수": "模型数",
+    "아직 결과가 없습니다": "暂无结果",
+    "파일을 먼저 선택하세요": "请先选择文件",
 }

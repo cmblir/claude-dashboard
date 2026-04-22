@@ -11,6 +11,28 @@
 
 ---
 
+## [2.7.0] — 2026-04-23
+
+### 👁️ Vision / PDF Lab — 신규 탭 (work 그룹)
+
+이미지(PNG/JPG/WebP/GIF) 또는 PDF 를 업로드해 Opus / Sonnet / Haiku 3 모델에 병렬 질의 → 응답 비교.
+
+**기능**
+- 파일 선택 → 자동 base64 인코딩 (최대 10MB)
+- 이미지: `type:"image"` 블록, PDF: `type:"document"` 블록으로 content 구성
+- 3 모델을 **ThreadPoolExecutor** 로 병렬 호출
+- 각 모델별 응답/지연/토큰 사용량 카드 나란히 표시
+- 총 소요 시간 + 모델 수 요약
+
+**Architecture**
+- `server/vision_lab.py` 신설 — `api_vision_compare`, `api_vision_models` + `_call_one` 단일 모델 호출 유틸
+- `server/routes.py` — 2개 라우트 추가 (`GET models`, `POST compare`)
+- `server/nav_catalog.py` — `visionLab` 탭 등록 + en/zh desc
+- `dist/index.html` — NAV + `VIEWS.visionLab` (파일 선택 카드 + 3-column 결과 그리드)
+- `tools/translations_manual_9.py` — 16 키 × ko/en/zh 추가
+
+---
+
 ## [2.6.0] — 2026-04-23
 
 ### 📎 Files API — 신규 탭 (work 그룹)

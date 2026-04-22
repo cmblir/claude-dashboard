@@ -862,6 +862,9 @@ const NAV = [
   { id: 'apiFiles',    icon: '📎', label: 'Files API', group: 'work',
     desc: '파일 업로드 · 목록 · 삭제 + 메시지에 document reference',
     docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/files' },
+  { id: 'visionLab',   icon: '👁️', label: 'Vision / PDF', group: 'work',
+    desc: '이미지/PDF → Opus·Sonnet·Haiku 3 모델 병렬 비교',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/vision' },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -7615,6 +7618,140 @@ async function afAsk() {
   } catch (e) {
     toast(t('네트워크 오류') + ': ' + e.message, 'err');
     if (st) st.textContent = '';
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// VISION / PDF LAB (v2.7.0)
+// 이미지/PDF 업로드 → Opus / Sonnet / Haiku 3 모델 병렬 비교
+// ────────────────────────────────────────────────────────────────
+VIEWS.visionLab = async () => {
+  state.data.vl = state.data.vl || {
+    mediaType: '',
+    base64: '',
+    filename: '',
+    previewUrl: '',
+    question: '이 파일의 내용을 설명해줘.',
+    results: null,
+    running: false,
+  };
+  const vl = state.data.vl;
+
+  const preview = vl.previewUrl ? (
+    vl.mediaType === 'application/pdf'
+      ? `<div class="text-[11px] text-[var(--text-dim)]">📄 PDF: ${vl.filename} (${Math.round((vl.base64.length*3/4)/1024)} KB)</div>`
+      : `<img src="${vl.previewUrl}" alt="preview" class="max-h-48 rounded border border-[var(--border)]">`
+  ) : `<div class="text-[11px] text-[var(--text-dim)]">${t('이미지 또는 PDF 를 선택하세요')}</div>`;
+
+  const resultCards = (vl.results && vl.results.results) ? vl.results.results.map(r => {
+    const head = r.ok
+      ? `<span class="text-[var(--ok)]">✓</span> ${r.model} · ${r.durationMs}ms`
+      : `<span class="text-[var(--danger)]">✗</span> ${r.model}`;
+    const body = r.ok ? (r.output || '(empty)') : (r.error || 'error');
+    const usage = r.usage ? `<div class="text-[10px] text-[var(--text-dim)] mt-1">in=${r.usage.input_tokens||0} · out=${r.usage.output_tokens||0}</div>` : '';
+    return `<div class="card p-3">
+      <div class="text-[11px] font-mono mb-1">${head}</div>
+      <pre class="text-[11px] whitespace-pre-wrap max-h-64 overflow-auto">${_escapeHTML(body)}</pre>
+      ${usage}
+    </div>`;
+  }).join('') : '';
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">👁️ ${t('Vision / PDF 실험실')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('이미지(PNG/JPG/WebP/GIF) 또는 PDF 를 올리고 같은 질문을 Opus / Sonnet / Haiku 3 모델에 병렬 전송 → 응답을 나란히 비교합니다.')}
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div class="space-y-3">
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('파일 선택')}</div>
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" onchange="vlLoadFile(event)">
+          <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('최대 10MB')}</div>
+          <div class="mt-3">${preview}</div>
+        </div>
+
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('질문')}</label>
+          <textarea class="input text-[12px]" rows="3" oninput="vlSet('question', this.value)">${_escapeHTML(vl.question || '')}</textarea>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary" onclick="vlRun()" ${vl.base64 && !vl.running ? '' : 'disabled'}>
+            ▶ ${vl.running ? t('실행 중…') : t('3 모델 병렬 실행')}
+          </button>
+          <button class="btn" onclick="vlReset()">${t('초기화')}</button>
+          <span id="vlStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('결과 요약')}</div>
+          ${vl.results ? `
+            <div class="text-[11px]">
+              <div>${t('총 소요')}: <span class="font-mono">${vl.results.totalDurationMs}ms</span></div>
+              <div>${t('모델 수')}: ${(vl.results.results||[]).length}</div>
+            </div>` : `<div class="text-[11px] text-[var(--text-dim)]">${t('아직 결과가 없습니다')}</div>`}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">${resultCards}</div>
+  `;
+};
+
+function vlSet(key, val) {
+  state.data.vl = state.data.vl || {};
+  state.data.vl[key] = val;
+}
+function vlReset() {
+  state.data.vl = null;
+  renderView();
+}
+async function vlLoadFile(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  if (f.size > 10 * 1024 * 1024) { toast(t('최대 10MB'), 'err'); return; }
+  const buf = await f.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  const b64 = btoa(bin);
+  const mt = f.type || 'application/octet-stream';
+  // 미리보기 URL (이미지만 blob URL; PDF 는 메타만)
+  let previewUrl = '';
+  if (mt.startsWith('image/')) {
+    previewUrl = 'data:' + mt + ';base64,' + b64;
+  }
+  state.data.vl = { ...(state.data.vl||{}), mediaType: mt, base64: b64, filename: f.name, previewUrl, results: null };
+  renderView();
+}
+async function vlRun() {
+  const vl = state.data.vl || {};
+  if (!vl.base64) { toast(t('파일을 먼저 선택하세요'), 'err'); return; }
+  if (!(vl.question||'').trim()) { toast(t('질문을 입력하세요'), 'err'); return; }
+  vlSet('running', true);
+  const st = document.getElementById('vlStatus');
+  if (st) st.textContent = t('3 모델 병렬 호출 중…');
+  try {
+    const r = await fetch('/api/vision-lab/compare', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ mediaType: vl.mediaType, base64: vl.base64, question: vl.question }),
+    }).then(x => x.json());
+    vlSet('running', false);
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent=''; renderView(); return; }
+    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (st) st.textContent=''; renderView(); return; }
+    vlSet('results', r);
+    if (st) st.textContent = `${r.totalDurationMs}ms`;
+    renderView();
+  } catch (e) {
+    vlSet('running', false);
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (st) st.textContent = '';
+    renderView();
   }
 }
 
