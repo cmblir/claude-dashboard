@@ -11,6 +11,15 @@
 
 ---
 
+## [2.1.2] — 2026-04-22
+
+### Docs — 퍼블릭 배포용 README 3종 전면 재작성 + LICENSE 추가
+- `README.md` / `README.ko.md` / `README.zh.md` 를 v2.1.1 통계 기준으로 동등 구조(305줄)로 재작성.
+- 신규 섹션: Why(전/후 비교 표) · Use Cases(5 시나리오) · Troubleshooting 표 · Quick Start 30초 · Data Stores 표 · Tech Stack · Contributing 7단계.
+- 통계 갱신: API 라우트 138 → **143**, i18n 2,893 → **2,932**, 서브에이전트 16 역할 프리셋·38 탭·18 튜토리얼·Rate Limiter 등 v2.1.x 신규 지표 반영.
+- 배지 추가: Python 3.10+ · License · Version · Zero Dependencies.
+- `LICENSE` 파일 신규 (MIT) — README 의 `./LICENSE` 링크가 404 였던 문제 수정.
+
 ## [2.1.1] — 2026-04-22
 
 ### Fixed — i18n 잔존 39건 전수 해소
