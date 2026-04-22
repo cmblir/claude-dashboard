@@ -30,7 +30,7 @@ from .utils import _safe_read, _safe_write
 
 _NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
                "http", "transform", "variable", "subworkflow", "embedding",
-               "loop", "retry", "error_handler"}
+               "loop", "retry", "error_handler", "merge", "delay"}
 _INPUT_MODES = {"concat", "first", "json"}
 _ASSIGNEES = {"opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
@@ -224,6 +224,18 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
         out["data"] = {
             "onError": d.get("onError") if d.get("onError") in ("skip", "default", "route") else "skip",
             "defaultOutput": _clamp_str(d.get("defaultOutput"), 4000),
+        }
+    elif ntype == "merge":
+        out["data"] = {
+            "mergeMode": d.get("mergeMode") if d.get("mergeMode") in ("all", "any", "count") else "all",
+            "requiredCount": max(1, min(20, int(d.get("requiredCount") or 1))),
+            "timeout": max(0, min(3600, int(d.get("timeout") or 300))),
+        }
+    elif ntype == "delay":
+        out["data"] = {
+            "delayMs": max(0, min(300000, int(d.get("delayMs") or 1000))),
+            "delayType": d.get("delayType") if d.get("delayType") in ("fixed", "random") else "fixed",
+            "maxDelayMs": max(0, min(300000, int(d.get("maxDelayMs") or 5000))),
         }
     # start 는 data 비움
     return out
@@ -579,6 +591,14 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     if ntype == "variable":
         return _execute_variable_node(data, inputs, _elapsed)
 
+    # ── Merge 노드 — 병렬 경로 합류 ──
+    if ntype == "merge":
+        return _execute_merge_node(data, inputs, _elapsed)
+
+    # ── Delay 노드 — 대기 후 통과 ──
+    if ntype == "delay":
+        return _execute_delay_node(data, inputs, _elapsed)
+
     # ── Loop 노드 — 반복 실행 ──
     if ntype == "loop":
         return _execute_loop_node(data, inputs, _elapsed)
@@ -797,6 +817,51 @@ def _execute_variable_node(data: dict, inputs: list[str], _elapsed) -> dict:
     value = inputs[0] if inputs else (data.get("defaultValue") or "")
     return {"status": "ok", "output": value, "durationMs": _elapsed(),
             "sessionId": "", "varName": var_name}
+
+
+def _execute_merge_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Merge 노드 — 여러 병렬 입력을 합류.
+
+    mergeMode:
+      - all: 모든 입력이 있어야 통과 (빈 입력 제외)
+      - any: 하나라도 있으면 통과
+      - count: requiredCount 개 이상이면 통과
+    """
+    mode = data.get("mergeMode", "all")
+    required = data.get("requiredCount", 1)
+    valid = [i for i in inputs if i.strip()]
+
+    if mode == "all" and len(valid) < len(inputs):
+        return {"status": "ok", "output": "", "durationMs": _elapsed(),
+                "sessionId": "", "mergeWaiting": True}
+    if mode == "count" and len(valid) < required:
+        return {"status": "ok", "output": "", "durationMs": _elapsed(),
+                "sessionId": "", "mergeWaiting": True}
+    if mode == "any" and not valid:
+        return {"status": "ok", "output": "", "durationMs": _elapsed(),
+                "sessionId": "", "mergeWaiting": True}
+
+    output = "\n---\n".join(valid)
+    return {"status": "ok", "output": output, "durationMs": _elapsed(),
+            "sessionId": "", "mergeCount": len(valid)}
+
+
+def _execute_delay_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Delay 노드 — 지정 시간 대기 후 입력을 그대로 통과."""
+    import random as _random
+    delay_ms = data.get("delayMs", 1000)
+    delay_type = data.get("delayType", "fixed")
+
+    if delay_type == "random":
+        max_ms = data.get("maxDelayMs", 5000)
+        actual_ms = _random.randint(delay_ms, max(delay_ms, max_ms))
+    else:
+        actual_ms = delay_ms
+
+    time.sleep(actual_ms / 1000.0)
+    output = inputs[0] if inputs else ""
+    return {"status": "ok", "output": output, "durationMs": _elapsed(),
+            "sessionId": "", "actualDelayMs": actual_ms}
 
 
 def _execute_loop_node(data: dict, inputs: list[str], _elapsed) -> dict:
@@ -1743,6 +1808,70 @@ def api_workflow_schedule_set(body: dict) -> dict:
         wf["updatedAt"] = int(time.time() * 1000)
         _dump_all(store)
     return {"ok": True, "id": wfId, "schedule": wf["schedule"]}
+
+
+def api_workflow_stats() -> dict:
+    """전체 워크플로우 실행 통계 집계."""
+    store = _load_all()
+    runs = store.get("runs", {})
+    total = len(runs)
+    ok_count = sum(1 for r in runs.values() if r.get("status") == "ok")
+    err_count = sum(1 for r in runs.values() if r.get("status") == "err")
+    running = sum(1 for r in runs.values() if r.get("status") == "running")
+
+    # 평균 소요 시간
+    durations = [
+        max(0, (r.get("finishedAt") or 0) - (r.get("startedAt") or 0))
+        for r in runs.values() if r.get("finishedAt") and r.get("startedAt")
+    ]
+    avg_dur = int(sum(durations) / len(durations)) if durations else 0
+
+    # 프로바이더별 사용 횟수 (nodeResults 에서)
+    from collections import Counter
+    provider_counter: Counter = Counter()
+    for r in runs.values():
+        for nid, nr in (r.get("nodeResults") or {}).items():
+            prov = nr.get("provider", "")
+            if prov:
+                provider_counter[prov] += 1
+
+    # 워크플로우별 성공률
+    wf_stats: dict = {}
+    for r in runs.values():
+        wfId = r.get("workflowId", "")
+        if not wfId:
+            continue
+        s = wf_stats.setdefault(wfId, {"ok": 0, "err": 0, "total": 0, "name": ""})
+        s["total"] += 1
+        if r.get("status") == "ok":
+            s["ok"] += 1
+        elif r.get("status") == "err":
+            s["err"] += 1
+    # 이름 매핑
+    for wfId, s in wf_stats.items():
+        wf = store["workflows"].get(wfId)
+        s["name"] = wf.get("name", "Untitled") if wf else wfId
+        s["successRate"] = round(s["ok"] / max(1, s["total"]) * 100, 1)
+
+    # 트리거별 카운트
+    trigger_counter: Counter = Counter()
+    for r in runs.values():
+        trigger_counter[r.get("trigger", "manual")] += 1
+
+    return {
+        "ok": True,
+        "totals": {
+            "runs": total, "ok": ok_count, "err": err_count, "running": running,
+            "successRate": round(ok_count / max(1, total) * 100, 1),
+            "avgDurationMs": avg_dur,
+        },
+        "byProvider": [{"provider": p, "count": n} for p, n in provider_counter.most_common(20)],
+        "byWorkflow": sorted(wf_stats.values(), key=lambda x: x["total"], reverse=True)[:20],
+        "byTrigger": [{"trigger": t, "count": n} for t, n in trigger_counter.most_common()],
+        "workflowCount": len(store["workflows"]),
+        "scheduleCount": sum(1 for wf in store["workflows"].values()
+                             if (wf.get("schedule") or {}).get("enabled")),
+    }
 
 
 def api_workflow_schedule_list() -> dict:
