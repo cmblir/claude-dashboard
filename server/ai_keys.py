@@ -431,3 +431,58 @@ def api_fallback_chain_save(body: dict) -> dict:
     """폴백 체인 저장. body: {chain: [...]}"""
     chain = (body or {}).get("chain", []) if isinstance(body, dict) else []
     return set_fallback_chain(chain)
+
+
+def api_workflow_costs_summary() -> dict:
+    """워크플로우 프로바이더별 비용 집계."""
+    from .db import _db, _db_init
+    from collections import defaultdict
+
+    _db_init()
+    with _db() as c:
+        # 전체 집계
+        totals = c.execute(
+            "SELECT COALESCE(SUM(tokens_in),0) AS ti, COALESCE(SUM(tokens_out),0) AS to_,"
+            " COALESCE(SUM(tokens_total),0) AS tt, COALESCE(SUM(cost_usd),0) AS cost,"
+            " COUNT(*) AS n FROM workflow_costs"
+        ).fetchone()
+
+        # 프로바이더별
+        by_provider = [dict(r) for r in c.execute(
+            "SELECT provider, model, COUNT(*) AS calls,"
+            " SUM(tokens_in) AS tokens_in, SUM(tokens_out) AS tokens_out,"
+            " SUM(tokens_total) AS tokens_total, SUM(cost_usd) AS cost_usd,"
+            " SUM(duration_ms) AS duration_ms"
+            " FROM workflow_costs GROUP BY provider, model"
+            " ORDER BY cost_usd DESC"
+        ).fetchall()]
+
+        # 최근 30일 일별
+        import time
+        thirty = int((time.time() - 30 * 86400) * 1000)
+        daily_rows = c.execute(
+            "SELECT ts, provider, tokens_total, cost_usd"
+            " FROM workflow_costs WHERE ts >= ?", (thirty,)
+        ).fetchall()
+
+    # 일자별 bucket
+    from datetime import datetime
+    daily: dict = defaultdict(lambda: {"calls": 0, "tokens": 0, "cost": 0.0})
+    for r in daily_rows:
+        if not r["ts"]:
+            continue
+        d = datetime.fromtimestamp(r["ts"] / 1000).strftime("%Y-%m-%d")
+        daily[d]["calls"] += 1
+        daily[d]["tokens"] += r["tokens_total"] or 0
+        daily[d]["cost"] += r["cost_usd"] or 0
+    timeline = [{"date": d, **v} for d, v in sorted(daily.items())][-30:]
+
+    return {
+        "totals": {
+            "tokensIn": totals["ti"], "tokensOut": totals["to_"],
+            "tokensTotal": totals["tt"], "costUsd": round(totals["cost"], 4),
+            "calls": totals["n"],
+        },
+        "byProvider": by_provider,
+        "timeline": timeline,
+    }

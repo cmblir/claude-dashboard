@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .config import WORKFLOWS_PATH
+from .db import _db, _db_init
 from .logger import log
 from .utils import _safe_read, _safe_write
 
@@ -28,7 +29,7 @@ from .utils import _safe_read, _safe_write
 # ───────── 상수 ─────────
 
 _NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
-               "http", "transform", "variable"}
+               "http", "transform", "variable", "subworkflow"}
 _INPUT_MODES = {"concat", "first", "json"}
 _ASSIGNEES = {"opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
@@ -192,6 +193,11 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
         out["data"] = {
             "varName": _clamp_str(d.get("varName"), 60) or "var",
             "defaultValue": _clamp_str(d.get("defaultValue"), 4000),
+        }
+    elif ntype == "subworkflow":
+        out["data"] = {
+            "workflowId": _clamp_str(d.get("workflowId"), 60),
+            "passInput": bool(d.get("passInput", True)),
         }
     # start 는 data 비움
     return out
@@ -547,6 +553,10 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     if ntype == "variable":
         return _execute_variable_node(data, inputs, _elapsed)
 
+    # ── Sub-workflow 노드 — 다른 워크플로우 호출 ──
+    if ntype == "subworkflow":
+        return _execute_subworkflow_node(data, inputs, _elapsed)
+
     # ── session / subagent — 멀티 프로바이더 실행 ──
     prompt_parts = []
     if data.get("subject"):
@@ -743,6 +753,68 @@ def _execute_variable_node(data: dict, inputs: list[str], _elapsed) -> dict:
             "sessionId": "", "varName": var_name}
 
 
+def _execute_subworkflow_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Sub-workflow 노드 — 다른 워크플로우를 동기 실행하고 결과를 반환.
+
+    data.workflowId : 실행할 워크플로우 ID
+    data.passInput  : True 이면 이전 노드 출력을 start 노드에 주입
+    """
+    wf_id = (data.get("workflowId") or "").strip()
+    if not wf_id:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": "workflowId required", "sessionId": ""}
+
+    store = _load_all()
+    sub_wf = store["workflows"].get(wf_id)
+    if not sub_wf:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"workflow not found: {wf_id}", "sessionId": ""}
+
+    cyc = _check_dag(sub_wf.get("nodes", []), sub_wf.get("edges", []))
+    if cyc:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"sub-workflow has cycle: {cyc[0]}", "sessionId": ""}
+
+    # 입력을 start 노드의 다음 노드에 피드백으로 전달
+    extra_inputs = {}
+    if data.get("passInput", True) and inputs:
+        target_nid = _find_feedback_target(
+            sub_wf.get("nodes", []), sub_wf.get("edges", []))
+        if target_nid:
+            extra_inputs[target_nid] = "\n---\n".join(inputs)
+
+    # 동기 실행 (별도 runId 없이 inline)
+    sub_run_id = _new_run_id()
+    with _LOCK:
+        store = _load_all()
+        store["runs"][sub_run_id] = {
+            "id": sub_run_id, "workflowId": wf_id,
+            "status": "running", "startedAt": int(time.time() * 1000),
+            "finishedAt": 0, "currentNodeId": None,
+            "nodeResults": {}, "iteration": 0, "error": None,
+            "isSubworkflow": True,
+        }
+        _dump_all(store)
+
+    ok, _results, final_out = _run_one_iteration(
+        sub_wf, sub_run_id, 0, extra_inputs)
+
+    # 완료 기록
+    with _LOCK:
+        store = _load_all()
+        if sub_run_id in store["runs"]:
+            store["runs"][sub_run_id]["status"] = "ok" if ok else "err"
+            store["runs"][sub_run_id]["finishedAt"] = int(time.time() * 1000)
+            _dump_all(store)
+
+    if not ok:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"sub-workflow failed", "sessionId": ""}
+
+    return {"status": "ok", "output": final_out, "durationMs": _elapsed(),
+            "sessionId": "", "subRunId": sub_run_id}
+
+
 def _parse_hhmm(s: str) -> Optional[tuple[int, int]]:
     m = _TIME_RE.match(s or "")
     return (int(m.group(1)), int(m.group(2))) if m else None
@@ -783,6 +855,33 @@ def _find_feedback_target(nodes: list[dict], edges: list[dict]) -> str:
 
 
 _MAX_PARALLEL_WORKERS = int(os.environ.get("WORKFLOW_MAX_PARALLEL", "4"))
+
+
+def _record_workflow_cost(run_id: str, workflow_id: str, node_id: str, res: dict) -> None:
+    """워크플로우 노드 실행 비용을 DB에 기록."""
+    provider = res.get("provider", "")
+    model = res.get("model", "")
+    if not provider and not model:
+        return  # start/aggregate/branch 등 AI 호출 없는 노드는 스킵
+    try:
+        _db_init()
+        with _db() as c:
+            c.execute(
+                """INSERT INTO workflow_costs
+                   (run_id, workflow_id, node_id, provider, model,
+                    tokens_in, tokens_out, tokens_total, cost_usd,
+                    duration_ms, ts, status)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (run_id, workflow_id, node_id, provider, model,
+                 res.get("tokensIn", 0), res.get("tokensOut", 0),
+                 res.get("tokensIn", 0) + res.get("tokensOut", 0),
+                 res.get("costUsd", 0.0),
+                 res.get("durationMs", 0),
+                 int(time.time() * 1000),
+                 res.get("status", "ok")),
+            )
+    except Exception as e:
+        log.warning("workflow cost record failed: %s", e)
 
 
 def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
@@ -949,6 +1048,9 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                             "model": res.get("model", ""),
                         }
                         _dump_all(s)
+                # 비용 추적 DB 기록
+                _record_workflow_cost(
+                    runId, wf.get("id", ""), nid, res)
 
         if had_error:
             return (False, results, "")
@@ -1094,6 +1196,70 @@ def api_workflow_run_status(query: dict) -> dict:
     if not (isinstance(rid, str) and _RUN_ID_RE.match(rid)):
         return {"ok": False, "error": "invalid runId"}
     return _run_status_snapshot(rid)
+
+
+def handle_workflow_run_stream(handler, query: dict) -> None:
+    """GET /api/workflows/run-stream?runId=... — SSE 로 실행 상태를 실시간 스트림.
+
+    1초 간격으로 run 상태를 폴링하여 변경 사항을 SSE 로 전송.
+    run 이 완료(ok/err)되면 done 이벤트 후 연결 종료.
+    """
+    rid = None
+    if isinstance(query, dict):
+        v = query.get("runId")
+        if isinstance(v, list) and v:
+            rid = v[0]
+        elif isinstance(v, str):
+            rid = v
+
+    if not (isinstance(rid, str) and _RUN_ID_RE.match(rid)):
+        handler.send_response(400)
+        handler.send_header("Content-Type", "text/plain")
+        handler.end_headers()
+        handler.wfile.write(b"invalid runId")
+        return
+
+    # SSE 헤더
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
+    handler.send_header("Cache-Control", "no-cache")
+    handler.send_header("Connection", "keep-alive")
+    handler.send_header("X-Accel-Buffering", "no")
+    handler.end_headers()
+
+    def _sse(event: str, data: str) -> bool:
+        chunk = f"event: {event}\ndata: {data}\n\n"
+        try:
+            handler.wfile.write(chunk.encode("utf-8"))
+            handler.wfile.flush()
+            return True
+        except Exception:
+            return False
+
+    prev_snapshot = ""
+    max_polls = 1800  # 최대 30분 (1초 × 1800)
+
+    for _ in range(max_polls):
+        snap = _run_status_snapshot(rid)
+        snap_json = json.dumps(snap, ensure_ascii=False)
+
+        # 변경 있을 때만 전송 (대역폭 절약)
+        if snap_json != prev_snapshot:
+            if not _sse("status", snap_json):
+                return  # 클라이언트 연결 끊김
+            prev_snapshot = snap_json
+
+        # 완료 체크
+        run = snap.get("run") or {}
+        status = run.get("status", "")
+        if status in ("ok", "err"):
+            _sse("done", snap_json)
+            return
+
+        time.sleep(1)
+
+    # 타임아웃
+    _sse("timeout", json.dumps({"error": "stream timeout"}))
 
 
 _TPL_ID_RE = re.compile(r"^tpl-[0-9]{10,14}-[a-z0-9]{3,6}$")

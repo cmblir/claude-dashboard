@@ -1431,12 +1431,67 @@ const WF_NODE_TYPES = [
     desc: '조건에 따라 Y / N 두 포트 중 하나만 활성화. 조건 문자열이 입력에 포함되면 Y, 아니면 N 으로 흐름이 분기.' },
   { id: 'output',    icon: '📤', label: '결과', portIn: true,  portOut: false,
     desc: '워크플로우의 종착지. 이전 노드의 출력을 최종 결과로 저장. exportTo 에 경로(~/ 하위) 지정 시 파일로 저장됨.' },
+  { id: 'http',      icon: '🌐', label: 'HTTP 요청', portIn: true, portOut: true,
+    desc: '외부 REST API 호출. GET/POST/PUT + 헤더 + 응답 JSON 경로 추출. {{input}} 플레이스홀더로 이전 노드 출력 주입.' },
+  { id: 'transform', icon: '🔄', label: '변환', portIn: true, portOut: true,
+    desc: '텍스트/JSON 변환. 템플릿 치환 · JSON 경로 추출 · regex 치환 · 결합. 코드 실행 없이 데이터 가공.' },
+  { id: 'variable',  icon: '📌', label: '변수', portIn: true, portOut: true,
+    desc: '입력 값을 변수 이름에 바인딩. 후속 노드에서 참조. 기본값 설정 가능.' },
+  { id: 'subworkflow', icon: '🔁', label: '서브 워크플로우', portIn: true, portOut: true,
+    desc: '다른 워크플로우를 호출하고 결과를 받는 노드. 워크플로우 재사용 가능.' },
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
+
+// ── 멀티 AI 프로바이더 셀렉터 캐시 ──
+let __wfProviders = null; // {providers:[{id,name,icon,type,available,models:[]}]}
+async function _wfLoadProviders() {
+  if (__wfProviders) return __wfProviders;
+  try { __wfProviders = await api('/api/ai-providers/list'); } catch(e) { __wfProviders = {providers:[]}; }
+  return __wfProviders;
+}
+function _wfAssigneeOptions(selectedValue) {
+  const p = __wfProviders || {providers:[]};
+  const groups = {};
+  for (const prov of p.providers) {
+    if (!prov.available || !prov.models?.length) continue;
+    const gLabel = prov.icon + ' ' + prov.name;
+    groups[gLabel] = (groups[gLabel]||[]);
+    for (const m of prov.models) {
+      const val = prov.id === 'claude-cli'
+        ? (m.id.replace('claude-','').replace('-4-7','4.7').replace('-4-6','4.6').replace('-4-5','4.5').replace('opus','opus-').replace('sonnet','sonnet-').replace('haiku','haiku-').replace('--','-'))
+        : (prov.id.replace('-cli','').replace('-api','') + ':' + m.id);
+      // Claude CLI alias 정리
+      const displayVal = prov.id === 'claude-cli' ? m.id : val;
+      groups[gLabel].push({ value: val, label: m.label || m.id, note: m.note || '' });
+    }
+  }
+  // Claude 기본 3개는 항상 포함 (프로바이더 로드 전 fallback)
+  if (!Object.keys(groups).length) {
+    return ['opus-4.7','sonnet-4.6','haiku-4.5'].map(m =>
+      `<option value="${m}" ${selectedValue===m?'selected':''}>${m}</option>`
+    ).join('');
+  }
+  let html = '';
+  const isCustom = selectedValue && !Object.values(groups).flat().some(o => o.value === selectedValue);
+  for (const [gLabel, opts] of Object.entries(groups)) {
+    html += `<optgroup label="${escapeHtml(gLabel)}">`;
+    for (const o of opts) {
+      const sel = o.value === selectedValue ? 'selected' : '';
+      html += `<option value="${escapeHtml(o.value)}" ${sel}>${escapeHtml(o.label)}${o.note?' — '+escapeHtml(o.note):''}</option>`;
+    }
+    html += '</optgroup>';
+  }
+  // 자유 입력값이 목록에 없으면 표시 유지
+  if (isCustom && selectedValue) {
+    html += `<option value="${escapeHtml(selectedValue)}" selected>${escapeHtml(selectedValue)} (custom)</option>`;
+  }
+  html += `<optgroup label="⌨️ 직접 입력"><option value="__custom__">직접 입력...</option></optgroup>`;
+  return html;
+}
 const WF_NODE_W = 180, WF_NODE_H = 64;
 
 VIEWS.workflows = async () => {
-  const r = await api('/api/workflows/list');
+  const [r] = await Promise.all([api('/api/workflows/list'), _wfLoadProviders()]);
   __wf.workflows = (r && r.workflows) || [];
   // current 유지 (현재 선택된 워크플로우가 삭제되지 않았으면)
   if (__wf.current && !__wf.workflows.find(w => w.id === __wf.current.id)) {
@@ -1913,6 +1968,10 @@ function _wfAddNode(type) {
   } else if (type === 'branch') newNode.data = { condition: '' };
   else if (type === 'aggregate') newNode.data = { mode: 'concat' };
   else if (type === 'output') newNode.data = { exportTo: '' };
+  else if (type === 'http') newNode.data = { url:'', method:'GET', headers:{}, body:'', extractPath:'' };
+  else if (type === 'transform') newNode.data = { transformType:'template', template:'{{input}}', jsonPath:'', regexPattern:'', regexReplacement:'', separator:'\\n' };
+  else if (type === 'variable') newNode.data = { varName:'var1', defaultValue:'' };
+  else if (type === 'subworkflow') newNode.data = { workflowId:'', passInput:true };
   __wf.current.nodes.push(newNode);
   __wf.selectedNodeId = nid;
   __wf.dirty = true;
@@ -2391,6 +2450,10 @@ function _wfPickNodeType(winId, type) {
   } else if (type === 'branch')    draft.data = { condition:'' };
   else if (type === 'aggregate') draft.data = { mode:'concat' };
   else if (type === 'output')    draft.data = { exportTo:'' };
+  else if (type === 'http')      draft.data = { url:'', method:'GET', headers:{}, body:'', extractPath:'' };
+  else if (type === 'transform') draft.data = { transformType:'template', template:'{{input}}', jsonPath:'', regexPattern:'', regexReplacement:'', separator:'\\n' };
+  else if (type === 'variable')  draft.data = { varName:'var1', defaultValue:'' };
+  else if (type === 'subworkflow') draft.data = { workflowId:'', passInput:true };
   else draft.data = {};
   if (!draft.title) draft.title = WF_TYPE_MAP[type].label;
   _wfRenderEditorBody(winId);
@@ -2462,9 +2525,9 @@ function _wfRenderEditorBody(winId) {
       <input class="input w-full mt-1" value="${escapeHtml(d.subject||'')}" oninput="_wfDraftSetData('${winId}','subject',this.value)" placeholder="${t('이 세션이 수행할 업무 한 줄')}">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('설명 (description)')}</label>
       <textarea class="input w-full mt-1" rows="4" oninput="_wfDraftSetData('${winId}','description',this.value)" placeholder="${t('상세 지시·제약·출력 형식')}">${escapeHtml(d.description||'')}</textarea>
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('모델')}</label>
-      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','assignee',this.value)">
-        ${['opus-4.7','sonnet-4.6','haiku-4.5'].map(m => `<option value="${m}" ${d.assignee===m?'selected':''}>${m}</option>`).join('')}
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('AI 프로바이더 : 모델')}</label>
+      <select class="input w-full mt-1" onchange="if(this.value==='__custom__'){const v=prompt('provider:model 입력 (예: openai:gpt-4.1)');if(v){_wfDraftSetData('${winId}','assignee',v);this.value=v;}else{this.value='${escapeHtml(d.assignee||'sonnet-4.6')}';}}else{_wfDraftSetData('${winId}','assignee',this.value);}">
+        ${_wfAssigneeOptions(d.assignee||'sonnet-4.6')}
       </select>
       ${draft.type === 'subagent' ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('에이전트 역할')}</label>
@@ -2539,6 +2602,68 @@ function _wfRenderEditorBody(winId) {
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('파일로 저장 (선택, ~/ 하위만)')}</label>
       <input class="input w-full mt-1" value="${escapeHtml(d.exportTo||'')}" oninput="_wfDraftSetData('${winId}','exportTo',this.value)" placeholder="~/workflow-output.md">
     `;
+  } else if (draft.type === 'http') {
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('URL')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.url||'')}" oninput="_wfDraftSetData('${winId}','url',this.value)" placeholder="https://api.example.com/data">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('HTTP 메서드')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','method',this.value)">
+        ${['GET','POST','PUT','PATCH','DELETE'].map(m => `<option value="${m}" ${d.method===m?'selected':''}>${m}</option>`).join('')}
+      </select>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('요청 Body (POST/PUT 전용, {{input}} 치환)')}</label>
+      <textarea class="input w-full mt-1" rows="3" oninput="_wfDraftSetData('${winId}','body',this.value)" placeholder='{"query": "{{input}}"}'>${escapeHtml(d.body||'')}</textarea>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('응답 추출 경로 (JSON dot path, 비우면 전체)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.extractPath||'')}" oninput="_wfDraftSetData('${winId}','extractPath',this.value)" placeholder="data.result">
+    `;
+  } else if (draft.type === 'transform') {
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('변환 유형')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','transformType',this.value)">
+        <option value="template" ${d.transformType==='template'?'selected':''}>${t('템플릿 치환')}</option>
+        <option value="json_extract" ${d.transformType==='json_extract'?'selected':''}>${t('JSON 경로 추출')}</option>
+        <option value="regex" ${d.transformType==='regex'?'selected':''}>${t('Regex 치환')}</option>
+        <option value="concat" ${d.transformType==='concat'?'selected':''}>${t('입력 결합')}</option>
+      </select>
+      ${d.transformType === 'template' || !d.transformType ? `
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('템플릿 ({{input}} 로 이전 출력 참조)')}</label>
+        <textarea class="input w-full mt-1" rows="3" oninput="_wfDraftSetData('${winId}','template',this.value)" placeholder="요약: {{input}}">${escapeHtml(d.template||'{{input}}')}</textarea>
+      ` : ''}
+      ${d.transformType === 'json_extract' ? `
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('JSON 경로 (dot 구분)')}</label>
+        <input class="input w-full mt-1" value="${escapeHtml(d.jsonPath||'')}" oninput="_wfDraftSetData('${winId}','jsonPath',this.value)" placeholder="data.items.0.name">
+      ` : ''}
+      ${d.transformType === 'regex' ? `
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('정규식 패턴')}</label>
+        <input class="input w-full mt-1" value="${escapeHtml(d.regexPattern||'')}" oninput="_wfDraftSetData('${winId}','regexPattern',this.value)" placeholder="\\d+">
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('치환 문자열')}</label>
+        <input class="input w-full mt-1" value="${escapeHtml(d.regexReplacement||'')}" oninput="_wfDraftSetData('${winId}','regexReplacement',this.value)" placeholder="[숫자]">
+      ` : ''}
+      ${d.transformType === 'concat' ? `
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('구분자')}</label>
+        <input class="input w-full mt-1" value="${escapeHtml(d.separator||'\\n')}" oninput="_wfDraftSetData('${winId}','separator',this.value)" placeholder="\\n">
+      ` : ''}
+    `;
+  } else if (draft.type === 'variable') {
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('변수 이름')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.varName||'')}" oninput="_wfDraftSetData('${winId}','varName',this.value)" placeholder="result_text">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('기본값 (입력 없을 때)')}</label>
+      <textarea class="input w-full mt-1" rows="2" oninput="_wfDraftSetData('${winId}','defaultValue',this.value)" placeholder="">${escapeHtml(d.defaultValue||'')}</textarea>
+    `;
+  } else if (draft.type === 'subworkflow') {
+    const wfOpts = __wf.workflows.filter(w => __wf.current && w.id !== __wf.current.id)
+      .map(w => `<option value="${escapeHtml(w.id)}" ${d.workflowId===w.id?'selected':''}>${escapeHtml(w.name)} (${w.nodeCount} nodes)</option>`).join('');
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('호출할 워크플로우')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','workflowId',this.value)">
+        <option value="">${t('선택...')}</option>
+        ${wfOpts}
+      </select>
+      <label class="flex items-center gap-2 mt-3 text-xs" style="color:var(--text-mute)">
+        <input type="checkbox" ${d.passInput!==false?'checked':''} onchange="_wfDraftSetData('${winId}','passInput',this.checked)">
+        ${t('이전 노드 출력을 입력으로 전달')}
+      </label>
+    `;
   } else if (draft.type === 'start') {
     body += `<div class="text-xs text-[var(--text-dim)] mt-4">${t('시작 노드는 추가 입력이 없습니다. 워크플로우 진입점이 됩니다.')}</div>`;
   }
@@ -2603,9 +2728,9 @@ function _wfInspectorBody(n) {
       <input class="input w-full mt-1" value="${escapeHtml(d.subject||'')}" oninput="_wfNodeSetData('${n.id}','subject',this.value)" placeholder="${t('이 세션이 수행할 업무 한 줄')}">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('설명 (description)')}</label>
       <textarea class="input w-full mt-1" rows="4" oninput="_wfNodeSetData('${n.id}','description',this.value)" placeholder="${t('상세 지시·제약·출력 형식')}">${escapeHtml(d.description||'')}</textarea>
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('모델')}</label>
-      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','assignee',this.value)">
-        ${['opus-4.7','sonnet-4.6','haiku-4.5'].map(m => `<option value="${m}" ${d.assignee===m?'selected':''}>${m}</option>`).join('')}
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('AI 프로바이더 : 모델')}</label>
+      <select class="input w-full mt-1" onchange="if(this.value==='__custom__'){const v=prompt('provider:model 입력 (예: openai:gpt-4.1)');if(v){_wfNodeSetData('${n.id}','assignee',v);}else{this.value='${escapeHtml(d.assignee||'sonnet-4.6')}';}}else{_wfNodeSetData('${n.id}','assignee',this.value);}">
+        ${_wfAssigneeOptions(d.assignee||'sonnet-4.6')}
       </select>
       ${n.type==='subagent' ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('에이전트 역할')}</label>

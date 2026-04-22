@@ -46,12 +46,13 @@ from .workflows import (
     api_workflow_run_status, api_workflow_runs_list, api_workflow_save,
     api_workflow_template_delete, api_workflow_template_get,
     api_workflow_template_save, api_workflow_templates_list,
-    api_workflows_list,
+    api_workflows_list, handle_workflow_run_stream,
 )
 from .ai_keys import (
     api_providers_list, api_provider_test, api_provider_save_key,
     api_provider_delete_key, api_custom_provider_save,
     api_custom_provider_delete, api_fallback_chain_save,
+    api_workflow_costs_summary,
 )
 from .logger import log
 from .mcp import (
@@ -152,6 +153,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/templates/list": lambda q: api_workflow_templates_list(q),
     "/api/version": lambda q: api_version_info(),
     "/api/ai-providers/list": lambda q: api_providers_list(),
+    "/api/ai-providers/costs": lambda q: api_workflow_costs_summary(),
 }
 
 
@@ -315,6 +317,10 @@ class Handler(BaseHTTPRequestHandler):
         m = re.match(r"^/api/locales/([a-z]{2})\.json$", path)
         if m:
             self._send_locale(m.group(1))
+            return
+        # SSE 스트림 엔드포인트 — 일반 JSON 이 아닌 text/event-stream
+        if path == "/api/workflows/run-stream":
+            handle_workflow_run_stream(self, query)
             return
         if path in ROUTES_GET:
             try:
