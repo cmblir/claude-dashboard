@@ -461,6 +461,15 @@ for _k, _v in _NEW_EN_9.items():
 for _k, _v in _NEW_ZH_9.items():
     MANUAL_ZH.setdefault(_k, _v)
 
+# extractor 오탐(코드/주석)이 초기 MANUAL_EN/ZH 에 한글 원문으로 등록돼 있는 경우 덮어쓰기
+_EXTRACTOR_NOISE_OVERRIDES = {
+    # origin 이 사용하던 클린 표기(유니코드 이스케이프)로 맞춤 — en.json 에 한글 잔존 0 유지
+    "const _KO_RE = /[가-힣]/": ("const _KO_RE = /[\\uAC00-\\uD7A3]/", "const _KO_RE = /[\\uAC00-\\uD7A3]/"),
+}
+for _k, (_en, _zh) in _EXTRACTOR_NOISE_OVERRIDES.items():
+    MANUAL_EN[_k] = _en
+    MANUAL_ZH[_k] = _zh
+
 # ── 번역 검수 권장 항목 ──
 # 2026-04-21: 이전 9 항목 모두 확정 — 긴 안내 문구만 자연스러운 현지어로 재작성.
 # 향후 브랜드/금융 전문용어 등 외부 결정이 필요한 항목이 생기면 여기 등록.

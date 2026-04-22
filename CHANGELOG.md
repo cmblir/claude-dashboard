@@ -11,6 +11,13 @@
 
 ---
 
+## [2.1.1] — 2026-04-22
+
+### Fixed — i18n 잔존 39건 전수 해소
+- v2.1.0 신규 기능(HTTP/transform/variable/subworkflow/embedding/loop/retry/error_handler/merge/delay 노드 설명, AI 프로바이더 UI, Modelfile 편집 등)에서 누락됐던 **UI 문구 39개** 를 `translations_manual_9.py::NEW_EN`/`NEW_ZH` 에 등록.
+- `tools/translations_manual.py` 에 `_EXTRACTOR_NOISE_OVERRIDES` 추가 — `const _KO_RE = /[가-힣]/` 같이 기존 MANUAL_EN 에 한글 원문으로 고정돼 있던 JS 리터럴을 유니코드 이스케이프(`가-힣`)로 override.
+- 결과: **ko/en/zh 각 2,932 키 · 누락 0 · 영문/중문 한글 잔존 0** (origin 대비 값 회귀 0건).
+
 ## [2.1.0] — 2026-04-22
 
 ### 🎯 v2.1 — 미구현 23개 항목 전면 완료

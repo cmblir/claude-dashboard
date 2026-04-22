@@ -352,6 +352,66 @@ NEW_EN = {
     "입력": "Input",
     "확인": "Confirm",
     "취소": "Cancel",
+
+    # v2.1 신규: AI 프로바이더 / 멀티 AI
+    "AI 프로바이더": "AI providers",
+    "API 키 삭제 완료": "API key deleted",
+    "Claude · GPT · Gemini · Ollama · Codex 등 멀티 AI 프로바이더 관리":
+        "Manage multi-AI providers (Claude · GPT · Gemini · Ollama · Codex)",
+    "Claude/GPT/Gemini/Ollama/Codex 멀티 AI — API 키 · CLI 감지 · 폴백 체인 · 연결 테스트":
+        "Multi-AI (Claude/GPT/Gemini/Ollama/Codex) — API keys · CLI detect · fallback chain · connection test",
+    "🖥️ CLI 프로바이더 (로컬)": "🖥️ CLI providers (local)",
+    "⌨️ 직접 입력": "⌨️ Manual entry",
+    "환경 변수(OPENAI_API_KEY 등)가 이미 설정되어 있으면 자동 감지됩니다. 여기서 추가로 설정할 수 있습니다.":
+        "Environment variables (e.g., OPENAI_API_KEY) are auto-detected. You can also configure them here.",
+    "노드의 Assignee 를 claude:opus, openai:gpt-4.1, ollama:qwen2.5 등으로 지정하면 각 노드가 다른 AI 로 실행됩니다":
+        "Set each node's Assignee to claude:opus, openai:gpt-4.1, ollama:qwen2.5, etc. and every node will run on a different AI",
+    "같은 프롬프트를 병렬로 3개 AI 에 보내고 결과를 합치는 멀티 AI 비교 워크플로우.":
+        "A multi-AI comparison workflow that sends the same prompt to 3 AIs in parallel and merges the results.",
+
+    # v2.1 신규: 신규 노드 타입 (http/transform/variable/subworkflow/embedding/loop/retry/error_handler/merge/delay)
+    "HTTP 요청": "HTTP request",
+    "외부 REST API 호출. GET/POST/PUT + 헤더 + 응답 JSON 경로 추출.":
+        "Call an external REST API. GET/POST/PUT + headers + JSON path extraction on the response.",
+    "요청 Body (POST/PUT 전용": "Request Body (POST/PUT only",
+    "텍스트/JSON 변환. 템플릿 치환 · JSON 경로 추출 · regex 치환 · 결합. 코드 실행 없이 데이터 가공.":
+        "Text/JSON transform. Template substitution · JSON path extraction · regex replace · concatenation. Shape data without executing code.",
+    "입력 값을 변수 이름에 바인딩. 후속 노드에서 참조. 기본값 설정 가능.":
+        "Bind the input to a variable name for downstream nodes to reference. Default value supported.",
+    "다른 워크플로우를 호출하고 결과를 받는 노드. 워크플로우 재사용 가능.":
+        "A node that invokes another workflow and returns its result. Enables workflow reuse.",
+    "텍스트를 벡터로 변환. Ollama bge-m3, OpenAI text-embedding-3 등 임베딩 모델 사용. RAG/검색 파이프라인 구축용.":
+        "Convert text to vectors via embedding models (Ollama bge-m3, OpenAI text-embedding-3, etc.). For building RAG/search pipelines.",
+    "JSON (벡터 포함)": "JSON (with vector)",
+    "루프": "Loop",
+    "반복 처리 노드. for_each(리스트 순회) · count(횟수 반복) · while(조건 반복) 모드 지원. 입력을 분할하여 각 항목에 동일 흐름을 적용.":
+        "Iteration node. Supports for_each (iterate list) · count (fixed reps) · while (condition). Splits input to apply the same flow to every item.",
+    "실패 시 자동 재시도. 최대 재시도 횟수 · 백오프 간격 · 배수를 설정하여 일시적 오류를 자동 복구.":
+        "Auto-retry on failure. Configure max attempts · backoff interval · multiplier to recover from transient errors.",
+    "에러 처리 전략 노드. skip(무시) · default(기본값 반환) · route(다른 노드로 분기) 모드로 워크플로우 안정성 확보.":
+        "Error-handling strategy node. Use skip (ignore) · default (fallback value) · route (branch to another node) to harden workflow stability.",
+    "여러 병렬 경로를 합류. all/any/count 모드": "Merge parallel paths. Modes: all/any/count",
+    "딜레이": "Delay",
+    "지정 시간 대기 후 통과. 고정/랜덤 딜레이": "Wait a specified time, then pass through. Fixed or random delay.",
+
+    # v2.1 신규: 기타 UI
+    "채팅 전송": "Send chat",
+    "사이드바 열기/닫기": "Toggle sidebar",
+    "설정 메뉴 열기": "Open settings menu",
+    "개발": "Dev",
+    "커스텀": "Custom",
+    "패턴": "Pattern",
+    "템플릿 (": "Template (",
+    "플레이스홀더로 이전 노드 출력 주입.": "Inject previous node output via placeholders.",
+    "로 이전 출력 참조)": " to reference previous output)",
+    "치환)": "substitution)",
+    "✓ 성공 (": "✓ Success (",
+    "[숫자]": "[number]",
+
+    # extractor false positives (code/comments) — map to English-only text to keep en.json Korean-free
+    ").replace(/[^a-zA-Z0-9가-힣_-]/g": ").replace(/[^a-zA-Z0-9_-]/g",
+    "/* 비용 API 미지원 시 조용히 무시 */": "/* silently ignored when cost API is unsupported */",
+    "const _KO_RE = /[가-힣]/": "const _KO_RE = /<korean-range>/",
 }
 
 NEW_ZH = {
@@ -700,4 +760,64 @@ NEW_ZH = {
     "입력": "输入",
     "확인": "确认",
     "취소": "取消",
+
+    # v2.1 신규: AI 프로바이더 / 멀티 AI
+    "AI 프로바이더": "AI 提供商",
+    "API 키 삭제 완료": "API 密钥已删除",
+    "Claude · GPT · Gemini · Ollama · Codex 등 멀티 AI 프로바이더 관리":
+        "管理多 AI 提供商（Claude · GPT · Gemini · Ollama · Codex）",
+    "Claude/GPT/Gemini/Ollama/Codex 멀티 AI — API 키 · CLI 감지 · 폴백 체인 · 연결 테스트":
+        "多 AI（Claude/GPT/Gemini/Ollama/Codex）— API 密钥 · CLI 检测 · 回退链 · 连接测试",
+    "🖥️ CLI 프로바이더 (로컬)": "🖥️ CLI 提供商（本地）",
+    "⌨️ 직접 입력": "⌨️ 手动输入",
+    "환경 변수(OPENAI_API_KEY 등)가 이미 설정되어 있으면 자동 감지됩니다. 여기서 추가로 설정할 수 있습니다.":
+        "已设置的环境变量（如 OPENAI_API_KEY）会自动检测，也可以在此处额外设置。",
+    "노드의 Assignee 를 claude:opus, openai:gpt-4.1, ollama:qwen2.5 등으로 지정하면 각 노드가 다른 AI 로 실행됩니다":
+        "将节点的 Assignee 指定为 claude:opus、openai:gpt-4.1、ollama:qwen2.5 等，每个节点就会在不同的 AI 上运行",
+    "같은 프롬프트를 병렬로 3개 AI 에 보내고 결과를 합치는 멀티 AI 비교 워크플로우.":
+        "将同一提示并行发送到 3 个 AI 并合并结果的多 AI 比较工作流。",
+
+    # v2.1 신규: 신규 노드 타입
+    "HTTP 요청": "HTTP 请求",
+    "외부 REST API 호출. GET/POST/PUT + 헤더 + 응답 JSON 경로 추출.":
+        "调用外部 REST API。GET/POST/PUT + 请求头 + 响应 JSON 路径提取。",
+    "요청 Body (POST/PUT 전용": "请求 Body（仅 POST/PUT",
+    "텍스트/JSON 변환. 템플릿 치환 · JSON 경로 추출 · regex 치환 · 결합. 코드 실행 없이 데이터 가공.":
+        "文本/JSON 转换。模板替换 · JSON 路径提取 · 正则替换 · 合并。无需执行代码即可处理数据。",
+    "입력 값을 변수 이름에 바인딩. 후속 노드에서 참조. 기본값 설정 가능.":
+        "将输入值绑定到变量名，供后续节点引用。支持设置默认值。",
+    "다른 워크플로우를 호출하고 결과를 받는 노드. 워크플로우 재사용 가능.":
+        "调用其他工作流并接收结果的节点，支持工作流复用。",
+    "텍스트를 벡터로 변환. Ollama bge-m3, OpenAI text-embedding-3 등 임베딩 모델 사용. RAG/검색 파이프라인 구축용.":
+        "使用嵌入模型（Ollama bge-m3、OpenAI text-embedding-3 等）将文本转换为向量。用于构建 RAG/检索流水线。",
+    "JSON (벡터 포함)": "JSON（含向量）",
+    "루프": "循环",
+    "반복 처리 노드. for_each(리스트 순회) · count(횟수 반복) · while(조건 반복) 모드 지원. 입력을 분할하여 각 항목에 동일 흐름을 적용.":
+        "迭代节点。支持 for_each（遍历列表）· count（按次数重复）· while（按条件循环）。拆分输入以对每个元素应用相同流程。",
+    "실패 시 자동 재시도. 최대 재시도 횟수 · 백오프 간격 · 배수를 설정하여 일시적 오류를 자동 복구.":
+        "失败时自动重试。通过设置最大重试次数 · 退避间隔 · 倍数自动恢复暂时性错误。",
+    "에러 처리 전략 노드. skip(무시) · default(기본값 반환) · route(다른 노드로 분기) 모드로 워크플로우 안정성 확보.":
+        "错误处理策略节点。使用 skip（忽略）· default（返回默认值）· route（分支到其他节点）模式提升工作流稳定性。",
+    "여러 병렬 경로를 합류. all/any/count 모드": "合并多条并行路径。模式：all/any/count",
+    "딜레이": "延迟",
+    "지정 시간 대기 후 통과. 고정/랜덤 딜레이": "等待指定时间后通过。固定或随机延迟。",
+
+    # v2.1 신규: 기타 UI
+    "채팅 전송": "发送聊天",
+    "사이드바 열기/닫기": "切换侧边栏",
+    "설정 메뉴 열기": "打开设置菜单",
+    "개발": "开发",
+    "커스텀": "自定义",
+    "패턴": "模式",
+    "템플릿 (": "模板（",
+    "플레이스홀더로 이전 노드 출력 주입.": "通过占位符注入前一个节点的输出。",
+    "로 이전 출력 참조)": " 以引用之前输出）",
+    "치환)": "替换）",
+    "✓ 성공 (": "✓ 成功（",
+    "[숫자]": "[数字]",
+
+    # extractor false positives (code/comments)
+    ").replace(/[^a-zA-Z0-9가-힣_-]/g": ").replace(/[^a-zA-Z0-9_-]/g",
+    "/* 비용 API 미지원 시 조용히 무시 */": "/* 不支持成本 API 时静默忽略 */",
+    "const _KO_RE = /[가-힣]/": "const _KO_RE = /<korean-range>/",
 }
