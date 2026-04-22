@@ -2631,5 +2631,14 @@
   "Ollama를 정지하시겠습니까?": "确定停止 Ollama？",
   "err_ollama_not_installed": "未安装 ollama CLI。请从 https://ollama.com 安装。",
   "err_ollama_serve_failed": "启动 ollama serve 失败",
-  "err_ollama_serve_exited": "ollama serve 立即退出"
+  "err_ollama_serve_exited": "ollama serve 立即退出",
+  "Ollama 엔진 설정": "Ollama 引擎设置",
+  "기본 채팅 모델 (LLM)": "默认聊天模型 (LLM)",
+  "기본 임베딩 모델": "默认嵌入模型",
+  "자동 선택 (첫 번째 설치 모델)": "自动选择（第一个已安装模型）",
+  "설정 저장": "保存设置",
+  "설정 저장됨": "设置已保存",
+  "Ollama 엔진 설정이 저장되었습니다": "Ollama 引擎设置已保存",
+  "설치된 채팅 모델 없음 — 모델 허브에서 다운로드": "无聊天模型 — 从模型中心下载",
+  "설치된 임베딩 모델 없음 — bge-m3 권장": "无嵌入模型 — 推荐 bge-m3"
 }

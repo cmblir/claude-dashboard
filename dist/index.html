@@ -8599,6 +8599,32 @@ VIEWS.aiProviders = async () => {
       <div id="ollamaServeLog" class="mt-2" style="display:none;max-height:120px;overflow-y:auto;font-family:monospace;font-size:11px;background:var(--code-bg);border-radius:6px;padding:8px;color:var(--text-dim)"></div>
     </div>
 
+    <!-- Ollama 엔진 설정 -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-lg">⚙️</span>
+        <h4 class="text-sm font-semibold" style="color:var(--text)">${t('Ollama 엔진 설정')}</h4>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs" style="color:var(--text-dim)">${t('기본 채팅 모델 (LLM)')}</label>
+          <select id="ollamaChatModelSelect" class="input w-full mt-1 text-sm">
+            <option value="">${t('자동 선택 (첫 번째 설치 모델)')}</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs" style="color:var(--text-dim)">${t('기본 임베딩 모델')}</label>
+          <select id="ollamaEmbedModelSelect" class="input w-full mt-1 text-sm">
+            <option value="">${t('자동 선택')}</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 mt-3">
+        <button class="btn btn-sm btn-primary" onclick="_ollamaSaveSettings()">${t('설정 저장')}</button>
+        <span id="ollamaSettingsMsg" class="text-xs" style="color:var(--text-mute)"></span>
+      </div>
+    </div>
+
     <!-- Ollama 모델 허브 (Task 1) -->
     <div class="card p-6 mb-6">
       <div class="flex items-center justify-between mb-4">
@@ -8757,6 +8783,7 @@ AFTER.aiProviders = async () => {
   _aiRefreshHealth();
   _loadUsageAlertStatus();
   _ollamaServeCheckStatus();
+  _ollamaLoadSettings();
   _ollamaLoadCatalog();
   _ollamaLoadInstalled();
 };
@@ -9185,6 +9212,60 @@ async function _ollamaServeStop() {
     toast(r.message || t('Ollama 정지됨'), 'ok');
     _ollamaServeCheckStatus();
   } catch(e) { toast(String(e), 'err'); }
+}
+
+// ── Ollama 엔진 설정 ──
+async function _ollamaLoadSettings() {
+  try {
+    const s = await api('/api/ollama/settings');
+    const chatSel = document.getElementById('ollamaChatModelSelect');
+    const embedSel = document.getElementById('ollamaEmbedModelSelect');
+    if (!chatSel || !embedSel) return;
+
+    // 채팅 모델 옵션
+    chatSel.innerHTML = `<option value="">${t('자동 선택 (첫 번째 설치 모델)')}</option>`;
+    for (const m of (s.installedChat || [])) {
+      const sel = m.id === s.chatModel ? 'selected' : '';
+      chatSel.innerHTML += `<option value="${escapeHtml(m.id)}" ${sel}>${escapeHtml(m.label)}${m.note ? ' — ' + escapeHtml(m.note) : ''}</option>`;
+    }
+
+    // 임베딩 모델 옵션
+    embedSel.innerHTML = `<option value="">${t('자동 선택')}</option>`;
+    for (const m of (s.installedEmbed || [])) {
+      const sel = m.id === s.embedModel ? 'selected' : '';
+      embedSel.innerHTML += `<option value="${escapeHtml(m.id)}" ${sel}>${escapeHtml(m.label)}${m.note ? ' — ' + escapeHtml(m.note) : ''}</option>`;
+    }
+
+    // 설치된 모델이 없으면 안내
+    if (!(s.installedChat || []).length) {
+      chatSel.innerHTML += `<option disabled>${t('설치된 채팅 모델 없음 — 모델 허브에서 다운로드')}</option>`;
+    }
+    if (!(s.installedEmbed || []).length) {
+      embedSel.innerHTML += `<option disabled>${t('설치된 임베딩 모델 없음 — bge-m3 권장')}</option>`;
+    }
+  } catch(e) {
+    // Ollama 미실행 시 무시
+  }
+}
+
+async function _ollamaSaveSettings() {
+  const chatModel = document.getElementById('ollamaChatModelSelect')?.value || '';
+  const embedModel = document.getElementById('ollamaEmbedModelSelect')?.value || '';
+  const msgEl = document.getElementById('ollamaSettingsMsg');
+  try {
+    const r = await api('/api/ollama/settings/save', {
+      method: 'POST',
+      body: JSON.stringify({ chatModel, embedModel }),
+    });
+    if (r.ok) {
+      if (msgEl) msgEl.innerHTML = `<span style="color:var(--ok)">✓ ${t('설정 저장됨')}</span>`;
+      toast(t('Ollama 엔진 설정이 저장되었습니다'), 'ok');
+    } else {
+      if (msgEl) msgEl.innerHTML = `<span style="color:var(--err)">✗ ${errMsg(r)}</span>`;
+    }
+  } catch(e) {
+    if (msgEl) msgEl.innerHTML = `<span style="color:var(--err)">✗ ${escapeHtml(String(e))}</span>`;
+  }
 }
 
 function _ollamaSwitchTab(tab) {
