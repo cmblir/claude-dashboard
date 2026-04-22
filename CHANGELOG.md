@@ -11,6 +11,42 @@
 
 ---
 
+## [2.1.0] — 2026-04-22
+
+### 🎯 v2.1 — 미구현 23개 항목 전면 완료
+
+**백엔드**
+- 📌 **변수 스코프 시스템** — variable 노드에 글로벌/로컬 스코프 + `{{변수명}}` 템플릿 치환
+- 🔀 **조건부 실행 11종** — contains/equals/not_equals/greater/less/regex/length_gt/length_lt/is_empty/not_empty/expression(AND/OR)
+- ⏱️ **Rate Limiter** — 프로바이더별 토큰 버킷 알고리즘 (분당 요청 제한)
+- 📝 **Ollama Modelfile 생성** — `POST /api/ollama/create` (커스텀 모델 생성)
+- ✅ **에러 메시지 err() 전환 100%** — 모든 한글 에러에 error_key
+- 🌍 **nav_catalog 다국어** — 38개 탭 설명 en/zh 동적 전환 구조 (`TAB_DESC_I18N`)
+
+**프론트엔드 UX**
+- 📱 **모바일 반응형** — 사이드바 접기, 그리드 반응형, 모달 전체 화면
+- ♿ **접근성** — ARIA 레이블, role="dialog", 포커스 트랩
+- 🔔 **브라우저 Notification** — 워크플로우 완료/실패, 사용량 초과 알림
+- 🎨 **커스텀 테마 5종** — dark/light/midnight/forest/sunset
+- 🔀 **조건부 실행 UI** — conditionType 11종 셀렉트
+- 📌 **변수 스코프 UI** — scope 선택 + {{변수명}} 참조 안내
+- 📝 **Modelfile 편집 UI** — 커스텀 모델 생성 모달
+- 📊 **비용 히스토리 상세 차트** — 프로바이더별 일별 스택 차트
+- 📦 **노드 그룹핑** — Shift+클릭 다중 선택 → 그룹 생성/접기/펴기
+- 🔍 **워크플로우 diff** — 버전 비교 (추가/삭제/변경 노드 표시)
+
+**i18n**
+- +36개 키 사전 추가 (UX 신기능) + 전수 검증 0 miss
+- 2,711+ 키 × 3언어
+
+### Architecture
+- `server/ai_providers.py` — `_RateLimiter` 토큰 버킷, `threading` import
+- `server/workflows.py` — `_evaluate_branch_condition()` 11종, `_substitute_variables()`, variable 노드 `var_store` 인자
+- `server/ollama_hub.py` — `api_ollama_create_model()`
+- `server/nav_catalog.py` — `TAB_DESC_I18N` 38탭, `get_tab_desc()`
+- `server/errors.py` — 에러 전환 100% 완료
+- GET 75 + POST 63 = 138 라우트
+
 ## [2.0.0] — 2026-04-22
 
 ### 🎉 v2.0 메이저 릴리스 — 멀티 AI 오케스트라 플랫폼 완성

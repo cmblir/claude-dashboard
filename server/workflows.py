@@ -663,9 +663,8 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
         return {"status": "ok", "output": output, "durationMs": _elapsed(), "sessionId": ""}
 
     if ntype == "branch":
-        cond = (data.get("condition") or "").strip().lower()
-        prev = (inputs[0] if inputs else "").lower()
-        matched = bool(cond) and cond in prev
+        matched = _evaluate_branch_condition(data, inputs)
+        prev = inputs[0] if inputs else ""
         out_port = "out_y" if matched else "out_n"
         return {
             "status": "ok", "output": prev, "durationMs": _elapsed(), "sessionId": "",
@@ -915,14 +914,95 @@ def _execute_transform_node(data: dict, inputs: list[str], _elapsed) -> dict:
     return {"status": "ok", "output": input_text, "durationMs": _elapsed(), "sessionId": ""}
 
 
-def _execute_variable_node(data: dict, inputs: list[str], _elapsed) -> dict:
-    """Variable 노드 — 값 저장 (출력으로 전달). 현재는 pass-through."""
-    # variable 노드는 입력을 그대로 출력으로 전달하면서
-    # 워크플로우 상태에 이름을 붙인다 (프론트에서 참조용)
+def _execute_variable_node(data: dict, inputs: list[str], _elapsed,
+                           var_store: dict | None = None) -> dict:
+    """Variable 노드 — 변수 저장소에 값 저장 + 출력 전달.
+
+    var_store: 워크플로우 실행 중 공유되는 변수 딕셔너리.
+    저장 후 다른 노드에서 {{변수명}} 으로 참조 가능.
+    scope: 'global' (워크플로우 전체) 또는 'local' (이 실행만).
+    """
     var_name = (data.get("varName") or "var").strip()
     value = inputs[0] if inputs else (data.get("defaultValue") or "")
+    if var_store is not None:
+        var_store[var_name] = value
     return {"status": "ok", "output": value, "durationMs": _elapsed(),
             "sessionId": "", "varName": var_name}
+
+
+def _evaluate_branch_condition(data: dict, inputs: list[str]) -> bool:
+    """Branch 노드 복합 조건 평가.
+
+    conditionType:
+      - contains: 입력에 condition 문자열 포함 (기존 호환)
+      - equals: 입력 == condition
+      - not_equals: 입력 != condition
+      - greater: 숫자 비교 >
+      - less: 숫자 비교 <
+      - regex: 정규식 매칭
+      - length_gt: 입력 길이 > N
+      - length_lt: 입력 길이 < N
+      - is_empty: 입력 비어있음
+      - not_empty: 입력 비어있지 않음
+      - expression: AND/OR 복합 (콤마=AND, |=OR)
+    """
+    cond = (data.get("condition") or "").strip()
+    cond_type = (data.get("conditionType") or "contains").strip()
+    prev = inputs[0] if inputs else ""
+    prev_lower = prev.lower()
+    cond_lower = cond.lower()
+
+    if cond_type == "equals":
+        return prev.strip() == cond
+    if cond_type == "not_equals":
+        return prev.strip() != cond
+    if cond_type == "greater":
+        try:
+            return float(prev.strip()) > float(cond)
+        except ValueError:
+            return False
+    if cond_type == "less":
+        try:
+            return float(prev.strip()) < float(cond)
+        except ValueError:
+            return False
+    if cond_type == "regex":
+        try:
+            return bool(re.search(cond, prev))
+        except Exception:
+            return False
+    if cond_type == "length_gt":
+        try:
+            return len(prev) > int(cond)
+        except ValueError:
+            return False
+    if cond_type == "length_lt":
+        try:
+            return len(prev) < int(cond)
+        except ValueError:
+            return False
+    if cond_type == "is_empty":
+        return not prev.strip()
+    if cond_type == "not_empty":
+        return bool(prev.strip())
+    if cond_type == "expression":
+        # OR: | 구분, AND: , 구분
+        if "|" in cond:
+            return any(part.strip().lower() in prev_lower for part in cond.split("|") if part.strip())
+        if "," in cond:
+            return all(part.strip().lower() in prev_lower for part in cond.split(",") if part.strip())
+        return cond_lower in prev_lower
+    # default: contains (기존 호환)
+    return bool(cond) and cond_lower in prev_lower
+
+
+def _substitute_variables(text: str, var_store: dict) -> str:
+    """텍스트 내 {{변수명}} 을 변수 저장소 값으로 치환."""
+    if not var_store or "{{" not in text:
+        return text
+    for k, v in var_store.items():
+        text = text.replace(f"{{{{{k}}}}}", str(v))
+    return text
 
 
 def _execute_merge_node(data: dict, inputs: list[str], _elapsed) -> dict:

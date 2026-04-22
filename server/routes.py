@@ -66,6 +66,7 @@ from .ollama_hub import (
     api_ollama_models, api_ollama_catalog, api_ollama_pull,
     api_ollama_pull_status, api_ollama_delete, api_ollama_model_info,
     api_ollama_serve_start, api_ollama_serve_stop, api_ollama_serve_status,
+    api_ollama_create_model,
 )
 
 
@@ -265,6 +266,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/ollama/pull": api_ollama_pull,
     "/api/ollama/delete": api_ollama_delete,
     "/api/ollama/serve/start": api_ollama_serve_start,
+    "/api/ollama/create": api_ollama_create_model,
     "/api/ollama/settings/save": api_ollama_settings_save,
     "/api/ollama/serve/stop": api_ollama_serve_stop,
     "/api/ai-providers/default-model": api_set_default_model,
