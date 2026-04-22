@@ -1,94 +1,174 @@
 # 🧭 Claude Control Center
 
-> **Multi-AI Orchestration Dashboard** — Manage Claude, GPT, Gemini, Ollama, and Codex from a single interface.
+> **Multi-AI Orchestration Dashboard** — Manage Claude, GPT, Gemini, Ollama, and Codex from a single local interface.
 
-[![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md) [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
+[![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
+[![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Version](https://img.shields.io/badge/version-v2.1.1-green.svg)](./CHANGELOG.md)
+[![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#tech-stack)
 
-A local dashboard that manages your entire `~/.claude/` directory (agents, skills, hooks, plugins, MCP, sessions, projects) and adds a powerful **n8n-style workflow engine** with multi-AI provider orchestration.
+Claude Control Center is a **local-first dashboard** that manages your entire `~/.claude/` directory (agents, skills, hooks, plugins, MCP, sessions, projects) and ships a powerful **n8n-style workflow engine** with multi-AI provider orchestration — all in a single `python3 server.py` command.
 
-> Local only, no external calls — Python stdlib server + single HTML file.
-
----
-
-## ✨ Key Features
-
-### 🧠 Multi-AI Provider Orchestration
-- **8 built-in providers**: Claude CLI, Ollama, Gemini CLI, Codex + OpenAI API, Gemini API, Anthropic API, Ollama API
-- **Custom CLI providers**: Register any CLI tool as an AI provider
-- **Capability system**: chat / embed / code / vision / reasoning
-- **Fallback chain**: Auto-switch to next provider on failure
-- **Rate limiter**: Token bucket algorithm per provider
-- **Multi-AI comparison**: Send same prompt to multiple AIs simultaneously
-
-### 🦙 Ollama Model Hub (Open WebUI Style)
-- **23 model catalog**: LLM / Code / Embedding / Vision categories
-- **One-click download** with progress bar + delete + model details
-- **Auto-start**: `ollama serve` launches automatically with dashboard
-- **Engine settings**: Default chat model + embedding model selection
-- **Modelfile editor**: Create custom models
-
-### 🔀 Workflow Engine (n8n-style)
-- **16 node types**: start, session, subagent, aggregate, branch, output, http, transform, variable, subworkflow, embedding, loop, retry, error_handler, merge, delay
-- **Parallel execution**: ThreadPoolExecutor for same-depth nodes
-- **SSE real-time streaming**: Live node progress updates
-- **Webhook trigger**: External HTTP trigger (`POST /api/workflows/webhook/{id}`)
-- **Cron scheduler**: Auto-execute on schedule
-- **Export/Import**: Share workflows as JSON
-- **Version history**: Save up to 20 versions + restore
-- **8 built-in templates**: Multi-AI compare, RAG pipeline, Code review, Data ETL, Retry workflow, etc.
-- **18-scene interactive tutorial**: Step-by-step walkthrough
-- **Canvas features**: Minimap, node search, Ctrl+C/V/Z, keyboard shortcuts, node grouping
-
-### 📊 Analytics & Monitoring
-- **Session scoring** (0-100): engagement, productivity, delegation, diversity, reliability
-- **Cost tracking**: Per-provider daily cost charts + stacked bar
-- **Usage alerts**: Daily cost/token threshold notifications
-- **Provider health dashboard**: Real-time status with port info
-- **Workflow statistics**: Success rate, avg duration, provider distribution
-
-### 🌍 Internationalization
-- **3 languages**: Korean (ko), English (en), Chinese (zh)
-- **2,893 translation keys** per language
-- **Dynamic translation**: MutationObserver-based real-time DOM translation
-- **error_key system**: Backend error messages with i18n support
-
-### 🎨 UX
-- **5 themes**: Dark, Light, Midnight, Forest, Sunset
-- **Mobile responsive**: Collapsible sidebar, responsive grids
-- **Accessibility**: ARIA labels, focus traps, keyboard navigation
-- **Browser notifications**: Workflow completion, usage alerts
-- **Performance optimized**: API caching, debounced rendering, RAF batching
+**No cloud. No telemetry. No dependencies to install.** Just Python stdlib and one HTML file.
 
 ---
 
-## 🚀 Quick Start
+## 🎬 What it looks like
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  🧭  Claude Control Center                          v2.1.1 🇰🇷│
+├────────┬───────────────────────────────────────────────────────┤
+│ 🆕 New │   🔀 Workflows                                         │
+│ 🏠 Main│   ┌──────┐      ┌──────┐      ┌──────┐                │
+│ 🛠 Work│   │🚀start│─────▶│🗂 Claude│─┬──▶│📤 out│              │
+│ ⚙ Config│  └──────┘      └──────┘   │  └──────┘                │
+│ 🎛 Adv │                  ┌──────┐   │                         │
+│ 📈 Sys │                  │🗂 GPT │──┤                         │
+│        │                  └──────┘   │                         │
+│ 💬 🐙  │                  ┌──────┐   │                         │
+│        │                  │🗂 Gemini│┘                         │
+│        │                  └──────┘                              │
+└────────┴───────────────────────────────────────────────────────┘
+```
+
+38 tabs across 6 groups · 16 workflow node types · 8 AI providers · 5 themes · 3 languages.
+
+---
+
+## ✨ Why this project?
+
+You already use Claude Code. But as you add more tools — GPT, Gemini, Ollama, Codex — you end up juggling CLIs, API keys, fallback logic, and cost tracking yourself. And Claude Code's configuration (`~/.claude/`) accumulates agents, skills, hooks, plugins, MCP servers, and sessions with no unified view.
+
+**Claude Control Center solves both problems in one tab.**
+
+| Before | With Control Center |
+|---|---|
+| `cat ~/.claude/settings.json` and eyeball it | 38 tabs, each rendering the relevant slice |
+| `ls ~/.claude/agents/` → open in editor | 16 role presets · one-click create |
+| Shell-script multi-AI comparison | Drag 3 session nodes → merge → output |
+| Manual RAG pipeline assembly | Built-in `RAG Pipeline` template |
+| API cost a mystery | Daily stacked chart per provider |
+| Korean/English context switching | Runtime `ko` / `en` / `zh` toggle |
+
+---
+
+## 🎯 Use cases
+
+**Individual developer** — Manage your Claude Code setup: agents, skills, slash commands, MCP servers, and sessions from one place. One-click create sub-agents from 16 role presets.
+
+**Team lead** — Build a `Lead → Frontend + Backend + Reviewer` parallel workflow. Spawn real Terminal sessions, resume by `session_id`, inject feedback notes, and loop for N sprints.
+
+**AI researcher** — Send the same prompt to Claude + GPT + Gemini in parallel, merge results, and auto-save the comparison. Or build a RAG pipeline with `embedding → vector search (HTTP) → Claude` in five drag-and-drops.
+
+**Automation engineer** — Trigger workflows via Webhook (`POST /api/workflows/webhook/{id}`) from GitHub Actions / Zapier. Schedule daily runs with Cron. Retry on failure, fall back to a cheaper provider, and alert on token budget overruns.
+
+**Ollama power user** — Browse a 23-model catalog, one-click download, create custom models with Modelfile, and pick default chat / embedding models — no `ollama pull` memorization needed.
+
+---
+
+## 🚀 Quick Start (30 seconds)
 
 ```bash
-# Clone
 git clone https://github.com/cmblir/claude-dashboard.git
 cd claude-dashboard
-
-# Run (Python 3.10+ required, no dependencies)
 python3 server.py
-
-# Open in browser
-open http://localhost:8080
+# → open http://localhost:8080
 ```
+
+**That's it.** No `pip install`, no `npm install`, no Docker. The server uses only Python stdlib.
 
 ### Prerequisites
-- **Python 3.10+** (stdlib only, no pip install needed)
-- **Claude Code CLI** (`npm i -g @anthropic-ai/claude-code`)
-- **Ollama** (optional, for local LLM) — auto-started by dashboard
 
-### Environment Variables
+| Required | Recommended | Optional |
+|---|---|---|
+| Python 3.10+ | Claude Code CLI — `npm i -g @anthropic-ai/claude-code` | Ollama (auto-started) |
+| — | macOS (for Terminal.app session spawn) | GPT / Gemini / Anthropic API keys |
+
+### Environment variables
+
 ```bash
-HOST=127.0.0.1          # Bind address (default: 127.0.0.1)
-PORT=8080               # Port (default: 8080)
-OLLAMA_HOST=http://localhost:11434  # Ollama server
-OPENAI_API_KEY=sk-...   # OpenAI API (optional)
-GEMINI_API_KEY=AIza...   # Gemini API (optional)
-ANTHROPIC_API_KEY=sk-... # Anthropic API (optional)
+HOST=127.0.0.1                       # Bind address (default)
+PORT=8080                            # Port (default)
+CHAT_MODEL=haiku                     # Chatbot model: haiku (default) / sonnet / opus
+OLLAMA_HOST=http://localhost:11434   # Ollama server
+OPENAI_API_KEY=sk-...                # Optional, can also be set in UI
+GEMINI_API_KEY=AIza...               # Optional
+ANTHROPIC_API_KEY=sk-...             # Optional
 ```
+
+API keys can also be saved via the `🧠 AI Providers` tab — stored in `~/.claude-dashboard-config.json`.
+
+---
+
+## ✨ Features
+
+### 🔀 Workflow Engine (n8n-style DAG)
+
+- **16 node types**: `start` · `session` · `subagent` · `aggregate` · `branch` · `output` · `http` · `transform` · `variable` · `subworkflow` · `embedding` · `loop` · `retry` · `error_handler` · `merge` · `delay`
+- **Parallel execution** via topological levels + ThreadPoolExecutor
+- **SSE streaming** for live node progress
+- **🔁 Repeat** — max iterations · interval · schedule window (`HH:MM~HH:MM`) · feedback-note injection
+- **Cron scheduler** — 5-field `cron` expression, minute-granularity
+- **Webhook trigger** — `POST /api/workflows/webhook/{wfId}` from any external system
+- **Export / Import** — share workflows as JSON
+- **Version history** — last 20 versions auto-saved + one-click restore
+- **Conditional execution** — 11 condition types (contains, equals, regex, length, expression with AND/OR, ...)
+- **Variable scope** — `{{var}}` template substitution, global or local
+- **8 templates** — 5 built-in (Multi-AI Compare · RAG Pipeline · Code Review · Data ETL · Retry) + 3 team starters (Lead/FE/BE · Research · Parallel×3) + unlimited custom
+- **Canvas UX** — minimap · node search (highlight + dim) · grouping (Shift+click) · Ctrl+C/V/Z · `?` shortcuts modal
+- **18-scene interactive tutorial** with typewriter + cursor animation
+
+### 🧠 Multi-AI Providers
+
+- **8 built-in** — Claude CLI · Ollama · Gemini CLI · Codex + OpenAI API · Gemini API · Anthropic API · Ollama API
+- **Custom CLI providers** — register any CLI as a provider (chat + embed commands)
+- **Fallback chain** — auto-switch on failure (`claude-cli → anthropic-api → openai-api → gemini-api` default)
+- **Rate limiter** — per-provider token bucket (requests/min)
+- **Multi-AI comparison** — same prompt, multiple providers, side-by-side results
+- **Setup wizard** — 3-step guide for first-timers (select → configure → test)
+- **Health dashboard** — real-time availability per provider
+- **Cost tracking** — per-provider / per-workflow / per-day stacked bar chart
+- **Usage alerts** — configurable daily token / cost thresholds → browser notification
+
+### 🦙 Ollama Model Hub (Open WebUI style)
+
+- **23-model catalog** — LLM · Code · Embedding · Vision categories (llama3.1, qwen2.5, gemma2, deepseek-r1, bge-m3, ...)
+- **One-click pull** with progress bar (SSE polling) + delete + model info
+- **Auto-start** — dashboard launches `ollama serve` on boot
+- **Default model picker** — per-provider chat / embedding defaults
+- **Modelfile editor** — create custom models from the UI
+
+### 🤝 Claude Code Integration (38 tabs)
+
+| Group | Tabs |
+|---|---|
+| 🆕 New | `features` · `onboarding` · `guideHub` |
+| 🏠 Main | `overview` · `projects` · `analytics` · `aiEval` · `sessions` |
+| 🛠️ Work | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` |
+| ⚙️ Config | `hooks` · `permissions` · `mcp` · `plugins` · `settings` · `claudemd` |
+| 🎛️ Advanced | `outputStyles` · `statusline` · `plans` · `envConfig` · `modelConfig` · `ideStatus` · `marketplaces` · `scheduled` |
+| 📈 System | `usage` · `metrics` · `memory` · `tasks` · `backups` · `bashHistory` · `telemetry` · `homunculus` · `team` · `system` |
+
+Highlights: **16 sub-agent role presets** (backend-dev, security-reviewer, architect, ...), session timeline with quality scoring, CLAUDE.md editor with markdown preview, MCP connector installer, plugin marketplace integration.
+
+### 🌍 Internationalization
+
+- **3 languages** — Korean (`ko`, default) · English (`en`) · Chinese (`zh`)
+- **2,932 translation keys** per language · **zero residual Korean** verified
+- **Runtime DOM translation** via MutationObserver (no page reload)
+- **`error_key` system** — backend error messages localized on the frontend
+- **Verification pipeline** — `scripts/verify-translations.js` enforces 4 checks (parity · `t()` calls · audit · static DOM)
+
+### 🎨 UX & Accessibility
+
+- **5 themes** — Dark · Light · Midnight · Forest · Sunset
+- **Mobile responsive** — collapsible sidebar, full-screen modals
+- **Accessibility** — ARIA labels, `role="dialog"`, focus traps, keyboard navigation
+- **Browser notifications** — workflow complete, usage alert, system event
+- **Performance** — API response caching, debounced auto-reload, RAF batching
 
 ---
 
@@ -96,58 +176,130 @@ ANTHROPIC_API_KEY=sk-... # Anthropic API (optional)
 
 ```
 claude-dashboard/
-├── server.py              # Entry point (auto port-conflict resolution + ollama auto-start)
-├── server/
-│   ├── ai_providers.py    # 8 providers + CustomCliProvider + RateLimiter
-│   ├── ai_keys.py         # API key management + cost tracking + usage alerts
-│   ├── ollama_hub.py      # Model catalog (23) + pull/delete/create/serve
-│   ├── workflows.py       # DAG engine (16 nodes, parallel, SSE, cron, webhook)
-│   ├── errors.py          # i18n error key system (49 keys)
-│   ├── routes.py          # 138 API routes (GET 75 + POST 63)
-│   ├── sessions.py        # Session indexing + scoring
-│   ├── nav_catalog.py     # Tab catalog + multilingual descriptions
-│   └── ...                # 20 modules total
+├── server.py                     # Entry (port-conflict resolution + ollama auto-start)
+├── server/                       # 14,067 lines · stdlib only
+│   ├── routes.py                 # 143 API routes (GET + POST + PUT + DELETE + regex webhook)
+│   ├── workflows.py              # DAG engine · 16 node executors · Repeat · Cron · Webhook (2,296)
+│   ├── ai_providers.py           # 8 providers · registry · rate limiter (1,723)
+│   ├── ai_keys.py                # Key mgmt · custom providers · cost tracking (734)
+│   ├── ollama_hub.py             # Catalog · pull/delete/create · serve mgmt (606)
+│   ├── nav_catalog.py            # Single source of truth for 38 tabs + i18n descriptions
+│   ├── features.py               # Feature discovery · AI evaluation · recommendations
+│   ├── projects.py               # Project browser · 16 sub-agent role presets
+│   ├── sessions.py               # Session indexing · quality scoring · agent graph
+│   ├── system.py                 # Usage · memory · tasks · metrics · backups · telemetry
+│   ├── errors.py                 # i18n error key system (49 keys)
+│   └── …                         # 20 modules total
 ├── dist/
-│   ├── index.html         # Single-file frontend (~13,250 lines)
-│   └── locales/
-│       ├── ko.json        # 2,893 keys
-│       ├── en.json        # 2,893 keys
-│       └── zh.json        # 2,893 keys
-└── tools/                 # i18n audit, translation scripts
+│   ├── index.html                # Single-file SPA (~13,500 lines)
+│   └── locales/{ko,en,zh}.json   # 2,932 keys × 3 languages
+├── tools/
+│   ├── translations_manual_*.py  # Manual translation overrides
+│   ├── extract_ko_strings.py     # Korean string extractor
+│   ├── build_locales.py          # ko/en/zh JSON builder
+│   └── i18n_audit.mjs            # Node-side audit
+├── scripts/
+│   ├── verify-translations.js    # 4-stage i18n verification
+│   └── translate-refresh.sh      # One-shot pipeline
+├── VERSION · CHANGELOG.md
+└── README.md · README.ko.md · README.zh.md
 ```
 
-### Tech Stack
+### Data stores (all in `$HOME`, overridable via env vars)
+
+| File | Contents |
+|---|---|
+| `~/.claude-dashboard-workflows.json` | Workflows + runs + custom templates + version history + costs |
+| `~/.claude-dashboard-config.json` | API keys · custom providers · default models · fallback chain · usage thresholds |
+| `~/.claude-dashboard-translations.json` | AI translation cache |
+| `~/.claude-dashboard.db` | SQLite session index |
+| `~/.claude-dashboard-mcp-cache.json` | MCP catalog cache |
+| `~/.claude-dashboard-ai-evaluation.json` | AI evaluation cache |
+
+Atomic writes via `server/utils.py::_safe_write` (`.tmp → rename`), threading locks for concurrent safety.
+
+### Tech stack
+
 | Layer | Technology |
-|-------|-----------|
+|---|---|
 | Backend | Python stdlib `ThreadingHTTPServer` (zero dependencies) |
 | Database | SQLite WAL mode |
 | Frontend | Single HTML + Tailwind CDN + Chart.js + vis-network |
-| i18n | Runtime fetch (`/api/locales/{lang}.json`) + MutationObserver |
-| Workflow | DAG topological sort + ThreadPoolExecutor parallel |
+| i18n | Runtime JSON fetch + MutationObserver DOM translation |
+| Workflow | Topological DAG sort + `concurrent.futures.ThreadPoolExecutor` |
+| Chatbot | Dynamic system prompt (reads VERSION + CHANGELOG + nav_catalog on every request) |
 
 ---
 
-## 🔢 Stats (v2.1.0)
+## 🔢 Stats (v2.1.1)
 
 | Metric | Value |
-|--------|-------|
-| Node types | 16 |
-| AI Providers | 8 built-in + unlimited custom |
-| API Routes | 138 (GET 75 + POST 63) |
-| i18n Keys | 2,893 × 3 languages |
-| Ollama Catalog | 23 models |
-| Built-in Templates | 8 |
-| Themes | 5 |
-| Tutorial Scenes | 18 |
+|---|---|
+| Backend code | 14,067 lines · 20 modules · stdlib only |
+| Frontend code | ~13,500 lines · single HTML file |
+| API routes | **143** |
+| Tabs | **38** across 6 groups |
+| Workflow node types | **16** |
+| AI providers | **8** built-in + unlimited custom |
+| Ollama catalog | **23** models |
+| Sub-agent role presets | **16** |
+| Built-in workflow templates | **8** (5 built-in + 3 team) |
+| i18n keys | **2,932** × 3 languages · 0 missing |
+| Themes | **5** |
+| Tutorial scenes | **18** |
 
 ---
 
-## 📝 License
+## 🛠️ Troubleshooting
 
-MIT
+| Problem | Solution |
+|---|---|
+| Port 8080 already in use | `PORT=8090 python3 server.py` (the server also offers to kill the existing process) |
+| `claude` command not found | Install Claude Code CLI: `npm i -g @anthropic-ai/claude-code` |
+| Ollama connection failed | Check `OLLAMA_HOST` (default `http://localhost:11434`) or let the dashboard auto-start it |
+| Session spawn fails on macOS | Grant Terminal automation permission in System Settings → Privacy → Automation |
+| English mode still shows Korean | Run `scripts/translate-refresh.sh` (rebuilds locales + verifies) |
+| Chatbot says "I don't know about this feature" | Chatbot reads `VERSION` + `CHANGELOG.md` + `nav_catalog.py` live — update these 3 files when adding features |
 
 ---
 
 ## 🤝 Contributing
 
-Issues and PRs welcome at [github.com/cmblir/claude-dashboard](https://github.com/cmblir/claude-dashboard).
+PRs and issues welcome at [github.com/cmblir/claude-dashboard](https://github.com/cmblir/claude-dashboard).
+
+### Adding a new tab (7 steps)
+
+1. Add entry to `dist/index.html::NAV`
+2. Implement `VIEWS.<id>` renderer in `dist/index.html`
+3. Add `(id, group, desc, keywords)` to `server/nav_catalog.py::TAB_CATALOG`
+4. Add `en` / `zh` descriptions to `TAB_DESC_I18N`
+5. (If needed) Add backend route to `server/routes.py` + module under `server/`
+6. Register new UI strings in `tools/translations_manual_9.py`
+7. Run `python3 tools/extract_ko_strings.py && (cd tools && python3 build_locales.py) && node scripts/verify-translations.js`
+
+### Translation contributions
+
+See [`TRANSLATION_CONTRIBUTING.md`](./TRANSLATION_CONTRIBUTING.md) and [`TRANSLATION_MIGRATION.md`](./TRANSLATION_MIGRATION.md). All UI strings must exist in ko / en / zh; the CI check `verify-translations.js` enforces zero missing keys.
+
+### Versioning rule
+
+- `MAJOR` — breaking workflow / schema changes
+- `MINOR` — new tabs or major features (backward compatible)
+- `PATCH` — bug fixes, UI tweaks, i18n reinforcement
+
+On every feature change, update `VERSION` + `CHANGELOG.md` + `git tag -a vX.Y.Z` together.
+
+---
+
+## 📝 License
+
+[MIT](./LICENSE) — free for personal and commercial use. Attribution appreciated but not required.
+
+---
+
+## 🙏 Acknowledgements
+
+- [Anthropic Claude Code](https://claude.com/claude-code) — the CLI this dashboard is built around
+- [n8n](https://n8n.io) — inspiration for the workflow editor
+- [Open WebUI](https://openwebui.com) — inspiration for the Ollama model hub
+- All contributors to the open-source LLM ecosystem 🧠
