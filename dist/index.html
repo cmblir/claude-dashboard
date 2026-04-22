@@ -8656,13 +8656,21 @@ async function appendToClaudeMd(recId) {
 // ────────────────────────────────────────────────────────────────
 // AI PROVIDERS — 멀티 AI 프로바이더 설정
 // ────────────────────────────────────────────────────────────────
+// providerId(claude-cli, ollama, gemini-cli, codex) → cli_tools 카탈로그 키
+const _CLI_TOOL_MAP = { 'claude-cli':'claude', 'ollama':'ollama', 'gemini-cli':'gemini', 'codex':'codex' };
+
 VIEWS.aiProviders = async () => {
-  const d = await cachedApi('/api/ai-providers/list');
+  const [d, cliStatus] = await Promise.all([
+    cachedApi('/api/ai-providers/list'),
+    api('/api/cli/status').catch(() => ({tools: {}, brewAvailable:false, npmAvailable:false})),
+  ]);
   state.data._aiProviders = d;
+  state.data._cliStatus = cliStatus;
   const providers = d.providers || [];
   const apiKeys = d.apiKeys || {};
   const customProviders = d.customProviders || [];
   const fallbackChain = d.fallbackChain || [];
+  const cliTools = cliStatus.tools || {};
 
   const cliProviders = providers.filter(p => p.type === 'cli');
   const apiProviders = providers.filter(p => p.type === 'api');
@@ -8681,6 +8689,30 @@ VIEWS.aiProviders = async () => {
     const testBtn = avail
       ? `<button class="btn btn-sm" onclick="testProvider('${p.id}')">${t('연결 테스트')}</button>`
       : '';
+
+    // CLI 설치·로그인 버튼 (CLI 타입 + 카탈로그에 존재하는 도구만)
+    let cliInstallBlock = '';
+    const toolId = _CLI_TOOL_MAP[p.id];
+    if (p.type === 'cli' && toolId && cliTools[toolId]) {
+      const ts = cliTools[toolId];
+      if (ts.installed) {
+        const verTxt = ts.version ? ` · ${escapeHtml(ts.version)}` : '';
+        const loginBtn = ts.loginCmd
+          ? `<button class="btn btn-sm" onclick="_cliLogin('${toolId}')" title="${escapeHtml(ts.loginCmd)}">🔐 ${t('로그인')}</button>`
+          : '';
+        cliInstallBlock = `<div class="flex items-center gap-2 mt-2 flex-wrap">
+          <span class="chip chip-ok text-[10px]">✅ ${t('설치 완료')}${verTxt}</span>
+          ${loginBtn}
+        </div>`;
+      } else {
+        const method = cliStatus.brewAvailable ? 'brew' : (cliStatus.npmAvailable ? 'npm' : 'script');
+        const methodLabel = method === 'brew' ? 'Homebrew' : (method === 'npm' ? 'npm' : t('설치 스크립트'));
+        cliInstallBlock = `<div class="flex items-center gap-2 mt-2 flex-wrap">
+          <button class="btn-primary btn btn-sm" onclick="_cliInstall('${toolId}')" title="${escapeHtml(ts.installCmd)}">⬇️ ${t('설치')} (${methodLabel})</button>
+          <span class="text-[10px]" style="color:var(--text-dim)">${t('설치 시 터미널 창이 열립니다')}</span>
+        </div>`;
+      }
+    }
 
     // 기본 모델 드롭다운 (Task 3)
     const allModels = p.models || [];
@@ -8708,6 +8740,7 @@ VIEWS.aiProviders = async () => {
         </div>
       </div>
       ${p.homepage ? `<a href="${escapeHtml(p.homepage)}" target="_blank" class="text-xs" style="color:var(--cyan)">${escapeHtml(p.homepage)}</a>` : ''}
+      ${cliInstallBlock}
       <div class="mt-2 flex flex-wrap gap-1">
         <span class="text-xs" style="color:var(--text-dim)">${t('모델')}:</span> ${modelTags || '<span class="text-xs" style="color:var(--text-dim)">—</span>'}
       </div>
@@ -8901,60 +8934,6 @@ VIEWS.aiProviders = async () => {
       <p class="text-xs mb-3" style="color:var(--text-dim)" data-i18n="custom_providers_desc">임의의 CLI 도구를 AI 프로바이더로 등록합니다. 워크플로우 노드의 assignee 에서 사용 가능.</p>
       ${customCards || `<p class="text-sm" style="color:var(--text-dim)" data-i18n="no_custom_providers">등록된 커스텀 프로바이더가 없습니다.</p>`}
       <button class="btn btn-sm mt-3" onclick="showAddCustomProviderModal()" data-i18n="add_custom_provider">+ 커스텀 프로바이더 추가</button>
-    </div>
-
-    <div class="card p-6 mb-6">
-      <h3 class="text-lg font-semibold mb-3" style="color:var(--text)">💡 ${t('워크플로우 & 프로바이더 사용 가이드')}</h3>
-      <div class="text-sm" style="color:var(--text-mute)">
-        <p class="mb-3">${t('워크플로우 노드의 Assignee 필드에 프로바이더:모델 형태로 입력합니다.')}</p>
-        <table class="data w-full text-xs mb-4">
-          <thead><tr><th>Assignee</th><th>${t('프로바이더')}</th><th>${t('모델')}</th><th>${t('비고')}</th></tr></thead>
-          <tbody>
-            <tr><td><code>claude:opus</code></td><td>Claude CLI</td><td>Opus 4.7</td><td>${t('최강 성능')}</td></tr>
-            <tr><td><code>claude:sonnet</code></td><td>Claude CLI</td><td>Sonnet 4.6</td><td>${t('균형형')}</td></tr>
-            <tr><td><code>openai:gpt-4.1</code></td><td>OpenAI API</td><td>GPT-4.1</td><td>${t('API 키 필요')}</td></tr>
-            <tr><td><code>gemini:2.5-pro</code></td><td>Gemini CLI/API</td><td>Gemini 2.5 Pro</td><td>${t('CLI 또는 API 키')}</td></tr>
-            <tr><td><code>ollama:qwen2.5:14b</code></td><td>Ollama</td><td>${t('설치된 모델')}</td><td>${t('로컬 무료')}</td></tr>
-            <tr><td><code>codex:o4-mini</code></td><td>Codex CLI</td><td>o4-mini</td><td>${t('코드 특화')}</td></tr>
-          </tbody>
-        </table>
-        <details class="mb-3">
-          <summary class="cursor-pointer text-xs font-semibold" style="color:var(--accent)">📦 ${t('16개 노드 타입')}</summary>
-          <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-[11px]">
-            <div>🚀 start — ${t('시작')}</div>
-            <div>🗂️ session — ${t('AI 세션')}</div>
-            <div>🤝 subagent — ${t('역할 부여')}</div>
-            <div>🧩 aggregate — ${t('취합')}</div>
-            <div>🔀 branch — ${t('조건 분기')}</div>
-            <div>📤 output — ${t('결과')}</div>
-            <div>🌐 http — ${t('API 호출')}</div>
-            <div>🔄 transform — ${t('데이터 변환')}</div>
-            <div>📌 variable — ${t('변수')}</div>
-            <div>🔁 subworkflow — ${t('서브 워크플로우')}</div>
-            <div>🧲 embedding — ${t('임베딩')}</div>
-            <div>🔄 loop — ${t('반복')}</div>
-            <div>🔁 retry — ${t('재시도')}</div>
-            <div>🛡️ error_handler — ${t('에러 핸들링')}</div>
-            <div>🔀 merge — ${t('병렬 합류')}</div>
-            <div>⏱️ delay — ${t('대기')}</div>
-          </div>
-        </details>
-        <details class="mb-3">
-          <summary class="cursor-pointer text-xs font-semibold" style="color:var(--accent)">⚡ ${t('주요 기능')}</summary>
-          <ul class="mt-2 text-[11px] list-disc pl-4 space-y-1">
-            <li><b>${t('병렬 실행')}</b> — ${t('같은 depth 노드를 동시 실행')}</li>
-            <li><b>SSE ${t('스트림')}</b> — ${t('실행 진행률 실시간 표시')}</li>
-            <li><b>Webhook</b> — ${t('외부 시스템에서 HTTP로 워크플로우 트리거')}</li>
-            <li><b>Cron</b> — ${t('스케줄로 자동 반복 실행')}</li>
-            <li><b>${t('폴백 체인')}</b> — ${t('실패 시 다음 AI로 자동 전환')}</li>
-            <li><b>Export/Import</b> — ${t('JSON으로 워크플로우 공유')}</li>
-            <li><b>${t('버전 히스토리')}</b> — ${t('이전 버전으로 복원 가능')}</li>
-            <li><b>Ctrl+C/V/Z</b> — ${t('복사/붙여넣기/실행취소')}</li>
-            <li><b>${t('빌트인 템플릿')}</b> — ${t('멀티 AI 비교, RAG, 코드 리뷰 등 8종')}</li>
-            <li><b>Ollama ${t('허브')}</b> — ${t('모델 검색/다운로드/삭제 + 엔진 설정')}</li>
-          </ul>
-        </details>
-      </div>
     </div>
 
     <!-- Ollama Serve 상태 바 -->
@@ -9453,6 +9432,57 @@ window._wizardDismiss = (checked) => {
   } else {
     localStorage.removeItem('providerWizardDismissed');
   }
+};
+
+window._cliInstall = async (toolId) => {
+  const confirmed = await confirmModal({
+    title: t('CLI 설치'),
+    message: t('터미널 창이 열리고 설치 명령이 실행됩니다. 계속할까요?'),
+    confirmLabel: t('설치 시작'),
+  });
+  if (!confirmed) return;
+  try {
+    const r = await api('/api/cli/install', { method: 'POST', body: JSON.stringify({ tool: toolId }) });
+    if (r.ok) {
+      if (r.alreadyInstalled) {
+        toast(t('이미 설치되어 있습니다'), 'ok');
+      } else {
+        toast(t('터미널에서 설치가 진행 중입니다. 완료 후 새로고침하세요.'), 'ok');
+      }
+      // 10초마다 상태 재확인 (완료 시 자동 UI 갱신)
+      let tries = 0;
+      const poll = setInterval(async () => {
+        tries += 1;
+        try {
+          const s = await api('/api/cli/status');
+          if (s && s.tools && s.tools[toolId] && s.tools[toolId].installed) {
+            clearInterval(poll);
+            toast(t('설치가 감지되었습니다 — 새로고침합니다'), 'ok');
+            if (state.view === 'aiProviders') renderView();
+          } else if (tries >= 30) { // 5분 후 중단
+            clearInterval(poll);
+          }
+        } catch {}
+      }, 10000);
+    } else {
+      toast(errMsg(r) || t('설치 실패'), 'err');
+    }
+  } catch (e) { toast(String(e), 'err'); }
+};
+
+window._cliLogin = async (toolId) => {
+  try {
+    const r = await api('/api/cli/login', { method: 'POST', body: JSON.stringify({ tool: toolId }) });
+    if (r.ok) {
+      if (r.noLoginRequired) {
+        toast(t('이 도구는 로그인이 필요하지 않습니다'), 'ok');
+      } else {
+        toast(t('터미널에서 로그인 창이 열렸습니다'), 'ok');
+      }
+    } else {
+      toast(errMsg(r) || t('로그인 실패'), 'err');
+    }
+  } catch (e) { toast(String(e), 'err'); }
 };
 
 window.testProvider = async (pid) => {

@@ -11,6 +11,30 @@
 
 ---
 
+## [2.2.0] — 2026-04-22
+
+### 🎯 v2.2 — 프로바이더 탭 3종 개선
+
+**프로바이더 CLI 감지 견고화**
+- `server/ai_providers.py` 에 `_which()` 헬퍼 신설 — `shutil.which` PATH 탐지 실패 시 `/opt/homebrew/bin`·`~/.local/bin`·nvm/asdf node 버전 디렉터리 등 **11개 fallback 경로** 전수 검색. LaunchAgent·GUI 런치 등 PATH 가 좁혀진 환경에서도 Claude/Codex/Gemini/Ollama CLI 를 정확히 감지.
+- `ClaudeCliProvider._bin`, `OllamaProvider._bin`, `GeminiCliProvider._bin`, `CodexCliProvider._bin`, `CustomCLIProvider._bin`, 임베딩 실행 경로 모두 `_which()` 로 교체.
+
+**CLI 설치·로그인 원클릭 (신규)**
+- 신규 모듈 `server/cli_tools.py` — 4종 CLI 설치·상태·로그인 통합 관리.
+  - `GET /api/cli/status` — 4종(claude/codex/gemini/ollama) 설치 여부·버전·경로 + brew/npm 가용성 반환
+  - `POST /api/cli/install` — brew 우선 → npm → 설치 스크립트 자동 선택, AppleScript 로 Terminal 열어 **대화형 설치 수행**
+  - `POST /api/cli/login` — `claude auth login` / `codex login` / `gemini` 최초 실행 등을 터미널에서 실행
+- 설치 방법 카탈로그: `brew install --cask claude-code` · `npm install -g @openai/codex` · `npm install -g @google/gemini-cli` · `curl ... ollama.com/install.sh`
+- AI 프로바이더 탭의 CLI 카드에 상태 배지 추가:
+  - 미설치 → `⬇️ 설치 (Homebrew|npm)` 버튼 · 클릭 시 터미널 열림, 10초마다 설치 감지 폴링(최대 5분)
+  - 설치 완료 → `✅ 설치 완료 · <버전>` + `🔐 로그인` 버튼
+
+**UI 간소화**
+- AI 프로바이더 탭 하단 "💡 워크플로우 & 프로바이더 사용 가이드" 섹션 전체 제거(~50줄 삭제) — 별도 탭의 튜토리얼·노드 카탈로그와 중복.
+
+**i18n**
+- `translations_manual_9.py` 에 CLI 설치/로그인 문구 14개 키 등록(EN/ZH). ko/en/zh 각 **2,950 키** · 누락 0 · 한글 잔존 0.
+
 ## [2.1.4] — 2026-04-22
 
 ### Fixed — 설정 드롭다운 테마 3종 번역 누락

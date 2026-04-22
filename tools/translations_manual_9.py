@@ -419,6 +419,25 @@ NEW_EN = {
     "settings.sunset": "Sunset",
     # 한글 text 키 — runtime text-based 번역 경로 대응 (data-i18n 외 텍스트 노드 스캐너)
     "미드나잇": "Midnight",
+
+    # v2.2.0 — CLI 설치/로그인 UI
+    "설치": "Install",
+    "로그인": "Log in",
+    "설치 완료": "Installed",
+    "설치 시작": "Start install",
+    "설치 스크립트": "Install script",
+    "설치 실패": "Install failed",
+    "로그인 실패": "Login failed",
+    "CLI 설치": "Install CLI",
+    "설치 시 터미널 창이 열립니다": "A terminal window will open for installation",
+    "이미 설치되어 있습니다": "Already installed",
+    "이 도구는 로그인이 필요하지 않습니다": "This tool does not require login",
+    "설치가 감지되었습니다 — 새로고침합니다": "Installation detected — refreshing",
+    "터미널 창이 열리고 설치 명령이 실행됩니다. 계속할까요?":
+        "A terminal window will open and the install command will run. Continue?",
+    "터미널에서 설치가 진행 중입니다. 완료 후 새로고침하세요.":
+        "Installation is running in the terminal. Refresh after it completes.",
+    "터미널에서 로그인 창이 열렸습니다": "A login window has opened in the terminal",
 }
 
 NEW_ZH = {
@@ -834,4 +853,23 @@ NEW_ZH = {
     "settings.sunset": "日落",
     # 한글 text 키 — runtime text-based 번역 경로 대응
     "미드나잇": "午夜",
+
+    # v2.2.0 — CLI 安装/登录 UI
+    "설치": "安装",
+    "로그인": "登录",
+    "설치 완료": "已安装",
+    "설치 시작": "开始安装",
+    "설치 스크립트": "安装脚本",
+    "설치 실패": "安装失败",
+    "로그인 실패": "登录失败",
+    "CLI 설치": "安装 CLI",
+    "설치 시 터미널 창이 열립니다": "安装时将打开终端窗口",
+    "이미 설치되어 있습니다": "已安装",
+    "이 도구는 로그인이 필요하지 않습니다": "此工具无需登录",
+    "설치가 감지되었습니다 — 새로고침합니다": "检测到安装 — 正在刷新",
+    "터미널 창이 열리고 설치 명령이 실행됩니다. 계속할까요?":
+        "将打开终端窗口并执行安装命令。是否继续？",
+    "터미널에서 설치가 진행 중입니다. 완료 후 새로고침하세요.":
+        "终端中正在安装。完成后请刷新。",
+    "터미널에서 로그인 창이 열렸습니다": "已在终端中打开登录窗口",
 }
