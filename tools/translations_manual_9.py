@@ -493,6 +493,21 @@ NEW_EN = {
     "비지원": "unsupported",
     "프롬프트를 입력하세요": "Enter a prompt",
     "Extended Thinking 은 Haiku 에서 지원되지 않습니다": "Extended Thinking is not supported on Haiku",
+
+    # ── Tool Use Playground (v2.4.0) ───────────────────────────
+    "Tool Use 플레이그라운드": "Tool Use Playground",
+    "tool schema 를 JSON 으로 정의하고, Claude 가 tool_use 블록을 반환하면 그 자리에서 tool_result 를 수동 입력해 다음 턴을 진행합니다.":
+        "Define tool schemas as JSON. When Claude returns a tool_use block, enter the tool_result inline to proceed to the next turn.",
+    "사용자 메시지": "User message",
+    "Claude 에게 할 질문": "Your question for Claude",
+    "전송": "Send",
+    "새 대화": "New conversation",
+    "tool_result 수동 입력": "Enter tool_result",
+    "tool_result 를 먼저 입력하세요": "Enter tool_result first",
+    "tool_result 내용을 입력하세요": "Enter the tool_result content",
+    "제출": "Submit",
+    "대화가 비어 있습니다. 위 입력창에서 시작하세요.": "Conversation is empty. Start from the input above.",
+    "메시지를 입력하세요": "Enter a message",
 }
 
 NEW_ZH = {
@@ -982,4 +997,19 @@ NEW_ZH = {
     "비지원": "不支持",
     "프롬프트를 입력하세요": "请输入提示",
     "Extended Thinking 은 Haiku 에서 지원되지 않습니다": "Haiku 不支持 Extended Thinking",
+
+    # ── Tool Use Playground (v2.4.0) ───────────────────────────
+    "Tool Use 플레이그라운드": "工具使用实验室",
+    "tool schema 를 JSON 으로 정의하고, Claude 가 tool_use 블록을 반환하면 그 자리에서 tool_result 를 수동 입력해 다음 턴을 진행합니다.":
+        "用 JSON 定义工具 schema。当 Claude 返回 tool_use 块时,就地手动输入 tool_result 继续下一轮。",
+    "사용자 메시지": "用户消息",
+    "Claude 에게 할 질문": "要向 Claude 提出的问题",
+    "전송": "发送",
+    "새 대화": "新对话",
+    "tool_result 수동 입력": "手动输入 tool_result",
+    "tool_result 를 먼저 입력하세요": "请先输入 tool_result",
+    "tool_result 내용을 입력하세요": "请输入 tool_result 内容",
+    "제출": "提交",
+    "대화가 비어 있습니다. 위 입력창에서 시작하세요.": "对话为空。请从上方输入框开始。",
+    "메시지를 입력하세요": "请输入消息",
 }

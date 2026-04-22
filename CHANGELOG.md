@@ -11,6 +11,29 @@
 
 ---
 
+## [2.4.0] — 2026-04-23
+
+### 🛠️ Tool Use Playground — 신규 탭 (work 그룹)
+
+Anthropic Tool Use 의 라운드 트립(user → assistant tool_use → user tool_result → assistant)을 수동으로 연습할 수 있는 플레이그라운드.
+
+**기능**
+- 기본 도구 템플릿 3종 원클릭 추가: `get_weather` / `calculator` / `web_search` (mock)
+- tools JSON 배열을 직접 편집
+- 대화 버블 시각화 (role, text, tool_use, tool_result 구분 색상)
+- tool_use 수신 시 같은 메시지 안에서 바로 tool_result 수동 입력 → 제출 → 다음 턴
+- "새 대화" 버튼으로 messages 배열 초기화
+- 히스토리 최근 20건 (`~/.claude-dashboard-tool-use-lab.json`)
+
+**Architecture**
+- `server/tool_use_lab.py` 신설 — `api_tool_use_{turn,templates,history}`
+- `server/routes.py` — 3개 라우트 추가 (`GET templates/history`, `POST turn`)
+- `server/nav_catalog.py` — `toolUseLab` 탭 등록 + en/zh desc
+- `dist/index.html` — NAV + `VIEWS.toolUseLab` (대화 버블 + tool_result 인라인 폼)
+- `tools/translations_manual_9.py` — 13 키 × ko/en/zh 추가
+
+---
+
 ## [2.3.0] — 2026-04-23
 
 ### 🧊 Prompt Cache Lab — 신규 탭 (work 그룹)

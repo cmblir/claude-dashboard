@@ -853,6 +853,9 @@ const NAV = [
   { id: 'thinkingLab', icon: '🧠', label: 'Extended Thinking', group: 'work',
     desc: 'Opus/Sonnet thinking block 분리 시각화 — budget_tokens 슬라이더',
     docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking' },
+  { id: 'toolUseLab',  icon: '🛠️', label: 'Tool Use 플레이그라운드', group: 'work',
+    desc: 'tool schema 정의 → tool_use 수신 → tool_result 피드 멀티 턴',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use' },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -7091,6 +7094,199 @@ async function tlRun() {
     toast(t('네트워크 오류') + ': ' + e.message, 'err');
     if (st) st.textContent = '';
   }
+}
+
+// ────────────────────────────────────────────────────────────────
+// TOOL USE PLAYGROUND (v2.4.0)
+// tool schema 정의 → 메시지 → tool_use 수신 → 사용자가 tool_result 수동 입력 → 다음 턴
+// ────────────────────────────────────────────────────────────────
+VIEWS.toolUseLab = async () => {
+  const [tpl, hist] = await Promise.all([
+    api('/api/tool-use-lab/templates'),
+    api('/api/tool-use-lab/history'),
+  ]);
+  state.data.tu = state.data.tu || {
+    model: 'claude-sonnet-4-6',
+    maxTokens: 2048,
+    tools: JSON.stringify((tpl.templates || []).slice(0, 1).map(x => x.tool), null, 2),
+    messages: [],
+    pendingInput: '',
+    busy: false,
+  };
+  const tu = state.data.tu;
+
+  const tplBtns = (tpl.templates || []).map(x =>
+    `<button class="chip" onclick="tuAddTool('${x.id}')">+ ${x.label}</button>`
+  ).join('');
+
+  // messages 배열을 대화 버블 형태로 렌더
+  const bubbles = (tu.messages || []).map((m, idx) => {
+    const role = m.role;
+    const content = Array.isArray(m.content) ? m.content : [{type:'text', text: String(m.content||'')}];
+    const parts = content.map((c, ci) => {
+      if (c.type === 'text') {
+        return `<div class="text-[12px] whitespace-pre-wrap">${_escapeHTML(c.text||'')}</div>`;
+      }
+      if (c.type === 'tool_use') {
+        return `<div class="mt-1 p-2 bg-[var(--bg-alt)] border border-[var(--accent)] rounded text-[11px]">
+          <div class="text-[var(--accent)] font-mono mb-1">🛠️ tool_use: ${c.name}</div>
+          <pre class="font-mono text-[11px] whitespace-pre-wrap">${_escapeHTML(JSON.stringify(c.input||{}, null, 2))}</pre>
+          <div class="mt-2">
+            <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('tool_result 수동 입력')}</label>
+            <textarea id="tr_${idx}_${ci}" class="input text-[11px] font-mono" rows="2" placeholder='{"result":"..."}'></textarea>
+            <button class="btn btn-sm mt-1" onclick="tuSubmitToolResult(${idx}, ${ci}, '${c.id}')">${t('제출')}</button>
+          </div>
+        </div>`;
+      }
+      if (c.type === 'tool_result') {
+        const text = Array.isArray(c.content)
+          ? c.content.map(x => x.text || JSON.stringify(x)).join('\n')
+          : String(c.content || '');
+        return `<div class="mt-1 p-2 bg-[var(--bg-alt)] border border-[var(--ok)] rounded text-[11px]">
+          <div class="text-[var(--ok)] font-mono mb-1">✓ tool_result (${c.tool_use_id||''})</div>
+          <pre class="font-mono text-[11px] whitespace-pre-wrap">${_escapeHTML(text)}</pre>
+        </div>`;
+      }
+      return `<div class="text-[11px] text-[var(--text-dim)]">[${c.type||'?'}]</div>`;
+    }).join('');
+    const badge = role === 'user' ? '👤' : '🤖';
+    const align = role === 'user' ? 'justify-end' : 'justify-start';
+    return `<div class="flex ${align} mb-2">
+      <div class="max-w-[90%] p-2 rounded ${role==='user'?'bg-[var(--bg-hover)]':'card'}">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${badge} ${role}</div>
+        ${parts}
+      </div>
+    </div>`;
+  }).join('');
+
+  const awaitingToolResult = (() => {
+    const last = tu.messages[tu.messages.length-1];
+    if (!last || last.role !== 'assistant') return false;
+    const arr = Array.isArray(last.content) ? last.content : [];
+    return arr.some(c => c.type === 'tool_use');
+  })();
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">🛠️ ${t('Tool Use 플레이그라운드')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('tool schema 를 JSON 으로 정의하고, Claude 가 tool_use 블록을 반환하면 그 자리에서 tool_result 를 수동 입력해 다음 턴을 진행합니다.')}
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="space-y-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('모델')}</label>
+          <select class="input flex-1" onchange="tuSet('model', this.value)">
+            <option value="claude-opus-4-7" ${tu.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${tu.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
+            <option value="claude-haiku-4-5" ${tu.model==='claude-haiku-4-5'?'selected':''}>Haiku 4.5</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('tools (JSON 배열)')}</label>
+            <div class="flex gap-1 flex-wrap">${tplBtns}</div>
+          </div>
+          <textarea class="input font-mono text-[11px]" rows="10" oninput="tuSet('tools', this.value)">${_escapeHTML(tu.tools || '[]')}</textarea>
+        </div>
+
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('사용자 메시지')}</label>
+          <textarea class="input text-[12px]" rows="3" id="tuInput" oninput="tuSet('pendingInput', this.value)" placeholder="${t('Claude 에게 할 질문')}">${_escapeHTML(tu.pendingInput || '')}</textarea>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary" onclick="tuSendUser()" ${awaitingToolResult?'disabled':''}>▶ ${t('전송')}</button>
+          <button class="btn" onclick="tuReset()">${t('새 대화')}</button>
+          <span id="tuStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+        </div>
+        ${awaitingToolResult ? `<div class="text-[11px] text-[var(--warn)]">⚠️ ${t('tool_result 를 먼저 입력하세요')}</div>` : ''}
+      </div>
+
+      <div class="space-y-2 max-h-[700px] overflow-auto pr-1">
+        ${bubbles || `<div class="text-[11px] text-[var(--text-dim)]">${t('대화가 비어 있습니다. 위 입력창에서 시작하세요.')}</div>`}
+      </div>
+    </div>
+  `;
+};
+
+function tuSet(key, val) {
+  state.data.tu = state.data.tu || {};
+  state.data.tu[key] = val;
+}
+function tuReset() {
+  const tu = state.data.tu || {};
+  state.data.tu = { ...tu, messages: [], pendingInput: '' };
+  renderView();
+}
+async function tuAddTool(id) {
+  const r = await api('/api/tool-use-lab/templates');
+  const tpl = (r.templates || []).find(x => x.id === id);
+  if (!tpl) return;
+  const tu = state.data.tu || {};
+  let cur;
+  try { cur = JSON.parse(tu.tools || '[]'); if (!Array.isArray(cur)) cur = []; }
+  catch { cur = []; }
+  if (!cur.find(x => x && x.name === tpl.tool.name)) cur.push(tpl.tool);
+  tuSet('tools', JSON.stringify(cur, null, 2));
+  renderView();
+}
+async function tuSendUser() {
+  const tu = state.data.tu || {};
+  const text = (tu.pendingInput || '').trim();
+  if (!text) { toast(t('메시지를 입력하세요'), 'err'); return; }
+  let tools;
+  try { tools = JSON.parse(tu.tools || '[]'); }
+  catch (e) { toast(t('tools JSON 오류') + ': ' + e.message, 'err'); return; }
+  const msgs = [...(tu.messages || []), { role: 'user', content: text }];
+  state.data.tu.messages = msgs;
+  state.data.tu.pendingInput = '';
+  await tuCallTurn(tools);
+}
+async function tuCallTurn(tools) {
+  const tu = state.data.tu;
+  const st = document.getElementById('tuStatus');
+  if (st) st.textContent = t('호출 중…');
+  try {
+    const r = await fetch('/api/tool-use-lab/turn', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ model: tu.model, maxTokens: tu.maxTokens, tools, messages: tu.messages }),
+    }).then(x => x.json());
+    if (r.needKey) {
+      toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err');
+      if (st) st.textContent = '';
+      return;
+    }
+    if (!r.ok) {
+      toast((r.error || t('실행 실패')), 'err');
+      if (st) st.textContent = '';
+      return;
+    }
+    state.data.tu.messages.push({ role: 'assistant', content: r.assistantContent || [] });
+    if (st) st.textContent = `${r.durationMs||0}ms · ${r.stopReason||''}`;
+    renderView();
+  } catch (e) {
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (st) st.textContent = '';
+  }
+}
+async function tuSubmitToolResult(msgIdx, _blockIdx, toolUseId) {
+  const ta = document.getElementById(`tr_${msgIdx}_${_blockIdx}`);
+  const raw = (ta && ta.value || '').trim();
+  if (!raw) { toast(t('tool_result 내용을 입력하세요'), 'err'); return; }
+  const tu = state.data.tu;
+  // 새 user 메시지에 tool_result 블록 추가
+  tu.messages.push({
+    role: 'user',
+    content: [{ type: 'tool_result', tool_use_id: toolUseId, content: raw }],
+  });
+  let tools;
+  try { tools = JSON.parse(tu.tools || '[]'); }
+  catch (e) { toast(t('tools JSON 오류') + ': ' + e.message, 'err'); return; }
+  await tuCallTurn(tools);
 }
 
 // ────────────────────────────────────────────────────────────────
