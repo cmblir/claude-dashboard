@@ -6,12 +6,21 @@
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.3.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.9.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#技术栈)
 
 Claude Control Center 是一款**本地优先的仪表板**，统一管理你的整个 `~/.claude/` 目录（代理、技能、钩子、插件、MCP、会话、项目），并内置一个强大的 **n8n 风格工作流引擎** 用于多 AI 供应商编排——全部包含在一行 `python3 server.py` 中。
 
 **无云端上传。无遥测。无需安装任何依赖。** 只需 Python 标准库和一个 HTML 文件。
+
+🆕 **v2.3.0 ~ v2.9.0 (2026-04-23)** — `work` 组新增 Claude API 实验室 **7 个标签页**：
+- 🧊 [Prompt Cache Lab](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) (v2.3.0) — `cache_control` 实测 + USD 成本节省
+- 🧠 [Extended Thinking Lab](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking) (v2.4.0) — 思维块分离展示 + `budget_tokens` 滑块
+- 🛠️ [Tool Use 实验室](https://docs.anthropic.com/en/docs/build-with-claude/tool-use) (v2.5.0) — `tool_use` ↔ `tool_result` 手动往返
+- 📦 [Batch Jobs](https://docs.anthropic.com/en/docs/build-with-claude/message-batches) (v2.6.0) — 最多 1000 条/批,JSONL 结果
+- 📎 [Files API](https://docs.anthropic.com/en/docs/build-with-claude/files) (v2.7.0) — 上传/列出/删除 + `document` 引用
+- 👁️ [视觉 / PDF 实验室](https://docs.anthropic.com/en/docs/build-with-claude/vision) (v2.8.0) — Opus/Sonnet/Haiku 3 模型并行比较
+- 🏁 模型基准测试 (v2.9.0) — 提示集 × 模型交叉运行,汇总延迟·令牌·费用
 
 ---
 

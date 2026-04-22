@@ -6,14 +6,21 @@
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.3.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.9.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#tech-stack)
 
 Claude Control Center is a **local-first dashboard** that manages your entire `~/.claude/` directory (agents, skills, hooks, plugins, MCP, sessions, projects) and ships a powerful **n8n-style workflow engine** with multi-AI provider orchestration — all in a single `python3 server.py` command.
 
 **No cloud. No telemetry. No dependencies to install.** Just Python stdlib and one HTML file.
 
-🆕 **v2.3.0** — [Prompt Cache Lab](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching): measure `cache_control` impact on tokens & USD cost in real time (work tab)
+🆕 **v2.3.0 ~ v2.9.0 (2026-04-23)** — Seven Claude API playground tabs added to the **work** group:
+- [🧊 Prompt Cache Lab](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) (v2.3.0) — `cache_control` measurement + USD savings
+- [🧠 Extended Thinking Lab](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking) (v2.4.0) — `thinking` block visualization + `budget_tokens` slider
+- [🛠️ Tool Use Playground](https://docs.anthropic.com/en/docs/build-with-claude/tool-use) (v2.5.0) — manual `tool_use` ↔ `tool_result` round-trip
+- [📦 Batch Jobs](https://docs.anthropic.com/en/docs/build-with-claude/message-batches) (v2.6.0) — up to 1000 prompts/batch, JSONL results
+- [📎 Files API](https://docs.anthropic.com/en/docs/build-with-claude/files) (v2.7.0) — upload/list/delete + `document` reference
+- [👁️ Vision / PDF Lab](https://docs.anthropic.com/en/docs/build-with-claude/vision) (v2.8.0) — parallel Opus/Sonnet/Haiku comparison
+- 🏁 Model Benchmark (v2.9.0) — cross-run prompt sets × models, aggregate latency/tokens/USD cost
 
 ---
 
