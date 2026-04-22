@@ -48,7 +48,39 @@ class AIResponse:
         return asdict(self)
 
 
+@dataclass
+class EmbeddingResponse:
+    """임베딩 프로바이더가 반환하는 통일된 응답 형식."""
+    status: str = "ok"              # "ok" | "err"
+    embeddings: list = field(default_factory=list)  # [[float, ...], ...]
+    error: str = ""
+    provider: str = ""
+    model: str = ""
+    dimensions: int = 0             # 벡터 차원
+    tokens_used: int = 0
+    duration_ms: int = 0
+    cost_usd: float = 0.0
+    raw: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        # embeddings 는 크기가 클 수 있으므로 요약만
+        if d["embeddings"]:
+            d["embeddingCount"] = len(d["embeddings"])
+            d["dimensions"] = len(d["embeddings"][0]) if d["embeddings"] else 0
+            d["embeddings"] = f"[{len(d['embeddings'])} vectors]"
+        return d
+
+
 # ───────── 모델 정보 데이터클래스 ─────────
+
+# 모델 capability 상수
+CAP_CHAT = "chat"          # 대화/생성
+CAP_EMBED = "embed"        # 임베딩
+CAP_CODE = "code"          # 코드 생성 특화
+CAP_VISION = "vision"      # 이미지 입력
+CAP_REASONING = "reasoning" # 추론 모드 (o3 등)
+
 
 @dataclass
 class ModelInfo:
@@ -63,6 +95,7 @@ class ModelInfo:
     supports_system_prompt: bool = True
     supports_streaming: bool = True
     supports_tools: bool = False
+    capabilities: list = field(default_factory=lambda: [CAP_CHAT])  # ["chat", "embed", "code", ...]
     note: str = ""
 
     def to_dict(self) -> dict:
@@ -80,6 +113,7 @@ class BaseProvider(ABC):
     provider_type: str = ""         # "cli" | "api"
     homepage: str = ""
     icon: str = ""                  # 이모지 또는 아이콘 키
+    capabilities: list = [CAP_CHAT] # 기본: 채팅만. 서브클래스가 오버라이드
 
     @abstractmethod
     def is_available(self) -> bool:
@@ -88,6 +122,10 @@ class BaseProvider(ABC):
     @abstractmethod
     def list_models(self) -> list[ModelInfo]:
         """사용 가능한 모델 목록."""
+
+    def list_models_by_capability(self, cap: str) -> list[ModelInfo]:
+        """특정 capability 를 가진 모델만 필터."""
+        return [m for m in self.list_models() if cap in (m.capabilities or [CAP_CHAT])]
 
     @abstractmethod
     def execute(
@@ -102,6 +140,24 @@ class BaseProvider(ABC):
     ) -> AIResponse:
         """프롬프트 실행 → 응답 반환."""
 
+    def embed(
+        self,
+        texts: list[str],
+        *,
+        model: str = "",
+        timeout: int = 60,
+    ) -> EmbeddingResponse:
+        """텍스트 임베딩 생성. 지원하지 않는 프로바이더는 기본 에러 반환."""
+        return EmbeddingResponse(
+            status="err",
+            error=f"provider '{self.provider_id}' does not support embeddings",
+            provider=self.provider_id,
+        )
+
+    def supports(self, cap: str) -> bool:
+        """이 프로바이더가 특정 capability 를 지원하는지."""
+        return cap in self.capabilities
+
     def health_check(self) -> dict:
         """프로바이더 상태 확인."""
         try:
@@ -112,6 +168,7 @@ class BaseProvider(ABC):
                 "available": available,
                 "modelCount": len(models),
                 "models": [m.id for m in models[:10]],
+                "capabilities": self.capabilities,
             }
         except Exception as e:
             return {"provider": self.provider_id, "available": False, "error": str(e)}
@@ -139,6 +196,7 @@ class BaseProvider(ABC):
             "homepage": self.homepage,
             "icon": self.icon,
             "available": self.is_available(),
+            "capabilities": self.capabilities,
         }
 
 
@@ -537,19 +595,26 @@ class CodexProvider(BaseProvider):
 
 
 class CustomCliProvider(BaseProvider):
-    """사용자 정의 CLI 프로바이더 — 임의의 CLI 도구를 등록."""
+    """사용자 정의 CLI 프로바이더 — 임의의 CLI 도구를 등록.
+
+    워크플로우 노드의 assignee 에서 `custom-id:model` 형태로 사용 가능.
+    config 에 capabilities 를 지정하면 해당 기능만 노출 (기본: [chat]).
+    embedCommand 가 별도로 있으면 embed() 도 지원.
+    """
 
     provider_type = "cli"
     icon = "⚙️"
 
     def __init__(self, config: dict):
-        """config: {id, name, command, args_template, models, homepage?}
+        """config: {id, name, command, argsTemplate, models, homepage?,
+                    capabilities?, embedCommand?, embedArgsTemplate?}
 
-        args_template 에서 사용 가능한 플레이스홀더:
+        argsTemplate 에서 사용 가능한 플레이스홀더:
           {prompt}  — 사용자 프롬프트
           {system}  — 시스템 프롬프트
           {model}   — 모델 id
           {cwd}     — 작업 디렉토리
+          {input}   — 입력 텍스트 (embed 용)
         """
         self.provider_id = config.get("id", "custom")
         self.provider_name = config.get("name", "Custom CLI")
@@ -558,6 +623,12 @@ class CustomCliProvider(BaseProvider):
         self._args_template = config.get("argsTemplate", "{prompt}")
         self._models_raw = config.get("models", [])
         self._timeout_default = int(config.get("timeout", 300))
+        # capabilities: 사용자가 지정 가능 (chat, embed, code 등)
+        raw_caps = config.get("capabilities") or ["chat"]
+        self.capabilities = [str(c) for c in raw_caps if isinstance(c, str)][:5]
+        # embedding 전용 명령어 (별도 CLI 명령이 필요한 경우)
+        self._embed_command = config.get("embedCommand", "")
+        self._embed_args_template = config.get("embedArgsTemplate", "{input}")
 
     def _bin(self) -> str:
         return shutil.which(self._command) or ""
@@ -569,14 +640,16 @@ class CustomCliProvider(BaseProvider):
         out = []
         for m in self._models_raw:
             if isinstance(m, str):
-                out.append(ModelInfo(id=m, label=m))
+                out.append(ModelInfo(id=m, label=m, capabilities=list(self.capabilities)))
             elif isinstance(m, dict):
+                caps = m.get("capabilities", self.capabilities)
                 out.append(ModelInfo(
                     id=m.get("id", ""), label=m.get("label", m.get("id", "")),
                     context_window=int(m.get("contextWindow", 0)),
                     price_in=float(m.get("priceIn", 0)),
                     price_out=float(m.get("priceOut", 0)),
                     note=m.get("note", ""),
+                    capabilities=[str(c) for c in caps] if isinstance(caps, list) else list(self.capabilities),
                 ))
         return out
 
@@ -652,12 +725,13 @@ class OpenAIApiProvider(BaseProvider):
     provider_type = "api"
     homepage = "https://platform.openai.com"
     icon = "🤖"
+    capabilities = [CAP_CHAT, CAP_EMBED, CAP_CODE, CAP_VISION, CAP_REASONING]
 
     _MODELS = [
         ModelInfo("gpt-4.1", "GPT-4.1", 1_000_000,
-                  2.0, 8.0, note="최신 플래그십"),
+                  2.0, 8.0, note="최신 플래그십", capabilities=[CAP_CHAT, CAP_CODE]),
         ModelInfo("gpt-4.1-mini", "GPT-4.1 Mini", 1_000_000,
-                  0.40, 1.60, note="저렴한 대안"),
+                  0.40, 1.60, note="저렴한 대안", capabilities=[CAP_CHAT, CAP_CODE]),
         ModelInfo("gpt-4.1-nano", "GPT-4.1 Nano", 1_000_000,
                   0.10, 0.40, note="가장 저렴"),
         ModelInfo("gpt-4o", "GPT-4o", 128_000,
@@ -669,7 +743,14 @@ class OpenAIApiProvider(BaseProvider):
         ModelInfo("o3", "o3", 200_000,
                   2.0, 8.0, note="고성능 추론"),
         ModelInfo("o3-mini", "o3-mini", 200_000,
-                  1.10, 4.40, note="추론 경량"),
+                  1.10, 4.40, note="추론 경량", capabilities=[CAP_CHAT, CAP_REASONING]),
+        # ── Embedding 모델 ──
+        ModelInfo("text-embedding-3-large", "Embedding 3 Large", 8_191,
+                  0.13, 0.0, note="3072 dims, 최고 품질", capabilities=[CAP_EMBED]),
+        ModelInfo("text-embedding-3-small", "Embedding 3 Small", 8_191,
+                  0.02, 0.0, note="1536 dims, 저렴", capabilities=[CAP_EMBED]),
+        ModelInfo("text-embedding-ada-002", "Embedding Ada 002", 8_191,
+                  0.10, 0.0, note="1536 dims, legacy", capabilities=[CAP_EMBED]),
     ]
 
     def __init__(self, api_key: str = ""):
@@ -758,6 +839,70 @@ class OpenAIApiProvider(BaseProvider):
             status="ok", output=output,
             provider=self.provider_id, model=model,
             tokens_in=ti, tokens_out=to_, tokens_total=ti + to_,
+            cost_usd=cost, duration_ms=duration, raw=data,
+        )
+
+    def embed(
+        self,
+        texts: list[str],
+        *,
+        model: str = "",
+        timeout: int = 60,
+    ) -> EmbeddingResponse:
+        """OpenAI Embeddings API 호출."""
+        import urllib.request
+        import urllib.error
+
+        t0 = int(time.time() * 1000)
+        if not self._api_key:
+            return EmbeddingResponse(
+                status="err", error="OPENAI_API_KEY not set",
+                provider=self.provider_id, duration_ms=int(time.time() * 1000) - t0,
+            )
+
+        model = model or "text-embedding-3-small"
+        body = json.dumps({"input": texts, "model": model}).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/embeddings",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._api_key}",
+            },
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            err_body = ""
+            try:
+                err_body = e.read().decode("utf-8")[:500]
+            except Exception:
+                pass
+            return EmbeddingResponse(
+                status="err", error=f"HTTP {e.code}: {err_body}",
+                provider=self.provider_id, model=model,
+                duration_ms=int(time.time() * 1000) - t0,
+            )
+        except Exception as e:
+            return EmbeddingResponse(
+                status="err", error=str(e),
+                provider=self.provider_id, model=model,
+                duration_ms=int(time.time() * 1000) - t0,
+            )
+
+        duration = int(time.time() * 1000) - t0
+        embeddings = [d["embedding"] for d in data.get("data", [])]
+        dims = len(embeddings[0]) if embeddings else 0
+        usage = data.get("usage") or {}
+        tokens = usage.get("total_tokens", 0)
+        cost = self.estimate_cost(model, tokens, 0)
+
+        return EmbeddingResponse(
+            status="ok", embeddings=embeddings,
+            provider=self.provider_id, model=model,
+            dimensions=dims, tokens_used=tokens,
             cost_usd=cost, duration_ms=duration, raw=data,
         )
 
@@ -967,13 +1112,22 @@ class AnthropicApiProvider(BaseProvider):
 
 
 class OllamaApiProvider(BaseProvider):
-    """Ollama HTTP API — CLI 대신 REST API 직접 호출 (원격 서버 지원)."""
+    """Ollama HTTP API — CLI 대신 REST API 직접 호출 (원격 서버 지원).
+
+    chat + embedding 모두 지원. embedding 모델(bge-m3, nomic-embed-text 등)은
+    자동 감지되어 list_models 에서 capability=[CAP_EMBED] 로 태깅된다.
+    """
 
     provider_id = "ollama-api"
     provider_name = "Ollama (API)"
     provider_type = "api"
     homepage = "https://ollama.com"
     icon = "🦙"
+    capabilities = [CAP_CHAT, CAP_EMBED]
+
+    # 모델 이름에 이 키워드가 포함되면 embedding 모델로 인식
+    _EMBED_HINTS = {"embed", "bge", "nomic-embed", "e5", "gte", "instructor",
+                    "mxbai-embed", "snowflake-arctic-embed", "all-minilm"}
 
     def __init__(self, base_url: str = "", api_key: str = ""):
         self._base_url = (
@@ -992,20 +1146,26 @@ class OllamaApiProvider(BaseProvider):
         except Exception:
             return False
 
+    def _is_embed_model(self, name: str) -> bool:
+        lower = name.lower()
+        return any(h in lower for h in self._EMBED_HINTS)
+
     def list_models(self) -> list[ModelInfo]:
         import urllib.request
         try:
             req = urllib.request.Request(f"{self._base_url}/api/tags")
             with urllib.request.urlopen(req, timeout=5) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-            return [
-                ModelInfo(
-                    id=m.get("name", ""),
-                    label=m.get("name", ""),
-                    note="로컬 — 무료",
-                )
-                for m in data.get("models", [])
-            ]
+            out = []
+            for m in data.get("models", []):
+                name = m.get("name", "")
+                is_embed = self._is_embed_model(name)
+                caps = [CAP_EMBED] if is_embed else [CAP_CHAT]
+                note = "임베딩 모델 — 무료" if is_embed else "로컬 — 무료"
+                out.append(ModelInfo(
+                    id=name, label=name, note=note, capabilities=caps,
+                ))
+            return out
         except Exception:
             return []
 
@@ -1059,6 +1219,64 @@ class OllamaApiProvider(BaseProvider):
             provider=self.provider_id, model=model,
             tokens_in=ti, tokens_out=to_, tokens_total=ti + to_,
             duration_ms=duration, raw=data,
+        )
+
+    def embed(
+        self,
+        texts: list[str],
+        *,
+        model: str = "",
+        timeout: int = 60,
+    ) -> EmbeddingResponse:
+        """Ollama /api/embed 엔드포인트로 임베딩 생성.
+
+        model 예시: bge-m3, nomic-embed-text, mxbai-embed-large
+        """
+        import urllib.request
+        import urllib.error
+
+        t0 = int(time.time() * 1000)
+        model = model or "bge-m3"  # 기본 임베딩 모델
+
+        body_obj = {"model": model, "input": texts}
+        body = json.dumps(body_obj).encode("utf-8")
+        req = urllib.request.Request(
+            f"{self._base_url}/api/embed",
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            err_body = ""
+            try:
+                err_body = e.read().decode("utf-8")[:500]
+            except Exception:
+                pass
+            return EmbeddingResponse(
+                status="err", error=f"HTTP {e.code}: {err_body}",
+                provider=self.provider_id, model=model,
+                duration_ms=int(time.time() * 1000) - t0,
+            )
+        except Exception as e:
+            return EmbeddingResponse(
+                status="err", error=str(e),
+                provider=self.provider_id, model=model,
+                duration_ms=int(time.time() * 1000) - t0,
+            )
+
+        duration = int(time.time() * 1000) - t0
+        embeddings = data.get("embeddings", [])
+        dims = len(embeddings[0]) if embeddings else 0
+
+        return EmbeddingResponse(
+            status="ok", embeddings=embeddings,
+            provider=self.provider_id, model=model,
+            dimensions=dims, duration_ms=duration,
+            tokens_used=data.get("prompt_eval_count", 0),
+            raw={"model": model, "count": len(embeddings), "dimensions": dims},
         )
 
 
@@ -1313,3 +1531,39 @@ def execute_with_assignee(
         system_prompt=system_prompt, cwd=cwd,
         timeout=timeout, extra=extra, fallback=fallback,
     )
+
+
+def embed_with_provider(
+    provider_id: str,
+    texts: list[str],
+    *,
+    model: str = "",
+    timeout: int = 60,
+) -> EmbeddingResponse:
+    """워크플로우 embedding 노드에서 호출하는 편의 함수."""
+    reg = get_registry()
+    p = reg.get(provider_id)
+    if not p:
+        return EmbeddingResponse(status="err", error=f"provider not found: {provider_id}")
+    if not p.supports(CAP_EMBED):
+        return EmbeddingResponse(status="err", error=f"provider '{provider_id}' does not support embeddings")
+    return p.embed(texts, model=model, timeout=timeout)
+
+
+def list_providers_by_capability(cap: str) -> list[dict]:
+    """특정 capability 를 가진 프로바이더 + 모델 목록."""
+    reg = get_registry()
+    out = []
+    for p in reg.available_providers():
+        if not p.supports(cap):
+            continue
+        models = p.list_models_by_capability(cap)
+        if models:
+            out.append({
+                "id": p.provider_id,
+                "name": p.provider_name,
+                "icon": p.icon,
+                "type": p.provider_type,
+                "models": [m.to_dict() for m in models],
+            })
+    return out

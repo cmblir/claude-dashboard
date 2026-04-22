@@ -29,7 +29,7 @@ from .utils import _safe_read, _safe_write
 # ───────── 상수 ─────────
 
 _NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
-               "http", "transform", "variable", "subworkflow"}
+               "http", "transform", "variable", "subworkflow", "embedding"}
 _INPUT_MODES = {"concat", "first", "json"}
 _ASSIGNEES = {"opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
@@ -198,6 +198,12 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
         out["data"] = {
             "workflowId": _clamp_str(d.get("workflowId"), 60),
             "passInput": bool(d.get("passInput", True)),
+        }
+    elif ntype == "embedding":
+        out["data"] = {
+            "provider": _clamp_str(d.get("provider"), 60) or "ollama-api",
+            "model": _clamp_str(d.get("model"), 80) or "bge-m3",
+            "outputFormat": d.get("outputFormat") if d.get("outputFormat") in ("json", "dimensions", "raw") else "json",
         }
     # start 는 data 비움
     return out
@@ -553,6 +559,10 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     if ntype == "variable":
         return _execute_variable_node(data, inputs, _elapsed)
 
+    # ── Embedding 노드 — 텍스트 임베딩 생성 ──
+    if ntype == "embedding":
+        return _execute_embedding_node(data, inputs, _elapsed)
+
     # ── Sub-workflow 노드 — 다른 워크플로우 호출 ──
     if ntype == "subworkflow":
         return _execute_subworkflow_node(data, inputs, _elapsed)
@@ -751,6 +761,60 @@ def _execute_variable_node(data: dict, inputs: list[str], _elapsed) -> dict:
     value = inputs[0] if inputs else (data.get("defaultValue") or "")
     return {"status": "ok", "output": value, "durationMs": _elapsed(),
             "sessionId": "", "varName": var_name}
+
+
+def _execute_embedding_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Embedding 노드 — 텍스트를 벡터로 변환.
+
+    data.provider : "ollama-api", "openai-api" 등 (embed capability 필요)
+    data.model    : "bge-m3", "text-embedding-3-small" 등
+    data.outputFormat : "json" (벡터 JSON), "dimensions" (차원 수만), "raw" (전체)
+    """
+    provider_id = (data.get("provider") or "ollama-api").strip()
+    model = (data.get("model") or "bge-m3").strip()
+    output_fmt = data.get("outputFormat", "json")
+
+    texts = [t for t in inputs if t.strip()] if inputs else []
+    if not texts:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": "embedding input is empty", "sessionId": ""}
+
+    try:
+        from .ai_providers import get_registry
+        reg = get_registry()
+        p = reg.get(provider_id)
+        if not p:
+            return {"status": "err", "output": "", "durationMs": _elapsed(),
+                    "error": f"provider not found: {provider_id}", "sessionId": ""}
+        if not p.supports("embed"):
+            return {"status": "err", "output": "", "durationMs": _elapsed(),
+                    "error": f"provider '{provider_id}' does not support embeddings", "sessionId": ""}
+
+        resp = p.embed(texts, model=model)
+        if resp.status != "ok":
+            return {"status": "err", "output": "", "durationMs": _elapsed(),
+                    "error": resp.error, "sessionId": ""}
+
+        if output_fmt == "dimensions":
+            output = json.dumps({"dimensions": resp.dimensions, "count": len(resp.embeddings)})
+        elif output_fmt == "raw":
+            output = json.dumps(resp.to_dict(), ensure_ascii=False)
+        else:  # json
+            output = json.dumps({
+                "model": resp.model,
+                "dimensions": resp.dimensions,
+                "count": len(resp.embeddings),
+                "embeddings": resp.embeddings,
+            }, ensure_ascii=False)
+
+        return {
+            "status": "ok", "output": output, "durationMs": resp.duration_ms or _elapsed(),
+            "sessionId": "", "provider": resp.provider, "model": resp.model,
+            "tokensIn": resp.tokens_used, "tokensOut": 0,
+        }
+    except Exception as e:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"embedding failed: {e}", "sessionId": ""}
 
 
 def _execute_subworkflow_node(data: dict, inputs: list[str], _elapsed) -> dict:

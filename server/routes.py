@@ -54,6 +54,13 @@ from .ai_keys import (
     api_custom_provider_delete, api_fallback_chain_save,
     api_workflow_costs_summary,
 )
+from .ai_providers import list_providers_by_capability
+
+
+def _ai_providers_by_cap(query: dict) -> dict:
+    """GET /api/ai-providers/by-capability?cap=embed"""
+    cap = (query.get("cap", ["chat"])[0] or "chat").strip()
+    return {"capability": cap, "providers": list_providers_by_capability(cap)}
 from .logger import log
 from .mcp import (
     api_mcp_catalog, api_mcp_install, api_mcp_install_prepare,
@@ -154,6 +161,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/version": lambda q: api_version_info(),
     "/api/ai-providers/list": lambda q: api_providers_list(),
     "/api/ai-providers/costs": lambda q: api_workflow_costs_summary(),
+    "/api/ai-providers/by-capability": lambda q: _ai_providers_by_cap(q),
 }
 
 
