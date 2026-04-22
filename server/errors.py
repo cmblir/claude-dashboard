@@ -68,6 +68,7 @@ ERROR_MESSAGES: dict[str, str] = {
     "providers_required":     "프로바이더 목록 필수",
 
     # ── 워크플로우 ──
+    "invalid_cron":           "유효하지 않은 cron 표현식",
     "workflow_not_found":     "워크플로우를 찾을 수 없습니다",
     "workflow_cycle":         "워크플로우에 순환이 있습니다",
     "workflow_invalid":       "유효하지 않은 워크플로우 구조",

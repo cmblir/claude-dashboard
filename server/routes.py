@@ -45,6 +45,7 @@ from .workflows import (
     api_workflow_delete, api_workflow_export, api_workflow_get,
     api_workflow_import, api_workflow_patch, api_workflow_run,
     api_workflow_run_status, api_workflow_runs_list, api_workflow_save,
+    api_workflow_schedule_list, api_workflow_schedule_set,
     api_workflow_template_delete, api_workflow_template_get,
     api_workflow_template_save, api_workflow_templates_list,
     api_workflow_webhook, api_workflows_list, handle_workflow_run_stream,
@@ -54,7 +55,7 @@ from .ai_keys import (
     api_provider_delete_key, api_custom_provider_save,
     api_custom_provider_delete, api_fallback_chain_save,
     api_workflow_costs_summary, api_provider_compare,
-    api_provider_health,
+    api_provider_health, api_usage_alert_check, api_usage_alert_set,
 )
 from .ai_providers import list_providers_by_capability
 
@@ -160,11 +161,13 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/run-status": api_workflow_run_status,
     "/api/workflows/runs": api_workflow_runs_list,
     "/api/workflows/templates/list": lambda q: api_workflow_templates_list(q),
+    "/api/workflows/schedules": lambda q: api_workflow_schedule_list(),
     "/api/version": lambda q: api_version_info(),
     "/api/ai-providers/list": lambda q: api_providers_list(),
     "/api/ai-providers/costs": lambda q: api_workflow_costs_summary(),
     "/api/ai-providers/by-capability": lambda q: _ai_providers_by_cap(q),
     "/api/ai-providers/health": lambda q: api_provider_health(),
+    "/api/ai-providers/usage-alert": lambda q: api_usage_alert_check(),
 }
 
 
@@ -229,6 +232,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/templates/delete": api_workflow_template_delete,
     "/api/workflows/export": api_workflow_export,
     "/api/workflows/import": api_workflow_import,
+    "/api/workflows/schedule/set": api_workflow_schedule_set,
     "/api/session/spawn": api_session_spawn,
     "/api/ai-providers/test": api_provider_test,
     "/api/ai-providers/compare": api_provider_compare,
@@ -237,6 +241,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/ai-providers/custom/save": api_custom_provider_save,
     "/api/ai-providers/custom/delete": api_custom_provider_delete,
     "/api/ai-providers/fallback-chain": api_fallback_chain_save,
+    "/api/ai-providers/usage-alert/set": api_usage_alert_set,
 }
 
 

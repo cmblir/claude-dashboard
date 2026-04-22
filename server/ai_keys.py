@@ -521,6 +521,54 @@ def api_provider_health() -> dict:
     return {"ok": True, "results": results, "total": len(results), "available": available}
 
 
+def api_usage_alert_check() -> dict:
+    """사용량 임계치 초과 확인.
+
+    설정 파일의 alerts 필드에서 임계치를 읽고, 현재 비용 집계와 비교.
+    """
+    cfg = _load_config()
+    alerts = cfg.get("alerts") or {}
+    max_cost = float(alerts.get("maxDailyCostUsd") or 0)
+    max_tokens = int(alerts.get("maxDailyTokens") or 0)
+    if not max_cost and not max_tokens:
+        return {"ok": True, "alerts": [], "configured": False}
+
+    # 오늘 비용 집계
+    from .db import _db, _db_init
+    from datetime import datetime
+    _db_init()
+    today = datetime.now().strftime("%Y-%m-%d")
+    with _db() as c:
+        row = c.execute(
+            "SELECT COALESCE(SUM(cost_usd),0) AS cost, COALESCE(SUM(tokens_total),0) AS tokens,"
+            " COUNT(*) AS calls FROM workflow_costs WHERE ts >= ?",
+            (int(datetime.strptime(today, "%Y-%m-%d").timestamp() * 1000),)
+        ).fetchone()
+
+    fired = []
+    if max_cost > 0 and row["cost"] >= max_cost:
+        fired.append({"type": "cost", "threshold": max_cost, "current": round(row["cost"], 4),
+                       "message": f"일일 비용 ${row['cost']:.4f} ≥ ${max_cost} 초과"})
+    if max_tokens > 0 and row["tokens"] >= max_tokens:
+        fired.append({"type": "tokens", "threshold": max_tokens, "current": row["tokens"],
+                       "message": f"일일 토큰 {row['tokens']:,} ≥ {max_tokens:,} 초과"})
+    return {"ok": True, "alerts": fired, "configured": True,
+            "today": {"cost": round(row["cost"], 4), "tokens": row["tokens"], "calls": row["calls"]}}
+
+
+def api_usage_alert_set(body: dict) -> dict:
+    """사용량 알림 임계치 설정. body: {maxDailyCostUsd?, maxDailyTokens?}"""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    cfg = _load_config()
+    cfg["alerts"] = {
+        "maxDailyCostUsd": max(0, float(body.get("maxDailyCostUsd") or 0)),
+        "maxDailyTokens": max(0, int(body.get("maxDailyTokens") or 0)),
+    }
+    ok = _save_config(cfg)
+    return {"ok": ok, "alerts": cfg["alerts"]}
+
+
 def api_fallback_chain_save(body: dict) -> dict:
     """폴백 체인 저장. body: {chain: [...]}"""
     chain = (body or {}).get("chain", []) if isinstance(body, dict) else []
