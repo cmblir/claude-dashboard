@@ -107,6 +107,12 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "Opus / Sonnet / Haiku 3 모델에 병렬 질문 → 응답 나란히 비교.",
         ["vision", "이미지 인식", "PDF", "멀티모달", "multimodal",
          "image_url", "비교"]),
+    ("modelBench",    "work",
+        "Model Benchmark — 사전 정의 프롬프트 셋(기본 Q&A / 코드 / 추론) × "
+        "선택한 모델들을 교차 실행 → 모델별 평균 지연·토큰·비용 집계 + "
+        "개별 응답 매트릭스. 결과 JSON 다운로드.",
+        ["benchmark", "벤치마크", "모델 비교", "model compare",
+         "지연 비교", "cost compare"]),
 
     # ── 설정 & 구성 ─────────────────────────────────
     ("hooks",         "config",   "이벤트 훅 설정",
@@ -192,6 +198,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                 "zh": "Files API — 上传/列出/删除文件,并在消息中以 document 形式引用"},
     "visionLab": {"en": "Vision/PDF Lab — drop an image or PDF, compare Opus/Sonnet/Haiku responses side-by-side",
                  "zh": "视觉/PDF 实验室 — 拖入图片或 PDF,并排比较 Opus/Sonnet/Haiku 响应"},
+    "modelBench": {"en": "Model Benchmark — cross run prompt sets × models, aggregate latency/tokens/cost",
+                  "zh": "模型基准测试 — 提示集 × 模型交叉运行,汇总延迟/令牌/费用"},
     "hooks": {"en": "Event hooks", "zh": "事件钩子"},
     "permissions": {"en": "Tool permissions", "zh": "工具权限"},
     "mcp": {"en": "MCP Connectors", "zh": "MCP 连接器"},
