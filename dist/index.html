@@ -6,9 +6,42 @@
 <title>Claude Control Center — 최적화 대시보드</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+<link rel="dns-prefetch" href="https://unpkg.com">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+// Tailwind CDN 런타임 JIT 최적화 — 불필요한 스캔 범위 축소
+tailwind.config = {
+  darkMode: 'class',
+  // corePlugins 중 사용하지 않는 기능 비활성화 → JIT 컴파일 속도 향상
+  corePlugins: {
+    float: false,
+    clear: false,
+    skew: false,
+    caretColor: false,
+    sepia: false,
+    hueRotate: false,
+    saturate: false,
+    backdropBlur: false,
+    backdropBrightness: false,
+    backdropContrast: false,
+    backdropGrayscale: false,
+    backdropHueRotate: false,
+    backdropInvert: false,
+    backdropOpacity: false,
+    backdropSaturate: false,
+    backdropSepia: false,
+    ringOffsetWidth: false,
+    ringOffsetColor: false,
+    scrollSnapType: false,
+    scrollSnapAlign: false,
+    touchAction: false,
+  },
+};
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@11.2.0/marked.min.js"></script>
@@ -216,7 +249,7 @@
   .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; min-width: 0; max-width: 100%; }
   .card-hi { background: var(--card-hi); border-color: var(--border-hi); }
-  .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.85rem; border-radius: 10px; font-size: 0.82rem; font-weight: 500; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text); cursor: pointer; transition: all 0.15s; }
+  .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.85rem; border-radius: 10px; font-size: 0.82rem; font-weight: 500; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text); cursor: pointer; transition: background 0.15s, border-color 0.15s, filter 0.15s, transform 0.15s; }
   .btn:hover { background: rgba(255,255,255,0.12); border-color: var(--border-hi); }
   .btn-primary { background: var(--grad); border: none; color: #0a0a0f; font-weight: 600; }
   .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
@@ -255,7 +288,7 @@
   .count-up { animation: countFadeIn 0.5s ease-out backwards; }
   /* card stagger entrance */
   @keyframes cardPop { from { opacity:0; transform:translateY(12px) scale(0.97); } to { opacity:1; transform:none; } }
-  .card-animate { animation: cardPop 0.4s cubic-bezier(0.16,1,0.3,1) backwards; }
+  .card-animate { animation: cardPop 0.4s cubic-bezier(0.16,1,0.3,1) backwards; will-change: transform, opacity; }
   /* spotlight — macOS floating window style */
   #spotlightInput, #spotlightInput:focus,
   #chatInput, #chatInput:focus { outline:none !important; box-shadow:none !important; --tw-ring-shadow:none !important; }
@@ -270,7 +303,7 @@
   body.theme-light .settings-item:hover { background:rgba(0,0,0,0.05); }
   .settings-check { margin-left:auto;color:var(--accent);font-size:0.85rem; }
   .divider { height: 1px; background: var(--border); margin: 0.75rem 0; }
-  .nav-item { display: flex; align-items: center; gap: 0.7rem; padding: 0.6rem 0.8rem; border-radius: 10px; color: var(--text-mute); font-size: 0.88rem; cursor: pointer; transition: background 0.15s, color 0.15s; user-select: none; }
+  .nav-item { display: flex; align-items: center; gap: 0.7rem; padding: 0.6rem 0.8rem; border-radius: 10px; color: var(--text-mute); font-size: 0.88rem; cursor: pointer; transition: background 0.15s, color 0.15s; user-select: none; will-change: background; }
   .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
   .nav-item.active { background: var(--grad-soft); color: var(--text); border: 1px solid rgba(167,139,250,0.35); }
   .badge-n { display: inline-block; min-width: 20px; height: 20px; line-height: 20px; text-align: center; padding: 0 6px; border-radius: 10px; font-size: 0.7rem; background: rgba(255,255,255,0.08); color: var(--text-mute); }
@@ -285,7 +318,7 @@
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
   .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 1.4s infinite; display: inline-block; }
   .pulse-dot.off { background: #6b7280; animation: none; }
-  .tab-enter { animation: tabFade 0.3s ease; }
+  .tab-enter { animation: tabFade 0.3s ease; will-change: transform, opacity; }
   @keyframes tabFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   table.data { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
   table.data th { text-align: left; font-weight: 500; color: var(--text-mute); padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -311,7 +344,7 @@
   .prose-claude code { background: rgba(255,255,255,0.08); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.85em; }
   .prose-claude pre { background: var(--code-bg); padding: 1em; border-radius: 10px; overflow-x: auto; border: 1px solid var(--border); }
   .prose-claude ul { padding-left: 1.2em; }
-  .hover-lift { transition: transform 0.15s, background 0.15s; }
+  .hover-lift { transition: transform 0.15s, background 0.15s; will-change: transform; }
   .hover-lift:hover { transform: translateY(-2px); background: var(--card-hi); }
   .btn-active { background: var(--grad-soft) !important; border-color: rgba(167,139,250,0.45) !important; color: var(--text) !important; }
   .onboard-done { opacity: 0.78; }
@@ -585,6 +618,7 @@
   }
   /* Ollama 모델 허브 */
   .ollama-cat-filter.active { background: var(--accent) !important; color: #fff !important; }
+  #ollamaCatalogGrid { max-height: 720px; overflow-y: auto; }
   #ollamaCatalogGrid .card { transition: transform 0.15s, box-shadow 0.15s; }
   #ollamaCatalogGrid .card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
   #ollamaInstalledTable th { text-align: left; white-space: nowrap; }
@@ -884,12 +918,19 @@ function viewHeader(title, subtitle, viewId) {
 
 // 변경(POST/PUT/DELETE) 후 자동 페이지 리로드 — 디바운스로 연속 호출 합치기
 let __autoReloadTimer = null;
+let __lastRenderedView = null;
+let __lastRenderTs = 0;
 function _scheduleAutoReload() {
   if (__autoReloadTimer) clearTimeout(__autoReloadTimer);
   __autoReloadTimer = setTimeout(() => {
     __autoReloadTimer = null;
+    // 같은 뷰에서 500ms 이내 중복 렌더 방지
+    const now = Date.now();
+    if (state.view === __lastRenderedView && now - __lastRenderTs < 500) return;
+    __lastRenderedView = state.view;
+    __lastRenderTs = now;
     try { renderView && renderView(); } catch (e) { console.warn('autoReload renderView failed', e); }
-  }, 250);
+  }, 500);
 }
 // 데이터 갱신과 무관한 엔드포인트는 자동 리로드 제외 (LLM 호출, 단순 미리보기, 외부 IO 등)
 const __noReloadPaths = [
@@ -905,6 +946,29 @@ const __noReloadPaths = [
   // Ollama — pull/serve/info/settings 는 인라인 상태 업데이트
   '/api/ollama/',
 ];
+// ── 인메모리 GET 캐시 — 빈번한 GET 호출의 중복 네트워크 비용 제거 ──
+const _apiCache = {};
+const _apiCacheTTL = {
+  '/api/ai-providers/list': 30000,
+  '/api/ai-providers/health': 20000,
+  '/api/ollama/catalog': 60000,
+  '/api/workflows/stats': 30000,
+};
+function _apiCacheInvalidate(path) {
+  // POST/PUT/DELETE 시 관련 캐시 무효화
+  for (const key of Object.keys(_apiCache)) {
+    if (key.startsWith(path) || path.startsWith(key.replace(/\/[^/]*$/, ''))) {
+      delete _apiCache[key];
+    }
+  }
+}
+function cachedApi(path, ttlMs) {
+  const ttl = ttlMs || _apiCacheTTL[path] || 30000;
+  const c = _apiCache[path];
+  if (c && Date.now() - c.ts < ttl) return Promise.resolve(c.data);
+  return api(path).then(d => { _apiCache[path] = { data: d, ts: Date.now() }; return d; });
+}
+
 async function api(path, opts = {}) {
   const r = await fetch(path, opts);
   if (!r.ok && r.status !== 200) {
@@ -918,6 +982,8 @@ async function api(path, opts = {}) {
   const data = await r.json();
   const method = ((opts && opts.method) || 'GET').toUpperCase();
   if (method !== 'GET') {
+    // POST/PUT/DELETE 성공 시 관련 GET 캐시 무효화
+    _apiCacheInvalidate(path.replace(/\/[^/]*$/, ''));
     const ok = data && (data.ok === true || data.ok === undefined && !data.error);
     const skip = __noReloadPaths.some(p => path.startsWith(p));
     if (ok && !skip) _scheduleAutoReload();
@@ -1049,7 +1115,13 @@ window.addEventListener('hashchange', () => {
 const VIEWS = {};
 const AFTER = {};
 
+let __renderLock = false;
+let __renderQueued = false;
 async function renderView() {
+  // 동시 렌더 방지 — 이전 렌더 완료 전 호출 시 큐잉
+  if (__renderLock) { __renderQueued = true; return; }
+  __renderLock = true;
+  __renderQueued = false;
   const v = document.getElementById('view');
   v.innerHTML = `<div class="tab-enter"><div class="shimmer h-32 mb-4"></div><div class="shimmer h-64"></div></div>`;
   try {
@@ -1065,6 +1137,10 @@ async function renderView() {
   } catch (e) {
     console.error(e);
     v.innerHTML = `<div class="card p-8 empty">${t('뷰 렌더 실패:')} ${escapeHtml(e.message)}</div>`;
+  } finally {
+    __renderLock = false;
+    // 큐에 쌓인 렌더 요청 처리
+    if (__renderQueued) { __renderQueued = false; renderView(); }
   }
 }
 
@@ -1628,7 +1704,7 @@ const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 let __wfProviders = null; // {providers:[{id,name,icon,type,available,models:[]}]}
 async function _wfLoadProviders() {
   if (__wfProviders) return __wfProviders;
-  try { __wfProviders = await api('/api/ai-providers/list'); } catch(e) { __wfProviders = {providers:[]}; }
+  try { __wfProviders = await cachedApi('/api/ai-providers/list'); } catch(e) { __wfProviders = {providers:[]}; }
   return __wfProviders;
 }
 function _wfAssigneeOptions(selectedValue) {
@@ -1997,7 +2073,7 @@ async function _wfLoadStats() {
   const host = document.getElementById('wfStatsBody');
   if (!host) return;
   try {
-    const r = await api('/api/workflows/stats');
+    const r = await cachedApi('/api/workflows/stats');
     const s = r || {};
     const tot = s.totals || {};
     const totalRuns = tot.runs ?? 0;
@@ -5569,14 +5645,16 @@ function statCard(label, value, color, hint) {
     </div>`;
 }
 
+let _overviewTimelineChart = null;
 function drawTimeline(data) {
   const ctx = document.getElementById('timelineChart');
   if (!ctx) return;
+  if (_overviewTimelineChart) { _overviewTimelineChart.destroy(); _overviewTimelineChart = null; }
   const labels = data.map(d => d.date.slice(5));
   const scores = data.map(d => d.avg_score);
   const tools = data.map(d => d.tools);
   const errors = data.map(d => d.errors);
-  new Chart(ctx, {
+  _overviewTimelineChart = new Chart(ctx, {
     type: 'line',
     data: {
       labels,
@@ -5655,11 +5733,14 @@ VIEWS.analytics = async () => {
     </div>
   `;
 };
+let _analyticsToolChart = null;
+let _analyticsAgentChart = null;
 AFTER.analytics = () => {
   const s = state.data.analytics;
   const tc = document.getElementById('toolChart');
   if (tc && s.toolDistribution.length) {
-    new Chart(tc, {
+    if (_analyticsToolChart) { _analyticsToolChart.destroy(); _analyticsToolChart = null; }
+    _analyticsToolChart = new Chart(tc, {
       type: 'bar',
       data: {
         labels: s.toolDistribution.map(t => t.tool),
@@ -5675,7 +5756,8 @@ AFTER.analytics = () => {
   }
   const ac = document.getElementById('agentChart');
   if (ac && s.subagentDistribution.length) {
-    new Chart(ac, {
+    if (_analyticsAgentChart) { _analyticsAgentChart.destroy(); _analyticsAgentChart = null; }
+    _analyticsAgentChart = new Chart(ac, {
       type: 'doughnut',
       data: {
         labels: s.subagentDistribution.map(t => t.name),
@@ -8568,7 +8650,7 @@ async function appendToClaudeMd(recId) {
 // AI PROVIDERS — 멀티 AI 프로바이더 설정
 // ────────────────────────────────────────────────────────────────
 VIEWS.aiProviders = async () => {
-  const d = await api('/api/ai-providers/list');
+  const d = await cachedApi('/api/ai-providers/list');
   state.data._aiProviders = d;
   const providers = d.providers || [];
   const apiKeys = d.apiKeys || {};
@@ -9094,7 +9176,7 @@ async function _aiRefreshHealth() {
   if (!host) return;
   host.innerHTML = `<span class="text-xs" style="color:var(--text-dim)">${t('로딩 중...')}</span>`;
   try {
-    const d = await api('/api/ai-providers/health');
+    const d = await cachedApi('/api/ai-providers/health');
     const items = d.results || d.providers || d.health || [];
     if (!items.length) {
       host.innerHTML = `<span class="text-xs" style="color:var(--text-dim)">${t('프로바이더 없음')}</span>`;
@@ -9641,7 +9723,7 @@ function _ollamaSwitchTab(tab) {
 
 async function _ollamaLoadCatalog() {
   try {
-    const d = await api('/api/ollama/catalog');
+    const d = await cachedApi('/api/ollama/catalog');
     _ollamaCatalogData = d.models || d.catalog || [];
     _ollamaRenderCatalog();
   } catch (e) {
@@ -9913,10 +9995,12 @@ function _formatBytes(bytes) {
 let _costTimelineChart = null;
 let _costByProviderChart = null;
 
+window.__lastCostsData = null; // 비용 데이터 캐시 — 스택 바 차트에서 재사용
 window.initCostCharts = async () => {
   try {
-    const d = await api('/api/ai-providers/costs');
+    const d = await cachedApi('/api/ai-providers/costs', 20000);
     if (!d || !d.ok) return;
+    window.__lastCostsData = d; // 캐시 저장
     const costs = d.costs || {};
     const daily = costs.daily || [];        // [{date, cost, tokens, calls}]
     const byProvider = costs.byProvider || []; // [{provider, cost, tokens, calls}]
@@ -10557,11 +10641,13 @@ VIEWS.metrics = async () => {
       </table>
     </div>`;
 };
+let _metricsDailyChart = null;
 AFTER.metrics = () => {
   const d = state.data.metrics;
   const ctx = document.getElementById('metricsDaily');
   if (!ctx || !d?.timeline) return;
-  new Chart(ctx, {
+  if (_metricsDailyChart) { _metricsDailyChart.destroy(); _metricsDailyChart = null; }
+  _metricsDailyChart = new Chart(ctx, {
     type: 'line',
     data: {
       labels: d.timeline.map(x => x.date.slice(5)),
@@ -10773,12 +10859,14 @@ VIEWS.usage = async () => {
     </div>` : ''}
   `;
 };
+let _usageTokenDailyChart = null;
 AFTER.usage = () => {
   const d = state.data.usage;
   const tl = (d && d.tokens && d.tokens.dailyTimeline) || [];
   const ctx = document.getElementById('usageTokenDaily');
   if (ctx && tl.length) {
-    new Chart(ctx, {
+    if (_usageTokenDailyChart) { _usageTokenDailyChart.destroy(); _usageTokenDailyChart = null; }
+    _usageTokenDailyChart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: tl.map(x => x.date.slice(5)),
@@ -12841,9 +12929,9 @@ let _costStackedBarChart = null;
 const _origInitCostCharts = window.initCostCharts;
 window.initCostCharts = async function() {
   if (_origInitCostCharts) await _origInitCostCharts();
-  // 스택 바 차트 추가
+  // 스택 바 차트 추가 — 원본에서 캐시한 데이터 재사용 (이중 API 호출 제거)
   try {
-    const d = await api('/api/ai-providers/costs');
+    const d = window.__lastCostsData;
     if (!d || !d.ok) return;
     const costs = d.costs || {};
     const daily = costs.daily || [];
