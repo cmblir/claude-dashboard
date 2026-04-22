@@ -1408,6 +1408,60 @@ def api_workflow_template_get(tid: str) -> dict:
     return {"ok": True, "template": tpl}
 
 
+def api_workflow_export(body: dict) -> dict:
+    """워크플로우 JSON export. body: {id}. 반환: 워크플로우 전체 JSON (import 호환)."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    wfId = body.get("id")
+    if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
+        return {"ok": False, "error": "invalid id"}
+    store = _load_all()
+    wf = store["workflows"].get(wfId)
+    if not wf:
+        return {"ok": False, "error": "not found"}
+    export = {
+        "exportVersion": 1,
+        "exportedAt": int(time.time() * 1000),
+        "workflow": wf,
+    }
+    return {"ok": True, "export": export}
+
+
+def api_workflow_import(body: dict) -> dict:
+    """워크플로우 JSON import. body: {export: {exportVersion, workflow}} 또는 {workflow: {...}}.
+
+    새 ID 를 부여하여 저장. 기존 워크플로우와 충돌 없음.
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+
+    # export 래퍼가 있으면 풀기
+    raw_wf = body.get("workflow")
+    if not raw_wf and isinstance(body.get("export"), dict):
+        raw_wf = body["export"].get("workflow")
+    if not isinstance(raw_wf, dict):
+        return {"ok": False, "error": "workflow object required"}
+
+    wf_clean = _sanitize_workflow(raw_wf)
+    if wf_clean is None:
+        return {"ok": False, "error": "invalid workflow structure"}
+
+    now = int(time.time() * 1000)
+    with _LOCK:
+        store = _load_all()
+        new_id = _new_wf_id()
+        wf_clean["id"] = new_id
+        wf_clean["createdAt"] = now
+        wf_clean["updatedAt"] = now
+        # 이름에 (imported) 추가
+        orig_name = wf_clean.get("name", "Untitled")
+        wf_clean["name"] = f"{orig_name} (imported)"
+        store["workflows"][new_id] = wf_clean
+        _dump_all(store)
+
+    return {"ok": True, "id": new_id, "name": wf_clean["name"]}
+
+
 def api_workflow_runs_list(query: dict) -> dict:
     """GET /api/workflows/runs?wfId=... — 해당 워크플로우의 runs 리스트 (최신순).
 

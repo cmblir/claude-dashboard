@@ -120,18 +120,19 @@ def _CHAT_SYSTEM_PROMPT() -> str:  # type: ignore[misc]
 
 def api_chat(body: dict) -> dict:
     """챗봇 API — 사용자 질문을 받아 대시보드 안내 답변 반환."""
+    from .errors import err, ERROR_MESSAGES
     if not isinstance(body, dict):
-        return {"error": "잘못된 요청"}
+        return {"error": ERROR_MESSAGES["bad_body"], "error_key": "err_bad_body"}
     user_msg = (body.get("message") or "").strip()
     if not user_msg:
-        return {"error": "메시지가 비어있습니다."}
+        return {"error": ERROR_MESSAGES["msg_empty"], "error_key": "err_msg_empty"}
     history = body.get("history") or []
 
     claude_bin = shutil.which("claude")
     if not claude_bin:
-        return {"error": "Claude CLI 미설치"}
+        return {"error": ERROR_MESSAGES["cli_not_installed"], "error_key": "err_cli_not_installed"}
     if not api_auth_status().get("connected"):
-        return {"error": "Claude 계정 연결 필요"}
+        return {"error": ERROR_MESSAGES["auth_required"], "error_key": "err_auth_required"}
 
     # 대화 히스토리를 프롬프트에 포함
     conv_lines = []

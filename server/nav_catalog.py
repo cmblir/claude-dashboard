@@ -56,9 +56,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
          "하네스", "persona", "페르소나", "spawn", "resume", "템플릿", "template"]),
     ("aiProviders",   "work",
         "AI 프로바이더 — Claude/GPT/Gemini/Ollama/Codex 멀티 AI 관리. "
-        "API 키 설정, CLI 감지, 커스텀 프로바이더 등록, 폴백 체인, 연결 테스트",
+        "API 키 설정, CLI 감지, 커스텀 프로바이더 등록, 폴백 체인, 연결 테스트, "
+        "임베딩(bge-m3 등), 비용 분석 차트, 멀티 AI 비교",
         ["프로바이더", "provider", "AI 프로바이더", "멀티 AI", "GPT", "Gemini",
-         "Ollama", "Codex", "OpenAI", "API 키", "폴백"]),
+         "Ollama", "Codex", "OpenAI", "API 키", "폴백", "임베딩", "embedding",
+         "bge-m3", "비용", "cost", "비교", "compare"]),
     ("agents",        "work",     "에이전트 목록 · 상호작용 그래프 (vis-network)",
         ["에이전트", "agent", "상호작용 그래프"]),
     ("projectAgents", "work",     "프로젝트별 서브 에이전트 관리 · 16 역할 프리셋",
