@@ -97,6 +97,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "예시 2종 (Q&A 10건 / 요약 5건), 최대 1000건/batch.",
         ["batch", "메시지 배치", "message batches", "대량 요청", "jsonl",
          "일괄 처리"]),
+    ("apiFiles",      "work",
+        "Files API — Anthropic 파일 업로드 · 목록 · 삭제 + 업로드한 파일을 "
+        "메시지에 document 로 reference 해서 질문 테스트.",
+        ["files api", "파일 업로드", "document reference", "files",
+         "file_id"]),
 
     # ── 설정 & 구성 ─────────────────────────────────
     ("hooks",         "config",   "이벤트 훅 설정",
@@ -178,6 +183,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                   "zh": "工具使用实验室 — 定义工具,触发 tool_use,多轮传递 tool_result"},
     "batchJobs": {"en": "Batch Jobs — submit large Message Batches, poll status, download JSONL results",
                  "zh": "批量任务 — 提交大批量 Message Batches,轮询状态,下载 JSONL 结果"},
+    "apiFiles": {"en": "Files API — upload/list/delete files, reference them in messages as documents",
+                "zh": "Files API — 上传/列出/删除文件,并在消息中以 document 形式引用"},
     "hooks": {"en": "Event hooks", "zh": "事件钩子"},
     "permissions": {"en": "Tool permissions", "zh": "工具权限"},
     "mcp": {"en": "MCP Connectors", "zh": "MCP 连接器"},

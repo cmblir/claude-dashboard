@@ -55,6 +55,9 @@ from .batch_jobs import (
     api_batch_cancel, api_batch_create, api_batch_examples,
     api_batch_get, api_batch_list, api_batch_results,
 )
+from .api_files import (
+    api_files_delete, api_files_list, api_files_test, api_files_upload,
+)
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -214,6 +217,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/batch/list": api_batch_list,
     "/api/batch/get": api_batch_get,
     "/api/batch/results": api_batch_results,
+    "/api/api-files/list": api_files_list,
 }
 
 
@@ -305,6 +309,9 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/tool-use-lab/turn": api_tool_use_turn,
     "/api/batch/create": api_batch_create,
     "/api/batch/cancel": api_batch_cancel,
+    "/api/api-files/upload": api_files_upload,
+    "/api/api-files/delete": api_files_delete,
+    "/api/api-files/test": api_files_test,
 }
 
 

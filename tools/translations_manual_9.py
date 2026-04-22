@@ -540,6 +540,29 @@ NEW_EN = {
     "이 배치를 취소할까요?": "Cancel this batch?",
     "취소 요청됨": "Cancellation requested",
     "취소 실패": "Cancel failed",
+
+    # ── Files API (v2.6.0) ─────────────────────────────────────
+    "Anthropic 에 파일을 업로드하고, file_id 를 메시지에 document 로 reference 해서 질문을 던질 수 있습니다.":
+        "Upload files to Anthropic, reference them as documents in messages by file_id, and ask questions.",
+    "파일 업로드": "Upload file",
+    "최대 30MB · PDF / txt / md 권장": "Up to 30MB · PDF / txt / md recommended",
+    "업로드 중…": "Uploading…",
+    "업로드 완료": "Uploaded",
+    "업로드 실패": "Upload failed",
+    "파일로 질문 테스트": "Ask about a file",
+    "선택된 파일": "Selected file",
+    "이 문서의 핵심을 3줄로 요약해줘": "Summarize this document in 3 lines",
+    "질문 실행": "Ask",
+    "업로드된 파일": "Uploaded files",
+    "업로드된 파일이 없습니다": "No files uploaded",
+    "선택": "Select",
+    "삭제": "Delete",
+    "파일 삭제": "Delete file",
+    "이 파일을 삭제할까요?": "Delete this file?",
+    "삭제 완료": "Deleted",
+    "삭제 실패": "Delete failed",
+    "먼저 파일을 선택하세요": "Select a file first",
+    "질문을 입력하세요": "Enter a question",
 }
 
 NEW_ZH = {
@@ -1076,4 +1099,27 @@ NEW_ZH = {
     "이 배치를 취소할까요?": "取消此批次?",
     "취소 요청됨": "已请求取消",
     "취소 실패": "取消失败",
+
+    # ── Files API (v2.6.0) ─────────────────────────────────────
+    "Anthropic 에 파일을 업로드하고, file_id 를 메시지에 document 로 reference 해서 질문을 던질 수 있습니다.":
+        "将文件上传到 Anthropic,通过 file_id 在消息中以 document 形式引用并提问。",
+    "파일 업로드": "上传文件",
+    "최대 30MB · PDF / txt / md 권장": "最大 30MB · 推荐 PDF / txt / md",
+    "업로드 중…": "上传中…",
+    "업로드 완료": "上传完成",
+    "업로드 실패": "上传失败",
+    "파일로 질문 테스트": "基于文件提问",
+    "선택된 파일": "已选文件",
+    "이 문서의 핵심을 3줄로 요약해줘": "用 3 行概括这份文档的要点",
+    "질문 실행": "提问",
+    "업로드된 파일": "已上传文件",
+    "업로드된 파일이 없습니다": "没有已上传的文件",
+    "선택": "选择",
+    "삭제": "删除",
+    "파일 삭제": "删除文件",
+    "이 파일을 삭제할까요?": "删除此文件?",
+    "삭제 완료": "已删除",
+    "삭제 실패": "删除失败",
+    "먼저 파일을 선택하세요": "请先选择文件",
+    "질문을 입력하세요": "请输入问题",
 }

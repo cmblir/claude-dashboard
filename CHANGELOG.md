@@ -11,6 +11,28 @@
 
 ---
 
+## [2.6.0] — 2026-04-23
+
+### 📎 Files API — 신규 탭 (work 그룹)
+
+Anthropic Files API 의 업로드/목록/삭제 + 메시지 document reference 를 UI 에서 다룬다.
+
+**기능**
+- 브라우저 파일 선택 → 자동 base64 전송 → 서버에서 multipart/form-data 로 Anthropic 업로드 (최대 30MB)
+- 업로드된 파일 목록 (filename · size · mime · id)
+- 파일 선택 → 모델 선택 → 질문 textarea → 실행 (메시지 content 에 `{type:"document", source:{type:"file", file_id}}` 블록 삽입)
+- 개별 삭제 + 삭제 전 확인 모달
+
+**Architecture**
+- `server/api_files.py` 신설 — `api_files_{list,upload,delete,test}` + stdlib multipart POST 유틸
+- `server/routes.py` — 4개 라우트 추가 (`GET list` · `POST upload/delete/test`)
+- `server/nav_catalog.py` — `apiFiles` 탭 등록 + en/zh desc
+- `dist/index.html` — NAV + `VIEWS.apiFiles` (업로드 카드 + 질문 카드 + 파일 리스트)
+- `tools/translations_manual_9.py` — 22 키 × ko/en/zh 추가
+- beta header: `anthropic-beta: files-api-2025-04-14`
+
+---
+
 ## [2.5.0] — 2026-04-23
 
 ### 📦 Batch Jobs — 신규 탭 (work 그룹)
