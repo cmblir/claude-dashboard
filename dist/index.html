@@ -1462,6 +1462,8 @@ const __wf = {
   pollTimer: null,
   runId: null,
   lastRunResults: null,
+  _clipboard: [],      // 복사된 노드 배열
+  _undoStack: [],      // undo 스냅샷 (최대 30)
 };
 
 const WF_NODE_TYPES = [
@@ -1599,6 +1601,7 @@ VIEWS.workflows = async () => {
           </div>
           <div class="wf-floating">
             <button class="btn text-xs" onclick="_wfFitView()" title="${t('자동 정렬 + 화면 맞춤')}">🎯 ${t('맞춤')}</button>
+            <button class="btn text-xs" onclick="_wfShowShortcutHelp()" title="${t('키보드 단축키')} (?)">⌨️</button>
             <input id="wfNodeSearch" class="input text-xs" placeholder="${t('노드 검색...')}" style="width:130px;padding:3px 8px;font-size:11px;margin-left:4px;" oninput="_wfNodeSearchFilter(this.value)">
           </div>
           <svg id="wfCanvas" xmlns="http://www.w3.org/2000/svg">
@@ -1668,6 +1671,7 @@ function _wfRenderList() {
             ${w.nodeCount} ${t('노드')} · ${w.edgeCount} ${t('연결')} · ${fmtRel(w.updatedAt)}
           </div>
         </div>
+        <button class="text-[var(--text-dim)] hover:text-[var(--cyan)] text-sm" onclick="event.stopPropagation();_wfClone('${w.id}')" title="${t('복제')}">📋</button>
         <button class="text-[var(--text-dim)] hover:text-red-400 text-sm" onclick="event.stopPropagation();_wfDelete('${w.id}')" title="${t('삭제')}">🗑️</button>
       </div>
     </div>
@@ -1724,6 +1728,19 @@ async function _wfDelete(wfId) {
   _wfRenderCanvas();
   _wfRenderInspector();
   _wfUpdateToolbar();
+}
+
+async function _wfClone(wfId) {
+  const r = await api('/api/workflows/clone', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: wfId }),
+  });
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
+  toast(t('복제됨'), 'ok');
+  const list = await api('/api/workflows/list');
+  __wf.workflows = list.workflows || [];
+  _wfRenderList();
+  if (r.id) await _wfOpen(r.id);
 }
 
 async function _wfOpen(wfId) {
@@ -2207,9 +2224,77 @@ function _wfUpdateNodeTransform(nid) {
   });
 }
 
+// ─── Undo 스냅샷 ──────────────────────────────────────────────
+function _wfPushUndo() {
+  if (!__wf.current) return;
+  const snap = {
+    nodes: JSON.parse(JSON.stringify(__wf.current.nodes)),
+    edges: JSON.parse(JSON.stringify(__wf.current.edges)),
+  };
+  __wf._undoStack.push(snap);
+  if (__wf._undoStack.length > 30) __wf._undoStack.shift();
+}
+
+function _wfUndo() {
+  if (!__wf.current || !__wf._undoStack.length) {
+    toast(t('되돌릴 작업이 없습니다'), 'warn');
+    return;
+  }
+  const snap = __wf._undoStack.pop();
+  __wf.current.nodes = snap.nodes;
+  __wf.current.edges = snap.edges;
+  __wf.selectedNodeId = null;
+  __wf.selectedEdgeId = null;
+  __wf.dirty = true;
+  _wfRenderCanvas();
+  _wfRenderInspector();
+  _wfUpdateToolbar();
+}
+
+// ─── 키보드 단축키 도움말 모달 ─────────────────────────────────
+function _wfShowShortcutHelp() {
+  // 이미 열려 있으면 닫기
+  const existing = document.getElementById('wfShortcutModal');
+  if (existing) { existing.remove(); return; }
+
+  const shortcuts = [
+    { key: 'Delete / Backspace', desc: t('선택 노드/엣지 삭제') },
+    { key: 'Ctrl+C', desc: t('선택 노드 복사') },
+    { key: 'Ctrl+V', desc: t('노드 붙여넣기') },
+    { key: 'Ctrl+Z', desc: t('실행 취소') },
+    { key: 'Ctrl+S', desc: t('워크플로우 저장') },
+    { key: 'Ctrl+F', desc: t('노드 검색 포커스') },
+    { key: 'Esc', desc: t('선택 해제') },
+    { key: '?', desc: t('단축키 도움말 표시') },
+  ];
+
+  const rows = shortcuts.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span class="text-sm" style="color:var(--text);">${s.desc}</span>
+      <kbd class="kbd" style="margin-left:16px;white-space:nowrap;">${s.key}</kbd>
+    </div>
+  `).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'wfShortcutModal';
+  modal.className = 'modal-backdrop';
+  modal.onclick = (ev) => { if (ev.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal modal-narrow" style="max-width:420px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);">
+        <span class="text-base font-semibold" style="color:var(--text);">⌨️ ${t('키보드 단축키')}</span>
+        <button class="btn btn-ghost text-xs" onclick="document.getElementById('wfShortcutModal').remove()">✕</button>
+      </div>
+      <div style="padding:12px 20px 20px;">${rows}</div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
 // ─── 노드/엣지 추가·삭제 ──────────────────────────────────────
 function _wfAddNode(type) {
   if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
+  _wfPushUndo();
   const nid = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
   // 캔버스 중앙 근처
@@ -2245,6 +2330,7 @@ function _wfAddNode(type) {
 
 function _wfDeleteSelectedNode() {
   if (!__wf.current || !__wf.selectedNodeId) return;
+  _wfPushUndo();
   const nid = __wf.selectedNodeId;
   __wf.current.nodes = __wf.current.nodes.filter(n => n.id !== nid);
   __wf.current.edges = __wf.current.edges.filter(e => e.from !== nid && e.to !== nid);
@@ -2255,6 +2341,7 @@ function _wfDeleteSelectedNode() {
 
 function _wfDeleteSelectedEdge() {
   if (!__wf.current || !__wf.selectedEdgeId) return;
+  _wfPushUndo();
   __wf.current.edges = __wf.current.edges.filter(e => e.id !== __wf.selectedEdgeId);
   __wf.selectedEdgeId = null;
   __wf.dirty = true;
@@ -2279,6 +2366,7 @@ function _wfHasPath(edges, from, to) {
 function _wfAddEdge(fromId, fromPort, toId, toPort) {
   if (!__wf.current) return false;
   if (fromId === toId) { toast(t('같은 노드에 연결할 수 없습니다'), 'warn'); return false; }
+  _wfPushUndo();
   // 중복 방지
   if (__wf.current.edges.some(e => e.from===fromId && e.to===toId && e.fromPort===fromPort)) {
     toast(t('이미 연결되어 있습니다'), 'warn'); return false;
@@ -2343,6 +2431,7 @@ function _wfBindCanvas() {
       const node = __wf.current.nodes.find(n => n.id === nid);
       if (!node) return;
       __wf.selectedNodeId = nid; __wf.selectedEdgeId = null;
+      _wfPushUndo();
       __wf.drag = { kind: 'node', nodeId: nid, origX: node.x, origY: node.y, startX: pt.x, startY: pt.y };
       // 전체 re-render 대신 selected 클래스만 토글 (깜빡임 방지)
       _wfSyncSelectionClasses();
@@ -2460,14 +2549,90 @@ function _wfBindCanvas() {
     onUp(e, true);
   }, { passive: false });
 
-  // 키보드: Delete / Backspace
+  // 키보드 단축키 (워크플로우 캔버스)
   document.addEventListener('keydown', (e) => {
     if (state.view !== 'workflows') return;
-    if (!['Delete','Backspace'].includes(e.key)) return;
-    // input 포커스 중이면 무시
-    if (['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName)) return;
-    if (__wf.selectedNodeId) { e.preventDefault(); _wfDeleteSelectedNode(); }
-    else if (__wf.selectedEdgeId) { e.preventDefault(); _wfDeleteSelectedEdge(); }
+    const inInput = ['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName);
+
+    // ? → 단축키 도움말 (input 안에서는 무시)
+    if (e.key === '?' && !inInput && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault(); _wfShowShortcutHelp(); return;
+    }
+
+    // Esc → 단축키 모달 닫기 / 선택 해제
+    if (e.key === 'Escape') {
+      const helpModal = document.getElementById('wfShortcutModal');
+      if (helpModal) { helpModal.remove(); return; }
+      if (!inInput) {
+        __wf.selectedNodeId = null; __wf.selectedEdgeId = null;
+        _wfSyncSelectionClasses(); _wfRenderInspector();
+      }
+      return;
+    }
+
+    // Ctrl/Cmd 단축키
+    const mod = e.ctrlKey || e.metaKey;
+
+    // Ctrl+Z → 실행 취소
+    if (mod && e.key === 'z' && !e.shiftKey && !inInput) {
+      e.preventDefault(); _wfUndo(); return;
+    }
+
+    // Ctrl+C → 노드 복사
+    if (mod && e.key === 'c' && !inInput) {
+      if (__wf.current && __wf.selectedNodeId) {
+        const node = __wf.current.nodes.find(n => n.id === __wf.selectedNodeId);
+        if (node) {
+          __wf._clipboard = [JSON.parse(JSON.stringify(node))];
+          toast(t('노드 복사됨'), 'ok');
+        }
+      }
+      return;
+    }
+
+    // Ctrl+V → 노드 붙여넣기
+    if (mod && e.key === 'v' && !inInput) {
+      if (__wf.current && __wf._clipboard.length) {
+        e.preventDefault();
+        _wfPushUndo();
+        const pasted = [];
+        __wf._clipboard.forEach(src => {
+          const nid = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+          const clone = JSON.parse(JSON.stringify(src));
+          clone.id = nid;
+          clone.x = (clone.x || 0) + 40;
+          clone.y = (clone.y || 0) + 40;
+          clone.title = clone.title || 'Copy';
+          __wf.current.nodes.push(clone);
+          pasted.push(clone);
+        });
+        // clipboard 업데이트 (연속 붙여넣기 시 점점 오프셋 누적)
+        __wf._clipboard = pasted.map(n => JSON.parse(JSON.stringify(n)));
+        __wf.selectedNodeId = pasted[pasted.length - 1].id;
+        __wf.dirty = true;
+        _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
+        toast(t('노드 붙여넣기 완료'), 'ok');
+      }
+      return;
+    }
+
+    // Ctrl+S → 저장
+    if (mod && e.key === 's') {
+      e.preventDefault(); _wfSave(); return;
+    }
+
+    // Ctrl+F → 노드 검색 포커스
+    if (mod && e.key === 'f') {
+      const si = document.getElementById('wfNodeSearch');
+      if (si) { e.preventDefault(); si.focus(); }
+      return;
+    }
+
+    // Delete / Backspace → 삭제
+    if (['Delete','Backspace'].includes(e.key) && !inInput) {
+      if (__wf.selectedNodeId) { e.preventDefault(); _wfDeleteSelectedNode(); }
+      else if (__wf.selectedEdgeId) { e.preventDefault(); _wfDeleteSelectedEdge(); }
+    }
   });
 
   // 휠 줌

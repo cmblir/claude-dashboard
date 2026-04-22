@@ -42,8 +42,9 @@ from .guide import api_guide_onboarding, api_guide_toolkit
 from .hooks import api_plugin_hook_update, get_hooks
 from .version import api_version_info
 from .workflows import (
-    api_workflow_delete, api_workflow_export, api_workflow_get,
-    api_workflow_history, api_workflow_import, api_workflow_patch,
+    api_workflow_clone, api_workflow_delete, api_workflow_export,
+    api_workflow_get, api_workflow_history, api_workflow_import,
+    api_workflow_node_clipboard, api_workflow_patch,
     api_workflow_restore, api_workflow_run,
     api_workflow_run_status, api_workflow_runs_list, api_workflow_save,
     api_workflow_schedule_list, api_workflow_schedule_set,
@@ -247,6 +248,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/import": api_workflow_import,
     "/api/workflows/schedule/set": api_workflow_schedule_set,
     "/api/workflows/restore": api_workflow_restore,
+    "/api/workflows/clone": api_workflow_clone,
+    "/api/workflows/node-clipboard": api_workflow_node_clipboard,
     "/api/session/spawn": api_session_spawn,
     "/api/ai-providers/test": api_provider_test,
     "/api/ai-providers/compare": api_provider_compare,
