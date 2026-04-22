@@ -11,6 +11,26 @@
 
 ---
 
+## [2.3.0] — 2026-04-23
+
+### 🧊 Prompt Cache Lab — 신규 탭 (work 그룹)
+
+Anthropic Messages API 의 `cache_control` 을 실험/관측하는 전용 플레이그라운드 추가.
+
+**기능**
+- 원클릭 예시 3종: 시스템 프롬프트 캐시 / 대용량 문서 캐시 / 도구 정의 캐시
+- 모델 선택 (Opus 4.7 / Sonnet 4.6 / Haiku 4.5) + max_tokens 조절
+- system / tools / messages JSON 편집기
+- 응답 즉시: input/output/cache_creation/cache_read 토큰 + USD 비용 상세 + 캐시 절감 추정
+- 히스토리 최근 20건 (`~/.claude-dashboard-prompt-cache.json`)
+
+**Architecture**
+- `server/prompt_cache.py` 신설 (297줄) — `api_prompt_cache_test/history/examples` + `_estimate_cost` (3 모델 가격 테이블)
+- `server/routes.py` — 3개 라우트 추가 (`GET /api/prompt-cache/examples`, `/history` · `POST /api/prompt-cache/test`)
+- `server/nav_catalog.py` — `promptCache` 탭 등록 + `TAB_DESC_I18N` en/zh 등록
+- `dist/index.html` — NAV + `VIEWS.promptCache` 추가 (pcRun / pcLoadExample / pcReset / pcSet)
+- `tools/translations_manual_9.py` — 35 키 × ko/en/zh 추가
+
 ## [2.2.1] — 2026-04-22
 
 ### Fixed — 타이틀 리터럴 노출 + 위자드 테스트 오류

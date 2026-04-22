@@ -75,6 +75,12 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         ["스킬", "skill"]),
     ("commands",      "work",     "슬래시 명령어 목록",
         ["슬래시", "슬래시 명령어", "slash"]),
+    ("promptCache",   "work",
+        "프롬프트 캐시 실험실 — Anthropic Messages API 의 cache_control 을 "
+        "시스템/도구/메시지 블록에 적용해 cache_creation / cache_read 토큰과 "
+        "비용 절감을 실측. 예시 3종(시스템/문서/도구) 원클릭 실행, 히스토리 20건.",
+        ["프롬프트 캐시", "prompt cache", "cache_control", "ephemeral",
+         "캐시 절감", "cache_read", "cache_creation"]),
 
     # ── 설정 & 구성 ─────────────────────────────────
     ("hooks",         "config",   "이벤트 훅 설정",
@@ -148,6 +154,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
     "projectAgents": {"en": "Per-project sub-agents / 16 role presets", "zh": "项目子代理 / 16 角色预设"},
     "skills": {"en": "User-defined skills", "zh": "用户自定义技能"},
     "commands": {"en": "Slash commands", "zh": "斜杠命令"},
+    "promptCache": {"en": "Prompt Cache Lab — cache_control + cache_read/creation tokens + cost savings",
+                   "zh": "提示缓存实验室 — cache_control + cache_read/creation 令牌 + 成本节约"},
     "hooks": {"en": "Event hooks", "zh": "事件钩子"},
     "permissions": {"en": "Tool permissions", "zh": "工具权限"},
     "mcp": {"en": "MCP Connectors", "zh": "MCP 连接器"},

@@ -6,12 +6,14 @@
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.1.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.3.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#tech-stack)
 
 Claude Control Center is a **local-first dashboard** that manages your entire `~/.claude/` directory (agents, skills, hooks, plugins, MCP, sessions, projects) and ships a powerful **n8n-style workflow engine** with multi-AI provider orchestration — all in a single `python3 server.py` command.
 
 **No cloud. No telemetry. No dependencies to install.** Just Python stdlib and one HTML file.
+
+🆕 **v2.3.0** — [Prompt Cache Lab](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching): measure `cache_control` impact on tokens & USD cost in real time (work tab)
 
 ---
 

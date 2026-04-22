@@ -847,6 +847,9 @@ const NAV = [
     desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE+'sub-agents' },
   { id: 'skills',      icon: '✨', label: '스킬',              group: 'work', docUrl: DOCS_BASE+'skills' },
   { id: 'commands',    icon: '/',  label: '슬래시 명령어',      group: 'work', docUrl: DOCS_BASE+'slash-commands' },
+  { id: 'promptCache', icon: '🧊', label: '프롬프트 캐시 실험실', group: 'work',
+    desc: 'Anthropic cache_control 실측 — cache_read / cache_creation 토큰 + 비용 절감',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching' },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -6725,6 +6728,189 @@ async function translateAll(kind) {
   } catch (e) {
     logLine(`❌ ${e.message}`);
     toast('번역 중 오류: '+e.message, 'err');
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// PROMPT CACHE LAB (v2.2.0)
+// Anthropic Messages API 의 cache_control 실험실 — 예시 원클릭, 토큰/비용 실측
+// ────────────────────────────────────────────────────────────────
+VIEWS.promptCache = async () => {
+  const [ex, hist] = await Promise.all([
+    api('/api/prompt-cache/examples'),
+    api('/api/prompt-cache/history'),
+  ]);
+  state.data.pc = state.data.pc || {
+    model: 'claude-sonnet-4-6',
+    maxTokens: 1024,
+    system: '[]',
+    tools: '[]',
+    messages: '[{"role":"user","content":"안녕"}]',
+    lastResult: null,
+  };
+  const pc = state.data.pc;
+  const last = pc.lastResult;
+  const histItems = (hist && hist.items) || [];
+
+  const exBtns = (ex.examples || []).map(e =>
+    `<button class="chip" onclick="pcLoadExample('${e.id}')">${t(e.label)}</button>`
+  ).join('');
+
+  const usage = last && last.usage || {};
+  const cost = last && last.cost || {};
+  const usageTbl = last ? `
+    <table class="w-full text-[11px] border-collapse">
+      <tbody>
+        <tr class="border-b border-[var(--border)]"><td class="py-1 text-[var(--text-dim)]">input_tokens</td><td class="py-1 text-right font-mono">${usage.input_tokens||0}</td></tr>
+        <tr class="border-b border-[var(--border)]"><td class="py-1 text-[var(--text-dim)]">cache_creation_input_tokens</td><td class="py-1 text-right font-mono text-[var(--warn)]">${usage.cache_creation_input_tokens||0}</td></tr>
+        <tr class="border-b border-[var(--border)]"><td class="py-1 text-[var(--text-dim)]">cache_read_input_tokens</td><td class="py-1 text-right font-mono text-[var(--ok)]">${usage.cache_read_input_tokens||0}</td></tr>
+        <tr><td class="py-1 text-[var(--text-dim)]">output_tokens</td><td class="py-1 text-right font-mono">${usage.output_tokens||0}</td></tr>
+      </tbody>
+    </table>
+  ` : `<div class="text-[11px] text-[var(--text-dim)]">${t('아직 실행한 결과가 없습니다')}</div>`;
+
+  const costTbl = last ? `
+    <div class="grid grid-cols-2 gap-2 text-[11px]">
+      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('입력 비용')}</span><span class="font-mono">$${(cost.usdInput||0).toFixed(6)}</span></div>
+      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('캐시 쓰기')}</span><span class="font-mono">$${(cost.usdCacheWrite||0).toFixed(6)}</span></div>
+      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('캐시 읽기')}</span><span class="font-mono">$${(cost.usdCacheRead||0).toFixed(6)}</span></div>
+      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('출력 비용')}</span><span class="font-mono">$${(cost.usdOutput||0).toFixed(6)}</span></div>
+      <div class="flex justify-between col-span-2 pt-2 border-t border-[var(--border)]"><span class="font-semibold">${t('합계')}</span><span class="font-mono font-semibold">$${(cost.usdTotal||0).toFixed(6)}</span></div>
+      <div class="flex justify-between col-span-2"><span class="text-[var(--ok)]">${t('캐시 절감 추정')}</span><span class="font-mono text-[var(--ok)]">-$${(cost.usdSaved||0).toFixed(6)}</span></div>
+    </div>
+  ` : '';
+
+  const histList = histItems.slice(0, 10).map(h => {
+    const tsStr = new Date((h.ts||0)*1000).toLocaleString();
+    const icon = h.status === 'ok' ? '✅' : '❌';
+    const cr = h.usage && h.usage.cache_read_input_tokens || 0;
+    const cw = h.usage && h.usage.cache_creation_input_tokens || 0;
+    return `<div class="text-[11px] py-1 border-b border-[var(--border)] flex justify-between gap-2">
+      <span>${icon} <span class="text-[var(--text-dim)]">${tsStr}</span> · ${h.model||''}</span>
+      <span class="font-mono text-[var(--text-dim)]">cw=${cw} · cr=${cr}</span>
+    </div>`;
+  }).join('') || `<div class="text-[11px] text-[var(--text-dim)]">${t('이력 없음')}</div>`;
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">🧊 ${t('프롬프트 캐시 실험실')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('Anthropic Messages API 의 cache_control 을 실측. cache_creation 은 캐시 쓰기, cache_read 는 캐시 히트 — 히트 비용은 1/10 수준입니다.')}
+      </p>
+    </div>
+
+    <div class="mb-3 flex items-center gap-2 flex-wrap">
+      <span class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('예시')}</span>
+      ${exBtns}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="space-y-3">
+        <div class="flex items-center gap-2">
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider w-20">${t('모델')}</label>
+          <select class="input flex-1" onchange="pcSet('model', this.value)">
+            <option value="claude-opus-4-7" ${pc.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${pc.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
+            <option value="claude-haiku-4-5" ${pc.model==='claude-haiku-4-5'?'selected':''}>Haiku 4.5</option>
+          </select>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('max_tokens')}</label>
+          <input type="text" inputmode="numeric" class="input w-24" value="${pc.maxTokens}"
+                 oninput="pcSet('maxTokens', parseInt((this.value||'').replace(/\\D/g,''))||1024)">
+        </div>
+
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('system (JSON 배열)')}</label>
+          <textarea class="input font-mono text-[11px]" rows="4" oninput="pcSet('system', this.value)">${_escapeHTML(pc.system)}</textarea>
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('tools (JSON 배열)')}</label>
+          <textarea class="input font-mono text-[11px]" rows="4" oninput="pcSet('tools', this.value)">${_escapeHTML(pc.tools)}</textarea>
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('messages (JSON 배열)')}</label>
+          <textarea class="input font-mono text-[11px]" rows="8" oninput="pcSet('messages', this.value)">${_escapeHTML(pc.messages)}</textarea>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary" onclick="pcRun()">▶ ${t('실행')}</button>
+          <button class="btn" onclick="pcReset()">${t('초기화')}</button>
+          <span id="pcStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('토큰 사용량')}</div>
+          ${usageTbl}
+        </div>
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('비용 상세 (USD)')}</div>
+          ${costTbl}
+        </div>
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('응답')}</div>
+          <pre class="text-[11px] whitespace-pre-wrap max-h-64 overflow-auto">${last ? _escapeHTML(last.output || (last.error || '(empty)')) : t('아직 실행한 결과가 없습니다')}</pre>
+        </div>
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('최근 히스토리')} (${histItems.length})</div>
+          ${histList}
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+function pcSet(key, val) {
+  state.data.pc = state.data.pc || {};
+  state.data.pc[key] = val;
+}
+function pcReset() {
+  state.data.pc = null;
+  renderView();
+}
+async function pcLoadExample(id) {
+  const r = await api('/api/prompt-cache/examples');
+  const e = (r.examples || []).find(x => x.id === id);
+  if (!e) return;
+  state.data.pc = {
+    model: e.model,
+    maxTokens: e.maxTokens,
+    system: JSON.stringify(e.system || [], null, 2),
+    tools: JSON.stringify(e.tools || [], null, 2),
+    messages: JSON.stringify(e.messages || [], null, 2),
+    lastResult: null,
+  };
+  renderView();
+}
+async function pcRun() {
+  const st = document.getElementById('pcStatus');
+  if (st) st.textContent = t('호출 중…');
+  const pc = state.data.pc || {};
+  let system, tools, messages;
+  try { system = JSON.parse(pc.system || '[]'); }
+  catch (e) { toast(t('system JSON 오류') + ': ' + e.message, 'err'); if (st) st.textContent=''; return; }
+  try { tools = JSON.parse(pc.tools || '[]'); }
+  catch (e) { toast(t('tools JSON 오류') + ': ' + e.message, 'err'); if (st) st.textContent=''; return; }
+  try { messages = JSON.parse(pc.messages || '[]'); }
+  catch (e) { toast(t('messages JSON 오류') + ': ' + e.message, 'err'); if (st) st.textContent=''; return; }
+
+  try {
+    const r = await fetch('/api/prompt-cache/test', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ model: pc.model, maxTokens: pc.maxTokens, system, tools, messages }),
+    }).then(x => x.json());
+
+    if (r.needKey) {
+      toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err');
+      if (st) st.textContent = '';
+      return;
+    }
+    state.data.pc.lastResult = r.ok ? { usage: r.usage, cost: r.cost, output: r.output, durationMs: r.durationMs } : { error: r.error || t('실행 실패') };
+    if (st) st.textContent = r.ok ? `${r.durationMs}ms` : '';
+    renderView();
+  } catch (e) {
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (st) st.textContent = '';
   }
 }
 

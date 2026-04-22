@@ -6,12 +6,14 @@
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.1.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.3.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#기술-스택)
 
 Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claude/` 디렉토리 전체(에이전트·스킬·훅·플러그인·MCP·세션·프로젝트)를 관리하고, 멀티 AI 프로바이더 오케스트레이션을 위한 **n8n 스타일 워크플로우 엔진**을 제공합니다. 모든 것이 `python3 server.py` 한 줄에 들어있습니다.
 
 **클라우드 업로드 없음. 텔레메트리 없음. 설치할 의존성 없음.** 파이썬 표준 라이브러리와 HTML 한 파일이면 끝입니다.
+
+🆕 **v2.3.0 — 프롬프트 캐시 실험실** (`work` 그룹): Anthropic Messages API 의 `cache_control` 을 시스템/도구/메시지 블록에 지정해 `cache_creation / cache_read` 토큰과 USD 비용 절감을 실측. 예시 3종(시스템/문서/도구 캐시) 원클릭 실행 + 히스토리 20건. → [docs](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching)
 
 ---
 
