@@ -255,6 +255,10 @@
   .wf-node[data-type="retry"].selected .wf-node-body { stroke: #fb923c; stroke-width: 2.5; }
   .wf-node[data-type="error_handler"] .wf-node-body { stroke: #f87171; stroke-width: 1.5; }
   .wf-node[data-type="error_handler"].selected .wf-node-body { stroke: #f87171; stroke-width: 2.5; }
+  .wf-node[data-type="merge"] .wf-node-body { stroke: #06b6d4; stroke-width: 1.5; }
+  .wf-node[data-type="merge"].selected .wf-node-body { stroke: #06b6d4; stroke-width: 2.5; }
+  .wf-node[data-type="delay"] .wf-node-body { stroke: #94a3b8; stroke-width: 1.5; }
+  .wf-node[data-type="delay"].selected .wf-node-body { stroke: #94a3b8; stroke-width: 2.5; }
   .wf-node[data-type="session"] .wf-node-body { stroke: var(--accent); stroke-width: 1.5; }
   .wf-node[data-type="subagent"] .wf-node-body { stroke: var(--accent); stroke-width: 1.5; }
   .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2; animation: wfPulse 1.4s infinite; }
@@ -1483,6 +1487,10 @@ const WF_NODE_TYPES = [
     desc: '실패 시 자동 재시도. 최대 재시도 횟수 · 백오프 간격 · 배수를 설정하여 일시적 오류를 자동 복구.' },
   { id: 'error_handler', icon: '🛡️', label: '에러 핸들러', portIn: true, portOut: true,
     desc: '에러 처리 전략 노드. skip(무시) · default(기본값 반환) · route(다른 노드로 분기) 모드로 워크플로우 안정성 확보.' },
+  { id: 'merge', icon: '🔀', label: '합류', portIn: true, portOut: true,
+    desc: '여러 병렬 경로를 합류. all/any/count 모드' },
+  { id: 'delay', icon: '⏱️', label: '딜레이', portIn: true, portOut: true,
+    desc: '지정 시간 대기 후 통과. 고정/랜덤 딜레이' },
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 
@@ -1548,6 +1556,12 @@ VIEWS.workflows = async () => {
   }
   return `
     ${viewHeader('🔀 워크플로우', '세션 노드를 DAG 로 연결해 업무 흐름 설계. 포트를 드래그해 화살표로 연결.', 'workflows')}
+    <details id="wfStatsPanel" class="card mb-3">
+      <summary class="cursor-pointer text-sm font-semibold" style="color:var(--text);">📊 ${t('워크플로우 통계')}</summary>
+      <div id="wfStatsBody" class="mt-3">
+        <div class="text-xs text-[var(--text-dim)] text-center py-4">${t('통계 로딩 중...')}</div>
+      </div>
+    </details>
     <div id="wfRoot">
       <div id="wfList" class="card">
         <button class="btn-primary btn text-sm w-full mb-2" style="justify-content:center;" onclick="_wfCreateNew()">＋ ${t('새 워크플로우')}</button>
@@ -1579,6 +1593,7 @@ VIEWS.workflows = async () => {
           </div>
           <div class="wf-floating">
             <button class="btn text-xs" onclick="_wfFitView()" title="${t('자동 정렬 + 화면 맞춤')}">🎯 ${t('맞춤')}</button>
+            <input id="wfNodeSearch" class="input text-xs" placeholder="${t('노드 검색...')}" style="width:130px;padding:3px 8px;font-size:11px;margin-left:4px;" oninput="_wfNodeSearchFilter(this.value)">
           </div>
           <svg id="wfCanvas" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -1612,6 +1627,8 @@ VIEWS.workflows = async () => {
 AFTER.workflows = async () => {
   _wfRenderList();
   _wfApplyInspectorState();
+  // 워크플로우 통계 로드
+  _wfLoadStats();
   // 검색 바인딩
   const se = document.getElementById('wfSearch');
   if (se) se.oninput = (e) => { __wf.search = e.target.value.toLowerCase(); _wfRenderList(); };
@@ -1796,8 +1813,80 @@ function _wfRenderCanvas() {
   nodesG.innerHTML = (__wf.current.nodes || []).map(n => _wfRenderNode(n)).join('');
   // 엣지
   edgesG.innerHTML = (__wf.current.edges || []).map(e => _wfRenderEdge(e)).join('');
+  // 노드 검색 필터 반영
+  _wfApplyNodeSearchHighlight();
   // 미니맵 업데이트
   _wfRenderMinimap();
+}
+
+// ─── 노드 검색 필터 ────────────────────────────────────────────
+let __wfNodeSearchQuery = '';
+function _wfNodeSearchFilter(q) {
+  __wfNodeSearchQuery = (q || '').trim().toLowerCase();
+  _wfApplyNodeSearchHighlight();
+}
+function _wfApplyNodeSearchHighlight() {
+  const q = __wfNodeSearchQuery;
+  document.querySelectorAll('#wfNodes .wf-node').forEach(el => {
+    if (!q) {
+      el.style.opacity = ''; el.querySelector('.wf-node-body').style.strokeDasharray = '';
+      return;
+    }
+    const nid = el.getAttribute('data-node');
+    const ntype = el.getAttribute('data-type');
+    const n = (__wf.current && __wf.current.nodes || []).find(x => x.id === nid);
+    const title = (n && n.title || '').toLowerCase();
+    const typeMeta = WF_TYPE_MAP[ntype];
+    const label = typeMeta ? typeMeta.label.toLowerCase() : '';
+    const matched = title.includes(q) || ntype.includes(q) || label.includes(q);
+    el.style.opacity = matched ? '1' : '0.2';
+    const body = el.querySelector('.wf-node-body');
+    if (body) body.style.strokeDasharray = matched ? '6 3' : '';
+  });
+}
+
+// ─── 워크플로우 통계 ────────────────────────────────────────────
+async function _wfLoadStats() {
+  const host = document.getElementById('wfStatsBody');
+  if (!host) return;
+  try {
+    const r = await api('/api/workflows/stats');
+    const s = r || {};
+    const totalRuns = s.totalRuns ?? 0;
+    const successRate = s.successRate ?? 0;
+    const avgDuration = s.avgDuration ?? 0;
+    const activeSchedules = s.activeSchedules ?? 0;
+    const providerDist = s.providerDistribution || {};
+    const providerChips = Object.entries(providerDist).map(([k, v]) =>
+      `<span class="chip text-[10px]">${escapeHtml(k)}: ${v}</span>`
+    ).join(' ') || `<span class="text-[10px] text-[var(--text-dim)]">${t('데이터 없음')}</span>`;
+    host.innerHTML = `
+      <div class="grid grid-cols-4 gap-3 mb-3">
+        <div class="card p-3 text-center">
+          <div class="text-lg font-bold" style="color:var(--accent);">${totalRuns}</div>
+          <div class="text-[10px] text-[var(--text-dim)]">${t('총 실행 수')}</div>
+        </div>
+        <div class="card p-3 text-center">
+          <div class="text-lg font-bold" style="color:var(--ok);">${successRate.toFixed(1)}%</div>
+          <div class="text-[10px] text-[var(--text-dim)]">${t('성공률')}</div>
+        </div>
+        <div class="card p-3 text-center">
+          <div class="text-lg font-bold" style="color:var(--cyan);">${(avgDuration/1000).toFixed(1)}s</div>
+          <div class="text-[10px] text-[var(--text-dim)]">${t('평균 소요시간')}</div>
+        </div>
+        <div class="card p-3 text-center">
+          <div class="text-lg font-bold" style="color:var(--warn);">${activeSchedules}</div>
+          <div class="text-[10px] text-[var(--text-dim)]">${t('활성 스케줄')}</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('프로바이더별 사용')}</span>
+        ${providerChips}
+      </div>
+    `;
+  } catch (e) {
+    host.innerHTML = `<div class="text-xs text-[var(--text-dim)] text-center py-2">${t('통계를 불러올 수 없습니다')}</div>`;
+  }
 }
 
 // ─── 미니맵 ────────────────────────────────────────────────
@@ -1808,6 +1897,7 @@ const _WF_NODE_COLORS = {
   http: '#4ade80', transform: '#c084fc', variable: '#fbbf24',
   subworkflow: '#7dd3fc', embedding: '#f472b6',
   loop: '#a78bfa', retry: '#fb923c', error_handler: '#f87171',
+  merge: '#06b6d4', delay: '#94a3b8',
 };
 function _wfRenderMinimap() {
   const cvs = document.getElementById('wfMinimap');
@@ -2139,6 +2229,8 @@ function _wfAddNode(type) {
   else if (type === 'loop') newNode.data = { loopType:'for_each', maxIterations:10, separator:'\\n', condition:'' };
   else if (type === 'retry') newNode.data = { maxRetries:3, backoffMs:1000, backoffMultiplier:2.0, retryOn:'error' };
   else if (type === 'error_handler') newNode.data = { onError:'skip', defaultOutput:'' };
+  else if (type === 'merge') newNode.data = { mergeMode:'all', requiredCount:1, timeout:300 };
+  else if (type === 'delay') newNode.data = { delayMs:1000, delayType:'fixed', maxDelayMs:5000 };
   __wf.current.nodes.push(newNode);
   __wf.selectedNodeId = nid;
   __wf.dirty = true;
@@ -2703,6 +2795,8 @@ function _wfPickNodeType(winId, type) {
   else if (type === 'loop') draft.data = { loopType:'for_each', maxIterations:10, separator:'\\n', condition:'' };
   else if (type === 'retry') draft.data = { maxRetries:3, backoffMs:1000, backoffMultiplier:2.0, retryOn:'error' };
   else if (type === 'error_handler') draft.data = { onError:'skip', defaultOutput:'' };
+  else if (type === 'merge') draft.data = { mergeMode:'all', requiredCount:1, timeout:300 };
+  else if (type === 'delay') draft.data = { delayMs:1000, delayType:'fixed', maxDelayMs:5000 };
   else draft.data = {};
   if (!draft.title) draft.title = WF_TYPE_MAP[type].label;
   _wfRenderEditorBody(winId);
@@ -2979,6 +3073,35 @@ function _wfRenderEditorBody(winId) {
         <textarea class="input w-full mt-1" rows="3" oninput="_wfDraftSetData('${winId}','defaultOutput',this.value)" placeholder="${d.onError === 'default' ? t('에러 발생 시 반환할 기본값') : t('에러 발생 시 전달할 값')}">${escapeHtml(d.defaultOutput||'')}</textarea>
       ` : ''}
     `;
+  } else if (draft.type === 'merge') {
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('합류 모드')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','mergeMode',this.value);_wfRenderEditorBody('${winId}');">
+        <option value="all" ${d.mergeMode==='all'?'selected':''}>${t('전체 대기 (all)')}</option>
+        <option value="any" ${d.mergeMode==='any'?'selected':''}>${t('하나라도 도착 (any)')}</option>
+        <option value="count" ${d.mergeMode==='count'?'selected':''}>${t('지정 개수 도착 (count)')}</option>
+      </select>
+      ${d.mergeMode === 'count' ? `
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('필요 입력 수')}</label>
+        <input type="number" class="input w-full mt-1" min="1" value="${d.requiredCount||1}" oninput="_wfDraftSetData('${winId}','requiredCount',Math.max(1,parseInt(this.value)||1))">
+      ` : ''}
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('타임아웃 (초)')}</label>
+      <input type="number" class="input w-full mt-1" min="0" value="${d.timeout||300}" oninput="_wfDraftSetData('${winId}','timeout',parseInt(this.value)||300)">
+    `;
+  } else if (draft.type === 'delay') {
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('대기 시간 (ms)')}</label>
+      <input type="number" class="input w-full mt-1" min="0" value="${d.delayMs||1000}" oninput="_wfDraftSetData('${winId}','delayMs',parseInt(this.value)||1000)">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('딜레이 유형')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','delayType',this.value);_wfRenderEditorBody('${winId}');">
+        <option value="fixed" ${d.delayType==='fixed'?'selected':''}>${t('고정 (fixed)')}</option>
+        <option value="random" ${d.delayType==='random'?'selected':''}>${t('랜덤 (random)')}</option>
+      </select>
+      ${d.delayType === 'random' ? `
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('최대 대기 시간 (ms)')}</label>
+        <input type="number" class="input w-full mt-1" min="0" value="${d.maxDelayMs||5000}" oninput="_wfDraftSetData('${winId}','maxDelayMs',parseInt(this.value)||5000)">
+      ` : ''}
+    `;
   } else if (draft.type === 'start') {
     body += `<div class="text-xs text-[var(--text-dim)] mt-4">${t('시작 노드는 추가 입력이 없습니다. 워크플로우 진입점이 됩니다.')}</div>`;
   }
@@ -3083,6 +3206,37 @@ function _wfInspectorBody(n) {
     return `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('파일로 저장 (선택, ~/ 하위만)')}</label>
       <input class="input w-full mt-1" value="${escapeHtml(d.exportTo||'')}" oninput="_wfNodeSetData('${n.id}','exportTo',this.value)" placeholder="~/workflow-output.md">
+    `;
+  }
+  if (n.type === 'merge') {
+    return `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('합류 모드')}</label>
+      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','mergeMode',this.value);_wfRenderInspector();">
+        <option value="all" ${d.mergeMode==='all'?'selected':''}>${t('전체 대기 (all)')}</option>
+        <option value="any" ${d.mergeMode==='any'?'selected':''}>${t('하나라도 도착 (any)')}</option>
+        <option value="count" ${d.mergeMode==='count'?'selected':''}>${t('지정 개수 도착 (count)')}</option>
+      </select>
+      ${d.mergeMode === 'count' ? `
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('필요 입력 수')}</label>
+        <input type="number" class="input w-full mt-1" min="1" value="${d.requiredCount||1}" oninput="_wfNodeSetData('${n.id}','requiredCount',Math.max(1,parseInt(this.value)||1))">
+      ` : ''}
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('타임아웃 (초)')}</label>
+      <input type="number" class="input w-full mt-1" min="0" value="${d.timeout||300}" oninput="_wfNodeSetData('${n.id}','timeout',parseInt(this.value)||300)">
+    `;
+  }
+  if (n.type === 'delay') {
+    return `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('대기 시간 (ms)')}</label>
+      <input type="number" class="input w-full mt-1" min="0" value="${d.delayMs||1000}" oninput="_wfNodeSetData('${n.id}','delayMs',parseInt(this.value)||1000)">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('딜레이 유형')}</label>
+      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','delayType',this.value);_wfRenderInspector();">
+        <option value="fixed" ${d.delayType==='fixed'?'selected':''}>${t('고정 (fixed)')}</option>
+        <option value="random" ${d.delayType==='random'?'selected':''}>${t('랜덤 (random)')}</option>
+      </select>
+      ${d.delayType === 'random' ? `
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('최대 대기 시간 (ms)')}</label>
+        <input type="number" class="input w-full mt-1" min="0" value="${d.maxDelayMs||5000}" oninput="_wfNodeSetData('${n.id}','maxDelayMs',parseInt(this.value)||5000)">
+      ` : ''}
     `;
   }
   return '';
