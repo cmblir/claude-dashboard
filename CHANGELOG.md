@@ -10,6 +10,26 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.9.2] — 2026-04-23
+
+### Docs — README 3종 통계/탭 테이블 전면 갱신
+
+v2.3.0 ~ v2.9.1 누적 결과를 README 의 본문 섹션에 반영 (그간 상단 배너만 추가하고 본문 통계가 v2.1.1 로 남아있었음).
+
+- 버전 배지 **v2.9.0 → v2.9.1**
+- ASCII 미리보기 표기 "6 그룹 38 탭" → **"6 그룹 45 탭"**
+- "Why" 비교 표 셀 "38 탭" → **"45 탭"**
+- `🤝 Claude Code Integration` 탭 테이블의 work 그룹에 신규 7 탭(`promptCache` `thinkingLab` `toolUseLab` `batchJobs` `apiFiles` `visionLab` `modelBench`) 🆕 표시로 추가 + "Claude API 플레이그라운드" 하이라이트 줄 추가
+- Architecture 트리: `routes.py` 143 → **168 라우트**, `nav_catalog.py` 38 → **45 탭**, `locales` 2,932 → **3,090 키**
+- `🔢 Stats (v2.1.1)` 섹션 전체를 **`v2.9.1`** 기준으로 갱신:
+  - 백엔드 14,067줄/20 모듈 → **~16,000줄/27 모듈**
+  - 프론트 ~13,500줄 → **~15,500줄**
+  - API 라우트 143 → **168 (GET 90 / POST 75 / PUT 3)**
+  - 탭 38 → **45**
+  - i18n 키 2,932 → **3,090**
+  - 신규 행: "Claude API 플레이그라운드 탭 — 7"
+- README.md / README.ko.md / README.zh.md 3종 동등 구조로 반영.
+
 ## [2.9.1] — 2026-04-23
 
 ### Fixed — v2.3.0~v2.9.0 신규 탭 렌더 실패 + NAV desc 번역 누락
