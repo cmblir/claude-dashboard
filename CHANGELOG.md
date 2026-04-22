@@ -11,6 +11,31 @@
 
 ---
 
+## [2.5.0] — 2026-04-23
+
+### 📦 Batch Jobs — 신규 탭 (work 그룹)
+
+Anthropic Message Batches API 를 감싸 대용량 프롬프트 병렬 제출·상태 폴링·결과 다운로드를 제공하는 관리 탭.
+
+**기능**
+- 원클릭 예시 2종: Q&A 10건 / 요약 5건
+- 모델 (Opus 4.7 / Sonnet 4.6 / Haiku 4.5) + max_tokens 조절
+- 프롬프트 한 줄당 1건 입력 (최대 1000건)
+- 제출 전 **비용 발생 경고** 모달 (confirmModal)
+- 최근 배치 목록 + 상태 + request_counts
+- 배치 선택 시 JSONL 결과 미리보기
+- 진행 중 배치 취소 지원
+
+**Architecture**
+- `server/batch_jobs.py` 신설 — `api_batch_{create,list,get,results,cancel,examples}`
+- `server/routes.py` — 6개 라우트 추가 (`GET examples/list/get/results` · `POST create/cancel`)
+- `server/nav_catalog.py` — `batchJobs` 탭 등록 + en/zh desc
+- `dist/index.html` — NAV + `VIEWS.batchJobs` (배치 리스트 + 결과 프리뷰 카드)
+- `tools/translations_manual_9.py` — 30 키 × ko/en/zh 추가
+- beta header: `anthropic-beta: message-batches-2024-09-24`
+
+---
+
 ## [2.4.0] — 2026-04-23
 
 ### 🛠️ Tool Use Playground — 신규 탭 (work 그룹)

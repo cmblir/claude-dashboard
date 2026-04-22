@@ -856,6 +856,9 @@ const NAV = [
   { id: 'toolUseLab',  icon: '🛠️', label: 'Tool Use 플레이그라운드', group: 'work',
     desc: 'tool schema 정의 → tool_use 수신 → tool_result 피드 멀티 턴',
     docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use' },
+  { id: 'batchJobs',   icon: '📦', label: '배치 작업', group: 'work',
+    desc: 'Message Batches API — 대용량 프롬프트 병렬 제출 · JSONL 결과',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/message-batches' },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -7287,6 +7290,178 @@ async function tuSubmitToolResult(msgIdx, _blockIdx, toolUseId) {
   try { tools = JSON.parse(tu.tools || '[]'); }
   catch (e) { toast(t('tools JSON 오류') + ': ' + e.message, 'err'); return; }
   await tuCallTurn(tools);
+}
+
+// ────────────────────────────────────────────────────────────────
+// BATCH JOBS (v2.5.0) — Message Batches API 관리 탭
+// 대용량 프롬프트 배치 제출 · 상태 폴링 · JSONL 결과 다운로드
+// ────────────────────────────────────────────────────────────────
+VIEWS.batchJobs = async () => {
+  const [ex, lst] = await Promise.all([
+    api('/api/batch/examples'),
+    api('/api/batch/list'),
+  ]);
+  state.data.bj = state.data.bj || {
+    model: 'claude-haiku-4-5',
+    maxTokens: 256,
+    promptsText: '',
+    selectedBatchId: '',
+    lastResults: null,
+  };
+  const bj = state.data.bj;
+
+  const exBtns = (ex.examples || []).map(e =>
+    `<button class="chip" onclick="bjLoadExample('${e.id}')">${t(e.label)}</button>`
+  ).join('');
+
+  let batches = [];
+  if (lst && lst.ok) batches = lst.data || [];
+  const needKey = lst && lst.needKey;
+
+  const batchRows = batches.slice(0, 20).map(b => {
+    const status = b.processing_status || b.status || '?';
+    const created = b.created_at ? new Date(b.created_at).toLocaleString() : '';
+    const counts = b.request_counts || {};
+    const selected = bj.selectedBatchId === b.id;
+    return `<div class="py-2 border-b border-[var(--border)] ${selected?'bg-[var(--bg-hover)]':''}">
+      <div class="flex justify-between items-center gap-2">
+        <span class="font-mono text-[11px]">${b.id}</span>
+        <span class="chip chip-sm">${status}</span>
+      </div>
+      <div class="text-[10px] text-[var(--text-dim)] mt-1">${created} · processed ${counts.processing||0}+${counts.succeeded||0}/${(counts.processing||0)+(counts.succeeded||0)+(counts.errored||0)+(counts.canceled||0)+(counts.expired||0)||'?'}</div>
+      <div class="mt-1 flex gap-1">
+        <button class="btn btn-sm" onclick="bjSelect('${b.id}')">${t('결과 보기')}</button>
+        ${status==='in_progress' || status==='processing' ? `<button class="btn btn-sm" onclick="bjCancel('${b.id}')">${t('취소')}</button>` : ''}
+      </div>
+    </div>`;
+  }).join('') || `<div class="text-[11px] text-[var(--text-dim)]">${t('배치 없음')}</div>`;
+
+  const resultsPanel = bj.lastResults ? `
+    <div class="text-[11px] text-[var(--text-dim)] mb-1">${t('결과')} ${bj.lastResults.count||0} ${t('건')} · ${bj.selectedBatchId}</div>
+    <pre class="text-[10px] max-h-80 overflow-auto font-mono whitespace-pre-wrap">${_escapeHTML(JSON.stringify(bj.lastResults.items||[], null, 2).slice(0, 8000))}</pre>
+  ` : `<div class="text-[11px] text-[var(--text-dim)]">${t('배치를 선택해서 결과를 보세요')}</div>`;
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">📦 ${t('배치 작업')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('Message Batches API 로 여러 프롬프트를 병렬 제출하고 상태 · JSONL 결과를 확인.')}
+      </p>
+      ${needKey ? `<div class="mt-2 text-[11px] text-[var(--warn)]">⚠️ ${t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요')}</div>` : ''}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="space-y-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('예시')}</span>
+          ${exBtns}
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider w-20">${t('모델')}</label>
+          <select class="input flex-1" onchange="bjSet('model', this.value)">
+            <option value="claude-opus-4-7" ${bj.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${bj.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
+            <option value="claude-haiku-4-5" ${bj.model==='claude-haiku-4-5'?'selected':''}>Haiku 4.5</option>
+          </select>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">max_tokens</label>
+          <input type="text" inputmode="numeric" class="input w-24" value="${bj.maxTokens}"
+                 oninput="bjSet('maxTokens', parseInt((this.value||'').replace(/\\D/g,''))||256)">
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('프롬프트 (한 줄에 하나)')}</label>
+          <textarea class="input text-[12px] font-mono" rows="10" oninput="bjSet('promptsText', this.value)" placeholder="${t('예: 한국의 수도는?')}">${_escapeHTML(bj.promptsText || '')}</textarea>
+          <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('최대 1000건')}</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary" onclick="bjSubmit()">🚀 ${t('배치 제출')}</button>
+          <button class="btn" onclick="bjRefresh()">🔄 ${t('새로고침')}</button>
+          <span id="bjStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="card p-3">
+          <div class="flex justify-between items-center mb-2">
+            <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('최근 배치')} (${batches.length})</div>
+          </div>
+          <div class="max-h-80 overflow-auto">${batchRows}</div>
+        </div>
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('결과 미리보기')}</div>
+          ${resultsPanel}
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+function bjSet(key, val) {
+  state.data.bj = state.data.bj || {};
+  state.data.bj[key] = val;
+}
+async function bjLoadExample(id) {
+  const r = await api('/api/batch/examples');
+  const e = (r.examples || []).find(x => x.id === id);
+  if (!e) return;
+  state.data.bj = {
+    model: e.model,
+    maxTokens: e.maxTokens,
+    promptsText: (e.prompts || []).join('\n'),
+    selectedBatchId: '',
+    lastResults: null,
+  };
+  renderView();
+}
+async function bjSubmit() {
+  const bj = state.data.bj || {};
+  const prompts = (bj.promptsText || '').split('\n').map(s => s.trim()).filter(Boolean);
+  if (!prompts.length) { toast(t('프롬프트를 1건 이상 입력하세요'), 'err'); return; }
+  if (prompts.length > 1000) { toast(t('최대 1000건'), 'err'); return; }
+  const ok = await confirmModal({
+    title: t('배치 제출 확인'),
+    message: t('총 {n} 건을 {model} 로 제출합니다. Anthropic API 요금이 발생할 수 있습니다. 계속할까요?').replace('{n}', prompts.length).replace('{model}', bj.model),
+    confirmLabel: t('제출'),
+  });
+  if (!ok) return;
+  const st = document.getElementById('bjStatus');
+  if (st) st.textContent = t('제출 중…');
+  try {
+    const r = await fetch('/api/batch/create', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ model: bj.model, maxTokens: bj.maxTokens, prompts }),
+    }).then(x => x.json());
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent=''; return; }
+    if (!r.ok) { toast(r.error || t('제출 실패'), 'err'); if (st) st.textContent=''; return; }
+    toast(t('배치 제출 완료') + ': ' + (r.batchId||''), 'ok');
+    if (st) st.textContent = '';
+    await bjRefresh();
+  } catch (e) {
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (st) st.textContent = '';
+  }
+}
+async function bjRefresh() {
+  await renderView();
+}
+async function bjSelect(id) {
+  state.data.bj = state.data.bj || {};
+  state.data.bj.selectedBatchId = id;
+  const r = await api('/api/batch/results?id=' + encodeURIComponent(id));
+  if (!r.ok) {
+    toast(r.error || t('결과 조회 실패') + ' (' + t('완료 전에는 결과가 비어있을 수 있습니다') + ')', 'err');
+  }
+  state.data.bj.lastResults = r.ok ? { items: r.items, count: r.count } : { items: [], count: 0 };
+  renderView();
+}
+async function bjCancel(id) {
+  const ok = await confirmModal({ title: t('배치 취소'), message: t('이 배치를 취소할까요?'), confirmLabel: t('취소'), danger: true });
+  if (!ok) return;
+  const r = await fetch('/api/batch/cancel', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id }),
+  }).then(x => x.json());
+  if (r.ok) toast(t('취소 요청됨'), 'ok'); else toast(r.error || t('취소 실패'), 'err');
+  await bjRefresh();
 }
 
 // ────────────────────────────────────────────────────────────────

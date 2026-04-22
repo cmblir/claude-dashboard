@@ -51,6 +51,10 @@ from .thinking_lab import (
 from .tool_use_lab import (
     api_tool_use_history, api_tool_use_templates, api_tool_use_turn,
 )
+from .batch_jobs import (
+    api_batch_cancel, api_batch_create, api_batch_examples,
+    api_batch_get, api_batch_list, api_batch_results,
+)
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -206,6 +210,10 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/thinking-lab/models": api_thinking_lab_models,
     "/api/tool-use-lab/templates": api_tool_use_templates,
     "/api/tool-use-lab/history": api_tool_use_history,
+    "/api/batch/examples": api_batch_examples,
+    "/api/batch/list": api_batch_list,
+    "/api/batch/get": api_batch_get,
+    "/api/batch/results": api_batch_results,
 }
 
 
@@ -295,6 +303,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/prompt-cache/test": api_prompt_cache_test,
     "/api/thinking-lab/test": api_thinking_lab_test,
     "/api/tool-use-lab/turn": api_tool_use_turn,
+    "/api/batch/create": api_batch_create,
+    "/api/batch/cancel": api_batch_cancel,
 }
 
 
