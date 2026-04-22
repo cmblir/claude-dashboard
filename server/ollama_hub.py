@@ -368,7 +368,7 @@ def api_ollama_serve_start(body: dict | None = None) -> dict:
     """
     global _OLLAMA_SERVE_PROC
 
-    # 이미 Ollama가 실행 중인지 먼저 확인
+    # 이미 Ollama가 실행 중인지 먼저 확인 (외부 프로세스 포함)
     host = _ollama_host()
     if _is_ollama_reachable(host):
         _OLLAMA_SERVE_STATUS["running"] = True
@@ -380,6 +380,17 @@ def api_ollama_serve_start(body: dict | None = None) -> dict:
             "host": host,
             "message": f"Ollama 이미 실행 중 ({host})",
             "error_key": "",
+        }
+
+    # 대시보드가 이전에 시작한 프로세스가 아직 살아있으면 재사용
+    if _OLLAMA_SERVE_PROC and _OLLAMA_SERVE_PROC.poll() is None:
+        _OLLAMA_SERVE_STATUS["running"] = True
+        return {
+            "ok": True,
+            "status": "already_managed",
+            "host": _OLLAMA_SERVE_STATUS.get("host", host),
+            "pid": _OLLAMA_SERVE_PROC.pid,
+            "message": "대시보드가 관리하는 Ollama 프로세스가 이미 실행 중",
         }
 
     # CLI 확인
