@@ -6,7 +6,7 @@
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.9.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.9.1-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#기술-스택)
 
 Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claude/` 디렉토리 전체(에이전트·스킬·훅·플러그인·MCP·세션·프로젝트)를 관리하고, 멀티 AI 프로바이더 오케스트레이션을 위한 **n8n 스타일 워크플로우 엔진**을 제공합니다. 모든 것이 `python3 server.py` 한 줄에 들어있습니다.
@@ -43,7 +43,7 @@ Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claud
 └────────┴───────────────────────────────────────────────────────┘
 ```
 
-6 그룹 38 탭 · 16 워크플로우 노드 타입 · 8 AI 프로바이더 · 5 테마 · 3 언어.
+6 그룹 45 탭 · 16 워크플로우 노드 타입 · 8 AI 프로바이더 · 5 테마 · 3 언어.
 
 ---
 
@@ -55,7 +55,7 @@ Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claud
 
 | 이전 방식 | Control Center |
 |---|---|
-| `cat ~/.claude/settings.json` 눈으로 확인 | 38 탭이 각 섹션을 렌더링 |
+| `cat ~/.claude/settings.json` 눈으로 확인 | 45 탭이 각 섹션을 렌더링 |
 | `ls ~/.claude/agents/` → 에디터 열기 | 16 역할 프리셋 · 원클릭 생성 |
 | 쉘 스크립트로 멀티 AI 비교 | 세션 노드 3개 드래그 → merge → output |
 | RAG 파이프라인 수동 구성 | 빌트인 `RAG Pipeline` 템플릿 |
@@ -150,23 +150,23 @@ API 키는 `🧠 AI 프로바이더` 탭에서 저장해도 됩니다 — `~/.cl
 - **기본 모델 지정** — 프로바이더별 채팅/임베딩 기본값
 - **Modelfile 편집기** — UI 에서 커스텀 모델 생성
 
-### 🤝 Claude Code 통합 (38 탭)
+### 🤝 Claude Code 통합 (45 탭)
 
 | 그룹 | 탭 |
 |---|---|
 | 🆕 신기능 | `features` · `onboarding` · `guideHub` |
 | 🏠 메인 | `overview` · `projects` · `analytics` · `aiEval` · `sessions` |
-| 🛠️ 작업 | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` |
+| 🛠️ 작업 | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` · 🆕 `promptCache` · 🆕 `thinkingLab` · 🆕 `toolUseLab` · 🆕 `batchJobs` · 🆕 `apiFiles` · 🆕 `visionLab` · 🆕 `modelBench` |
 | ⚙️ 설정 | `hooks` · `permissions` · `mcp` · `plugins` · `settings` · `claudemd` |
 | 🎛️ 고급 | `outputStyles` · `statusline` · `plans` · `envConfig` · `modelConfig` · `ideStatus` · `marketplaces` · `scheduled` |
 | 📈 시스템 | `usage` · `metrics` · `memory` · `tasks` · `backups` · `bashHistory` · `telemetry` · `homunculus` · `team` · `system` |
 
-하이라이트: **16개 서브에이전트 역할 프리셋** (backend-dev, security-reviewer, architect, ...), 세션 타임라인 + 품질 스코어링, 마크다운 프리뷰 CLAUDE.md 에디터, MCP 커넥터 설치기, 플러그인 마켓플레이스 연동.
+하이라이트: **16개 서브에이전트 역할 프리셋** (backend-dev, security-reviewer, architect, ...), 세션 타임라인 + 품질 스코어링, 마크다운 프리뷰 CLAUDE.md 에디터, MCP 커넥터 설치기, 플러그인 마켓플레이스 연동. **Claude API 플레이그라운드** — 프롬프트 캐시 · Extended Thinking · Tool Use · Batch · Files · Vision/PDF · 모델 벤치마크 7개 탭.
 
 ### 🌍 다국어 지원
 
 - **3개 언어** — 한국어(`ko`, 기본) · 영어(`en`) · 중국어(`zh`)
-- **언어당 2,932개 번역 키** · **영문/중문 모드 한글 잔존 0** (검증 완료)
+- **언어당 3,090개 번역 키** · **영문/중문 모드 한글 잔존 0** (검증 완료)
 - **런타임 DOM 번역** — MutationObserver (페이지 리로드 없음)
 - **`error_key` 시스템** — 백엔드 에러 메시지도 프론트에서 현지화
 - **검증 파이프라인** — `scripts/verify-translations.js` 가 4단계 검사 (parity · `t()` · audit · static DOM)
@@ -187,12 +187,12 @@ API 키는 `🧠 AI 프로바이더` 탭에서 저장해도 됩니다 — `~/.cl
 claude-dashboard/
 ├── server.py                     # 엔트리 (포트 충돌 자동 해결 + ollama 자동 시작)
 ├── server/                       # 14,067줄 · 표준 라이브러리만
-│   ├── routes.py                 # 143 API 라우트 (GET + POST + PUT + DELETE + regex webhook)
+│   ├── routes.py                 # 168 API 라우트 (GET + POST + PUT + DELETE + regex webhook)
 │   ├── workflows.py              # DAG 엔진 · 16 노드 실행 · Repeat · Cron · Webhook (2,296)
 │   ├── ai_providers.py           # 8 프로바이더 · 레지스트리 · Rate Limiter (1,723)
 │   ├── ai_keys.py                # 키 관리 · 커스텀 프로바이더 · 비용 추적 (734)
 │   ├── ollama_hub.py             # 카탈로그 · pull/delete/create · serve 관리 (606)
-│   ├── nav_catalog.py            # 38탭 단일 소스 + i18n 설명
+│   ├── nav_catalog.py            # 45탭 단일 소스 + i18n 설명
 │   ├── features.py               # 기능 탐색 · AI 평가 · 추천
 │   ├── projects.py               # 프로젝트 브라우저 · 16 서브에이전트 역할 프리셋
 │   ├── sessions.py               # 세션 인덱싱 · 품질 스코어링 · 에이전트 그래프
@@ -201,7 +201,7 @@ claude-dashboard/
 │   └── …                         # 총 20 모듈
 ├── dist/
 │   ├── index.html                # 단일 파일 SPA (~13,500줄)
-│   └── locales/{ko,en,zh}.json   # 2,932 키 × 3 언어
+│   └── locales/{ko,en,zh}.json   # 3,090 키 × 3 언어
 ├── tools/
 │   ├── translations_manual_*.py  # 수동 번역 override
 │   ├── extract_ko_strings.py     # 한국어 문자열 추출
@@ -240,20 +240,21 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.1.1)
+## 🔢 통계 (v2.9.1)
 
 | 지표 | 값 |
 |---|---|
-| 백엔드 코드 | 14,067줄 · 20 모듈 · stdlib only |
-| 프론트엔드 코드 | ~13,500줄 · 단일 HTML |
-| API 라우트 | **143** |
-| 탭 수 | **38** (6 그룹) |
+| 백엔드 코드 | ~16,000줄 · 27 모듈 · stdlib only |
+| 프론트엔드 코드 | ~15,500줄 · 단일 HTML |
+| API 라우트 | **168** (GET 90 / POST 75 / PUT 3 + regex webhook) |
+| 탭 수 | **45** (6 그룹) |
 | 워크플로우 노드 타입 | **16** |
 | AI 프로바이더 | **8** 빌트인 + 커스텀 무제한 |
+| Claude API 플레이그라운드 탭 | **7** (프롬프트 캐시 · Extended Thinking · Tool Use · Batch · Files · Vision · 모델 벤치) |
 | Ollama 카탈로그 | **23** 모델 |
 | 서브에이전트 역할 프리셋 | **16** |
 | 빌트인 워크플로우 템플릿 | **8** (빌트인 5 + 팀 3) |
-| i18n 키 | **2,932** × 3 언어 · 누락 0 |
+| i18n 키 | **3,090** × 3 언어 · 누락 0 |
 | 테마 | **5** |
 | 튜토리얼 장면 | **18** |
 

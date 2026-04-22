@@ -6,7 +6,7 @@
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.9.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.9.1-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#技术栈)
 
 Claude Control Center 是一款**本地优先的仪表板**，统一管理你的整个 `~/.claude/` 目录（代理、技能、钩子、插件、MCP、会话、项目），并内置一个强大的 **n8n 风格工作流引擎** 用于多 AI 供应商编排——全部包含在一行 `python3 server.py` 中。
@@ -43,7 +43,7 @@ Claude Control Center 是一款**本地优先的仪表板**，统一管理你的
 └────────┴───────────────────────────────────────────────────────┘
 ```
 
-6 组 38 个标签页 · 16 种工作流节点 · 8 个 AI 供应商 · 5 种主题 · 3 种语言。
+6 组 45 个标签页 · 16 种工作流节点 · 8 个 AI 供应商 · 5 种主题 · 3 种语言。
 
 ---
 
@@ -55,7 +55,7 @@ Claude Control Center 是一款**本地优先的仪表板**，统一管理你的
 
 | 以前 | 使用 Control Center |
 |---|---|
-| `cat ~/.claude/settings.json` 肉眼检查 | 38 个标签页各自渲染对应切片 |
+| `cat ~/.claude/settings.json` 肉眼检查 | 45 个标签页各自渲染对应切片 |
 | `ls ~/.claude/agents/` → 打开编辑器 | 16 种角色预设 · 一键创建 |
 | 用 shell 脚本做多 AI 比较 | 拖 3 个 session 节点 → merge → output |
 | 手动搭建 RAG 流水线 | 内置 `RAG Pipeline` 模板 |
@@ -152,23 +152,23 @@ API 密钥也可以在 `🧠 AI 供应商` 标签页中保存 — 存储于 `~/.
 - **默认模型选择** — 每供应商聊天 / 嵌入默认值
 - **Modelfile 编辑器** — 在 UI 中创建自定义模型
 
-### 🤝 Claude Code 集成（38 个标签页）
+### 🤝 Claude Code 集成（45 个标签页）
 
 | 分组 | 标签页 |
 |---|---|
 | 🆕 新功能 | `features` · `onboarding` · `guideHub` |
 | 🏠 主要 | `overview` · `projects` · `analytics` · `aiEval` · `sessions` |
-| 🛠️ 工作 | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` |
+| 🛠️ 工作 | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` · 🆕 `promptCache` · 🆕 `thinkingLab` · 🆕 `toolUseLab` · 🆕 `batchJobs` · 🆕 `apiFiles` · 🆕 `visionLab` · 🆕 `modelBench` |
 | ⚙️ 配置 | `hooks` · `permissions` · `mcp` · `plugins` · `settings` · `claudemd` |
 | 🎛️ 高级 | `outputStyles` · `statusline` · `plans` · `envConfig` · `modelConfig` · `ideStatus` · `marketplaces` · `scheduled` |
 | 📈 系统 | `usage` · `metrics` · `memory` · `tasks` · `backups` · `bashHistory` · `telemetry` · `homunculus` · `team` · `system` |
 
-亮点：**16 种子代理角色预设**（backend-dev, security-reviewer, architect, ...）、带质量评分的会话时间线、带 Markdown 预览的 CLAUDE.md 编辑器、MCP 连接器安装器、插件市场集成。
+亮点：**16 种子代理角色预设**（backend-dev, security-reviewer, architect, ...）、带质量评分的会话时间线、带 Markdown 预览的 CLAUDE.md 编辑器、MCP 连接器安装器、插件市场集成。**Claude API 实验室** — 提示缓存 · Extended Thinking · Tool Use · Batch · Files · Vision/PDF · 模型基准测试 7 个标签页。
 
 ### 🌍 多语言支持
 
 - **3 种语言** — 韩语（`ko`，默认）· 英语（`en`）· 中文（`zh`）
-- **每种语言 2,932 个翻译键** · **英文/中文模式下韩文残留为 0**（已验证）
+- **每种语言 3,090 个翻译键** · **英文/中文模式下韩文残留为 0**（已验证）
 - **运行时 DOM 翻译** — 基于 MutationObserver（无需刷新页面）
 - **`error_key` 系统** — 后端错误消息在前端本地化
 - **校验流水线** — `scripts/verify-translations.js` 执行四项检查（parity · `t()` 调用 · audit · static DOM）
@@ -194,7 +194,7 @@ claude-dashboard/
 │   ├── ai_providers.py           # 8 个供应商 · 注册表 · 速率限制器 (1,723)
 │   ├── ai_keys.py                # 密钥管理 · 自定义供应商 · 成本追踪 (734)
 │   ├── ollama_hub.py             # 模型目录 · pull/delete/create · serve 管理 (606)
-│   ├── nav_catalog.py            # 38 个标签页单一数据源 + i18n 描述
+│   ├── nav_catalog.py            # 45 个标签页单一数据源 + i18n 描述
 │   ├── features.py               # 功能发现 · AI 评估 · 推荐
 │   ├── projects.py               # 项目浏览器 · 16 个子代理角色预设
 │   ├── sessions.py               # 会话索引 · 质量评分 · 代理图谱
@@ -203,7 +203,7 @@ claude-dashboard/
 │   └── …                         # 共 20 个模块
 ├── dist/
 │   ├── index.html                # 单文件 SPA（~13,500 行）
-│   └── locales/{ko,en,zh}.json   # 2,932 键 × 3 语言
+│   └── locales/{ko,en,zh}.json   # 3,090 键 × 3 语言
 ├── tools/
 │   ├── translations_manual_*.py  # 手动翻译覆盖
 │   ├── extract_ko_strings.py     # 韩文字符串提取器
@@ -242,20 +242,21 @@ claude-dashboard/
 
 ---
 
-## 🔢 统计（v2.1.1）
+## 🔢 统计（v2.9.1）
 
 | 指标 | 值 |
 |---|---|
-| 后端代码 | 14,067 行 · 20 个模块 · 仅标准库 |
-| 前端代码 | ~13,500 行 · 单 HTML 文件 |
-| API 路由 | **143** |
-| 标签页 | **38**（6 组） |
+| 后端代码 | ~16,000 行 · 27 个模块 · 仅标准库 |
+| 前端代码 | ~15,500 行 · 单 HTML 文件 |
+| API 路由 | **168**（GET 90 / POST 75 / PUT 3 + regex webhook） |
+| 标签页 | **45**（6 组） |
 | 工作流节点类型 | **16** |
 | AI 供应商 | **8** 个内置 + 无限自定义 |
+| Claude API 实验室标签 | **7**（提示缓存 · Extended Thinking · Tool Use · Batch · Files · Vision · 模型基准） |
 | Ollama 目录 | **23** 个模型 |
 | 子代理角色预设 | **16** |
 | 内置工作流模板 | **8**（内置 5 + 团队 3） |
-| i18n 键 | **2,932** × 3 语言 · 缺失 0 |
+| i18n 键 | **3,090** × 3 语言 · 缺失 0 |
 | 主题 | **5** |
 | 教程场景 | **18** |
 
