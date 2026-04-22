@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.9.3] — 2026-04-23
+
+### Fixed — 빌트인 워크플로우 템플릿 조회 실패 (404 → "템플릿 생성 에러")
+
+사용자 리포트: **"멀티 AI 비교 커스텀 템플릿을 사용하려는데 error 라고 나오면서 안 생성돼"**.
+
+**원인**
+`server/routes.py::_ITEM_GET_ROUTES` 의 템플릿 단일 조회 정규식이 `(tpl-[0-9]{10,14}-[a-z0-9]{3,6})` 로 **커스텀 템플릿 id 포맷만 허용**하고 있었다. `workflows.py::BUILTIN_TEMPLATES` 의 id 는 `bt-multi-ai-compare / bt-rag-pipeline / bt-code-review / bt-data-etl / bt-retry-robust` 5종으로 전혀 다른 포맷이라 매칭 실패 → `GET /api/workflows/templates/bt-multi-ai-compare` 가 계속 **404**. 프론트의 템플릿 상세 fetch 가 실패해 워크플로우 생성이 중단됨.
+
+`api_workflow_template_get` 핸들러 자체는 이미 `BUILTIN_TEMPLATES` 먼저 조회 후 fallback 으로 custom 저장소를 뒤지는 올바른 구조였음 — 라우트 레이어에서 도달조차 못 하던 문제.
+
+**수정**
+- `server/routes.py` 정규식을 `(tpl-[0-9]{10,14}-[a-z0-9]{3,6}|bt-[a-z0-9-]+)` 로 확장해 두 id 포맷 모두 허용.
+
+**검증**
+5개 빌트인 템플릿 전수 스모크:
+- `bt-multi-ai-compare` (멀티 AI 비교, 6 nodes) ✓
+- `bt-rag-pipeline` (RAG 파이프라인, 5 nodes) ✓
+- `bt-code-review` (코드 리뷰, 5 nodes) ✓
+- `bt-data-etl` (데이터 ETL, 5 nodes) ✓
+- `bt-retry-robust` (재시도, 5 nodes) ✓
+
+모두 `ok: True`, 정확한 노드 수 반환.
+
 ## [2.9.2] — 2026-04-23
 
 ### Docs — README 3종 통계/탭 테이블 전면 갱신
