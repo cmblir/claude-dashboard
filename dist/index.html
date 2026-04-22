@@ -8860,24 +8860,45 @@ async function _aiRefreshHealth() {
       if (summary) summary.textContent = '';
       return;
     }
-    const avail = items.filter(p => p.available || p.status === 'available');
-    if (summary) summary.textContent = `${avail.length}/${items.length} ${t('프로바이더 사용 가능')}`;
-    host.innerHTML = items.map(p => {
+    // ollama + ollama-api 는 같은 서버이므로 하나로 합침
+    const merged = [];
+    const seenOllama = { local: false, api: false };
+    for (const p of items) {
+      const pid = p.provider || p.id || '';
+      if (pid === 'ollama-api') { seenOllama.api = true; continue; } // ollama 로컬이 대표
+      if (pid === 'ollama') seenOllama.local = true;
+      merged.push(p);
+    }
+    host.innerHTML = merged.map(p => {
       const ok = p.available || p.status === 'available';
       const dotColor = ok ? 'var(--ok)' : 'var(--err)';
       const icon = p.icon || '🔌';
-      const name = escapeHtml(p.name || p.provider || p.id || '');
+      const pid = p.provider || p.id || '';
+      const name = escapeHtml(p.name || pid);
       const chipCls = ok ? 'chip chip-ok' : 'chip chip-err';
       const ep = p.endpoint || '';
-      const epShort = ep.replace('https://','').replace('http://','').replace(/\/.*$/,'');
-      const epHtml = ok && epShort ? `<span class="text-[9px]" style="color:var(--cyan);font-family:monospace">${escapeHtml(epShort)}</span>` : '';
-      return `<div class="flex items-center gap-1.5" title="${escapeHtml(ep||p.provider||'')}">
+      const ptype = p.type || '';
+      // endpoint 표시 로직
+      let epHtml = '';
+      if (ok) {
+        if (ptype === 'cli' && ep.includes('/')) {
+          // CLI: 짧은 경로만 (마지막 부분)
+          epHtml = `<span class="text-[9px]" style="color:var(--cyan);font-family:monospace">CLI ✓</span>`;
+        } else if (ep.startsWith('http')) {
+          const epShort = ep.replace('https://','').replace('http://','');
+          epHtml = `<span class="text-[9px]" style="color:var(--cyan);font-family:monospace">${escapeHtml(epShort)}</span>`;
+        }
+      }
+      return `<div class="flex items-center gap-1.5" title="${escapeHtml(ep||pid)}">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
         <span class="text-sm">${icon}</span>
         <span class="${chipCls} text-[11px]">${name}</span>
         ${epHtml}
       </div>`;
     }).join('');
+    // 헬스 카운트도 merged 기준으로 재계산
+    const mergedAvail = merged.filter(p => p.available || p.status === 'available');
+    if (summary) summary.textContent = `${mergedAvail.length}/${merged.length} ${t('프로바이더 사용 가능')}`;
   } catch (e) {
     // health 엔드포인트가 없으면 기존 리스트 데이터로 폴백
     const cached = state.data._aiProviders;
