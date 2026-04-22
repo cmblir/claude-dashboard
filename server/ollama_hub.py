@@ -555,6 +555,44 @@ def api_ollama_serve_status(query: dict | None = None) -> dict:
     }
 
 
+def api_ollama_create_model(body: dict) -> dict:
+    """Modelfile 로 커스텀 모델 생성. body: {name, modelfile}
+
+    modelfile 예시:
+      FROM llama3.1
+      SYSTEM "너는 한국어 전문 비서다."
+      PARAMETER temperature 0.7
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    name = (body.get("name") or "").strip()
+    modelfile = (body.get("modelfile") or "").strip()
+    if not name or not modelfile:
+        return {"ok": False, "error": "name 과 modelfile 필수"}
+    if not re.match(r"^[a-zA-Z0-9._:/-]+$", name):
+        return {"ok": False, "error": "유효하지 않은 모델 이름", "error_key": "err_invalid_id"}
+
+    host = _ollama_host()
+    try:
+        body_bytes = json.dumps({"name": name, "modelfile": modelfile, "stream": False}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{host}/api/create", data=body_bytes,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return {"ok": True, "name": name, "status": data.get("status", "success")}
+    except urllib.error.HTTPError as e:
+        err_body = ""
+        try:
+            err_body = e.read().decode("utf-8")[:500]
+        except Exception:
+            pass
+        return {"ok": False, "error": f"HTTP {e.code}: {err_body}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def _update_provider_host(host: str) -> None:
     """감지된 Ollama 호스트를 프로바이더 레지스트리에 반영."""
     try:

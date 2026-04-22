@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
@@ -1608,6 +1609,60 @@ def reset_registry() -> None:
 
 
 # ───────── 편의 함수 ─────────
+
+# ───────── Rate Limiter (토큰 버킷) ─────────
+
+class _RateLimiter:
+    """프로바이더별 요청 빈도 제한 (토큰 버킷 알고리즘)."""
+
+    def __init__(self):
+        self._buckets: dict[str, dict] = {}  # {provider_id: {tokens, max, refill_rate, last_refill}}
+        self._lock = threading.Lock()
+
+    def configure(self, provider_id: str, max_rpm: int = 60) -> None:
+        """분당 최대 요청 수 설정."""
+        with self._lock:
+            self._buckets[provider_id] = {
+                "tokens": float(max_rpm),
+                "max": float(max_rpm),
+                "refill_rate": max_rpm / 60.0,  # 초당 리필
+                "last_refill": time.time(),
+            }
+
+    def acquire(self, provider_id: str, timeout: float = 30.0) -> bool:
+        """토큰 1개 획득. 가능하면 True, 타임아웃 내 불가하면 False."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            with self._lock:
+                bucket = self._buckets.get(provider_id)
+                if not bucket:
+                    return True  # 미설정이면 무제한
+                now = time.time()
+                elapsed = now - bucket["last_refill"]
+                bucket["tokens"] = min(bucket["max"], bucket["tokens"] + elapsed * bucket["refill_rate"])
+                bucket["last_refill"] = now
+                if bucket["tokens"] >= 1.0:
+                    bucket["tokens"] -= 1.0
+                    return True
+            time.sleep(0.1)
+        return False
+
+    def get_status(self) -> dict:
+        """현재 rate limit 상태."""
+        with self._lock:
+            out = {}
+            for pid, b in self._buckets.items():
+                out[pid] = {"tokens": round(b["tokens"], 1), "max": b["max"],
+                            "rpm": int(b["max"])}
+            return out
+
+
+_rate_limiter = _RateLimiter()
+
+
+def get_rate_limiter() -> _RateLimiter:
+    return _rate_limiter
+
 
 def execute_with_assignee(
     assignee: str,

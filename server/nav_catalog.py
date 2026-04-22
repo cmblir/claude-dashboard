@@ -132,6 +132,56 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
 ]
 
 
+# 탭 설명 다국어 매핑 (챗봇 + 프론트 다국어 전환용)
+TAB_DESC_I18N: dict[str, dict[str, str]] = {
+    "features": {"en": "New Features — Latest Anthropic announcements", "zh": "新功能 — Anthropic 最新发布"},
+    "onboarding": {"en": "Getting Started — Step-by-step checklist", "zh": "快速入门 — 分步清单"},
+    "guideHub": {"en": "Guides & Tools — Best practices & cheat sheets", "zh": "指南与工具 — 最佳实践/速查表"},
+    "overview": {"en": "Overview / Optimization Score", "zh": "概览 / 优化评分"},
+    "projects": {"en": "Per-project Claude settings & CLAUDE.md", "zh": "项目 Claude 设置 / CLAUDE.md"},
+    "analytics": {"en": "Stats & Score / 30-day timeline", "zh": "统计与评分 / 30天时间线"},
+    "aiEval": {"en": "AI Evaluation — Full setup diagnosis", "zh": "AI 综合评估"},
+    "sessions": {"en": "Session History / Search / Quality Score", "zh": "会话历史 / 搜索 / 质量评分"},
+    "workflows": {"en": "Workflow — n8n-style DAG editor with 16 node types", "zh": "工作流 — n8n 风格 DAG 编辑器，16 种节点"},
+    "aiProviders": {"en": "AI Providers — Multi-AI orchestration with Ollama hub", "zh": "AI 供应商 — 多 AI 编排 + Ollama 模型中心"},
+    "agents": {"en": "Agent list & interaction graph", "zh": "代理列表 / 交互图谱"},
+    "projectAgents": {"en": "Per-project sub-agents / 16 role presets", "zh": "项目子代理 / 16 角色预设"},
+    "skills": {"en": "User-defined skills", "zh": "用户自定义技能"},
+    "commands": {"en": "Slash commands", "zh": "斜杠命令"},
+    "hooks": {"en": "Event hooks", "zh": "事件钩子"},
+    "permissions": {"en": "Tool permissions", "zh": "工具权限"},
+    "mcp": {"en": "MCP Connectors", "zh": "MCP 连接器"},
+    "plugins": {"en": "Plugin management", "zh": "插件管理"},
+    "settings": {"en": "settings.json editor", "zh": "settings.json 编辑"},
+    "claudemd": {"en": "CLAUDE.md editor", "zh": "CLAUDE.md 编辑"},
+    "outputStyles": {"en": "Output style customization", "zh": "输出样式自定义"},
+    "statusline": {"en": "Status line / Key bindings", "zh": "状态栏 / 快捷键"},
+    "plans": {"en": "Plan archive", "zh": "计划存档"},
+    "envConfig": {"en": "Environment variables", "zh": "环境变量"},
+    "modelConfig": {"en": "Model configuration", "zh": "模型设置"},
+    "ideStatus": {"en": "IDE integration status", "zh": "IDE 集成状态"},
+    "marketplaces": {"en": "Marketplace management", "zh": "市场管理"},
+    "scheduled": {"en": "Scheduled tasks", "zh": "定时任务"},
+    "usage": {"en": "Usage / Cost estimation", "zh": "使用量 / 费用估算"},
+    "metrics": {"en": "Token metrics time series", "zh": "Token 指标时序"},
+    "memory": {"en": "Project memory management", "zh": "项目记忆管理"},
+    "tasks": {"en": "Task / TODO management", "zh": "任务 / TODO 管理"},
+    "backups": {"en": "Backup / File history", "zh": "备份 / 文件历史"},
+    "bashHistory": {"en": "Shell command history", "zh": "Shell 命令记录"},
+    "telemetry": {"en": "Telemetry logs", "zh": "遥测日志"},
+    "homunculus": {"en": "Homunculus project tracker", "zh": "Homunculus 项目追踪"},
+    "team": {"en": "Team / Organization info", "zh": "团队 / 组织信息"},
+    "system": {"en": "System status / Device info", "zh": "系统状态 / 设备信息"},
+}
+
+
+def get_tab_desc(tab_id: str, lang: str = "ko") -> str:
+    """탭 설명을 요청 언어로 반환. 없으면 한글 기본."""
+    if lang == "ko":
+        return next((desc for tid, _g, desc, _k in TAB_CATALOG if tid == tab_id), "")
+    return TAB_DESC_I18N.get(tab_id, {}).get(lang, "")
+
+
 def render_tab_catalog_prompt() -> str:
     """챗봇 시스템 프롬프트에 삽입할 탭 목록 문자열 생성."""
     group_to_label = dict(TAB_GROUPS)
