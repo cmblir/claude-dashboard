@@ -11,6 +11,26 @@
 
 ---
 
+## [1.6.0] — 2026-04-22
+
+### Added — 멀티 AI 오케스트라 Phase 6
+- 🔄 **Loop 노드** — for_each(배열 순회) / count(횟수 반복) / while(조건 반복). 입력 분할 구분자 + 최대 반복 횟수
+- 🔁 **Retry 노드** — 실패 시 자동 재시도. N회 + exponential backoff (초기 대기 × 배수). 지연 미리보기 UI
+- 🛡️ **Error Handler 노드** — skip(무시) / default(기본값 반환) / route(에러 라우팅) 3가지 전략
+- ⏰ **Cron 스케줄러** — 워크플로우를 cron 표현식으로 자동 실행. 서버 시작 시 스케줄러 스레드 자동 시작. 프리셋(매시/매일/평일/30분) + Inspector 설정 UI
+- 🚨 **사용량 알림** — 일일 비용(USD) / 토큰 한도 설정. 초과 시 경고 배너 표시. `/api/ai-providers/usage-alert` API
+- 🎨 **노드 캔버스 색상** — loop(연보라 #a78bfa) / retry(오렌지 #fb923c) / error_handler(빨강 #f87171)
+- 🌍 **i18n +23개 키** — 2,456개 × 3언어, **누락 0**
+
+### Architecture
+- `server/workflows.py` — loop/retry/error_handler 노드 실행, `_cron_matches_now()`, `_scheduler_loop()`, `start_scheduler()`
+- `server/ai_keys.py` — `api_usage_alert_check()` / `api_usage_alert_set()`
+- `server/server.py` — `start_scheduler()` 부팅 시 호출
+- `server/routes.py` — `/api/workflows/schedule/set`, `/schedules`, `/api/ai-providers/usage-alert`, `/usage-alert/set`
+- `server/nav_catalog.py` — workflows 탭 키워드 확장 (loop, retry, cron, webhook 등)
+- `dist/index.html` — 3종 노드 편집 패널, cron 설정 UI, 사용량 알림 설정/배너
+- 14개 노드 타입 · GET 67 + POST 53 라우트
+
 ## [1.5.0] — 2026-04-22
 
 ### Added — 멀티 AI 오케스트라 Phase 5

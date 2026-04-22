@@ -15,6 +15,7 @@ from server.logger import log, setup_logging
 from server.mcp import warmup_caches
 from server.routes import Handler
 from server.sessions import background_index
+from server.workflows import start_scheduler
 
 
 def main() -> None:
@@ -22,6 +23,7 @@ def main() -> None:
     _db_init()
     background_index()
     warmup_caches()
+    start_scheduler()
     host, port = get_bind()
     log.info("Serving http://%s:%s (dist=%s, db=%s)", host, port, DIST, DB_PATH)
     ThreadingHTTPServer((host, port), Handler).serve_forever()

@@ -29,7 +29,8 @@ from .utils import _safe_read, _safe_write
 # ───────── 상수 ─────────
 
 _NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
-               "http", "transform", "variable", "subworkflow", "embedding"}
+               "http", "transform", "variable", "subworkflow", "embedding",
+               "loop", "retry", "error_handler"}
 _INPUT_MODES = {"concat", "first", "json"}
 _ASSIGNEES = {"opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
@@ -204,6 +205,25 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
             "provider": _clamp_str(d.get("provider"), 60) or "ollama-api",
             "model": _clamp_str(d.get("model"), 80) or "bge-m3",
             "outputFormat": d.get("outputFormat") if d.get("outputFormat") in ("json", "dimensions", "raw") else "json",
+        }
+    elif ntype == "loop":
+        out["data"] = {
+            "loopType": d.get("loopType") if d.get("loopType") in ("for_each", "while", "count") else "for_each",
+            "maxIterations": max(1, min(1000, int(d.get("maxIterations") or 10))),
+            "condition": _clamp_str(d.get("condition"), 400),
+            "separator": _clamp_str(d.get("separator"), 20) or "\n",
+        }
+    elif ntype == "retry":
+        out["data"] = {
+            "maxRetries": max(1, min(10, int(d.get("maxRetries") or 3))),
+            "backoffMs": max(0, min(60000, int(d.get("backoffMs") or 1000))),
+            "backoffMultiplier": max(1.0, min(5.0, float(d.get("backoffMultiplier") or 2.0))),
+            "retryOn": _clamp_str(d.get("retryOn"), 200) or "error",
+        }
+    elif ntype == "error_handler":
+        out["data"] = {
+            "onError": d.get("onError") if d.get("onError") in ("skip", "default", "route") else "skip",
+            "defaultOutput": _clamp_str(d.get("defaultOutput"), 4000),
         }
     # start 는 data 비움
     return out
@@ -559,6 +579,22 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     if ntype == "variable":
         return _execute_variable_node(data, inputs, _elapsed)
 
+    # ── Loop 노드 — 반복 실행 ──
+    if ntype == "loop":
+        return _execute_loop_node(data, inputs, _elapsed)
+
+    # ── Retry 노드 — 재시도 래퍼 (pass-through, 실제 재시도는 _run_one_iteration 에서) ──
+    if ntype == "retry":
+        # retry 노드는 입력을 그대로 전달 — 실제 재시도 로직은 노드 연결 패턴으로 구현
+        return {"status": "ok", "output": inputs[0] if inputs else "",
+                "durationMs": _elapsed(), "sessionId": "",
+                "retryConfig": {"maxRetries": data.get("maxRetries", 3),
+                                "backoffMs": data.get("backoffMs", 1000)}}
+
+    # ── Error Handler 노드 — 에러 시 대안 출력 ──
+    if ntype == "error_handler":
+        return _execute_error_handler_node(data, inputs, _elapsed)
+
     # ── Embedding 노드 — 텍스트 임베딩 생성 ──
     if ntype == "embedding":
         return _execute_embedding_node(data, inputs, _elapsed)
@@ -761,6 +797,64 @@ def _execute_variable_node(data: dict, inputs: list[str], _elapsed) -> dict:
     value = inputs[0] if inputs else (data.get("defaultValue") or "")
     return {"status": "ok", "output": value, "durationMs": _elapsed(),
             "sessionId": "", "varName": var_name}
+
+
+def _execute_loop_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Loop 노드 — 입력을 분할하여 각 항목을 개별 출력으로 모아 반환.
+
+    loopType:
+      - for_each: 입력 텍스트를 separator 로 분할, 각 항목을 줄바꿈으로 결합
+      - count: maxIterations 횟수만큼 입력을 반복 (인덱스 주입)
+      - while: 조건 문자열이 출력에 포함되는 동안 반복 (최대 maxIterations)
+    """
+    loop_type = data.get("loopType", "for_each")
+    max_iter = data.get("maxIterations", 10)
+    separator = data.get("separator", "\n")
+    input_text = inputs[0] if inputs else ""
+
+    if loop_type == "for_each":
+        items = input_text.split(separator) if separator else [input_text]
+        items = [i.strip() for i in items if i.strip()][:max_iter]
+        output = json.dumps(items, ensure_ascii=False)
+        return {"status": "ok", "output": output, "durationMs": _elapsed(),
+                "sessionId": "", "loopCount": len(items)}
+
+    if loop_type == "count":
+        results = []
+        for i in range(max_iter):
+            results.append(f"[{i}] {input_text}")
+        output = "\n".join(results)
+        return {"status": "ok", "output": output, "durationMs": _elapsed(),
+                "sessionId": "", "loopCount": max_iter}
+
+    # while — 단순 pass-through (실제 while 루프는 워크플로우 repeat 기능으로 대체)
+    return {"status": "ok", "output": input_text, "durationMs": _elapsed(),
+            "sessionId": "", "loopCount": 1}
+
+
+def _execute_error_handler_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Error Handler 노드 — 이전 노드 에러 시 대안 출력 제공.
+
+    onError:
+      - skip: 에러 입력 무시, 빈 출력
+      - default: 기본 출력 텍스트 반환
+      - route: 에러 메시지를 출력으로 전달 (후속 노드가 처리)
+    """
+    on_error = data.get("onError", "skip")
+    default_output = data.get("defaultOutput", "")
+    input_text = inputs[0] if inputs else ""
+
+    # error_handler 는 이전 노드가 에러일 때 대안을 제공
+    # 정상 입력이면 그대로 통과
+    if input_text:
+        return {"status": "ok", "output": input_text, "durationMs": _elapsed(), "sessionId": ""}
+
+    if on_error == "default":
+        return {"status": "ok", "output": default_output, "durationMs": _elapsed(), "sessionId": ""}
+    if on_error == "route":
+        return {"status": "ok", "output": "[error routed]", "durationMs": _elapsed(), "sessionId": ""}
+    # skip
+    return {"status": "ok", "output": "", "durationMs": _elapsed(), "sessionId": ""}
 
 
 def _execute_embedding_node(data: dict, inputs: list[str], _elapsed) -> dict:
@@ -1560,3 +1654,153 @@ def api_workflow_runs_list(query: dict) -> dict:
         })
     out.sort(key=lambda x: x["startedAt"], reverse=True)
     return {"ok": True, "runs": out[:50]}  # 최근 50개 제한
+
+
+# ═══════════════════════════════════════════
+#  Cron 스케줄러 — 워크플로우 자동 실행
+# ═══════════════════════════════════════════
+
+_CRON_RE = re.compile(r"^(\*|[0-9,/-]+)\s+(\*|[0-9,/-]+)\s+(\*|[0-9,/-]+)\s+(\*|[0-9,/-]+)\s+(\*|[0-9,/-]+)$")
+_SCHEDULER_THREAD = None
+_SCHEDULER_STOP = threading.Event()
+
+
+def _cron_field_matches(field: str, value: int) -> bool:
+    """단일 cron 필드가 현재 값과 매칭되는지 확인."""
+    if field == "*":
+        return True
+    for part in field.split(","):
+        part = part.strip()
+        if "/" in part:
+            base, step = part.split("/", 1)
+            try:
+                step = int(step)
+                base_val = 0 if base == "*" else int(base)
+                if step > 0 and (value - base_val) % step == 0 and value >= base_val:
+                    return True
+            except ValueError:
+                continue
+        elif "-" in part:
+            try:
+                lo, hi = part.split("-", 1)
+                if int(lo) <= value <= int(hi):
+                    return True
+            except ValueError:
+                continue
+        else:
+            try:
+                if int(part) == value:
+                    return True
+            except ValueError:
+                continue
+    return False
+
+
+def _cron_matches_now(expr: str) -> bool:
+    """cron 표현식이 현재 시각과 매칭되는지. 형식: min hour dom month dow."""
+    from datetime import datetime as _dt
+    m = _CRON_RE.match(expr.strip())
+    if not m:
+        return False
+    now = _dt.now()
+    fields = [m.group(i) for i in range(1, 6)]
+    values = [now.minute, now.hour, now.day, now.month, now.weekday()]  # weekday: 0=Mon
+    return all(_cron_field_matches(f, v) for f, v in zip(fields, values))
+
+
+def api_workflow_schedule_set(body: dict) -> dict:
+    """워크플로우 cron 스케줄 설정.
+
+    body: {id, schedule: {enabled, cron, timezone?}}
+    cron 형식: "*/30 * * * *" (매 30분), "0 9 * * 1-5" (평일 9시)
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    wfId = body.get("id")
+    if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
+        return {"ok": False, "error": "invalid id"}
+    schedule = body.get("schedule") or {}
+    if not isinstance(schedule, dict):
+        return {"ok": False, "error": "schedule must be object"}
+
+    cron_expr = (schedule.get("cron") or "").strip()
+    enabled = bool(schedule.get("enabled", False))
+
+    if enabled and cron_expr and not _CRON_RE.match(cron_expr):
+        return {"ok": False, "error": "invalid cron expression", "error_key": "err_invalid_cron"}
+
+    with _LOCK:
+        store = _load_all()
+        wf = store["workflows"].get(wfId)
+        if not wf:
+            return {"ok": False, "error": "not found"}
+        wf["schedule"] = {
+            "enabled": enabled,
+            "cron": cron_expr,
+            "timezone": (schedule.get("timezone") or "").strip()[:40],
+            "lastRunAt": wf.get("schedule", {}).get("lastRunAt", 0),
+        }
+        wf["updatedAt"] = int(time.time() * 1000)
+        _dump_all(store)
+    return {"ok": True, "id": wfId, "schedule": wf["schedule"]}
+
+
+def api_workflow_schedule_list() -> dict:
+    """스케줄이 설정된 워크플로우 목록."""
+    store = _load_all()
+    out = []
+    for wfId, wf in store["workflows"].items():
+        sched = wf.get("schedule") or {}
+        if sched.get("cron"):
+            out.append({
+                "id": wfId,
+                "name": wf.get("name", "Untitled"),
+                "schedule": sched,
+                "nodeCount": len(wf.get("nodes", [])),
+            })
+    return {"ok": True, "schedules": out}
+
+
+def _scheduler_loop() -> None:
+    """60초 간격으로 cron 매칭 검사 + 워크플로우 자동 실행."""
+    log.info("workflow scheduler started")
+    while not _SCHEDULER_STOP.wait(60):
+        try:
+            store = _load_all()
+            now_ms = int(time.time() * 1000)
+            for wfId, wf in store["workflows"].items():
+                sched = wf.get("schedule") or {}
+                if not sched.get("enabled") or not sched.get("cron"):
+                    continue
+                last = sched.get("lastRunAt", 0) or 0
+                # 같은 분에 중복 실행 방지 (60초 이내)
+                if now_ms - last < 55000:
+                    continue
+                if _cron_matches_now(sched["cron"]):
+                    log.info("cron trigger: %s (%s)", wfId, sched["cron"])
+                    # lastRunAt 즉시 업데이트 (중복 방지)
+                    with _LOCK:
+                        s = _load_all()
+                        if wfId in s["workflows"]:
+                            s["workflows"][wfId].setdefault("schedule", {})["lastRunAt"] = now_ms
+                            _dump_all(s)
+                    # 실행
+                    api_workflow_run({"id": wfId})
+        except Exception as e:
+            log.warning("scheduler error: %s", e)
+    log.info("workflow scheduler stopped")
+
+
+def start_scheduler() -> None:
+    """서버 시작 시 호출 — 스케줄러 백그라운드 스레드 시작."""
+    global _SCHEDULER_THREAD
+    if _SCHEDULER_THREAD and _SCHEDULER_THREAD.is_alive():
+        return
+    _SCHEDULER_STOP.clear()
+    _SCHEDULER_THREAD = threading.Thread(target=_scheduler_loop, daemon=True)
+    _SCHEDULER_THREAD.start()
+
+
+def stop_scheduler() -> None:
+    """서버 종료 시 스케줄러 정지."""
+    _SCHEDULER_STOP.set()

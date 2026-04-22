@@ -53,7 +53,9 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "📜 실행 이력·🎬 14장면 인터랙티브 튜토리얼",
         ["워크플로우", "workflow", "DAG", "repeat", "반복", "피드백", "스케줄",
          "팀 개발", "리드", "프론트", "백엔드", "병렬", "노드", "포트", "드래그",
-         "하네스", "persona", "페르소나", "spawn", "resume", "템플릿", "template"]),
+         "하네스", "persona", "페르소나", "spawn", "resume", "템플릿", "template",
+         "loop", "루프", "retry", "재시도", "error handler", "에러 핸들러",
+         "webhook", "cron", "스케줄러", "import", "export"]),
     ("aiProviders",   "work",
         "AI 프로바이더 — Claude/GPT/Gemini/Ollama/Codex 멀티 AI 관리. "
         "API 키 설정, CLI 감지, 커스텀 프로바이더 등록, 폴백 체인, 연결 테스트, "
