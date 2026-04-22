@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.9.1] — 2026-04-23
+
+### Fixed — v2.3.0~v2.9.0 신규 탭 렌더 실패 + NAV desc 번역 누락
+
+**`_escapeHTML is not defined` 런타임 에러 해소**
+- v2.3.0~v2.9.0 에서 추가한 7개 VIEWS (`promptCache`, `thinkingLab`, `toolUseLab`, `batchJobs`, `apiFiles`, `visionLab`, `modelBench`) 가 **존재하지 않는 `_escapeHTML()`** 을 참조해 탭 진입 즉시 "View render failed" 에러가 나던 문제.
+- 저장소 실제 헬퍼 이름은 **`escapeHtml`** (소문자 HTML 중 H 만 대문자).
+- `dist/index.html` 에서 `_escapeHTML(` → `escapeHtml(` 21곳 일괄 치환.
+
+**i18n 14건 누락 번역 보강**
+- NAV `desc` 7개 (work 그룹 신규 탭들) — `escapeHtml(t(n.desc))` 경로에 번역이 없어 한국어 원문이 영/중문 모드에서도 그대로 노출되던 문제.
+- `confirmModal` 메시지 템플릿 (`총 {n} 건을 ...`, `회 API 호출을 수행합니다 (...`) 의 한글 조각들을 extractor 가 잘못 뽑아 missing 이던 7건.
+- `tools/translations_manual_9.py::NEW_EN` / `NEW_ZH` 에 14 키 × 2언어 추가.
+- 결과: `build_locales.py` **Missing EN/ZH 0** · `verify-translations.js` 전체 통과 (3,090 키 × 3언어).
+
 ## [2.9.0] — 2026-04-23
 
 ### 🏁 Model Benchmark — 신규 탭 (work 그룹)
