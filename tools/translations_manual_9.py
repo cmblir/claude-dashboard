@@ -476,6 +476,23 @@ NEW_EN = {
     "출력 비용": "Output cost",
     "합계": "Total",
     "캐시 절감 추정": "Estimated cache savings",
+
+    # ── Extended Thinking Lab (v2.3.0) ─────────────────────────
+    "Extended Thinking 실험실": "Extended Thinking Lab",
+    "Opus 4.7 / Sonnet 4.6 의 thinking block 과 최종 응답을 분리 시각화. budget_tokens 로 추론 길이 조절.":
+        "Visualize Opus 4.7 / Sonnet 4.6 thinking blocks separately from final response. Use budget_tokens to tune reasoning depth.",
+    "수학 추론": "Math reasoning",
+    "코드 디버깅": "Code debugging",
+    "설계 플래닝": "Design planning",
+    "프롬프트": "Prompt",
+    "질문을 입력하세요": "Enter a question",
+    "Thinking Block": "Thinking block",
+    "블록": "blocks",
+    "최종 응답": "Final response",
+    "소요 시간": "Duration",
+    "비지원": "unsupported",
+    "프롬프트를 입력하세요": "Enter a prompt",
+    "Extended Thinking 은 Haiku 에서 지원되지 않습니다": "Extended Thinking is not supported on Haiku",
 }
 
 NEW_ZH = {
@@ -948,4 +965,21 @@ NEW_ZH = {
     "출력 비용": "输出费用",
     "합계": "合计",
     "캐시 절감 추정": "缓存节省估算",
+
+    # ── Extended Thinking Lab (v2.3.0) ─────────────────────────
+    "Extended Thinking 실험실": "扩展思维实验室",
+    "Opus 4.7 / Sonnet 4.6 의 thinking block 과 최종 응답을 분리 시각화. budget_tokens 로 추론 길이 조절.":
+        "将 Opus 4.7 / Sonnet 4.6 的思维块与最终响应分离展示。用 budget_tokens 调节推理深度。",
+    "수학 추론": "数学推理",
+    "코드 디버깅": "代码调试",
+    "설계 플래닝": "设计规划",
+    "프롬프트": "提示",
+    "질문을 입력하세요": "请输入问题",
+    "Thinking Block": "思维块",
+    "블록": "块",
+    "최종 응답": "最终响应",
+    "소요 시간": "耗时",
+    "비지원": "不支持",
+    "프롬프트를 입력하세요": "请输入提示",
+    "Extended Thinking 은 Haiku 에서 지원되지 않습니다": "Haiku 不支持 Extended Thinking",
 }
