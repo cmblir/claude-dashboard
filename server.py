@@ -18,12 +18,30 @@ from server.sessions import background_index
 from server.workflows import start_scheduler
 
 
+def _auto_start_ollama() -> None:
+    """Ollama 가 설치되어 있고 아직 실행 중이 아니면 자동 시작."""
+    import shutil
+    if not shutil.which("ollama"):
+        return
+    try:
+        from server.ollama_hub import _is_ollama_reachable, api_ollama_serve_start
+        if _is_ollama_reachable():
+            log.info("ollama already running — skipping auto-start")
+            return
+        log.info("auto-starting ollama serve...")
+        result = api_ollama_serve_start({})
+        log.info("ollama auto-start: %s", result.get("status") or result.get("error"))
+    except Exception as e:
+        log.warning("ollama auto-start failed: %s", e)
+
+
 def main() -> None:
     setup_logging()
     _db_init()
     background_index()
     warmup_caches()
     start_scheduler()
+    _auto_start_ollama()
     host, port = get_bind()
     log.info("Serving http://%s:%s (dist=%s, db=%s)", host, port, DIST, DB_PATH)
     ThreadingHTTPServer((host, port), Handler).serve_forever()
