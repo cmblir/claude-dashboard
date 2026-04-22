@@ -1573,10 +1573,10 @@ VIEWS.workflows = async () => {
   }
   return `
     ${viewHeader('🔀 워크플로우', '세션 노드를 DAG 로 연결해 업무 흐름 설계. 포트를 드래그해 화살표로 연결.', 'workflows')}
-    <details id="wfStatsPanel" class="card mb-3">
-      <summary class="cursor-pointer text-sm font-semibold" style="color:var(--text);">📊 ${t('워크플로우 통계')}</summary>
-      <div id="wfStatsBody" class="mt-3">
-        <div class="text-xs text-[var(--text-dim)] text-center py-4">${t('통계 로딩 중...')}</div>
+    <details id="wfStatsPanel" class="card mb-3" style="padding:12px 16px;">
+      <summary class="cursor-pointer text-sm font-semibold" style="color:var(--text);user-select:none;">📊 ${t('워크플로우 통계')}</summary>
+      <div id="wfStatsBody" class="mt-3" style="border-top:1px solid var(--border);padding-top:12px;">
+        <div class="text-xs" style="color:var(--text-dim);text-align:center;padding:8px 0;">${t('통계 로딩 중...')}</div>
       </div>
     </details>
     <div id="wfRoot">
@@ -1884,14 +1884,15 @@ async function _wfLoadStats() {
   try {
     const r = await api('/api/workflows/stats');
     const s = r || {};
-    const totalRuns = s.totalRuns ?? 0;
-    const successRate = s.successRate ?? 0;
-    const avgDuration = s.avgDuration ?? 0;
-    const activeSchedules = s.activeSchedules ?? 0;
-    const providerDist = s.providerDistribution || {};
-    const providerChips = Object.entries(providerDist).map(([k, v]) =>
-      `<span class="chip text-[10px]">${escapeHtml(k)}: ${v}</span>`
-    ).join(' ') || `<span class="text-[10px] text-[var(--text-dim)]">${t('데이터 없음')}</span>`;
+    const tot = s.totals || {};
+    const totalRuns = tot.runs ?? 0;
+    const successRate = tot.successRate ?? 0;
+    const avgDuration = tot.avgDurationMs ?? 0;
+    const activeSchedules = s.scheduleCount ?? 0;
+    const byProvider = s.byProvider || [];
+    const providerChips = byProvider.length
+      ? byProvider.map(p => `<span class="chip text-[10px]">${escapeHtml(p.provider||'?')}: ${p.count}</span>`).join(' ')
+      : `<span class="text-[10px]" style="color:var(--text-dim)">${t('데이터 없음')}</span>`;
     host.innerHTML = `
       <div class="grid grid-cols-4 gap-3 mb-3">
         <div class="card p-3 text-center">
@@ -4346,6 +4347,72 @@ const WF_TUT_STEPS = [
     // 우측 메타 패널 mockup + 피드백 노트 typewriter
     overlay: { kind: 'repeatMeta', x: 1160, y: 40, w: 340, h: 380 },
     typewriter: '이 결과를 기반으로 다음 스프린트 업무를 프론트/백엔드 형식으로 기획해줘. 실현 가능성과 우선순위를 명확히.',
+  },
+  // ── 신기능 장면 ──
+  {
+    title: '15. 🧠 멀티 AI 프로바이더 — Claude · GPT · Ollama 동시 활용',
+    caption: '노드의 Assignee 를 claude:opus, openai:gpt-4.1, ollama:qwen2.5 등으로 지정하면 각 노드가 다른 AI 로 실행됩니다. 같은 프롬프트를 병렬로 3개 AI 에 보내고 결과를 합치는 멀티 AI 비교 워크플로우.',
+    nodes: [
+      { id:'s',  type:'start',     x:40,  y:200, title:'시작',     status:'ok' },
+      { id:'c1', type:'session',   x:280, y:60,  title:'Claude',   sub:'claude:opus', status:'ok' },
+      { id:'g1', type:'session',   x:280, y:200, title:'GPT',      sub:'openai:gpt-4.1', status:'running' },
+      { id:'o1', type:'session',   x:280, y:340, title:'Ollama',   sub:'ollama:qwen2.5', status:'ok' },
+      { id:'mg', type:'merge',     x:520, y:200, title:'합류',     status:'idle' },
+      { id:'out',type:'output',    x:720, y:200, title:'비교 결과', status:'idle' },
+    ],
+    edges: [
+      { from:'s', to:'c1' }, { from:'s', to:'g1' }, { from:'s', to:'o1' },
+      { from:'c1', to:'mg' }, { from:'g1', to:'mg' }, { from:'o1', to:'mg' },
+      { from:'mg', to:'out' },
+    ],
+    cursor: { x: 280, y: 200, label: '🧠 멀티 AI' },
+  },
+  {
+    title: '16. 🧲 임베딩 + 🌐 HTTP — RAG 파이프라인',
+    caption: '텍스트를 Ollama bge-m3 로 임베딩 → HTTP 노드로 벡터 DB 검색 → AI 가 답변 생성. embedding + http + session 노드를 조합한 RAG(검색 증강 생성) 파이프라인.',
+    nodes: [
+      { id:'s',  type:'start',     x:40,  y:180, title:'질문 입력', status:'ok' },
+      { id:'em', type:'embedding', x:240, y:180, title:'임베딩',    sub:'bge-m3', status:'ok' },
+      { id:'ht', type:'http',      x:440, y:180, title:'벡터 검색', sub:'POST /search', status:'ok' },
+      { id:'ai', type:'session',   x:640, y:180, title:'답변 생성', sub:'claude:sonnet', status:'running' },
+      { id:'o',  type:'output',    x:840, y:180, title:'최종 답변', status:'idle' },
+    ],
+    edges: [
+      { from:'s', to:'em' }, { from:'em', to:'ht' }, { from:'ht', to:'ai' }, { from:'ai', to:'o' },
+    ],
+    cursor: { x: 240, y: 180, label: '🧲 bge-m3' },
+  },
+  {
+    title: '17. 🔄 Loop + 🔁 Retry + 🛡️ Error Handler',
+    caption: 'Loop 노드로 입력을 분할 반복, Retry 로 실패 시 자동 재시도 (exponential backoff), Error Handler 로 에러 시 기본값 반환. 견고한 자동화 파이프라인.',
+    nodes: [
+      { id:'s',  type:'start',       x:40,  y:180, title:'데이터',   status:'ok' },
+      { id:'lp', type:'loop',        x:220, y:180, title:'분할 반복', sub:'for_each', status:'ok' },
+      { id:'rt', type:'retry',       x:400, y:180, title:'재시도 ×3', sub:'backoff 2s', status:'ok' },
+      { id:'ai', type:'session',     x:580, y:120, title:'AI 처리',  sub:'claude:sonnet', status:'running' },
+      { id:'eh', type:'error_handler',x:580, y:280, title:'에러 처리',sub:'기본값 반환', status:'idle' },
+      { id:'o',  type:'output',      x:780, y:180, title:'결과',     status:'idle' },
+    ],
+    edges: [
+      { from:'s', to:'lp' }, { from:'lp', to:'rt' }, { from:'rt', to:'ai' },
+      { from:'ai', to:'o' }, { from:'ai', to:'eh' }, { from:'eh', to:'o' },
+    ],
+    cursor: { x: 400, y: 180, label: '🔁 retry' },
+  },
+  {
+    title: '18. ⏰ Cron + 🔗 Webhook + 📦 Export/Import',
+    caption: 'Cron 스케줄로 매일 9시 자동 실행 · 외부 시스템에서 Webhook URL 로 트리거 · Export/Import 로 워크플로우 JSON 공유. Ctrl+C/V 로 노드 복사, Ctrl+Z 로 실행 취소.',
+    nodes: [
+      { id:'s',  type:'start',      x:40,  y:180, title:'⏰ Cron/Webhook', status:'ok' },
+      { id:'tf', type:'transform',   x:240, y:180, title:'데이터 변환',    sub:'JSON 추출', status:'ok' },
+      { id:'sw', type:'subworkflow', x:440, y:180, title:'서브 워크플로우', sub:'분석 파이프라인', status:'ok' },
+      { id:'dl', type:'delay',       x:640, y:180, title:'⏱️ 대기 5s',     sub:'5000ms', status:'ok' },
+      { id:'o',  type:'output',      x:840, y:180, title:'알림 전송',      status:'running' },
+    ],
+    edges: [
+      { from:'s', to:'tf' }, { from:'tf', to:'sw' }, { from:'sw', to:'dl' }, { from:'dl', to:'o' },
+    ],
+    cursor: { x: 440, y: 180, label: '🔁 재사용' },
   },
 ];
 
