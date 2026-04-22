@@ -6,7 +6,7 @@
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.1.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.3.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#技术栈)
 
 Claude Control Center 是一款**本地优先的仪表板**，统一管理你的整个 `~/.claude/` 目录（代理、技能、钩子、插件、MCP、会话、项目），并内置一个强大的 **n8n 风格工作流引擎** 用于多 AI 供应商编排——全部包含在一行 `python3 server.py` 中。
@@ -100,6 +100,8 @@ ANTHROPIC_API_KEY=sk-...             # 可选
 ```
 
 API 密钥也可以在 `🧠 AI 供应商` 标签页中保存 — 存储于 `~/.claude-dashboard-config.json`。
+
+🆕 **v2.3.0 — 提示缓存实验室**（`work` 组）：对 Anthropic Messages API 的 `cache_control` 在系统/工具/消息块中指定，实时测量 `cache_creation / cache_read` 令牌和 USD 成本节约。一键运行 3 种示例（系统/文档/工具缓存）+ 历史 20 条。→ [docs](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching)
 
 ---
 

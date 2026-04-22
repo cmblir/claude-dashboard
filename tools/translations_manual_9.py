@@ -442,6 +442,40 @@ NEW_EN = {
     # v2.2.1 — 위자드 테스트 피드백
     "대시보드 서버를 재시작하면 최신 기능이 적용됩니다":
         "Restart the dashboard server to apply the latest features",
+
+    # ── Prompt Cache Lab (v2.3.0) ──────────────────────────────
+    "프롬프트 캐시 실험실": "Prompt Cache Lab",
+    "시스템 프롬프트 캐시": "System prompt cache",
+    "대용량 문서 캐시": "Large document cache",
+    "도구 정의 캐시": "Tool definitions cache",
+    "Anthropic Messages API 의 cache_control 을 실측. cache_creation 은 캐시 쓰기, cache_read 는 캐시 히트 — 히트 비용은 1/10 수준입니다.":
+        "Measure Anthropic Messages API cache_control in real time. cache_creation = cache write, cache_read = cache hit — hit cost is ~10% of write.",
+    "예시": "Examples",
+    "모델": "Model",
+    "system (JSON 배열)": "system (JSON array)",
+    "tools (JSON 배열)": "tools (JSON array)",
+    "messages (JSON 배열)": "messages (JSON array)",
+    "실행": "Run",
+    "초기화": "Reset",
+    "토큰 사용량": "Token usage",
+    "비용 상세 (USD)": "Cost breakdown (USD)",
+    "응답": "Response",
+    "최근 히스토리": "Recent history",
+    "아직 실행한 결과가 없습니다": "No runs yet",
+    "이력 없음": "No history",
+    "호출 중…": "Calling…",
+    "system JSON 오류": "system JSON error",
+    "tools JSON 오류": "tools JSON error",
+    "messages JSON 오류": "messages JSON error",
+    "ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요": "ANTHROPIC_API_KEY not set — save it in the AI Providers tab",
+    "네트워크 오류": "Network error",
+    "실행 실패": "Execution failed",
+    "입력 비용": "Input cost",
+    "캐시 쓰기": "Cache write",
+    "캐시 읽기": "Cache read",
+    "출력 비용": "Output cost",
+    "합계": "Total",
+    "캐시 절감 추정": "Estimated cache savings",
 }
 
 NEW_ZH = {
@@ -880,4 +914,38 @@ NEW_ZH = {
     # v2.2.1 — 向导测试反馈
     "대시보드 서버를 재시작하면 최신 기능이 적용됩니다":
         "重启仪表板服务器后将应用最新功能",
+
+    # ── Prompt Cache Lab (v2.3.0) ──────────────────────────────
+    "프롬프트 캐시 실험실": "提示缓存实验室",
+    "시스템 프롬프트 캐시": "系统提示缓存",
+    "대용량 문서 캐시": "大文档缓存",
+    "도구 정의 캐시": "工具定义缓存",
+    "Anthropic Messages API 의 cache_control 을 실측. cache_creation 은 캐시 쓰기, cache_read 는 캐시 히트 — 히트 비용은 1/10 수준입니다.":
+        "实测 Anthropic Messages API 的 cache_control。cache_creation = 写入缓存,cache_read = 命中缓存 — 命中成本约为写入的十分之一。",
+    "예시": "示例",
+    "모델": "模型",
+    "system (JSON 배열)": "system (JSON 数组)",
+    "tools (JSON 배열)": "tools (JSON 数组)",
+    "messages (JSON 배열)": "messages (JSON 数组)",
+    "실행": "运行",
+    "초기화": "重置",
+    "토큰 사용량": "Token 用量",
+    "비용 상세 (USD)": "费用明细 (USD)",
+    "응답": "响应",
+    "최근 히스토리": "最近历史",
+    "아직 실행한 결과가 없습니다": "暂无运行结果",
+    "이력 없음": "无历史记录",
+    "호출 중…": "调用中…",
+    "system JSON 오류": "system JSON 错误",
+    "tools JSON 오류": "tools JSON 错误",
+    "messages JSON 오류": "messages JSON 错误",
+    "ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요": "未设置 ANTHROPIC_API_KEY — 请在 AI 供应商标签页中保存",
+    "네트워크 오류": "网络错误",
+    "실행 실패": "执行失败",
+    "입력 비용": "输入费用",
+    "캐시 쓰기": "缓存写入",
+    "캐시 읽기": "缓存读取",
+    "출력 비용": "输出费用",
+    "합계": "合计",
+    "캐시 절감 추정": "缓存节省估算",
 }

@@ -40,6 +40,10 @@ from .features import (
 )
 from .guide import api_guide_onboarding, api_guide_toolkit
 from .hooks import api_plugin_hook_update, get_hooks
+from .prompt_cache import (
+    api_prompt_cache_examples, api_prompt_cache_history,
+    api_prompt_cache_test,
+)
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -188,6 +192,8 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/ollama/info": api_ollama_model_info,
     "/api/ollama/serve/status": lambda q: api_ollama_serve_status(),
     "/api/ollama/settings": lambda q: api_ollama_settings_get(),
+    "/api/prompt-cache/examples": api_prompt_cache_examples,
+    "/api/prompt-cache/history": api_prompt_cache_history,
 }
 
 
@@ -274,6 +280,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/ollama/settings/save": api_ollama_settings_save,
     "/api/ollama/serve/stop": api_ollama_serve_stop,
     "/api/ai-providers/default-model": api_set_default_model,
+    "/api/prompt-cache/test": api_prompt_cache_test,
 }
 
 
