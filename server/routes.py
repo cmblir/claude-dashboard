@@ -62,6 +62,7 @@ from .ai_keys import (
     api_set_default_model, api_ollama_settings_get, api_ollama_settings_save,
 )
 from .ai_providers import list_providers_by_capability
+from .cli_tools import api_cli_status, api_cli_install, api_cli_login
 from .ollama_hub import (
     api_ollama_models, api_ollama_catalog, api_ollama_pull,
     api_ollama_pull_status, api_ollama_delete, api_ollama_model_info,
@@ -180,6 +181,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/ai-providers/by-capability": lambda q: _ai_providers_by_cap(q),
     "/api/ai-providers/health": lambda q: api_provider_health(),
     "/api/ai-providers/usage-alert": lambda q: api_usage_alert_check(),
+    "/api/cli/status": api_cli_status,
     "/api/ollama/models": lambda q: api_ollama_models(),
     "/api/ollama/catalog": api_ollama_catalog,
     "/api/ollama/pull-status": api_ollama_pull_status,
@@ -229,6 +231,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/auth/claimed-plan": api_set_claimed_plan,
     "/api/auth/login": api_auth_login,
     "/api/auth/logout": api_auth_logout,
+    "/api/cli/install": api_cli_install,
+    "/api/cli/login": api_cli_login,
     "/api/project-agents/add": api_project_agent_add,
     "/api/project-agents/delete": api_project_agent_delete,
     "/api/project-agents/save": api_project_agent_save,

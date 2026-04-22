@@ -27,6 +27,57 @@ from typing import Any, Optional
 from .logger import log
 
 
+# ───────── CLI 탐지 헬퍼 ─────────
+# LaunchAgent · GUI 실행 등 PATH 가 제한된 환경에서도 CLI 를 탐지하기 위해
+# 홈브류/전역 npm/ nvm/ asdf/ pyenv 등 통상 설치 경로를 fallback 으로 검색한다.
+_CLI_SEARCH_PATHS: list[str] = [
+    "/opt/homebrew/bin",            # Apple Silicon Homebrew
+    "/usr/local/bin",               # Intel Homebrew · 일반 /usr/local 설치
+    "/usr/bin", "/bin", "/sbin", "/usr/sbin",
+    str(Path.home() / ".local/bin"),
+    str(Path.home() / "bin"),
+    str(Path.home() / ".bun/bin"),
+    str(Path.home() / ".cargo/bin"),
+    str(Path.home() / ".deno/bin"),
+    "/opt/homebrew/sbin",
+]
+
+
+def _which(name: str) -> str:
+    """PATH 기반 탐지 → 실패 시 통상 설치 경로 fallback."""
+    found = shutil.which(name)
+    if found:
+        return found
+    # PATH 가 비정상적으로 좁혀져 있을 때를 대비한 보강 경로 검색
+    extra_path = os.pathsep.join(_CLI_SEARCH_PATHS)
+    merged = (os.environ.get("PATH", "") + os.pathsep + extra_path).strip(os.pathsep)
+    found = shutil.which(name, path=merged)
+    if found:
+        return found
+    # nvm / asdf — 버전 디렉터리 전수 탐색
+    for base in (
+        Path.home() / ".nvm" / "versions" / "node",
+        Path.home() / ".asdf" / "installs" / "nodejs",
+        Path.home() / ".volta" / "bin",
+    ):
+        if not base.exists():
+            continue
+        # nvm / asdf: 각 버전 디렉터리의 bin/<name> 검사
+        if base.name == "bin":
+            candidate = base / name
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return str(candidate)
+            continue
+        try:
+            for ver in sorted(base.iterdir(), reverse=True):
+                cand = ver / "bin" / name
+                if cand.is_file() and os.access(cand, os.X_OK):
+                    return str(cand)
+        except Exception:
+            pass
+    return ""
+
+
 # ───────── 응답 공통 데이터클래스 ─────────
 
 @dataclass
@@ -237,7 +288,7 @@ class ClaudeCliProvider(BaseProvider):
     }
 
     def _bin(self) -> str:
-        return shutil.which("claude") or ""
+        return _which("claude")
 
     def is_available(self) -> bool:
         return bool(self._bin())
@@ -349,7 +400,7 @@ class OllamaProvider(BaseProvider):
         return (os.environ.get("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
 
     def _bin(self) -> str:
-        return shutil.which("ollama") or ""
+        return _which("ollama")
 
     def is_available(self) -> bool:
         # CLI 설치됨 + API 응답 가능
@@ -470,7 +521,7 @@ class GeminiCliProvider(BaseProvider):
     icon = "💎"
 
     def _bin(self) -> str:
-        return shutil.which("gemini") or ""
+        return _which("gemini")
 
     def is_available(self) -> bool:
         return bool(self._bin())
@@ -556,7 +607,7 @@ class CodexProvider(BaseProvider):
     icon = "🧬"
 
     def _bin(self) -> str:
-        return shutil.which("codex") or ""
+        return _which("codex")
 
     def is_available(self) -> bool:
         return bool(self._bin())
@@ -667,7 +718,7 @@ class CustomCliProvider(BaseProvider):
         self._embed_args_template = config.get("embedArgsTemplate", "{input}")
 
     def _bin(self) -> str:
-        return shutil.which(self._command) or ""
+        return _which(self._command)
 
     def is_available(self) -> bool:
         return bool(self._bin())
@@ -758,7 +809,7 @@ class CustomCliProvider(BaseProvider):
         """커스텀 프로바이더 임베딩 — embedCommand 가 설정된 경우에만."""
         t0 = int(time.time() * 1000)
         cmd_name = self._embed_command or self._command
-        b = shutil.which(cmd_name)
+        b = _which(cmd_name)
         if not b:
             return EmbeddingResponse(
                 status="err", error=f"{cmd_name} not found in PATH",
