@@ -9417,12 +9417,19 @@ window._wizardTestConnection = async () => {
     const r = await api('/api/ai-providers/test', { method: 'POST', body: JSON.stringify({ providerId: pid }) });
     if (r.ok) {
       const resp = r.response || {};
-      result.innerHTML = `<span style="color:var(--ok)">✓ ${t('성공')} (${resp.duration_ms || 0}ms)</span>`;
+      const outPreview = (resp.output || '').substring(0, 80);
+      result.innerHTML = `<span style="color:var(--ok)">✓ ${t('성공')} (${resp.duration_ms || 0}ms)${outPreview ? ' — ' + escapeHtml(outPreview) : ''}</span>`;
     } else {
-      result.innerHTML = `<span style="color:var(--err)">✗ ${escapeHtml(r.error || (r.response||{}).error || t('실패'))}</span>`;
+      const errTxt = r.error || (r.response||{}).error || t('실패');
+      result.innerHTML = `<span style="color:var(--err)">✗ ${escapeHtml(errTxt)}</span>`;
     }
   } catch (e) {
-    result.innerHTML = `<span style="color:var(--err)">✗ ${escapeHtml(String(e))}</span>`;
+    const msg = String(e);
+    // 서버 재시작이 필요한 신규 라우트 누락 케이스 친절하게 안내
+    const hint = /unknown route|404/.test(msg)
+      ? ' — ' + t('대시보드 서버를 재시작하면 최신 기능이 적용됩니다')
+      : '';
+    result.innerHTML = `<span style="color:var(--err)">✗ ${escapeHtml(msg)}${hint}</span>`;
   }
 };
 
@@ -11841,11 +11848,19 @@ function _translateDOM(root) {
     }
   }
 }
-// t() 번역 함수 — 한국어 원문을 키로 사용, 현재 언어의 번역 반환
-function t(ko) {
-  if (_curLang === 'ko') return ko;
+// t() 번역 함수 — Korean 원문 또는 구조화 키를 받는다.
+//   1-arg: single Korean argument - ko 에서는 그대로, 다른 언어는 dict 조회
+//   2-arg: structured key + fallback - ko/미번역 시 fallback 사용
+// 구조화 키(영문만) 가 ko 모드에 오면 리터럴로 새는 것을 방지.
+function t(key, fallback) {
+  if (_curLang === 'ko') {
+    // 한글 원문은 그대로, 구조화 키는 fallback > key 순
+    if (_KO_RE && _KO_RE.test(key)) return key;
+    return fallback != null ? fallback : key;
+  }
   const dict = I18N[_curLang];
-  return (dict && dict[ko]) || ko;
+  if (dict && dict[key]) return dict[key];
+  return fallback != null ? fallback : key;
 }
 
 // NAV 라벨 원본 보관

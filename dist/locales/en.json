@@ -1032,6 +1032,7 @@
   "대시보드": "Dashboard",
   "대시보드 도우미": "Dashboard Assistant",
   "대시보드 도우미와 대화": "Chat with dashboard assistant",
+  "대시보드 서버를 재시작하면 최신 기능이 적용됩니다": "Restart the dashboard server to apply the latest features",
   "대시보드에서 직접 만든 태스크는": "Tasks created from dashboard are saved in",
   "대시보드에서 직접 만든 태스크는 ~/.claude/tasks/dashboard-manual/ 로 저장": "Tasks created directly in the dashboard are saved to ~/.claude/tasks/dashboard-manual/",
   "대형": "Large",

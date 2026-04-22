@@ -11,6 +11,15 @@
 
 ---
 
+## [2.2.1] — 2026-04-22
+
+### Fixed — 타이틀 리터럴 노출 + 위자드 테스트 오류
+
+- **`ai_providers_title`/`ai_providers_subtitle` 리터럴 노출 수정** — 기존 `t(ko)` 함수가 1-인자만 받아 `t('ai_providers_title','AI 프로바이더')` 호출 시 fallback 을 무시하고 키 그대로 반환하던 문제. `t(key, fallback)` 2-인자 시그니처로 확장. ko 모드에서 구조화 키(영문 only) 가 오면 fallback 우선 사용.
+- **`api_auth_login` NameError 수정** — `server/auth.py:170` 에서 `platform.system()` 호출하면서 `import platform` 이 누락돼 `/api/auth/login` 이 항상 500 을 반환하던 문제.
+- **위자드 연결 테스트 UX 개선** — 테스트 결과에 응답 프리뷰(앞 80자) 표시, 404/unknown route 오류 시 "대시보드 서버를 재시작하면 최신 기능이 적용됩니다" 힌트 추가. 신규 라우트가 반영되지 않은 스테일 서버 상태를 사용자가 즉시 인지 가능.
+- i18n: 신규 1개 키(ko/en/zh). 총 2,950 키 유지 (audit items 1806→1807).
+
 ## [2.2.0] — 2026-04-22
 
 ### 🎯 v2.2 — 프로바이더 탭 3종 개선

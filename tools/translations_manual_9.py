@@ -438,6 +438,10 @@ NEW_EN = {
     "터미널에서 설치가 진행 중입니다. 완료 후 새로고침하세요.":
         "Installation is running in the terminal. Refresh after it completes.",
     "터미널에서 로그인 창이 열렸습니다": "A login window has opened in the terminal",
+
+    # v2.2.1 — 위자드 테스트 피드백
+    "대시보드 서버를 재시작하면 최신 기능이 적용됩니다":
+        "Restart the dashboard server to apply the latest features",
 }
 
 NEW_ZH = {
@@ -872,4 +876,8 @@ NEW_ZH = {
     "터미널에서 설치가 진행 중입니다. 완료 후 새로고침하세요.":
         "终端中正在安装。完成后请刷新。",
     "터미널에서 로그인 창이 열렸습니다": "已在终端中打开登录窗口",
+
+    # v2.2.1 — 向导测试反馈
+    "대시보드 서버를 재시작하면 최신 기능이 적용됩니다":
+        "重启仪表板服务器后将应用最新功能",
 }
