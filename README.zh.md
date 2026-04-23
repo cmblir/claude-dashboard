@@ -10,7 +10,7 @@ _别死记 50+ CLI 命令，点一下就行。_
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.23.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.23.2-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-架构)
 
 </div>
@@ -38,7 +38,7 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.23.1 🇨🇳│
+│  💤  LazyClaude                                     v2.23.2 🇨🇳│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 新功能│   🔀 工作流                                          │
 │ 🏠 主要 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -61,29 +61,29 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 | 概览（优化评分 + 简报） | 工作流 DAG 编辑器（n8n 风格） |
 |---|---|
-| ![Overview](./docs/screenshots/overview.png) | ![Workflows](./docs/screenshots/workflows.png) |
+| ![Overview](./docs/screenshots/zh/overview.png) | ![Workflows](./docs/screenshots/zh/workflows.png) |
 
 **多 AI + 统一费用**
 
 | AI 供应商（Claude/GPT/Gemini/Ollama/Codex） | 费用时间线（所有实验室 + 工作流统一） |
 |---|---|
-| ![AI Providers](./docs/screenshots/aiProviders.png) | ![Costs Timeline](./docs/screenshots/costsTimeline.png) |
+| ![AI Providers](./docs/screenshots/zh/aiProviders.png) | ![Costs Timeline](./docs/screenshots/zh/costsTimeline.png) |
 
 **Claude API 实验室**
 
 | 🧊 提示缓存实验室 | 🧠 扩展思维实验室 |
 |---|---|
-| ![Prompt Cache](./docs/screenshots/promptCache.png) | ![Thinking Lab](./docs/screenshots/thinkingLab.png) |
+| ![Prompt Cache](./docs/screenshots/zh/promptCache.png) | ![Thinking Lab](./docs/screenshots/zh/thinkingLab.png) |
 | 🛠️ 工具使用实验室 | 🏁 模型基准测试 |
-| ![Tool Use](./docs/screenshots/toolUseLab.png) | ![Model Bench](./docs/screenshots/modelBench.png) |
+| ![Tool Use](./docs/screenshots/zh/toolUseLab.png) | ![Model Bench](./docs/screenshots/zh/modelBench.png) |
 
 **知识 · 复用**
 
 | 📖 Claude 文档中心 | 📝 提示库 |
 |---|---|
-| ![Claude Docs](./docs/screenshots/claudeDocs.png) | ![Prompt Library](./docs/screenshots/promptLibrary.png) |
+| ![Claude Docs](./docs/screenshots/zh/claudeDocs.png) | ![Prompt Library](./docs/screenshots/zh/promptLibrary.png) |
 | 👥 项目子代理 | 🔗 MCP 连接器 |
-| ![Project Agents](./docs/screenshots/projectAgents.png) | ![MCP](./docs/screenshots/mcp.png) |
+| ![Project Agents](./docs/screenshots/zh/projectAgents.png) | ![MCP](./docs/screenshots/zh/mcp.png) |
 
 _所有截图由 `scripts/capture-screenshots.mjs`（Playwright · 1440×900 @2x）自动生成。UI 变更后请重新生成。_
 
@@ -288,7 +288,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 统计（v2.23.1）
+## 🔢 统计（v2.23.2）
 
 | 指标 | 值 |
 |---|---|
