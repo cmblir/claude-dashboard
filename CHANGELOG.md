@@ -10,6 +10,29 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.23.1] — 2026-04-23
+
+### 🎨 Branding — 프로젝트 이름을 **LazyClaude** 로
+
+레퍼런스: [`Yeachan-Heo/oh-my-claudecode`](https://github.com/Yeachan-Heo/oh-my-claudecode) 의 README 스타일 참고.
+
+- **브랜드 네임**: `Claude Control Center` → `💤 LazyClaude`
+  - 네이밍 톤: `lazygit` / `lazydocker` / `lazyvim` 패밀리 편승. 게으른 사람을 위한 로컬 Claude 커맨드 센터.
+  - 캐치프레이즈: "Don't memorize 50+ CLI commands. Just click." / "50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요."
+- **README 3종 (ko/en/zh)**
+  - Hero 섹션을 `<div align="center">` 중앙 정렬, 태그라인 + 캐치프레이즈 상단에 배치.
+  - Quick Start 를 "1 · 클론 / 2 · 실행 / 3 · 접속" 3단계 박스 스타일로 재구성.
+  - 장문 "v2.x 신기능" 나열을 "최근 업데이트" 테이블 (6 행) 로 압축.
+  - ASCII 배너 내 `🧭 Claude Control Center` → `💤 LazyClaude`.
+  - Contributing 섹션: 1인 메인테이너 개인 프로젝트임을 명시, "core team" 같은 구절 제거. PR 유도 톤은 유지.
+  - Acknowledgements 에 lazygit/lazydocker 크레딧 추가.
+  - 하단에 "Made with 💤 for those who'd rather click than type." 서명.
+- **기술 경로 유지** (하위 호환):
+  - Repo URL `github.com/cmblir/claude-dashboard` 유지 (rename 은 사용자 선택 사항).
+  - 데이터 파일 `~/.claude-dashboard-*.json` 경로 유지 — 기존 사용자 데이터 보존.
+  - 내부 변수명·모듈명 변경 없음.
+
+---
 ## [2.23.0] — 2026-04-23
 
 ### 🛡 Security — Webhook 인증 + Output 경로 화이트리스트 (v2.22 보안 감사 후속)

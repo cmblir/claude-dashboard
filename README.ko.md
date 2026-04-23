@@ -1,30 +1,36 @@
-# 🧭 Claude Control Center
+<div align="center">
 
-> **멀티 AI 오케스트레이션 대시보드** — Claude, GPT, Gemini, Ollama, Codex 를 하나의 로컬 인터페이스에서 관리합니다.
+# 💤 LazyClaude
+
+**모든 Claude 작업을, 게으르고 우아하게.**
+
+_50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요._
 
 [![English](https://img.shields.io/badge/🇺🇸_English-blue)](./README.md)
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.23.0-green.svg)](./CHANGELOG.md)
-[![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#기술-스택)
+[![Version](https://img.shields.io/badge/version-v2.23.1-green.svg)](./CHANGELOG.md)
+[![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-아키텍처)
 
-Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claude/` 디렉토리 전체(에이전트·스킬·훅·플러그인·MCP·세션·프로젝트)를 관리하고, 멀티 AI 프로바이더 오케스트레이션을 위한 **n8n 스타일 워크플로우 엔진**을 제공합니다. 모든 것이 `python3 server.py` 한 줄에 들어있습니다.
+</div>
+
+LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디렉토리 전체(에이전트·스킬·훅·플러그인·MCP·세션·프로젝트)를 관리하고, 멀티 AI 프로바이더 오케스트레이션을 위한 **n8n 스타일 워크플로우 엔진**을 제공합니다. 모든 것이 `python3 server.py` 한 줄에 들어있습니다.
 
 **클라우드 업로드 없음. 텔레메트리 없음. 설치할 의존성 없음.** 파이썬 표준 라이브러리와 HTML 한 파일이면 끝입니다.
 
-🆕 **v2.20.0** — 💸 비용 타임라인 탭: 모든 Claude API 플레이그라운드 + 워크플로우 비용을 통합 조회, 일별 소스 스택 차트.
+<sub>`lazygit` / `lazydocker` 에서 영감 — 이번엔 Claude 스택을 위한 "Lazy" 툴입니다.</sub>
 
-🆕 **v2.19.0** — 워크플로우 실행 이력 diff/rerun: 두 run 을 per-node 로 비교, 원클릭 재실행.
+### 최근 업데이트
 
-🆕 **v2.3.0 ~ v2.9.0 (2026-04-23)** — `work` 그룹에 Claude API 플레이그라운드 **7개 탭** 신설:
-- 🧊 [Prompt Cache Lab](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) (v2.3.0) — `cache_control` 실측 + USD 절감 계산
-- 🧠 [Extended Thinking Lab](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking) (v2.4.0) — thinking block 분리 시각화 + `budget_tokens` 슬라이더
-- 🛠️ [Tool Use 플레이그라운드](https://docs.anthropic.com/en/docs/build-with-claude/tool-use) (v2.5.0) — `tool_use` ↔ `tool_result` 수동 라운드 트립
-- 📦 [Batch Jobs](https://docs.anthropic.com/en/docs/build-with-claude/message-batches) (v2.6.0) — 최대 1000건/배치 제출, JSONL 결과
-- 📎 [Files API](https://docs.anthropic.com/en/docs/build-with-claude/files) (v2.7.0) — 업로드/목록/삭제 + `document` reference
-- 👁️ [Vision / PDF 실험실](https://docs.anthropic.com/en/docs/build-with-claude/vision) (v2.8.0) — Opus/Sonnet/Haiku 3 모델 병렬 비교
-- 🏁 모델 벤치마크 (v2.9.0) — 프롬프트 셋 × 모델 교차 실행, 평균 지연·토큰·비용 집계
+| 버전 | 요점 |
+|---|---|
+| **v2.23.0** | 🛡 Webhook `X-Webhook-Secret` 인증 + 출력 경로 화이트리스트 (`~/Downloads` · `~/Documents` · `~/Desktop`) |
+| **v2.22.1** | 📸 실 UI 스크린샷 12장 자동 생성 (Playwright) |
+| **v2.22.0** | 🛡 HTTP 노드 SSRF 가드 (scheme/host/prefix + DNS rebinding 방어) |
+| **v2.20.0** | 💸 **통합 비용 타임라인** — 모든 플레이그라운드 + 워크플로우 실행 비용 한눈에 |
+| **v2.19.0** | 📜 워크플로우 **run diff / rerun** — 두 실행을 per-node 비교 |
+| **v2.3 ~ v2.9** | 🧊🧠🛠️📦📎👁️🏁 Claude API 플레이그라운드 7탭 (prompt cache · thinking · tool-use · batch · files · vision · model bench) |
 
 ---
 
@@ -32,7 +38,7 @@ Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claud
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  🧭  Claude Control Center                          v2.23.0 🇰🇷│
+│  💤  LazyClaude                                     v2.23.1 🇰🇷│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 신기능│   🔀 워크플로우                                       │
 │ 🏠 메인 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -87,7 +93,7 @@ _모든 스크린샷은 `scripts/capture-screenshots.mjs` (Playwright · 1440×9
 
 이미 Claude Code 를 쓰고 있다면, GPT · Gemini · Ollama · Codex 를 추가하면서 CLI · API 키 · 폴백 로직 · 비용 추적을 직접 관리하고 있을 가능성이 높습니다. 그리고 Claude Code 의 설정 폴더(`~/.claude/`)에는 에이전트 · 스킬 · 훅 · 플러그인 · MCP 서버 · 세션이 쌓이는데 이를 한 번에 보는 방법이 없죠.
 
-**Claude Control Center 가 이 두 문제를 한 탭에서 해결합니다.**
+**LazyClaude 가 이 두 문제를 한 탭에서 해결합니다.**
 
 | 이전 방식 | Control Center |
 |---|---|
@@ -116,14 +122,20 @@ _모든 스크린샷은 `scripts/capture-screenshots.mjs` (Playwright · 1440×9
 
 ## 🚀 빠른 시작 (30초)
 
+**1 · 클론**
 ```bash
-git clone https://github.com/cmblir/claude-dashboard.git
-cd claude-dashboard
-python3 server.py
-# → http://localhost:8080 접속
+git clone https://github.com/cmblir/claude-dashboard.git && cd claude-dashboard
 ```
 
-**끝.** `pip install`, `npm install`, Docker 모두 불필요. 서버는 파이썬 표준 라이브러리만 사용합니다.
+**2 · 실행**
+```bash
+python3 server.py
+```
+
+**3 · 접속**
+→ [http://127.0.0.1:8080](http://127.0.0.1:8080)
+
+끝. `pip install`, `npm install`, Docker 모두 불필요. 서버는 파이썬 표준 라이브러리만 사용합니다.
 
 ### 사전 요구사항
 
@@ -276,7 +288,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.23.0)
+## 🔢 통계 (v2.23.1)
 
 | 지표 | 값 |
 |---|---|
@@ -338,7 +350,9 @@ TAB_ID=workflows npm run test:e2e:smoke   # 단일 탭만
 
 ## 🤝 기여하기
 
-이슈 · PR 환영: [github.com/cmblir/claude-dashboard](https://github.com/cmblir/claude-dashboard).
+LazyClaude 는 1인 메인테이너 개인 프로젝트이지만, 이슈와 PR 모두 환영합니다: [github.com/cmblir/claude-dashboard](https://github.com/cmblir/claude-dashboard).
+
+오탈자·i18n 누락·자명한 버그는 바로 PR 보내주세요. 큰 기능/리팩터링은 중복 작업 방지를 위해 이슈 먼저 열어주시면 좋습니다.
 
 ### 새 탭 추가 (7 단계)
 
@@ -375,4 +389,7 @@ TAB_ID=workflows npm run test:e2e:smoke   # 단일 탭만
 - [Anthropic Claude Code](https://claude.com/claude-code) — 이 대시보드가 감싸는 CLI
 - [n8n](https://n8n.io) — 워크플로우 에디터 영감
 - [Open WebUI](https://openwebui.com) — Ollama 모델 허브 영감
+- [lazygit](https://github.com/jesseduffield/lazygit) / [lazydocker](https://github.com/jesseduffield/lazydocker) — 이 프로젝트에 이름을 준 "lazy" 정신
 - 오픈소스 LLM 생태계의 모든 기여자 분들 🧠
+
+<div align="center"><sub>타이핑보다 클릭을 사랑하는 사람들을 위해 💤 만들었습니다.</sub></div>
