@@ -240,17 +240,18 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.9.1)
+## 🔢 통계 (v2.14.1)
 
 | 지표 | 값 |
 |---|---|
-| 백엔드 코드 | ~16,000줄 · 27 모듈 · stdlib only |
+| 백엔드 코드 | ~17,000줄 · 42 모듈 · stdlib only |
 | 프론트엔드 코드 | ~15,500줄 · 단일 HTML |
-| API 라우트 | **168** (GET 90 / POST 75 / PUT 3 + regex webhook) |
-| 탭 수 | **45** (6 그룹) |
+| API 라우트 | **178** (GET 97 / POST 78 / PUT 3 + regex webhook) |
+| 탭 수 | **49** (6 그룹) |
 | 워크플로우 노드 타입 | **16** |
 | AI 프로바이더 | **8** 빌트인 + 커스텀 무제한 |
-| Claude API 플레이그라운드 탭 | **7** (프롬프트 캐시 · Extended Thinking · Tool Use · Batch · Files · Vision · 모델 벤치) |
+| Claude API 플레이그라운드 탭 | **10** (프롬프트 캐시 · Extended Thinking · Tool Use · Batch · Files · Vision · 모델 벤치 · Server Tools · Citations · Agent SDK 스캐폴드) |
+| 공식 문서 색인 | **33** 페이지 (Claude Code + API + SDK + Models + Account) |
 | Ollama 카탈로그 | **23** 모델 |
 | 서브에이전트 역할 프리셋 | **16** |
 | 빌트인 워크플로우 템플릿 | **8** (빌트인 5 + 팀 3) |
