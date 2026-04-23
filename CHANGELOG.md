@@ -10,6 +10,26 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.14.1] — 2026-04-23
+
+### Docs — README 3종 통계/탭 테이블 v2.14 기준 갱신
+
+T5~T8 (v2.11.0 ~ v2.14.0) 신규 4 탭(serverTools · claudeDocs · citationsLab · agentSdkScaffold) 이 README 본문에 반영되도록 일괄 갱신.
+
+- 배지 v2.9.1 → **v2.14.1**
+- 미리보기 "45 탭" → **"49 탭"**
+- Why 비교표 "45 tabs" → "49 tabs"
+- Claude Code Integration 테이블:
+  * 🆕 그룹에 `claudeDocs` 추가
+  * 🛠️ Work 그룹에 `serverTools` · `citationsLab` · `agentSdkScaffold` 추가
+- Architecture 트리: routes 168 → **178**, nav_catalog 45 → **49 tabs**, locales 3,090 → **3,157 keys**
+- Stats 섹션을 v2.14.1 기준으로 갱신:
+  * 백엔드 ~16,000줄/27 → **~17,000줄/42 모듈**
+  * API 라우트 168 → **178** (GET 97 / POST 78 / PUT 3)
+  * Claude API 플레이그라운드 탭 7 → **10**
+  * **신규 행**: "공식 문서 색인 — 33 페이지"
+- README ko/en/zh 3종 동등 반영
+
 ## [2.14.0] — 2026-04-23
 
 ### 🧪 Agent SDK 스캐폴드 — 신규 탭 `agentSdkScaffold`

@@ -6,7 +6,7 @@
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.9.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.14.1-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#tech-stack)
 
 Claude Control Center is a **local-first dashboard** that manages your entire `~/.claude/` directory (agents, skills, hooks, plugins, MCP, sessions, projects) and ships a powerful **n8n-style workflow engine** with multi-AI provider orchestration — all in a single `python3 server.py` command.
@@ -43,7 +43,7 @@ Claude Control Center is a **local-first dashboard** that manages your entire `~
 └────────┴───────────────────────────────────────────────────────┘
 ```
 
-45 tabs across 6 groups · 16 workflow node types · 8 AI providers · 5 themes · 3 languages.
+49 tabs across 6 groups · 16 workflow node types · 8 AI providers · 5 themes · 3 languages.
 
 ---
 
@@ -55,7 +55,7 @@ You already use Claude Code. But as you add more tools — GPT, Gemini, Ollama, 
 
 | Before | With Control Center |
 |---|---|
-| `cat ~/.claude/settings.json` and eyeball it | 45 tabs, each rendering the relevant slice |
+| `cat ~/.claude/settings.json` and eyeball it | 49 tabs, each rendering the relevant slice |
 | `ls ~/.claude/agents/` → open in editor | 16 role presets · one-click create |
 | Shell-script multi-AI comparison | Drag 3 session nodes → merge → output |
 | Manual RAG pipeline assembly | Built-in `RAG Pipeline` template |
@@ -150,23 +150,23 @@ API keys can also be saved via the `🧠 AI Providers` tab — stored in `~/.cla
 - **Default model picker** — per-provider chat / embedding defaults
 - **Modelfile editor** — create custom models from the UI
 
-### 🤝 Claude Code Integration (45 tabs)
+### 🤝 Claude Code Integration (49 tabs)
 
 | Group | Tabs |
 |---|---|
-| 🆕 New | `features` · `onboarding` · `guideHub` |
+| 🆕 New | `features` · `onboarding` · `guideHub` · 🆕 `claudeDocs` |
 | 🏠 Main | `overview` · `projects` · `analytics` · `aiEval` · `sessions` |
-| 🛠️ Work | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` · 🆕 `promptCache` · 🆕 `thinkingLab` · 🆕 `toolUseLab` · 🆕 `batchJobs` · 🆕 `apiFiles` · 🆕 `visionLab` · 🆕 `modelBench` |
+| 🛠️ Work | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` · `promptCache` · `thinkingLab` · `toolUseLab` · `batchJobs` · `apiFiles` · `visionLab` · `modelBench` · 🆕 `serverTools` · 🆕 `citationsLab` · 🆕 `agentSdkScaffold` |
 | ⚙️ Config | `hooks` · `permissions` · `mcp` · `plugins` · `settings` · `claudemd` |
 | 🎛️ Advanced | `outputStyles` · `statusline` · `plans` · `envConfig` · `modelConfig` · `ideStatus` · `marketplaces` · `scheduled` |
 | 📈 System | `usage` · `metrics` · `memory` · `tasks` · `backups` · `bashHistory` · `telemetry` · `homunculus` · `team` · `system` |
 
-Highlights: **16 sub-agent role presets** (backend-dev, security-reviewer, architect, ...), session timeline with quality scoring, CLAUDE.md editor with markdown preview, MCP connector installer, plugin marketplace integration. **Claude API playground** — 7 tabs for prompt caching, extended thinking, tool use, batch jobs, files API, vision/PDF, model benchmarking.
+Highlights: **16 sub-agent role presets**, session timeline with quality scoring, CLAUDE.md editor, MCP connector installer, plugin marketplace. **Claude API playground** — 10 tabs: prompt caching, extended thinking, tool use, batch jobs, files API, vision/PDF, model benchmarking, **hosted server tools (web_search + code_execution)**, **citations**, **Agent SDK scaffold**. **Docs Hub** — 33 curated docs.anthropic.com pages with cross-links to dashboard tabs.
 
 ### 🌍 Internationalization
 
 - **3 languages** — Korean (`ko`, default) · English (`en`) · Chinese (`zh`)
-- **3,090 translation keys** per language · **zero residual Korean** verified
+- **3,157 translation keys** per language · **zero residual Korean** verified
 - **Runtime DOM translation** via MutationObserver (no page reload)
 - **`error_key` system** — backend error messages localized on the frontend
 - **Verification pipeline** — `scripts/verify-translations.js` enforces 4 checks (parity · `t()` calls · audit · static DOM)
@@ -187,12 +187,12 @@ Highlights: **16 sub-agent role presets** (backend-dev, security-reviewer, archi
 claude-dashboard/
 ├── server.py                     # Entry (port-conflict resolution + ollama auto-start)
 ├── server/                       # 14,067 lines · stdlib only
-│   ├── routes.py                 # 168 API routes (GET + POST + PUT + DELETE + regex webhook)
+│   ├── routes.py                 # 178 API routes (GET + POST + PUT + DELETE + regex webhook)
 │   ├── workflows.py              # DAG engine · 16 node executors · Repeat · Cron · Webhook (2,296)
 │   ├── ai_providers.py           # 8 providers · registry · rate limiter (1,723)
 │   ├── ai_keys.py                # Key mgmt · custom providers · cost tracking (734)
 │   ├── ollama_hub.py             # Catalog · pull/delete/create · serve mgmt (606)
-│   ├── nav_catalog.py            # Single source of truth for 45 tabs + i18n descriptions
+│   ├── nav_catalog.py            # Single source of truth for 49 tabs + i18n descriptions
 │   ├── features.py               # Feature discovery · AI evaluation · recommendations
 │   ├── projects.py               # Project browser · 16 sub-agent role presets
 │   ├── sessions.py               # Session indexing · quality scoring · agent graph
@@ -201,7 +201,7 @@ claude-dashboard/
 │   └── …                         # 20 modules total
 ├── dist/
 │   ├── index.html                # Single-file SPA (~13,500 lines)
-│   └── locales/{ko,en,zh}.json   # 3,090 keys × 3 languages
+│   └── locales/{ko,en,zh}.json   # 3,157 keys × 3 languages
 ├── tools/
 │   ├── translations_manual_*.py  # Manual translation overrides
 │   ├── extract_ko_strings.py     # Korean string extractor
@@ -240,21 +240,22 @@ Atomic writes via `server/utils.py::_safe_write` (`.tmp → rename`), threading 
 
 ---
 
-## 🔢 Stats (v2.9.1)
+## 🔢 Stats (v2.14.1)
 
 | Metric | Value |
 |---|---|
-| Backend code | ~16,000 lines · 27 modules · stdlib only |
+| Backend code | ~17,000 lines · 42 modules · stdlib only |
 | Frontend code | ~15,500 lines · single HTML file |
-| API routes | **168** (GET 90 / POST 75 / PUT 3 + regex webhook) |
-| Tabs | **45** across 6 groups |
+| API routes | **178** (GET 97 / POST 78 / PUT 3 + regex webhook) |
+| Tabs | **49** across 6 groups |
 | Workflow node types | **16** |
 | AI providers | **8** built-in + unlimited custom |
-| Claude API playground tabs | **7** (prompt cache · extended thinking · tool use · batch · files · vision · model bench) |
+| Claude API playground tabs | **10** (prompt cache · extended thinking · tool use · batch · files · vision · model bench · server tools · citations · agent sdk scaffold) |
+| Curated docs pages | **33** (Claude Code + API + SDK + Models + Account) |
 | Ollama catalog | **23** models |
 | Sub-agent role presets | **16** |
 | Built-in workflow templates | **8** (5 built-in + 3 team) |
-| i18n keys | **3,090** × 3 languages · 0 missing |
+| i18n keys | **3,157** × 3 languages · 0 missing |
 | Themes | **5** |
 | Tutorial scenes | **18** |
 
