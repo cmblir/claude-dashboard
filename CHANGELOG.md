@@ -10,6 +10,29 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.16.0] — 2026-04-23
+
+### 📝 Prompt Library — 신규 탭 `promptLibrary`
+
+자주 쓰는 프롬프트를 태그와 함께 저장하고 검색 · 복사 · 복제 · **워크플로우로 변환** 가능한 라이브러리 탭.
+
+**기능**
+- CRUD 인라인 에디터: title · body · tags (쉼표 구분) · model
+- 검색: 제목/본문/태그 substring (250ms debounce)
+- 태그 chip 필터
+- 카드별 액션 5개: 📋 복사 / ✏️ 수정 / 🗂️ 복제 / 🔀 워크플로우로 / 🗑️ 삭제
+- 🔀 워크플로우로 — start → session(prompt) → output 3 노드 자동 생성 후 workflows 탭으로 이동
+- 시드 3종 (코드 리뷰 / 회의 요약 / SQL 최적화)
+
+**Architecture**
+- `server/prompt_library.py` 신설 — `api_prompt_library_{list,save,delete,duplicate,to_workflow}` + SEED_ITEMS 3종
+- 저장: `~/.claude-dashboard-prompt-library.json`
+- workflows store 와 통합 (to-workflow 가 `_load_all/_dump_all/_new_wf_id` 사용)
+- `server/routes.py` 5 라우트 (GET list · POST save/delete/duplicate/to-workflow)
+- `server/nav_catalog.py` `promptLibrary` 탭 + en/zh
+- `dist/index.html` NAV (icon 📝) + `VIEWS.promptLibrary` (에디터 + 카드 리스트 + 필터)
+- `tools/translations_manual_9.py` 24 키 × ko/en/zh
+
 ## [2.15.0] — 2026-04-23
 
 ### 🧬 Embedding 비교 실험실 — 신규 탭 `embeddingLab`

@@ -137,6 +137,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "프로바이더별 rank 차이를 하이라이트.",
         ["embedding", "임베딩", "voyage", "bge-m3", "text-embedding-3",
          "cosine", "vector search", "rank 비교"]),
+    ("promptLibrary", "work",
+        "Prompt Library — 자주 쓰는 프롬프트를 태그와 함께 저장/검색/복제/"
+        "워크플로우로 변환. 시드 3종 포함.",
+        ["prompt library", "프롬프트 템플릿", "프롬프트 저장", "library",
+         "template", "스니펫"]),
     ("claudeDocs",    "new",
         "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
         "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "
@@ -237,6 +242,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                         "zh": "Agent SDK 脚手架 — 生成 claude-agent-sdk Python/TS 项目骨架"},
     "embeddingLab": {"en": "Embedding Lab — compare Voyage / OpenAI / Ollama embeddings via cosine-sim rank matrix",
                     "zh": "嵌入实验室 — 通过余弦相似度 rank 矩阵比较 Voyage / OpenAI / Ollama 嵌入"},
+    "promptLibrary": {"en": "Prompt Library — save/search/duplicate prompts, convert to workflow",
+                     "zh": "提示库 — 保存/搜索/复制提示,转换为工作流"},
     "claudeDocs": {"en": "Claude Docs Hub — curated docs.anthropic.com index with cross-links to dashboard tabs",
                   "zh": "Claude 文档中心 — docs.anthropic.com 分类索引,关联仪表板标签页"},
     "hooks": {"en": "Event hooks", "zh": "事件钩子"},
