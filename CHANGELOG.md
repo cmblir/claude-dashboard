@@ -10,6 +10,37 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.11.0] — 2026-04-23
+
+### 🧰 Claude 공식 내장 Tools 플레이그라운드 — 신규 탭 `serverTools`
+
+Anthropic 서버가 **직접 실행하는 hosted tool** 실습 탭. 기존 `toolUseLab` 이 사용자가 tool_result 를 수동 공급하는 구조라면, 이건 Anthropic 이 tool 을 실행하고 결과를 포함한 응답을 돌려준다.
+
+**지원 도구**
+- 🌐 **web_search** (`web_search_20250305`, beta `web-search-2025-03-05`) — 웹 검색 + citation
+- 🧪 **code_execution** (`code_execution_20250522`, beta `code-execution-2025-05-22`) — Python sandbox (stdout / stderr / return_code)
+
+**기능**
+- 도구 체크박스 (model supportedModels 가드 — Haiku 비활성)
+- 모델 선택 (Opus / Sonnet) + max_tokens
+- 예시 3종 (뉴스 검색 / Python 계산 / 검색+분석 결합)
+- 응답 content 블록 분류 시각화:
+  * `server_tool_use` — 보라 카드 (tool 입력 JSON)
+  * `*_tool_result` — 초록 카드 (실행 결과)
+  * `text` — 최종 응답
+- 히스토리 최근 20건 (`~/.claude-dashboard-server-tools.json`)
+
+**Architecture**
+- `server/server_tools.py` 신설 — `api_server_tools_{catalog,history,run}` + `TOOL_CATALOG` (beta 헤더 중앙화) + `EXAMPLES` 3종
+- `server/routes.py` 3 라우트 추가 (GET catalog/history · POST run)
+- `server/nav_catalog.py` `serverTools` 탭 등록 + en/zh desc
+- `dist/index.html` NAV (icon 🧰) + `VIEWS.serverTools` + `stRun/stToggleTool/stLoadExample/stReset/stSet`
+- `tools/translations_manual_9.py` 17 키 × ko/en/zh
+
+**주의**
+- beta header 스펙은 2026-04 시점 추정. Anthropic 에서 바뀌면 `TOOL_CATALOG[*].beta` 만 갱신.
+- `web_search` / `code_execution` 호출은 별도 과금.
+
 ## [2.10.4] — 2026-04-23
 
 ### Fixed — v2.10.3 스모크 테스트 실행으로 드러난 2건
