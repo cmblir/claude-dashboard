@@ -1001,6 +1001,9 @@ const NAV = [
   { id: 'sessionReplay', icon: '🎞️', label: 'Session Replay', group: 'playground',
     desc: 'Claude Code JSONL 세션 로그 타임라인 재생 · 툴 호출 강조 · 누적 토큰 차트',
     docUrl: null },
+  { id: 'learner', icon: '🎓', label: 'Learner', group: 'build',
+    desc: '최근 세션 JSONL 에서 반복 tool 시퀀스/프롬프트 자동 추출 → Prompt Library / 워크플로우 제안',
+    docUrl: null },
 
   // config — Claude Code 설정 전반 (13, advanced 흡수)
   { id: 'hooks',       icon: '🪝', label: '훅',
@@ -13821,6 +13824,130 @@ function formatBytes(n) {
   if (n < 1024*1024) return (n/1024).toFixed(1) + 'KB';
   if (n < 1024*1024*1024) return (n/1024/1024).toFixed(2) + 'MB';
   return (n/1024/1024/1024).toFixed(2) + 'GB';
+}
+
+// ────────────────────────────────────────────────────────────────
+// LEARNER (v2.30.0) — 세션 JSONL 에서 반복 패턴 추출 → skill/prompt/workflow 제안
+// ────────────────────────────────────────────────────────────────
+VIEWS.learner = async () => {
+  const d = await api('/api/learner/patterns');
+  if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}</div>`;
+  if ((d.sessions || 0) === 0) {
+    return `
+      ${viewHeader('🎓 Learner', t('learner_subtitle', '최근 세션에서 반복되는 패턴을 자동 추출. AI 판단 없이 통계 기반.'), 'learner')}
+      <div class="card p-6 text-center text-[12px]" style="color:var(--text-dim)">
+        ${t('learner_no_sessions', '최근 30일 세션이 없습니다. Claude Code 를 한 번 이상 사용하세요.')}
+      </div>`;
+  }
+  const stats = d.stats || {};
+  const topTools = (stats.topTools || []).slice(0, 8);
+  const maxTool = topTools.reduce((m, x) => Math.max(m, x.count), 1);
+  const lb = stats.lengthBuckets || {};
+  const totalSess = d.sessions || 0;
+
+  const toolRows = topTools.map(x => `
+    <div class="flex items-center gap-2 text-[11px]">
+      <span class="w-28 font-mono truncate" title="${escapeHtml(x.name)}">${escapeHtml(x.name)}</span>
+      <div class="flex-1 h-3 rounded" style="background:rgba(255,255,255,0.06); position:relative;">
+        <div style="background:var(--accent);height:100%;border-radius:4px;width:${(x.count/maxTool*100).toFixed(0)}%;"></div>
+      </div>
+      <span class="w-10 text-right font-mono" style="color:var(--text-dim)">${x.count}</span>
+    </div>`).join('');
+
+  const patternCards = (d.patterns || []).map((p, i) => {
+    if (p.type === 'repeated_prompt') {
+      return `
+        <div class="card p-3">
+          <div class="flex items-start justify-between mb-1 gap-2">
+            <div class="text-[12px] font-semibold">📝 ${t('learner_repeated_prompt', '반복 프롬프트')}</div>
+            <span class="chip text-[10px]">${p.count}×</span>
+          </div>
+          <div class="text-[11px] mb-2 line-clamp-2" style="color:var(--text-mute)">${escapeHtml(p.detail)}</div>
+          <button class="btn btn-primary text-[11px] w-full"
+                  onclick='_learnerToPromptLib(${JSON.stringify(p.action).replace(/'/g, "&#39;")})'>
+            → ${t('learner_to_prompt_lib', 'Prompt Library 로 저장')}
+          </button>
+        </div>`;
+    } else if (p.type === 'tool_sequence') {
+      return `
+        <div class="card p-3">
+          <div class="flex items-start justify-between mb-1 gap-2">
+            <div class="text-[12px] font-semibold">🔀 ${t('learner_tool_seq', 'Tool 시퀀스')}</div>
+            <span class="chip text-[10px]">${p.count}×</span>
+          </div>
+          <div class="text-[11px] mb-2">
+            ${p.action.sequence.map(s => `<span class="chip text-[10px] font-mono">${escapeHtml(s)}</span>`).join(' → ')}
+          </div>
+          <div class="text-[10px] mb-2" style="color:var(--text-dim)">${escapeHtml(p.detail)}</div>
+          <button class="btn btn-primary text-[11px] w-full" onclick="go('workflows')">
+            → ${t('learner_to_workflows', '워크플로우 탭으로 이동')}
+          </button>
+        </div>`;
+    }
+    return '';
+  }).join('') || `<div class="text-[11px]" style="color:var(--text-dim)">${t('learner_no_patterns', '아직 제안할 패턴이 충분히 누적되지 않았습니다.')}</div>`;
+
+  const lengthsTotal = (lb.small||0)+(lb.medium||0)+(lb.large||0)+(lb.huge||0);
+  const bar = (n) => lengthsTotal ? (n/lengthsTotal*100).toFixed(0) : 0;
+
+  return `
+    ${viewHeader('🎓 Learner', t('learner_subtitle', '최근 세션에서 반복되는 패턴을 자동 추출. AI 판단 없이 통계 기반.'), 'learner')}
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('learner_sessions_scanned', '스캔한 세션')}</div>
+        <div class="text-2xl font-bold mt-1 font-mono">${totalSess}</div>
+        <div class="text-[10px]" style="color:var(--text-dim)">${t('learner_days_window', `최근 ${d.days}일`)}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('learner_total_tokens', '누적 토큰')}</div>
+        <div class="text-2xl font-bold mt-1 font-mono" style="color:var(--accent)">${(stats.totalTokens||0).toLocaleString()}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('learner_length_dist', '세션 길이 분포')}</div>
+        <div class="flex gap-1 h-4 rounded overflow-hidden" style="background:rgba(255,255,255,0.05);">
+          <div style="width:${bar(lb.small||0)}%;background:#4ade80" title="small ≤10: ${lb.small||0}"></div>
+          <div style="width:${bar(lb.medium||0)}%;background:#60a5fa" title="medium 10-50: ${lb.medium||0}"></div>
+          <div style="width:${bar(lb.large||0)}%;background:#a78bfa" title="large 50-200: ${lb.large||0}"></div>
+          <div style="width:${bar(lb.huge||0)}%;background:#f472b6" title="huge >200: ${lb.huge||0}"></div>
+        </div>
+        <div class="flex gap-2 text-[9px] mt-1" style="color:var(--text-dim)">
+          <span>🟢 ${lb.small||0} small</span><span>🔵 ${lb.medium||0} med</span>
+          <span>🟣 ${lb.large||0} large</span><span>🌸 ${lb.huge||0} huge</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div class="card p-4">
+        <div class="text-[12px] font-semibold mb-2">🛠️ ${t('learner_top_tools', '자주 쓰는 Tool')}</div>
+        <div class="space-y-1.5">${toolRows || `<div class="text-[10px]" style="color:var(--text-dim)">${t('데이터 없음')}</div>`}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-[12px] font-semibold mb-2">💡 ${t('learner_suggestions', '자동 추출된 제안')}</div>
+        <div class="grid grid-cols-1 gap-2">${patternCards}</div>
+      </div>
+    </div>
+
+    <div class="text-[10px]" style="color:var(--text-dim)">
+      ${t('learner_hint', '분석은 완전히 로컬에서 수행됩니다. Claude API 호출 없음. 제안 카드는 클릭 시 해당 탭으로 이동하여 수동 저장할 수 있습니다.')}
+    </div>
+  `;
+};
+
+function _learnerToPromptLib(action) {
+  try {
+    state.data.pl = state.data.pl || {};
+    state.data.pl.editing = {
+      title: (action.suggestedTitle || '').slice(0, 80) || 'From Learner',
+      body: action.body || '',
+      tags: ['learner'], tagsRaw: 'learner',
+      keywords: [], keywordsRaw: '',
+      model: '',
+    };
+    go('promptLibrary');
+    toast(t('learner_prefilled', '에디터에 미리 채워졌습니다 — 검토 후 저장하세요'), 'ok');
+  } catch (e) { toast(String(e), 'err'); }
 }
 
 // ────────────────────────────────────────────────────────────────

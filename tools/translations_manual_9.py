@@ -1072,6 +1072,23 @@ NEW_EN = {
     "fwd_added": "Forwarder added",
     "fwd_removed": "Removed",
     "fwd_remove_confirm": "This removes the forwarder from settings.json. Continue?",
+
+    # v2.30.0 — Learner
+    "learner_subtitle": "Automatically detect repeated patterns from recent sessions — pure statistics, no AI calls.",
+    "learner_no_sessions": "No sessions in the last 30 days. Use Claude Code at least once.",
+    "learner_sessions_scanned": "Sessions scanned",
+    "learner_days_window": "Last 30 days",
+    "learner_total_tokens": "Cumulative tokens",
+    "learner_length_dist": "Session length distribution",
+    "learner_top_tools": "Most-used tools",
+    "learner_suggestions": "Auto-extracted suggestions",
+    "learner_repeated_prompt": "Repeated prompt",
+    "learner_tool_seq": "Tool sequence",
+    "learner_to_prompt_lib": "Save to Prompt Library",
+    "learner_to_workflows": "Go to Workflows",
+    "learner_no_patterns": "Not enough repeated patterns yet.",
+    "learner_prefilled": "Editor prefilled — review and save.",
+    "learner_hint": "Analysis is fully local. No Claude API calls. Clicking a card opens the target tab so you can manually save.",
 }
 
 NEW_ZH = {
@@ -2139,4 +2156,21 @@ NEW_ZH = {
     "fwd_added": "Forwarder 已添加",
     "fwd_removed": "已移除",
     "fwd_remove_confirm": "将从 settings.json 移除此 forwarder。继续吗？",
+
+    # v2.30.0 — Learner
+    "learner_subtitle": "自动从最近会话中检测重复模式 — 纯统计，无 AI 调用。",
+    "learner_no_sessions": "最近 30 天没有会话。请至少使用一次 Claude Code。",
+    "learner_sessions_scanned": "已扫描会话",
+    "learner_days_window": "最近 30 天",
+    "learner_total_tokens": "累计 token",
+    "learner_length_dist": "会话长度分布",
+    "learner_top_tools": "最常用工具",
+    "learner_suggestions": "自动提取的建议",
+    "learner_repeated_prompt": "重复的提示",
+    "learner_tool_seq": "工具序列",
+    "learner_to_prompt_lib": "保存到提示库",
+    "learner_to_workflows": "前往工作流",
+    "learner_no_patterns": "尚未积累足够的重复模式。",
+    "learner_prefilled": "编辑器已预填 — 请检查并保存。",
+    "learner_hint": "分析完全在本地进行。无 Claude API 调用。点击卡片会打开目标标签页以便手动保存。",
 }
