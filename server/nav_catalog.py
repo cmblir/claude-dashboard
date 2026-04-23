@@ -166,6 +166,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "외부 HTTP endpoint 로 포워딩. 호스트 화이트리스트 적용.",
         ["event forwarder", "이벤트 포워더", "hooks", "webhook", "외부 전송",
          "event", "integration", "outbound"]),
+    ("learner", "work",
+        "Learner — 최근 세션 JSONL 에서 반복되는 tool 시퀀스·프롬프트를 "
+        "자동 추출 → Prompt Library / 워크플로우 템플릿 제안.",
+        ["learner", "러너", "패턴", "pattern", "반복", "제안", "suggest",
+         "tool sequence", "repeated prompt"]),
     ("claudeDocs",    "new",
         "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
         "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "
@@ -278,6 +283,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                       "zh": "会话重放 — 将 Claude Code JSONL 会话日志作为时间线重放，高亮工具调用并显示累计 token 图表"},
     "eventForwarder": {"en": "Event Forwarder — forward Claude Code hook events (PostToolUse, etc.) to an external HTTP endpoint with host allow-list",
                        "zh": "事件转发器 — 将 Claude Code hook 事件（如 PostToolUse）转发到外部 HTTP 端点，采用主机白名单"},
+    "learner": {"en": "Learner — automatically detect repeated tool sequences and prompts from recent sessions, with suggestions to save as Prompt Library / workflow templates",
+                "zh": "学习器 — 自动从最近会话中检测重复的工具序列和提示，建议保存为提示库 / 工作流模板"},
     "promptLibrary": {"en": "Prompt Library — save/search/duplicate prompts, convert to workflow",
                      "zh": "提示库 — 保存/搜索/复制提示,转换为工作流"},
     "claudeDocs": {"en": "Claude Docs Hub — curated docs.anthropic.com index with cross-links to dashboard tabs",

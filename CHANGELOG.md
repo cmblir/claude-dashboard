@@ -10,6 +10,45 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.30.0] — 2026-04-24
+
+### 🎓 Learner 탭 — 세션 패턴 추출 (B8, 마지막 backlog medium 항목 소화)
+
+Claude Code 세션 JSONL 에서 반복되는 tool 시퀀스 · 프롬프트를 자동 감지해 Prompt Library / 워크플로우 템플릿으로 저장하도록 제안하는 탭.
+
+**순수 통계 기반 (AI 호출 없음)**
+- 최근 30일 / 최대 100 세션 / 세션당 500 라인 스캔
+- 추출 지표:
+  - **Top Tools** (Bash / Edit / Read 등 빈도 TOP 10, 가로 바 차트)
+  - **Tool 3-gram 시퀀스** (같은 세션 내 연속 tool 호출 패턴, 3회 이상 발생)
+  - **반복 프롬프트** (첫 60자 정규화 매칭, 3회 이상 반복)
+  - **세션 길이 분포** (small ≤10 / medium 10-50 / large 50-200 / huge >200 라인 bucket)
+  - **누적 토큰**
+- 분석은 100% 로컬 — 외부 API 호출 없음
+
+**UI**
+- 3열 상단 카드 (스캔 세션 수 / 누적 토큰 / 길이 분포 stacked bar)
+- Top Tools 가로 바 차트 (8개)
+- 자동 추출 제안 카드 그리드:
+  - 반복 프롬프트 → "Prompt Library 로 저장" 버튼 (에디터에 title/body/tags=['learner'] 자동 prefill 후 promptLibrary 탭으로 이동)
+  - Tool 시퀀스 → "워크플로우 탭으로 이동" 버튼
+- 하단 힌트 "분석은 완전히 로컬에서 수행됩니다"
+
+**모듈**
+- 신규 `server/learner.py::api_learner_patterns` (1 라우트)
+- 새 탭 `learner` (build 그룹, nav_catalog + TAB_DESC_I18N + 프런트 NAV 엔트리)
+- VIEWS.learner + `_learnerToPromptLib()` 헬퍼
+
+**검증**
+- 56/56 탭 smoke (신규 `learner` 추가로 55→56)
+- 실환경 테스트: 100 세션 스캔 → 2.9M 토큰, 10 패턴 카드 생성 (Bash 412 · Edit 403 · Read 389 등), 반복 프롬프트 11회 감지
+- i18n 16 키 추가 × ko/en/zh (learner_*)
+
+**Backlog 현황**
+- ✅ B1~B8 모두 소화 완료
+- 🚫 blocked (사용자 설계 승인 필요): MCP 서버 모드 · Artifacts 로컬 뷰어
+
+---
 ## [2.29.0] — 2026-04-24
 
 ### ⚙️ Policy fallbackProvider 확장 + 📤 Event Forwarder 신규 탭 (B7)
