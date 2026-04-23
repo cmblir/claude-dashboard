@@ -1,30 +1,36 @@
-# 🧭 Claude Control Center
+<div align="center">
 
-> **多 AI 编排仪表板** — 在一个本地界面中管理 Claude、GPT、Gemini、Ollama 和 Codex。
+# 💤 LazyClaude
+
+**你的 Claude 全家桶，一个标签页搞定。**
+
+_别死记 50+ CLI 命令，点一下就行。_
 
 [![English](https://img.shields.io/badge/🇺🇸_English-blue)](./README.md)
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.23.0-green.svg)](./CHANGELOG.md)
-[![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#技术栈)
+[![Version](https://img.shields.io/badge/version-v2.23.1-green.svg)](./CHANGELOG.md)
+[![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-架构)
 
-Claude Control Center 是一款**本地优先的仪表板**，统一管理你的整个 `~/.claude/` 目录（代理、技能、钩子、插件、MCP、会话、项目），并内置一个强大的 **n8n 风格工作流引擎** 用于多 AI 供应商编排——全部包含在一行 `python3 server.py` 中。
+</div>
+
+LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `~/.claude/` 目录（代理、技能、钩子、插件、MCP、会话、项目），并内置一个强大的 **n8n 风格工作流引擎** 用于多 AI 供应商编排——全部包含在一行 `python3 server.py` 中。
 
 **无云端上传。无遥测。无需安装任何依赖。** 只需 Python 标准库和一个 HTML 文件。
 
-🆕 **v2.20.0** — 💸 费用时间线标签：统一查看所有 Claude API 实验室标签 + 工作流的费用，按源堆叠的每日图表。
+<sub>灵感来自 `lazygit` / `lazydocker`——这次是为 Claude 技术栈而生的 "Lazy" 工具。</sub>
 
-🆕 **v2.19.0** — 工作流运行历史 diff/rerun：逐节点比较两次 run，一键重新运行当前工作流。
+### 近期更新
 
-🆕 **v2.3.0 ~ v2.9.0 (2026-04-23)** — `work` 组新增 Claude API 实验室 **7 个标签页**：
-- 🧊 [Prompt Cache Lab](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) (v2.3.0) — `cache_control` 实测 + USD 成本节省
-- 🧠 [Extended Thinking Lab](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking) (v2.4.0) — 思维块分离展示 + `budget_tokens` 滑块
-- 🛠️ [Tool Use 实验室](https://docs.anthropic.com/en/docs/build-with-claude/tool-use) (v2.5.0) — `tool_use` ↔ `tool_result` 手动往返
-- 📦 [Batch Jobs](https://docs.anthropic.com/en/docs/build-with-claude/message-batches) (v2.6.0) — 最多 1000 条/批,JSONL 结果
-- 📎 [Files API](https://docs.anthropic.com/en/docs/build-with-claude/files) (v2.7.0) — 上传/列出/删除 + `document` 引用
-- 👁️ [视觉 / PDF 实验室](https://docs.anthropic.com/en/docs/build-with-claude/vision) (v2.8.0) — Opus/Sonnet/Haiku 3 模型并行比较
-- 🏁 模型基准测试 (v2.9.0) — 提示集 × 模型交叉运行,汇总延迟·令牌·费用
+| 版本 | 重点 |
+|---|---|
+| **v2.23.0** | 🛡 Webhook `X-Webhook-Secret` 鉴权 + 输出路径白名单 (`~/Downloads` · `~/Documents` · `~/Desktop`) |
+| **v2.22.1** | 📸 Playwright 自动生成 12 张真实 UI 截图 |
+| **v2.22.0** | 🛡 HTTP 节点 SSRF 防护 (scheme/host/prefix + DNS rebinding 防御) |
+| **v2.20.0** | 💸 **统一费用时间线**——所有实验室 + 工作流运行费用一览 |
+| **v2.19.0** | 📜 工作流 **run diff / rerun**——逐节点对比两次执行 |
+| **v2.3 ~ v2.9** | 🧊🧠🛠️📦📎👁️🏁 Claude API 实验室 7 个标签（prompt cache · thinking · tool-use · batch · files · vision · model bench） |
 
 ---
 
@@ -32,7 +38,7 @@ Claude Control Center 是一款**本地优先的仪表板**，统一管理你的
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  🧭  Claude Control Center                          v2.23.0 🇨🇳│
+│  💤  LazyClaude                                     v2.23.1 🇨🇳│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 新功能│   🔀 工作流                                          │
 │ 🏠 主要 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -87,7 +93,7 @@ _所有截图由 `scripts/capture-screenshots.mjs`（Playwright · 1440×900 @2x
 
 如果你已经在使用 Claude Code，当你添加更多工具（GPT、Gemini、Ollama、Codex）时，就得自己管理一堆 CLI、API 密钥、回退逻辑和成本追踪。而 Claude Code 的配置目录（`~/.claude/`）会不断积累代理、技能、钩子、插件、MCP 服务器和会话，却没有一个统一视图。
 
-**Claude Control Center 在一个标签页内解决了这两个问题。**
+**LazyClaude 在一个标签页内解决了这两个问题。**
 
 | 以前 | 使用 Control Center |
 |---|---|
@@ -116,14 +122,20 @@ _所有截图由 `scripts/capture-screenshots.mjs`（Playwright · 1440×900 @2x
 
 ## 🚀 快速开始（30 秒）
 
+**1 · 克隆**
 ```bash
-git clone https://github.com/cmblir/claude-dashboard.git
-cd claude-dashboard
-python3 server.py
-# → 打开 http://localhost:8080
+git clone https://github.com/cmblir/claude-dashboard.git && cd claude-dashboard
 ```
 
-**就这样。** 无需 `pip install`、`npm install` 或 Docker。服务器仅使用 Python 标准库。
+**2 · 运行**
+```bash
+python3 server.py
+```
+
+**3 · 打开**
+→ [http://127.0.0.1:8080](http://127.0.0.1:8080)
+
+就这样。无需 `pip install`、`npm install` 或 Docker。服务器仅使用 Python 标准库。
 
 ### 先决条件
 
@@ -276,7 +288,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 统计（v2.23.0）
+## 🔢 统计（v2.23.1）
 
 | 指标 | 值 |
 |---|---|
@@ -336,7 +348,9 @@ TAB_ID=workflows npm run test:e2e:smoke   # 仅单个标签页
 
 ## 🤝 贡献
 
-欢迎在 [github.com/cmblir/claude-dashboard](https://github.com/cmblir/claude-dashboard) 提交 Issue 和 PR。
+LazyClaude 是单人维护的个人项目，但欢迎提交 Issue 和 PR：[github.com/cmblir/claude-dashboard](https://github.com/cmblir/claude-dashboard)。
+
+小修复（错别字、i18n 缺失、明显 bug）可直接提 PR。大型功能或重构请先开 Issue，避免重复工作。
 
 ### 添加新标签页（7 步）
 
@@ -373,4 +387,7 @@ TAB_ID=workflows npm run test:e2e:smoke   # 仅单个标签页
 - [Anthropic Claude Code](https://claude.com/claude-code) — 本仪表板所围绕的 CLI
 - [n8n](https://n8n.io) — 工作流编辑器灵感来源
 - [Open WebUI](https://openwebui.com) — Ollama 模型中心灵感来源
+- [lazygit](https://github.com/jesseduffield/lazygit) / [lazydocker](https://github.com/jesseduffield/lazydocker) — 给这个项目起名的 "lazy" 精神
 - 所有为开源 LLM 生态做出贡献的人 🧠
+
+<div align="center"><sub>为那些宁可点击也不愿打字的人，用 💤 制作。</sub></div>
