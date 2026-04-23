@@ -92,6 +92,7 @@ from .event_forwarder import (
 from .learner import api_learner_patterns
 from .security_scan import api_security_scan
 from .mcp_server import api_mcp_server_info
+from .artifacts import api_artifacts_list, api_artifacts_render
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -279,6 +280,8 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/learner/patterns": api_learner_patterns,
     "/api/security-scan": api_security_scan,
     "/api/mcp-server/info": api_mcp_server_info,
+    "/api/artifacts/list": api_artifacts_list,
+    "/api/artifacts/render": api_artifacts_render,
 }
 
 

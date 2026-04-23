@@ -1004,6 +1004,9 @@ const NAV = [
   { id: 'learner', icon: '🎓', label: 'Learner', group: 'build',
     desc: '최근 세션 JSONL 에서 반복 tool 시퀀스/프롬프트 자동 추출 → Prompt Library / 워크플로우 제안',
     docUrl: null },
+  { id: 'artifacts', icon: '🎨', label: 'Artifacts Viewer', group: 'build',
+    desc: '워크플로우 출력(HTML/SVG/Markdown/JSON)을 sandbox iframe + CSP + 정적 필터로 안전 미리보기',
+    docUrl: null },
 
   // config — Claude Code 설정 전반 (13, advanced 흡수)
   { id: 'hooks',       icon: '🪝', label: '훅',
@@ -13862,6 +13865,96 @@ function formatBytes(n) {
   if (n < 1024*1024) return (n/1024).toFixed(1) + 'KB';
   if (n < 1024*1024*1024) return (n/1024/1024).toFixed(2) + 'MB';
   return (n/1024/1024/1024).toFixed(2) + 'GB';
+}
+
+// ────────────────────────────────────────────────────────────────
+// ARTIFACTS VIEWER (v2.33.0) — 워크플로우 출력물 4중 보안 미리보기
+// ────────────────────────────────────────────────────────────────
+VIEWS.artifacts = async () => {
+  const d = await api('/api/artifacts/list');
+  if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}</div>`;
+  const items = d.items || [];
+  const selected = state.data._artRunId || '';
+  const fmtMs = (ms) => ms ? new Date(ms).toLocaleString() : '-';
+
+  const left = items.length ? items.map(it => `
+    <div class="card p-2 mb-1 ${selected === it.runId ? 'border-[var(--accent)]' : ''}"
+         style="border-width:1px;cursor:pointer;"
+         onclick="_artSelect('${escapeHtml(it.runId)}')">
+      <div class="text-[11px] font-semibold truncate">${escapeHtml(it.workflowName)}</div>
+      <div class="text-[10px] font-mono" style="color:var(--text-dim)">${escapeHtml(it.runId.slice(-12))}</div>
+      <div class="flex items-center gap-1 mt-1">
+        <span class="chip text-[9px]">${escapeHtml(it.formatHint)}</span>
+        <span class="chip text-[9px]" style="color:${it.status==='ok'?'var(--success)':'#fca5a5'}">${escapeHtml(it.status)}</span>
+        <span class="text-[9px]" style="color:var(--text-dim);margin-left:auto;">${it.outputLen.toLocaleString()}B</span>
+      </div>
+      <div class="text-[9px]" style="color:var(--text-dim)">${fmtMs(it.finishedAt)}</div>
+    </div>
+  `).join('') : `<div class="text-[11px]" style="color:var(--text-dim)">${t('art_no_outputs', '출력물이 있는 run 이 없습니다.')}</div>`;
+
+  return `
+    ${viewHeader('🎨 Artifacts Viewer', t('art_subtitle', '워크플로우 출력물을 sandbox iframe + CSP + 정적 필터 4중 보안으로 안전하게 미리보기 — 스크립트 실행·외부 네트워크·쿠키 모두 차단.'), 'artifacts')}
+    <div class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
+      <div style="max-height:75vh;overflow-y:auto;">
+        <div class="text-[10px] uppercase tracking-wider mb-1" style="color:var(--text-dim)">${t('art_recent', '최근 50 run')}</div>
+        ${left}
+      </div>
+      <div id="artDetail" class="card p-4">
+        ${selected ? `<div class="text-[11px]" style="color:var(--text-dim)">${t('로딩 중...')}</div>`
+          : `<div class="text-[12px] text-center py-16" style="color:var(--text-dim)">
+              ${t('art_pick', '왼쪽에서 run 을 선택하세요.')}<br>
+              <div class="text-[10px] mt-3">🛡️ ${t('art_sec_hint', 'sandbox 속성 = "" (모든 권한 차단) + CSP default-src:none + 정적 필터 (script/iframe/on*/javascript: 제거).')}</div>
+             </div>`
+        }
+      </div>
+    </div>
+  `;
+};
+
+function _artSelect(rid) {
+  state.data._artRunId = rid;
+  state.data._artFormat = 'auto';
+  renderView();
+  setTimeout(() => _artLoad(rid), 30);
+}
+
+async function _artLoad(rid) {
+  const host = document.getElementById('artDetail');
+  if (!host) return;
+  const fmt = state.data._artFormat || 'auto';
+  try {
+    const r = await api(`/api/artifacts/render?runId=${encodeURIComponent(rid)}&format=${encodeURIComponent(fmt)}`);
+    if (!r.ok) { host.innerHTML = `<div class="text-[12px]" style="color:var(--danger)">${escapeHtml(r.error||'error')}</div>`; return; }
+    const formats = ['auto','html','svg','markdown','json','text'];
+    const fmtTabs = formats.map(f => `
+      <button class="btn text-[10px] ${(f===fmt||(f==='auto'&&fmt==='auto'))?'btn-primary':''}"
+              onclick="_artSetFormat('${f}')">${f}</button>
+    `).join(' ');
+    // sandbox="" (빈 문자열) = 모든 권한 차단. srcdoc 은 서버 sanitize 완료.
+    host.innerHTML = `
+      <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
+        <div class="text-[11px]">
+          <span class="chip text-[10px]">📄 ${escapeHtml(r.format)}</span>
+          <span class="text-[10px]" style="color:var(--text-dim);margin-left:6px;">${(r.rawLen||0).toLocaleString()} bytes</span>
+        </div>
+        <div class="flex gap-1">${fmtTabs}</div>
+      </div>
+      <iframe id="artFrame" sandbox="" style="width:100%;height:60vh;border:1px solid var(--border);border-radius:6px;background:#1a1a1a;"></iframe>
+      <div class="text-[9px] mt-2" style="color:var(--text-dim)">
+        🛡️ ${t('art_sandbox_note', 'iframe sandbox="" — 스크립트·폼·쿠키·탐색·플러그인 전부 차단. CSP default-src:none, img-src:data 만 허용.')}
+      </div>
+    `;
+    // srcdoc 을 JS 로 할당해 HTML 파서가 속성 해석하는 과정을 피함
+    const fr = document.getElementById('artFrame');
+    if (fr) fr.srcdoc = r.srcdoc || '';
+  } catch (e) {
+    host.innerHTML = `<div class="text-[12px]" style="color:var(--danger)">${escapeHtml(String(e))}</div>`;
+  }
+}
+
+function _artSetFormat(f) {
+  state.data._artFormat = f;
+  _artLoad(state.data._artRunId);
 }
 
 // ────────────────────────────────────────────────────────────────

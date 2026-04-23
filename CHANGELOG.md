@@ -10,6 +10,39 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.33.0] — 2026-04-24
+
+### 🎨 Artifacts 로컬 뷰어 — 4중 보안 워크플로우 출력 미리보기 (build 그룹)
+
+v2.21.0 Obsidian 설계 이후 미루어왔던 Artifacts 뷰어를 전면 새 설계 + 구현. 워크플로우 노드 출력(HTML/SVG/Markdown/JSON)을 **4중 보안** 으로 대시보드에서 안전하게 미리보기.
+
+**4중 보안**
+1. **Sandbox iframe** `sandbox=""` (빈 값 = 모든 권한 차단: 스크립트 실행·폼·쿠키·탐색·플러그인·탑레벨 이동 전부 블록)
+2. **CSP meta 주입** `default-src 'none'; style-src 'unsafe-inline'; img-src data:` (외부 리소스 전면 차단, inline CSS 와 data: 이미지만)
+3. **postMessage 화이트리스트** — iframe → parent 방향 메시지 검증 (현재 구조상 이벤트 없지만 향후 확장용)
+4. **정적 필터** — `<script>` / `<iframe>` / `<object>` / `<embed>` / `<link>` / `<meta>` / `<base>` / `<form>` 태그 제거, `on*=` 이벤트 속성 제거, `javascript:` / `data:text/html` URL 제거
+
+**신규 모듈 `server/artifacts.py`**
+- 포맷 자동 감지: HTML / SVG / Markdown / JSON / text
+- Markdown → 안전 HTML 변환 (외부 라이브러리 없이 순수 Python stdlib — 헤더/리스트/코드블록/bold/italic/code/link 지원)
+- `_SRCDOC_WRAPPER`: CSP meta + 다크 테마 CSS 포함 HTML 템플릿
+- 2 API: `/api/artifacts/list` (최근 50 run) · `/api/artifacts/render?runId=xxx&format=auto|html|svg|markdown|json|text`
+
+**신규 탭 `artifacts` (build 그룹)**
+- 좌측: 최근 run 목록 + 포맷 힌트 chip + 출력 크기
+- 우측: iframe 미리보기 + 포맷 재선택 탭 (auto/html/svg/markdown/json/text)
+- 보안 힌트: "sandbox='' + CSP default-src:none"
+
+**단위 테스트 — 9/9 공격 패턴 차단**
+- `<script>`, `<img onerror=>`, `javascript:`, `<iframe>`, `<object>`, `<link>`, `<meta refresh>`, `onload=`, `data:text/html` 모두 완전 제거 확인
+- 포맷 감지 5/5 정확
+
+**검증**
+- 58/58 탭 smoke (57→58)
+- CSP 주입 확인, srcdoc 길이 1.1KB (빈 문서 템플릿)
+- i18n 6 키 × ko/en/zh
+
+---
 ## [2.32.0] — 2026-04-24
 
 ### 🔌 MCP 서버 모드 — LazyClaude 를 Claude Code 에서 직접 호출

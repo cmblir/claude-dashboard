@@ -177,6 +177,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "AI 호출 없음, 로컬 휴리스틱.",
         ["security scan", "보안 스캔", "scan", "audit", "감사", "agentshield",
          "secret detection", "permissions"]),
+    ("artifacts", "work",
+        "Artifacts Viewer — 워크플로우 출력물(HTML/SVG/Markdown/JSON)을 "
+        "sandbox iframe + CSP + 정적 필터 4중 보안으로 안전하게 미리보기.",
+        ["artifacts", "아티팩트", "viewer", "뷰어", "preview", "미리보기",
+         "render", "sandbox", "csp"]),
     ("claudeDocs",    "new",
         "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
         "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "
@@ -293,6 +298,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                 "zh": "学习器 — 自动从最近会话中检测重复的工具序列和提示，建议保存为提示库 / 工作流模板"},
     "securityScan": {"en": "Security Scan — static analysis of ~/.claude (settings, CLAUDE.md, hooks, agents, MCP) for secret leaks, risky hooks, over-privileged permissions, untrusted MCP servers. Local heuristics, no AI calls.",
                      "zh": "安全扫描 — 对 ~/.claude 全量进行静态分析（settings、CLAUDE.md、钩子、代理、MCP），检测密钥泄露、风险钩子、过度权限、不受信 MCP 服务器。本地启发式，无 AI 调用。"},
+    "artifacts": {"en": "Artifacts Viewer — preview workflow outputs (HTML/SVG/Markdown/JSON) safely with 4-layer security: sandbox iframe + CSP + postMessage whitelist + static filter.",
+                  "zh": "工件查看器 — 以 sandbox iframe + CSP + postMessage 白名单 + 静态过滤的 4 层安全机制安全预览工作流输出（HTML/SVG/Markdown/JSON）。"},
     "promptLibrary": {"en": "Prompt Library — save/search/duplicate prompts, convert to workflow",
                      "zh": "提示库 — 保存/搜索/复制提示,转换为工作流"},
     "claudeDocs": {"en": "Claude Docs Hub — curated docs.anthropic.com index with cross-links to dashboard tabs",
