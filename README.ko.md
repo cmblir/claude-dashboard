@@ -240,24 +240,27 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.14.1)
+## 🔢 통계 (v2.18.1)
 
 | 지표 | 값 |
 |---|---|
-| 백엔드 코드 | ~17,000줄 · 42 모듈 · stdlib only |
-| 프론트엔드 코드 | ~15,500줄 · 단일 HTML |
-| API 라우트 | **178** (GET 97 / POST 78 / PUT 3 + regex webhook) |
-| 탭 수 | **49** (6 그룹) |
+| 백엔드 코드 | ~17,600줄 · 44 모듈 · stdlib only |
+| 프론트엔드 코드 | ~16,300줄 · 단일 HTML |
+| API 라우트 | **188** (GET 101 / POST 84 / PUT 3 + regex webhook) |
+| 탭 수 | **51** (6 그룹) |
 | 워크플로우 노드 타입 | **16** |
 | AI 프로바이더 | **8** 빌트인 + 커스텀 무제한 |
-| Claude API 플레이그라운드 탭 | **10** (프롬프트 캐시 · Extended Thinking · Tool Use · Batch · Files · Vision · 모델 벤치 · Server Tools · Citations · Agent SDK 스캐폴드) |
-| 공식 문서 색인 | **33** 페이지 (Claude Code + API + SDK + Models + Account) |
+| Claude API 플레이그라운드 탭 | **11** (프롬프트 캐시 · Extended Thinking · Tool Use · Batch · Files · Vision · 모델 벤치 · Server Tools · Citations · Agent SDK 스캐폴드 · Embedding Lab) |
+| Prompt Library | ✓ (태그 검색 + 워크플로우로 복제) |
+| Batch 비용 가드 | ✓ (Batch 당 USD/토큰 임계치) |
+| 공식 문서 색인 | **33** 페이지 |
 | Ollama 카탈로그 | **23** 모델 |
 | 서브에이전트 역할 프리셋 | **16** |
 | 빌트인 워크플로우 템플릿 | **8** (빌트인 5 + 팀 3) |
 | i18n 키 | **3,212** × 3 언어 · 누락 0 |
 | 테마 | **5** |
 | 튜토리얼 장면 | **18** |
+| E2E 테스트 스크립트 | **3** (tabs smoke · workflow · ui elements) |
 
 ---
 
