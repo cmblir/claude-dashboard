@@ -6,7 +6,7 @@
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.21.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.23.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#기술-스택)
 
 Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claude/` 디렉토리 전체(에이전트·스킬·훅·플러그인·MCP·세션·프로젝트)를 관리하고, 멀티 AI 프로바이더 오케스트레이션을 위한 **n8n 스타일 워크플로우 엔진**을 제공합니다. 모든 것이 `python3 server.py` 한 줄에 들어있습니다.
@@ -32,7 +32,7 @@ Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claud
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  🧭  Claude Control Center                          v2.21.1 🇰🇷│
+│  🧭  Claude Control Center                          v2.23.0 🇰🇷│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 신기능│   🔀 워크플로우                                       │
 │ 🏠 메인 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -157,7 +157,7 @@ API 키는 `🧠 AI 프로바이더` 탭에서 저장해도 됩니다 — `~/.cl
 - **SSE 스트리밍** — 노드별 실시간 진행률
 - **🔁 Repeat** — 최대 횟수 · 간격 · 스케줄 윈도우(`HH:MM~HH:MM`) · 피드백 노트 자동 주입
 - **Cron 스케줄러** — 5필드 cron 표현식, 분 단위 정밀도
-- **Webhook 트리거** — `POST /api/workflows/webhook/{wfId}` 외부 시스템에서 호출
+- **Webhook 트리거** — `POST /api/workflows/webhook/{wfId}` + `X-Webhook-Secret` 헤더 (v2.23 부터 필수 · 에디터에서 발급/교체/제거)
 - **Export / Import** — JSON 으로 워크플로우 공유
 - **버전 히스토리** — 최근 20개 자동 보관 + 원클릭 복원
 - **조건부 실행** — 11종 (contains · equals · regex · length · expression AND/OR ...)
@@ -276,7 +276,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.21.1)
+## 🔢 통계 (v2.23.0)
 
 | 지표 | 값 |
 |---|---|

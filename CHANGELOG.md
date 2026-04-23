@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.23.0] — 2026-04-23
+
+### 🛡 Security — Webhook 인증 + Output 경로 화이트리스트 (v2.22 보안 감사 후속)
+
+v2.22.0 SSRF 가드 직후 남아있던 MEDIUM 2건을 마무리. 로컬 `127.0.0.1:8080` 바인딩 전제라 실위협은 제한적이지만, 원격 포워딩·컨테이너 공유 환경을 대비해 선반영.
+
+**Finding 2 · Webhook 무인증 → `X-Webhook-Secret` 필수 (`server/workflows.py`)**
+- 워크플로우마다 `webhookSecret` 필드 보관. `POST /api/workflows/webhook/<wfId>` 호출 시 헤더 필수.
+- 비교는 `hmac.compare_digest` — 타이밍 공격 방어.
+- secret 미발급 상태면 401 응답으로 호출 차단 (`err_webhook_no_secret`).
+- 저장 API (`/api/workflows/save`) 로는 secret 을 변경할 수 없음 (기존값만 보존). 전용 API 로만 관리.
+
+**신규: `POST /api/workflows/webhook-secret`**
+- `{action: "get"}` 현재값 조회
+- `{action: "generate"}` 미발급 시 발급, 이미 있으면 기존값
+- `{action: "rotate"}` 새 값으로 교체 (기존 호출자 모두 401)
+- `{action: "clear"}` 제거 — webhook 비활성화
+- 생성: `secrets.token_urlsafe(32)` → 43자 URL-safe base64
+
+**UI · 워크플로우 에디터 우측 인스펙터**
+- Webhook URL 아래 Secret 패널 추가. 상태(발급/미발급) 표시.
+- 버튼: 🔐 Generate · 🔄 Rotate · 🚫 Clear · 👁 Show/Hide · 📋 Copy
+- `curl` 예시에 `-H "X-Webhook-Secret: ..."` 자동 삽입 (실값 반영).
+- rotate/clear 는 confirm 모달로 이중 확인.
+
+**Finding 3 · Output 노드 `exportTo` 경로 화이트리스트 (`server/workflows.py`)**
+- 기존 `_under_home` (`~/` 하위 모두 허용) → 신규 `_under_allowed_export` (`~/Downloads` · `~/Documents` · `~/Desktop` 만 허용).
+- `os.path.realpath` 로 symlink 완전 해제 후 비교 → `~/Documents/../.ssh/x` 같은 traversal 차단.
+- 허용 경로 밖이면 노드 실행 단계에서 명시적 에러.
+
+**i18n · 한/영/중**
+- 17 항목 추가 (`webhook_secret_*` 9 + 표시/숨김 등). 3,253 키로 정합성 검증 통과.
+
+**검증**
+- `e2e-tabs-smoke.mjs` 52/52 통과
+- `verify:i18n` 통과 (3,253 ko/en/zh 키 집합 일치)
+- curl E2E: no-secret → 401, wrong → 401, rotate 후 옛 값 → 401, 새 값 → 200
+- 경로 화이트리스트 단위 테스트: `/etc/passwd`, `~/../etc/passwd`, `~/.ssh/id_rsa`, `/tmp/foo.txt`, `~/Documents/../.ssh/x` 모두 차단 확인
+
+---
 ## [2.22.1] — 2026-04-23
 
 ### 📸 Docs — README 3종에 스크린샷 12장 삽입
