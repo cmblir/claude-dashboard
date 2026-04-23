@@ -64,6 +64,9 @@ from .server_tools import (
     api_server_tools_catalog, api_server_tools_history, api_server_tools_run,
 )
 from .claude_docs import api_claude_docs_list, api_claude_docs_search
+from .citations_lab import (
+    api_citations_examples, api_citations_history, api_citations_test,
+)
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -230,6 +233,8 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/server-tools/history": api_server_tools_history,
     "/api/claude-docs/list": api_claude_docs_list,
     "/api/claude-docs/search": api_claude_docs_search,
+    "/api/citations-lab/examples": api_citations_examples,
+    "/api/citations-lab/history": api_citations_history,
 }
 
 
@@ -327,6 +332,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/vision-lab/compare": api_vision_compare,
     "/api/model-bench/run": api_model_bench_run,
     "/api/server-tools/run": api_server_tools_run,
+    "/api/citations-lab/test": api_citations_test,
 }
 
 

@@ -928,6 +928,9 @@ const NAV = [
   { id: 'serverTools', icon: '🧰', label: '공식 내장 Tools', group: 'work',
     desc: 'Anthropic hosted web_search / code_execution 실습',
     docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use' },
+  { id: 'citationsLab', icon: '📑', label: 'Citations', group: 'work',
+    desc: '문서 + citations.enabled → 인용 span 하이라이트',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/citations' },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -8273,6 +8276,177 @@ function mbDownload() {
   const a = document.createElement('a');
   a.href = url; a.download = `model-bench-${Date.now()}.json`; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ────────────────────────────────────────────────────────────────
+// CITATIONS LAB (v2.13.0) — 문서 + citations.enabled → 인용 span
+// ────────────────────────────────────────────────────────────────
+VIEWS.citationsLab = async () => {
+  const [ex, hist] = await Promise.all([
+    api('/api/citations-lab/examples'),
+    api('/api/citations-lab/history'),
+  ]);
+  state.data.ci = state.data.ci || {
+    model: 'claude-sonnet-4-6',
+    maxTokens: 1024,
+    title: '',
+    document: '',
+    prompt: '',
+    lastResult: null,
+    hoveredCitIndex: -1,
+  };
+  const ci = state.data.ci;
+  const examples = ex.examples || [];
+
+  const exBtns = examples.map(e =>
+    `<button class="chip" onclick="ciLoadExample('${e.id}')">${t(e.label)}</button>`
+  ).join('');
+
+  // 답변 렌더: text 세그먼트 + 각 citation pill
+  const last = ci.lastResult;
+  const segs = last && last.textSegments || [];
+  const allCits = [];
+  segs.forEach((seg, si) => {
+    (seg.citations || []).forEach((c) => {
+      allCits.push({
+        segIdx: si,
+        cited_text: c.cited_text || '',
+        start: c.start_char_index ?? c.start_page_number ?? null,
+        end: c.end_char_index ?? c.end_page_number ?? null,
+        type: c.type || 'char_location',
+      });
+    });
+  });
+
+  const answerHtml = segs.map((seg, si) => {
+    const pills = (seg.citations || []).map((c) => {
+      const idx = allCits.findIndex(a => a.segIdx === si && a.cited_text === (c.cited_text||''));
+      return `<sup class="wf-cite-pill" style="color:var(--accent);cursor:pointer;font-weight:600;margin-left:2px;" onmouseover="ciHoverCit(${idx})" onmouseout="ciHoverCit(-1)" title="${escapeHtml((c.cited_text||'').slice(0,200))}">[${idx+1}]</sup>`;
+    }).join('');
+    return `<span>${escapeHtml(seg.text||'').replace(/\n/g,'<br>')}${pills}</span>`;
+  }).join('');
+
+  // 문서 하이라이트: hoveredCitIndex 가 설정되면 해당 span 을 배경색으로
+  const doc = ci.document || '';
+  let docHtml;
+  if (ci.hoveredCitIndex >= 0 && allCits[ci.hoveredCitIndex]) {
+    const c = allCits[ci.hoveredCitIndex];
+    const s = c.start || 0;
+    const e = c.end != null ? c.end : (s + (c.cited_text||'').length);
+    const safe = (x) => escapeHtml(x).replace(/\n/g,'<br>');
+    docHtml = safe(doc.slice(0, s)) +
+      `<mark style="background:rgba(217,119,87,0.4);border-radius:3px;padding:1px 2px;">${safe(doc.slice(s, e))}</mark>` +
+      safe(doc.slice(e));
+  } else {
+    docHtml = escapeHtml(doc).replace(/\n/g,'<br>');
+  }
+
+  const histList = ((hist && hist.items) || []).slice(0, 8).map(h => {
+    const ts = new Date((h.ts||0)*1000).toLocaleString();
+    const icon = h.status === 'ok' ? '✅' : '❌';
+    return `<div class="text-[11px] py-1 border-b border-[var(--border)]">
+      ${icon} <span class="text-[var(--text-dim)]">${ts}</span> · ${escapeHtml(h.title||'(no title)')}
+    </div>`;
+  }).join('') || `<div class="text-[11px] text-[var(--text-dim)]">${t('이력 없음')}</div>`;
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">📑 ${t('Citations 플레이그라운드')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.')}
+      </p>
+    </div>
+
+    <div class="mb-3 flex items-center gap-2 flex-wrap">
+      <span class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('예시')}</span>
+      ${exBtns}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="space-y-3">
+        <div class="flex items-center gap-2">
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider w-20">${t('모델')}</label>
+          <select class="input flex-1" onchange="ciSet('model', this.value)">
+            <option value="claude-opus-4-7" ${ci.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${ci.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('문서 제목 (선택)')}</label>
+          <input class="input" value="${escapeHtml(ci.title||'')}" oninput="ciSet('title', this.value)" placeholder="About ...">
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('문서 본문')}</label>
+          <textarea class="input text-[12px] font-mono" rows="10" oninput="ciSet('document', this.value); renderView()" placeholder="${t('문서 텍스트를 붙여넣으세요')}">${escapeHtml(ci.document||'')}</textarea>
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('질문')}</label>
+          <textarea class="input text-[12px]" rows="3" oninput="ciSet('prompt', this.value)" placeholder="${t('문서 기반 질문')}">${escapeHtml(ci.prompt||'')}</textarea>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary" onclick="ciRun()">▶ ${t('실행')}</button>
+          <button class="btn" onclick="ciReset()">${t('초기화')}</button>
+          <span id="ciStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">💬 ${t('답변')} ${last ? `<span class="ml-2 text-[10px] text-[var(--text-dim)]">${last.durationMs||0}ms · ${(allCits||[]).length} ${t('인용')}</span>` : ''}</div>
+          <div class="text-[12px] leading-6">${last ? answerHtml : `<span class="text-[var(--text-dim)]">${t('아직 실행한 결과가 없습니다')}</span>`}</div>
+        </div>
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">📄 ${t('원문')}${allCits.length > 0 ? ` <span class="text-[10px] text-[var(--text-dim)]">(${t('답변의 [N] hover')})</span>` : ''}</div>
+          <div class="text-[11px] leading-5 max-h-80 overflow-auto whitespace-pre-wrap">${docHtml || `<span class="text-[var(--text-dim)]">${t('문서를 붙여넣으세요')}</span>`}</div>
+        </div>
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('최근 히스토리')}</div>
+          ${histList}
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+function ciSet(k, v) { state.data.ci = state.data.ci || {}; state.data.ci[k] = v; }
+function ciReset() { state.data.ci = null; renderView(); }
+function ciHoverCit(idx) {
+  state.data.ci = state.data.ci || {};
+  state.data.ci.hoveredCitIndex = idx;
+  renderView();
+}
+async function ciLoadExample(id) {
+  const r = await api('/api/citations-lab/examples');
+  const e = (r.examples || []).find(x => x.id === id);
+  if (!e) return;
+  state.data.ci = {
+    model: e.model, maxTokens: 1024,
+    title: e.title, document: e.document, prompt: e.prompt,
+    lastResult: null, hoveredCitIndex: -1,
+  };
+  renderView();
+}
+async function ciRun() {
+  const ci = state.data.ci || {};
+  if (!(ci.document||'').trim()) { toast(t('문서를 입력하세요'), 'err'); return; }
+  if (!(ci.prompt||'').trim()) { toast(t('질문을 입력하세요'), 'err'); return; }
+  const sEl = document.getElementById('ciStatus');
+  if (sEl) sEl.textContent = t('호출 중…');
+  try {
+    const r = await fetch('/api/citations-lab/test', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(ci),
+    }).then(x => x.json());
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (sEl) sEl.textContent=''; return; }
+    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (sEl) sEl.textContent=''; return; }
+    state.data.ci.lastResult = r;
+    state.data.ci.hoveredCitIndex = -1;
+    if (sEl) sEl.textContent = `${r.durationMs||0}ms`;
+    renderView();
+  } catch (e) {
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (sEl) sEl.textContent = '';
+  }
 }
 
 // ────────────────────────────────────────────────────────────────

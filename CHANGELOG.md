@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.13.0] — 2026-04-23
+
+### 📑 Citations 플레이그라운드 — 신규 탭 `citationsLab`
+
+Anthropic Messages API 의 `citations.enabled` 응답 모드 실습. 문서를 `content` 의 document 블록으로 제공 + `citations: {enabled: true}` 를 세팅하면 답변 text block 에 `citations: [{cited_text, start_char_index, end_char_index, ...}]` 배열이 포함된다.
+
+**기능**
+- 예시 2종: 회사 소개문 / 기술 아티클
+- 모델(Opus/Sonnet), 문서 제목(선택), 문서 본문 textarea, 질문 입력
+- 답변 렌더링: 각 citation 을 `[N]` 번호 pill 로 본문 뒤에 inline 추가
+- `[N]` hover → 원문 패널에서 해당 `start/end_char_index` 구간을 `<mark>` 로 하이라이트
+- 히스토리 최근 20건 (`~/.claude-dashboard-citations-lab.json`)
+
+**Architecture**
+- `server/citations_lab.py` 신설 — `api_citations_{test,examples,history}` · examples 2 · text-type document 블록 구성
+- `server/routes.py` 3 라우트 (GET examples/history · POST test)
+- `server/nav_catalog.py` `citationsLab` 탭 (work 그룹) + en/zh desc
+- `dist/index.html` NAV (icon 📑) + `VIEWS.citationsLab` · `ciHoverCit` · `ciLoadExample` · `ciRun` · `ciReset` · `ciSet`
+- `tools/translations_manual_9.py` 17 키 × ko/en/zh
+
+**한계 / 후속**
+- 현재는 **text source** 만 지원. PDF / base64 document 는 T+N 에서 확장 예정.
+- `page_location` citation 타입은 PDF 입력에서만 나타나므로 현 UI 는 `char_location` 중심.
+
 ## [2.12.0] — 2026-04-23
 
 ### 📖 Claude Docs Hub — 신규 탭 `claudeDocs` (new 그룹)

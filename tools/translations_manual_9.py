@@ -562,6 +562,27 @@ NEW_EN = {
     "검색 결과 없음": "No results",
     "docs.anthropic.com 공식 문서 색인 + 검색": "docs.anthropic.com curated index + search",
 
+    # ── v2.13.0 Citations Lab ──────────────────────────────────
+    "Citations 플레이그라운드": "Citations Playground",
+    "문서 + citations.enabled → 인용 span 하이라이트":
+        "document + citations.enabled → highlight cited spans",
+    "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
+        "Provide a document and use citations.enabled to get answers with precise citation spans. Hover [N] in the answer to highlight the matching range in the source.",
+    "문서 제목 (선택)": "Document title (optional)",
+    "문서 본문": "Document body",
+    "문서 텍스트를 붙여넣으세요": "Paste document text",
+    "문서 기반 질문": "Question about the document",
+    "회사 소개문": "Company overview",
+    "기술 아티클": "Technical article",
+    "짧은 회사 소개문에서 사실 추출 + 인용.": "Extract facts + citations from a short company blurb.",
+    "기술 설명 글에서 구체 수치 추출.": "Extract concrete numbers from a technical article.",
+    "답변": "Answer",
+    "원문": "Source",
+    "답변의 [N] hover": "hover [N] in the answer",
+    "문서를 붙여넣으세요": "Paste a document",
+    "문서를 입력하세요": "Enter a document",
+    "인용": "citations",
+
     "입력 비용": "Input cost",
     "캐시 쓰기": "Cache write",
     "캐시 읽기": "Cache read",
@@ -1259,6 +1280,27 @@ NEW_ZH = {
     "관련 탭": "相关标签页",
     "검색 결과 없음": "无搜索结果",
     "docs.anthropic.com 공식 문서 색인 + 검색": "docs.anthropic.com 官方文档索引与搜索",
+
+    # ── v2.13.0 引用实验室 ───────────────────────────────────
+    "Citations 플레이그라운드": "引用实验室",
+    "문서 + citations.enabled → 인용 span 하이라이트":
+        "文档 + citations.enabled → 高亮引用片段",
+    "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
+        "提供文档并启用 citations.enabled 以获得带精确引用片段的答案。将鼠标悬停在答案中的 [N] 上可高亮原文对应区间。",
+    "문서 제목 (선택)": "文档标题（可选）",
+    "문서 본문": "文档正文",
+    "문서 텍스트를 붙여넣으세요": "粘贴文档文本",
+    "문서 기반 질문": "关于文档的问题",
+    "회사 소개문": "公司介绍",
+    "기술 아티클": "技术文章",
+    "짧은 회사 소개문에서 사실 추출 + 인용.": "从简短的公司介绍中提取事实 + 引用。",
+    "기술 설명 글에서 구체 수치 추출.": "从技术文章中提取具体数字。",
+    "답변": "答案",
+    "원문": "原文",
+    "답변의 [N] hover": "悬停答案中的 [N]",
+    "문서를 붙여넣으세요": "请粘贴文档",
+    "문서를 입력하세요": "请输入文档",
+    "인용": "引用",
 
     "입력 비용": "输入费用",
     "캐시 쓰기": "缓存写入",
