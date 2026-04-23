@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.21.1] — 2026-04-23
+
+### Docs — README 3종 통계 v2.21.1 기준 갱신 (세션 5 결과)
+
+T15~T17 (v2.19.0 · v2.20.0 · v2.21.0 docs) 반영:
+- 버전 배지 v2.18.1 → **v2.21.1**
+- 51 → **52 tabs** (costsTimeline 추가)
+- 178→188→**190** routes (GET 102 / POST 85 / PUT 3)
+- 3,212 → **3,234** i18n keys × 3언어
+- Stats 섹션: 백엔드 ~17,600/44 → **~18,000/46 modules** · 프론트 ~16,300→**~16,600**
+- **신규 행**: "Unified cost timeline ✓ · Workflow run diff/rerun ✓"
+- README ko/en/zh 3종 동등 갱신
+- `npm run test:e2e:smoke` 52/52 tabs (comment 업데이트)
+
 ## [2.21.0] — 2026-04-23
 
 ### 📐 Docs — Artifacts 로컬 뷰어 설계 문서 (구현 X)

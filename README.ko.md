@@ -6,7 +6,7 @@
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.18.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.21.1-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#기술-스택)
 
 Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claude/` 디렉토리 전체(에이전트·스킬·훅·플러그인·MCP·세션·프로젝트)를 관리하고, 멀티 AI 프로바이더 오케스트레이션을 위한 **n8n 스타일 워크플로우 엔진**을 제공합니다. 모든 것이 `python3 server.py` 한 줄에 들어있습니다.
@@ -47,7 +47,7 @@ Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claud
 └────────┴───────────────────────────────────────────────────────┘
 ```
 
-6 그룹 51 탭 · 16 워크플로우 노드 타입 · 8 AI 프로바이더 · 5 테마 · 3 언어.
+6 그룹 52 탭 · 16 워크플로우 노드 타입 · 8 AI 프로바이더 · 5 테마 · 3 언어.
 
 ---
 
@@ -59,7 +59,7 @@ Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claud
 
 | 이전 방식 | Control Center |
 |---|---|
-| `cat ~/.claude/settings.json` 눈으로 확인 | 51 탭이 각 섹션을 렌더링 |
+| `cat ~/.claude/settings.json` 눈으로 확인 | 52 탭이 각 섹션을 렌더링 |
 | `ls ~/.claude/agents/` → 에디터 열기 | 16 역할 프리셋 · 원클릭 생성 |
 | 쉘 스크립트로 멀티 AI 비교 | 세션 노드 3개 드래그 → merge → output |
 | RAG 파이프라인 수동 구성 | 빌트인 `RAG Pipeline` 템플릿 |
@@ -154,7 +154,7 @@ API 키는 `🧠 AI 프로바이더` 탭에서 저장해도 됩니다 — `~/.cl
 - **기본 모델 지정** — 프로바이더별 채팅/임베딩 기본값
 - **Modelfile 편집기** — UI 에서 커스텀 모델 생성
 
-### 🤝 Claude Code 통합 (51 탭)
+### 🤝 Claude Code 통합 (52 탭)
 
 | 그룹 | 탭 |
 |---|---|
@@ -170,7 +170,7 @@ API 키는 `🧠 AI 프로바이더` 탭에서 저장해도 됩니다 — `~/.cl
 ### 🌍 다국어 지원
 
 - **3개 언어** — 한국어(`ko`, 기본) · 영어(`en`) · 중국어(`zh`)
-- **언어당 3,212개 번역 키** · **영문/중문 모드 한글 잔존 0** (검증 완료)
+- **언어당 3,234개 번역 키** · **영문/중문 모드 한글 잔존 0** (검증 완료)
 - **런타임 DOM 번역** — MutationObserver (페이지 리로드 없음)
 - **`error_key` 시스템** — 백엔드 에러 메시지도 프론트에서 현지화
 - **검증 파이프라인** — `scripts/verify-translations.js` 가 4단계 검사 (parity · `t()` · audit · static DOM)
@@ -191,12 +191,12 @@ API 키는 `🧠 AI 프로바이더` 탭에서 저장해도 됩니다 — `~/.cl
 claude-dashboard/
 ├── server.py                     # 엔트리 (포트 충돌 자동 해결 + ollama 자동 시작)
 ├── server/                       # 14,067줄 · 표준 라이브러리만
-│   ├── routes.py                 # 188 API 라우트 (GET + POST + PUT + DELETE + regex webhook)
+│   ├── routes.py                 # 190 API 라우트 (GET + POST + PUT + DELETE + regex webhook)
 │   ├── workflows.py              # DAG 엔진 · 16 노드 실행 · Repeat · Cron · Webhook (2,296)
 │   ├── ai_providers.py           # 8 프로바이더 · 레지스트리 · Rate Limiter (1,723)
 │   ├── ai_keys.py                # 키 관리 · 커스텀 프로바이더 · 비용 추적 (734)
 │   ├── ollama_hub.py             # 카탈로그 · pull/delete/create · serve 관리 (606)
-│   ├── nav_catalog.py            # 51탭 단일 소스 + i18n 설명
+│   ├── nav_catalog.py            # 52탭 단일 소스 + i18n 설명
 │   ├── features.py               # 기능 탐색 · AI 평가 · 추천
 │   ├── projects.py               # 프로젝트 브라우저 · 16 서브에이전트 역할 프리셋
 │   ├── sessions.py               # 세션 인덱싱 · 품질 스코어링 · 에이전트 그래프
@@ -205,7 +205,7 @@ claude-dashboard/
 │   └── …                         # 총 20 모듈
 ├── dist/
 │   ├── index.html                # 단일 파일 SPA (~13,500줄)
-│   └── locales/{ko,en,zh}.json   # 3,212 키 × 3 언어
+│   └── locales/{ko,en,zh}.json   # 3,234 키 × 3 언어
 ├── tools/
 │   ├── translations_manual_*.py  # 수동 번역 override
 │   ├── extract_ko_strings.py     # 한국어 문자열 추출
@@ -261,7 +261,7 @@ claude-dashboard/
 | Ollama 카탈로그 | **23** 모델 |
 | 서브에이전트 역할 프리셋 | **16** |
 | 빌트인 워크플로우 템플릿 | **8** (빌트인 5 + 팀 3) |
-| i18n 키 | **3,212** × 3 언어 · 누락 0 |
+| i18n 키 | **3,234** × 3 언어 · 누락 0 |
 | 테마 | **5** |
 | 튜토리얼 장면 | **18** |
 | E2E 테스트 스크립트 | **3** (tabs smoke · workflow · ui elements) |
@@ -292,7 +292,7 @@ npx playwright install chromium
 대시보드 서버가 실행 중인 상태에서 (`python3 server.py`):
 
 ```bash
-npm run test:e2e:smoke       # 51 탭 — 뷰 렌더 실패 / console error 검출
+npm run test:e2e:smoke       # 52 탭 — 뷰 렌더 실패 / console error 검출
 npm run test:e2e:workflow    # 빌트인 템플릿 생성 → 실행 → 배너 등장 관찰
 npm run test:e2e:headed      # 브라우저 창 띄워서 실행
 TAB_ID=workflows npm run test:e2e:smoke   # 단일 탭만
