@@ -124,7 +124,7 @@ You already use Claude Code. But as you add more tools — GPT, Gemini, Ollama, 
 
 **1 · Clone**
 ```bash
-git clone https://github.com/cmblir/claude-dashboard.git && cd claude-dashboard
+git clone https://github.com/cmblir/LazyClaude.git && cd LazyClaude
 ```
 
 **2 · Run**
@@ -352,7 +352,7 @@ Scripts live under `scripts/e2e-*.mjs` and run zero-dependency against a live `1
 
 ## 🤝 Contributing
 
-LazyClaude is a solo-maintained personal project, but issues and PRs are welcome at [github.com/cmblir/claude-dashboard](https://github.com/cmblir/claude-dashboard).
+LazyClaude is a solo-maintained personal project, but issues and PRs are welcome at [github.com/cmblir/LazyClaude](https://github.com/cmblir/LazyClaude).
 
 Small fixes (typos, i18n gaps, obvious bugs) can go straight to a PR. For larger features or refactors, please open an issue first so we can avoid duplicate work.
 
