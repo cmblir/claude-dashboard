@@ -63,6 +63,7 @@ from .model_bench import api_model_bench_run, api_model_bench_sets
 from .server_tools import (
     api_server_tools_catalog, api_server_tools_history, api_server_tools_run,
 )
+from .claude_docs import api_claude_docs_list, api_claude_docs_search
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -227,6 +228,8 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/model-bench/sets": api_model_bench_sets,
     "/api/server-tools/catalog": api_server_tools_catalog,
     "/api/server-tools/history": api_server_tools_history,
+    "/api/claude-docs/list": api_claude_docs_list,
+    "/api/claude-docs/search": api_claude_docs_search,
 }
 
 

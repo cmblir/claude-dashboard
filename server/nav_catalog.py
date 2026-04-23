@@ -119,6 +119,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "활성화하고 응답 블록(server_tool_use / *_tool_result / text)을 분류 시각화.",
         ["web_search", "웹 검색", "code_execution", "코드 실행",
          "hosted tool", "server tool", "공식 도구"]),
+    ("claudeDocs",    "new",
+        "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
+        "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "
+        "각 카드는 관련 대시보드 탭으로도 연결.",
+        ["docs", "공식 문서", "documentation", "claude docs", "reference"]),
 
     # ── 설정 & 구성 ─────────────────────────────────
     ("hooks",         "config",   "이벤트 훅 설정",
@@ -208,6 +213,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                   "zh": "模型基准测试 — 提示集 × 模型交叉运行,汇总延迟/令牌/费用"},
     "serverTools": {"en": "Server-side Tools — web_search + code_execution hosted by Anthropic",
                    "zh": "服务端工具 — Anthropic 托管的 web_search + code_execution"},
+    "claudeDocs": {"en": "Claude Docs Hub — curated docs.anthropic.com index with cross-links to dashboard tabs",
+                  "zh": "Claude 文档中心 — docs.anthropic.com 分类索引,关联仪表板标签页"},
     "hooks": {"en": "Event hooks", "zh": "事件钩子"},
     "permissions": {"en": "Tool permissions", "zh": "工具权限"},
     "mcp": {"en": "MCP Connectors", "zh": "MCP 连接器"},
