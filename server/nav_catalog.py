@@ -12,15 +12,24 @@
 - keywords  : 이 탭으로 라우팅해야 할 사용자 질문 키워드 (선택)
 """
 
-# 그룹 라벨
+# 그룹 라벨 (v2.26.0 — 6 상위 카테고리로 재편)
 TAB_GROUPS = [
-    ("new",      "신기능 그룹"),
-    ("main",     "메인"),
-    ("work",     "작업 자원"),
-    ("config",   "설정 & 구성"),
-    ("advanced", "고급"),
-    ("system",   "시스템 & 관측"),
+    ("learn",      "Learn — 신기능 · 온보딩 · 공식 문서 · 가이드"),
+    ("main",       "Main — 대시보드 · 프로젝트 · 플랜 · 세션"),
+    ("build",      "Build — 워크플로우 · 에이전트 · 프롬프트"),
+    ("playground", "Playground — Claude API 실험 12종 + 프로바이더"),
+    ("config",     "Config — 훅 · 권한 · MCP · 플러그인 · 설정"),
+    ("observe",    "Observe — 비용 · 메트릭 · 시스템 관측"),
 ]
+
+
+# 레거시 → 신규 그룹 매핑 (기존 TAB_CATALOG 엔트리 호환용)
+_GROUP_REMAP = {
+    "new":      "learn",
+    "work":     None,    # 케이스별 수동 분류 필요 (build | playground)
+    "system":   "observe",
+    "advanced": "config",  # plans 는 별도로 main 으로
+}
 
 
 # (id, group, desc, keywords)
@@ -302,12 +311,28 @@ def get_tab_desc(tab_id: str, lang: str = "ko") -> str:
     return TAB_DESC_I18N.get(tab_id, {}).get(lang, "")
 
 
+# v2.26.0 — 레거시 TAB_CATALOG 엔트리 group 을 신규 6 카테고리로 매핑
+_WORK_TO_BUILD = {"workflows", "promptLibrary", "rtk", "projectAgents",
+                  "agents", "skills", "commands", "agentSdkScaffold"}
+_ADVANCED_TO_MAIN = {"plans"}
+
+
+def _new_group(tid: str, legacy: str) -> str:
+    if legacy in _GROUP_REMAP and _GROUP_REMAP[legacy] is not None:
+        if tid in _ADVANCED_TO_MAIN:
+            return "main"
+        return _GROUP_REMAP[legacy]
+    if legacy == "work":
+        return "build" if tid in _WORK_TO_BUILD else "playground"
+    return legacy  # main / config / build / playground / observe / learn 이미 신규
+
+
 def render_tab_catalog_prompt() -> str:
     """챗봇 시스템 프롬프트에 삽입할 탭 목록 문자열 생성."""
-    group_to_label = dict(TAB_GROUPS)
     group_buckets: dict[str, list[tuple[str, str, list[str]]]] = {g: [] for g, _ in TAB_GROUPS}
     for tid, group, desc, kws in TAB_CATALOG:
-        group_buckets.setdefault(group, []).append((tid, desc, kws))
+        ng = _new_group(tid, group)
+        group_buckets.setdefault(ng, []).append((tid, desc, kws))
     lines = []
     for gid, glabel in TAB_GROUPS:
         items = group_buckets.get(gid) or []

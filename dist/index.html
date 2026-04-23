@@ -306,6 +306,53 @@ tailwind.config = {
   .nav-item { display: flex; align-items: center; gap: 0.7rem; padding: 0.6rem 0.8rem; border-radius: 10px; color: var(--text-mute); font-size: 0.88rem; cursor: pointer; transition: background 0.15s, color 0.15s; user-select: none; will-change: background; }
   .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
   .nav-item.active { background: var(--grad-soft); color: var(--text); border: 1px solid rgba(167,139,250,0.35); }
+
+  /* v2.26.0 — 상위 카테고리 + hover flyout */
+  .nav-category { display:flex; align-items:center; gap:0.7rem; padding:0.6rem 0.8rem; border-radius:10px; color:var(--text-mute); cursor:pointer; transition:background 0.15s, color 0.15s; position:relative; user-select:none; }
+  .nav-category:hover, .nav-category:focus-within, .nav-category.open { background: rgba(255,255,255,0.06); color: var(--text); }
+  .nav-category.has-active { color: var(--text); }
+  .nav-category.has-active .nav-cat-icon { filter: drop-shadow(0 0 6px rgba(217,119,87,0.5)); }
+  .nav-cat-icon { font-size: 1.15rem; width: 22px; text-align: center; flex-shrink: 0; }
+  .nav-cat-meta { display:flex; flex-direction:column; gap:2px; overflow:hidden; }
+  .nav-cat-label { font-size: 0.9rem; font-weight: 600; }
+  .nav-cat-dot { width:6px; height:6px; border-radius:50%; background: var(--accent); display:inline-block; flex-shrink:0; }
+  .nav-cat-desc { font-size: 10px; }
+  .nav-cat-count { flex-shrink: 0; padding: 1px 6px; border-radius: 8px; background: rgba(255,255,255,0.06); }
+  .nav-cat-chevron { flex-shrink:0; color: var(--text-dim); transition: transform 0.15s; }
+  .nav-category:hover .nav-cat-chevron,
+  .nav-category:focus-within .nav-cat-chevron,
+  .nav-category.open .nav-cat-chevron { transform: translateX(2px); color: var(--accent); }
+
+  .nav-flyout {
+    display:none; position:absolute; left: calc(100% + 8px); top: 0;
+    min-width: 300px; max-width: 360px; max-height: 80vh; overflow-y: auto;
+    background: var(--bg-soft); border: 1px solid var(--border-hi); border-radius: 12px;
+    padding: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+    z-index: 1200;
+    animation: navFlyoutIn 0.14s ease-out;
+  }
+  @keyframes navFlyoutIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .nav-flyout-header { padding: 2px 6px 8px; border-bottom: 1px solid var(--border); margin-bottom: 6px; display:flex; align-items:center; }
+  .nav-category:hover > .nav-flyout,
+  .nav-category:focus-within > .nav-flyout,
+  .nav-category.open > .nav-flyout { display: block; }
+  /* flyout 내부는 hover 유지를 위해 pointer-events 자연스럽게 */
+  .nav-flyout .nav-item { margin-bottom: 2px; }
+
+  /* 모바일: flyout 을 아코디언으로 (좌측에서 오른쪽으로 띄우면 영역 부족) */
+  @media (max-width: 900px) {
+    .nav-flyout {
+      position: static; left: auto; top: auto;
+      min-width: 0; max-width: none; margin-top: 6px;
+      box-shadow: none; background: rgba(255,255,255,0.03);
+      animation: none;
+    }
+    .nav-category:hover > .nav-flyout { display: none; }
+    .nav-category.open > .nav-flyout { display: block; }
+  }
   .badge-n { display: inline-block; min-width: 20px; height: 20px; line-height: 20px; text-align: center; padding: 0 6px; border-radius: 10px; font-size: 0.7rem; background: rgba(255,255,255,0.08); color: var(--text-mute); }
   .gradient-text { color: #d97757; }
   @property --p { syntax: '<number>'; inherits: false; initial-value: 0; }
@@ -697,7 +744,7 @@ tailwind.config = {
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
   </div>
-  <nav id="nav" class="flex-1 overflow-y-auto px-3 pb-3 space-y-1"></nav>
+  <nav id="nav" class="flex-1 px-3 pb-3 space-y-1" style="overflow: visible;"></nav>
   <div id="sidebar-foot" class="border-t border-[var(--border)] p-3 space-y-2">
     <div id="cliStatus" class="text-[11px]"></div>
     <button id="btn-reindex" class="btn w-full justify-center text-[12px]" aria-label="세션 재인덱스">
@@ -876,76 +923,86 @@ tailwind.config = {
 const state = { view: 'overview', data: {}, loading: {} };
 
 const DOCS_BASE = 'https://docs.claude.com/en/docs/claude-code/';
+// v2.26.0 — 상위 6 카테고리로 재분류 (hover flyout 사이드바).
+// 기존: new/main/work/config/advanced/system (6 그룹, advanced 2탭으로 얕음)
+// 신규: learn/main/build/playground/config/observe (advanced 해체 — plans→main, 나머지→config)
 const NAV = [
-  // 🆕 신기능 — 단일 탭 (카드 클릭 시 macOS 스타일 플로팅 창)
-  { id: 'features', icon: '🆕', label: '신기능', group: 'new',
+  // learn — 신기능 · 온보딩 · 문서 · 가이드 (4)
+  { id: 'features', icon: '🆕', label: '신기능', group: 'learn',
     desc: 'Anthropic 최신 발표 · 카드 클릭 → 창으로 열림 (여러 개 동시 가능)' },
-
-  // 🚀 가이드 — 온보딩 체크리스트 + 외부 툴/가이드 허브
-  { id: 'onboarding', icon: '🚀', label: '시작하기', group: 'new',
+  { id: 'onboarding', icon: '🚀', label: '시작하기', group: 'learn',
     desc: '처음 사용자를 위한 단계별 체크리스트 (현재 셋업 자동 감지)' },
-  { id: 'claudeDocs', icon: '📖', label: 'Claude Docs', group: 'new',
+  { id: 'claudeDocs', icon: '📖', label: 'Claude Docs', group: 'learn',
     desc: 'docs.anthropic.com 공식 문서 색인 + 검색',
     docUrl: 'https://docs.anthropic.com/' },
-  { id: 'guideHub',   icon: '📚', label: '가이드 & 툴', group: 'new',
+  { id: 'guideHub',   icon: '📚', label: '가이드 & 툴', group: 'learn',
     desc: '외부 가이드 · 유용한 툴 · 베스트 프랙티스 · 치트시트' },
 
+  // main — 한눈에 보기 (6, plans 포함)
   { id: 'overview',    icon: '✦',  label: '개요',            group: 'main', docUrl: DOCS_BASE+'overview' },
   { id: 'projects',    icon: '📁', label: '프로젝트',          group: 'main', desc: '프로젝트별 Claude 세팅 + AI 추천', docUrl: DOCS_BASE+'memory' },
+  { id: 'plans',       icon: '🧭', label: '플랜 보관소',
+    group: 'main', desc: 'Plan Mode 로 만든 계획 문서들', docUrl: DOCS_BASE+'plan-mode' },
   { id: 'analytics',   icon: '📊', label: '통계 & 스코어',      group: 'main', docUrl: DOCS_BASE+'costs' },
   { id: 'aiEval',      icon: '🤖', label: 'AI 종합 평가',       group: 'main', desc: 'Claude 가 전체 셋업을 보고 우선순위 진단' },
   { id: 'sessions',    icon: '🗂️', label: '세션 히스토리',      group: 'main', docUrl: DOCS_BASE+'interactive-mode' },
-  { id: 'workflows',   icon: '🔀', label: '워크플로우', group: 'work',
+
+  // build — 워크플로우/에이전트/프롬프트 (8)
+  { id: 'workflows',   icon: '🔀', label: '워크플로우', group: 'build',
     desc: '세션 노드를 DAG 로 연결해 업무 흐름 설계' },
-  { id: 'aiProviders', icon: '🧠', label: 'AI 프로바이더',
-    group: 'work', desc: 'Claude/GPT/Gemini/Ollama/Codex 멀티 AI — API 키 · CLI 감지 · 폴백 체인 · 연결 테스트' },
-  { id: 'agents',      icon: '🤝', label: '에이전트 & 그래프',  group: 'work', docUrl: DOCS_BASE+'sub-agents' },
-  { id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'work',
-    desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE+'sub-agents' },
-  { id: 'skills',      icon: '✨', label: '스킬',              group: 'work', docUrl: DOCS_BASE+'skills' },
-  { id: 'commands',    icon: '/',  label: '슬래시 명령어',      group: 'work', docUrl: DOCS_BASE+'slash-commands' },
-  { id: 'promptCache', icon: '🧊', label: '프롬프트 캐시 실험실', group: 'work',
-    desc: 'Anthropic cache_control 실측 — cache_read / cache_creation 토큰 + 비용 절감',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching' },
-  { id: 'thinkingLab', icon: '🧠', label: 'Extended Thinking', group: 'work',
-    desc: 'Opus/Sonnet thinking block 분리 시각화 — budget_tokens 슬라이더',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking' },
-  { id: 'toolUseLab',  icon: '🛠️', label: 'Tool Use 플레이그라운드', group: 'work',
-    desc: 'tool schema 정의 → tool_use 수신 → tool_result 피드 멀티 턴',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use' },
-  { id: 'batchJobs',   icon: '📦', label: '배치 작업', group: 'work',
-    desc: 'Message Batches API — 대용량 프롬프트 병렬 제출 · JSONL 결과',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/message-batches' },
-  { id: 'apiFiles',    icon: '📎', label: 'Files API', group: 'work',
-    desc: '파일 업로드 · 목록 · 삭제 + 메시지에 document reference',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/files' },
-  { id: 'visionLab',   icon: '👁️', label: 'Vision / PDF', group: 'work',
-    desc: '이미지/PDF → Opus·Sonnet·Haiku 3 모델 병렬 비교',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/vision' },
-  { id: 'modelBench',  icon: '🏁', label: '모델 벤치마크', group: 'work',
-    desc: '프롬프트 셋 × 모델 교차 실행 → 평균 지연/토큰/비용 집계',
-    docUrl: 'https://docs.anthropic.com/en/docs/about-claude/models' },
-  { id: 'serverTools', icon: '🧰', label: '공식 내장 Tools', group: 'work',
-    desc: 'Anthropic hosted web_search / code_execution 실습',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use' },
-  { id: 'citationsLab', icon: '📑', label: 'Citations', group: 'work',
-    desc: '문서 + citations.enabled → 인용 span 하이라이트',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/citations' },
-  { id: 'agentSdkScaffold', icon: '🧪', label: 'Agent SDK 스캐폴드', group: 'work',
-    desc: 'claude-agent-sdk Python/TS 프로젝트 뼈대 생성',
-    docUrl: 'https://docs.anthropic.com/en/docs/claude-code/sdk/sdk-overview' },
-  { id: 'embeddingLab', icon: '🧬', label: 'Embedding 비교', group: 'work',
-    desc: 'Voyage / OpenAI / Ollama 임베딩 cosine rank 매트릭스 비교',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/embeddings' },
-  { id: 'promptLibrary', icon: '📝', label: '프롬프트 라이브러리', group: 'work',
+  { id: 'promptLibrary', icon: '📝', label: '프롬프트 라이브러리', group: 'build',
     desc: '자주 쓰는 프롬프트 저장 · 태그 검색 · 워크플로우로 복제',
     docUrl: null },
-  { id: 'rtk', icon: '🦀', label: 'RTK Optimizer', group: 'work',
+  { id: 'rtk', icon: '🦀', label: 'RTK Optimizer', group: 'build',
     desc: 'rtk-ai/rtk Rust 프록시로 Claude 토큰 60-90% 절감 · 설치/훅 활성/통계 조회',
     docUrl: 'https://www.rtk-ai.app/guide' },
-  { id: 'sessionReplay', icon: '🎞️', label: 'Session Replay', group: 'work',
+  { id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'build',
+    desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE+'sub-agents' },
+  { id: 'agents',      icon: '🤝', label: '에이전트 & 그래프',  group: 'build', docUrl: DOCS_BASE+'sub-agents' },
+  { id: 'skills',      icon: '✨', label: '스킬',              group: 'build', docUrl: DOCS_BASE+'skills' },
+  { id: 'commands',    icon: '/',  label: '슬래시 명령어',      group: 'build', docUrl: DOCS_BASE+'slash-commands' },
+  { id: 'agentSdkScaffold', icon: '🧪', label: 'Agent SDK 스캐폴드', group: 'build',
+    desc: 'claude-agent-sdk Python/TS 프로젝트 뼈대 생성',
+    docUrl: 'https://docs.anthropic.com/en/docs/claude-code/sdk/sdk-overview' },
+
+  // playground — Claude API 실험실 + AI 프로바이더 + 세션 리플레이 (12)
+  { id: 'aiProviders', icon: '🧠', label: 'AI 프로바이더',
+    group: 'playground', desc: 'Claude/GPT/Gemini/Ollama/Codex 멀티 AI — API 키 · CLI 감지 · 폴백 체인 · 연결 테스트' },
+  { id: 'promptCache', icon: '🧊', label: '프롬프트 캐시 실험실', group: 'playground',
+    desc: 'Anthropic cache_control 실측 — cache_read / cache_creation 토큰 + 비용 절감',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching' },
+  { id: 'thinkingLab', icon: '🧠', label: 'Extended Thinking', group: 'playground',
+    desc: 'Opus/Sonnet thinking block 분리 시각화 — budget_tokens 슬라이더',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking' },
+  { id: 'toolUseLab',  icon: '🛠️', label: 'Tool Use 플레이그라운드', group: 'playground',
+    desc: 'tool schema 정의 → tool_use 수신 → tool_result 피드 멀티 턴',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use' },
+  { id: 'batchJobs',   icon: '📦', label: '배치 작업', group: 'playground',
+    desc: 'Message Batches API — 대용량 프롬프트 병렬 제출 · JSONL 결과',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/message-batches' },
+  { id: 'apiFiles',    icon: '📎', label: 'Files API', group: 'playground',
+    desc: '파일 업로드 · 목록 · 삭제 + 메시지에 document reference',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/files' },
+  { id: 'visionLab',   icon: '👁️', label: 'Vision / PDF', group: 'playground',
+    desc: '이미지/PDF → Opus·Sonnet·Haiku 3 모델 병렬 비교',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/vision' },
+  { id: 'modelBench',  icon: '🏁', label: '모델 벤치마크', group: 'playground',
+    desc: '프롬프트 셋 × 모델 교차 실행 → 평균 지연/토큰/비용 집계',
+    docUrl: 'https://docs.anthropic.com/en/docs/about-claude/models' },
+  { id: 'serverTools', icon: '🧰', label: '공식 내장 Tools', group: 'playground',
+    desc: 'Anthropic hosted web_search / code_execution 실습',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use' },
+  { id: 'citationsLab', icon: '📑', label: 'Citations', group: 'playground',
+    desc: '문서 + citations.enabled → 인용 span 하이라이트',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/citations' },
+  { id: 'embeddingLab', icon: '🧬', label: 'Embedding 비교', group: 'playground',
+    desc: 'Voyage / OpenAI / Ollama 임베딩 cosine rank 매트릭스 비교',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/embeddings' },
+  { id: 'sessionReplay', icon: '🎞️', label: 'Session Replay', group: 'playground',
     desc: 'Claude Code JSONL 세션 로그 타임라인 재생 · 툴 호출 강조 · 누적 토큰 차트',
     docUrl: null },
+
+  // config — Claude Code 설정 전반 (13, advanced 흡수)
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -954,55 +1011,55 @@ const NAV = [
     group: 'config', desc: '외부 시스템(DB·GitHub·브라우저 등)과 연결하는 MCP 서버', docUrl: DOCS_BASE+'mcp' },
   { id: 'plugins',     icon: '🔌', label: '플러그인',
     group: 'config', desc: '마켓플레이스에서 설치한 기능 팩(스킬+에이전트+명령어 묶음)', docUrl: DOCS_BASE+'plugins' },
+  { id: 'marketplaces',icon: '🏪', label: '마켓플레이스',
+    group: 'config', desc: '플러그인 마켓 추가/삭제 (git URL)', docUrl: DOCS_BASE+'plugins' },
   { id: 'settings',    icon: '⚙️', label: 'Settings 편집',
     group: 'config', desc: '~/.claude/settings.json 직접 편집 + 추천 프로파일 원클릭', docUrl: DOCS_BASE+'settings' },
   { id: 'claudemd',    icon: '📜', label: 'CLAUDE.md',
     group: 'config', desc: '모든 세션 시작 시 로드되는 글로벌 지침(기억·규칙·취향)', docUrl: DOCS_BASE+'memory' },
-  { id: 'outputStyles',icon: '🎨', label: '출력 스타일',
-    group: 'advanced', desc: '답변 톤/포맷을 바꾸는 output styles', docUrl: DOCS_BASE+'output-styles' },
-  { id: 'statusline',  icon: '📡', label: '상태라인 / 키바인딩',
-    group: 'advanced', desc: 'Claude Code 하단 상태라인, 키 바인딩', docUrl: DOCS_BASE+'statusline' },
-  { id: 'plans',       icon: '🧭', label: '플랜 보관소',
-    group: 'advanced', desc: 'Plan Mode 로 만든 계획 문서들', docUrl: DOCS_BASE+'plan-mode' },
   { id: 'envConfig',   icon: '🌿', label: '환경 변수',
-    group: 'advanced', desc: 'ANTHROPIC_MODEL, CLAUDE_CONFIG_DIR, 프록시 등', docUrl: DOCS_BASE+'settings#environment-variables' },
+    group: 'config', desc: 'ANTHROPIC_MODEL, CLAUDE_CONFIG_DIR, 프록시 등', docUrl: DOCS_BASE+'settings#environment-variables' },
   { id: 'modelConfig', icon: '🧬', label: '모델 설정',
-    group: 'advanced', desc: 'settings.json 의 model / autoUpdates / cleanup 등', docUrl: DOCS_BASE+'settings' },
+    group: 'config', desc: 'settings.json 의 model / autoUpdates / cleanup 등', docUrl: DOCS_BASE+'settings' },
+  { id: 'outputStyles',icon: '🎨', label: '출력 스타일',
+    group: 'config', desc: '답변 톤/포맷을 바꾸는 output styles', docUrl: DOCS_BASE+'output-styles' },
+  { id: 'statusline',  icon: '📡', label: '상태라인 / 키바인딩',
+    group: 'config', desc: 'Claude Code 하단 상태라인, 키 바인딩', docUrl: DOCS_BASE+'statusline' },
   { id: 'ideStatus',   icon: '💻', label: 'IDE 통합',
-    group: 'advanced', desc: 'VS Code/JetBrains 연결 상태, 감지된 터미널', docUrl: DOCS_BASE+'ide-integrations' },
-  { id: 'marketplaces',icon: '🏪', label: '마켓플레이스',
-    group: 'advanced', desc: '플러그인 마켓 추가/삭제 (git URL)', docUrl: DOCS_BASE+'plugins' },
+    group: 'config', desc: 'VS Code/JetBrains 연결 상태, 감지된 터미널', docUrl: DOCS_BASE+'ide-integrations' },
   { id: 'scheduled',   icon: '⏰', label: '예약된 작업',
-    group: 'advanced', desc: '~/.claude/scheduled-tasks/ 정의 스킬', docUrl: DOCS_BASE+'overview' },
-  { id: 'costsTimeline', icon: '💸', label: '비용 타임라인', group: 'system',
+    group: 'config', desc: '~/.claude/scheduled-tasks/ 정의 스킬', docUrl: DOCS_BASE+'overview' },
+
+  // observe — 비용/메트릭/세션 관측 (11)
+  { id: 'costsTimeline', icon: '💸', label: '비용 타임라인', group: 'observe',
     desc: '모든 플레이그라운드/워크플로우 비용 통합 타임라인' },
   { id: 'usage',       icon: '💳', label: '사용량 / 비용',
-    group: 'system', desc: '최근 도구 호출 통계 + 일자별 그래프', docUrl: DOCS_BASE+'costs' },
+    group: 'observe', desc: '최근 도구 호출 통계 + 일자별 그래프', docUrl: DOCS_BASE+'costs' },
   { id: 'metrics',     icon: '📉', label: '토큰 메트릭',
-    group: 'system', desc: 'metrics/costs.jsonl 토큰 사용량 시계열', docUrl: DOCS_BASE+'monitoring-usage' },
+    group: 'observe', desc: 'metrics/costs.jsonl 토큰 사용량 시계열', docUrl: DOCS_BASE+'monitoring-usage' },
   { id: 'memory',      icon: '🧠', label: '프로젝트 메모리',
-    group: 'system', desc: '~/.claude/projects/*/memory 자동 기억', docUrl: DOCS_BASE+'memory' },
+    group: 'observe', desc: '~/.claude/projects/*/memory 자동 기억', docUrl: DOCS_BASE+'memory' },
   { id: 'tasks',       icon: '✅', label: '태스크 / TODO',
-    group: 'system', desc: '세션별 TaskCreate 저장소', docUrl: DOCS_BASE+'overview' },
+    group: 'observe', desc: '세션별 TaskCreate 저장소', docUrl: DOCS_BASE+'overview' },
   { id: 'backups',     icon: '💾', label: '백업 / 파일 히스토리',
-    group: 'system', desc: 'backups/, file-history/, shell-snapshots/ 관측', docUrl: DOCS_BASE+'troubleshooting' },
+    group: 'observe', desc: 'backups/, file-history/, shell-snapshots/ 관측', docUrl: DOCS_BASE+'troubleshooting' },
   { id: 'bashHistory', icon: '📜', label: '셸 명령 기록',
-    group: 'system', desc: 'Bash 도구 실행 히스토리 (~/.claude/bash-commands.log)', docUrl: DOCS_BASE+'settings' },
+    group: 'observe', desc: 'Bash 도구 실행 히스토리 (~/.claude/bash-commands.log)', docUrl: DOCS_BASE+'settings' },
   { id: 'telemetry',   icon: '📡', label: '텔레메트리',
-    group: 'system', desc: 'Claude Code 내부 이벤트 로그', docUrl: DOCS_BASE+'monitoring-usage' },
+    group: 'observe', desc: 'Claude Code 내부 이벤트 로그', docUrl: DOCS_BASE+'monitoring-usage' },
   { id: 'homunculus',  icon: '🏠', label: 'Homunculus',
-    group: 'system', desc: 'Claude Code 내부 프로젝트 추적기', docUrl: DOCS_BASE+'overview' },
+    group: 'observe', desc: 'Claude Code 내부 프로젝트 추적기', docUrl: DOCS_BASE+'overview' },
   { id: 'team',        icon: '👨‍👩‍👧', label: '팀 / 조직',
-    group: 'system', desc: '워크스페이스 / 조직 정보 (claude.ai)', docUrl: 'https://claude.ai/settings/organization' },
-  { id: 'system',      icon: '🖥️', label: '시스템 상태',       group: 'system', docUrl: DOCS_BASE+'troubleshooting' },
+    group: 'observe', desc: '워크스페이스 / 조직 정보 (claude.ai)', docUrl: 'https://claude.ai/settings/organization' },
+  { id: 'system',      icon: '🖥️', label: '시스템 상태',       group: 'observe', docUrl: DOCS_BASE+'troubleshooting' },
 ];
 const GROUPS = [
-  { id: 'new',      label: '신기능' },
-  { id: 'main',     label: '메인' },
-  { id: 'work',     label: '작업 자원' },
-  { id: 'config',   label: '설정 & 구성' },
-  { id: 'advanced', label: '고급 기능' },
-  { id: 'system',   label: '시스템 & 관측' },
+  { id: 'learn',      icon: '🆕', label: 'Learn',      desc: '신기능 · 온보딩 · 공식 문서 · 가이드' },
+  { id: 'main',       icon: '🏠', label: 'Main',       desc: '대시보드 · 프로젝트 · 플랜 · 세션' },
+  { id: 'build',      icon: '🔀', label: 'Build',      desc: '워크플로우 · 에이전트 · 프롬프트' },
+  { id: 'playground', icon: '🧪', label: 'Playground', desc: 'Claude API 실험 12종 + 프로바이더' },
+  { id: 'config',     icon: '⚙️', label: 'Config',     desc: '훅 · 권한 · MCP · 플러그인 · 설정' },
+  { id: 'observe',    icon: '📊', label: 'Observe',    desc: '비용 · 메트릭 · 시스템 관측' },
 ];
 
 function viewHeader(title, subtitle, viewId) {
@@ -1147,47 +1204,112 @@ function scoreColor(n) {
 // ────────────────────────────────────────────────────────────────
 // SIDEBAR
 // ────────────────────────────────────────────────────────────────
+// v2.26.0 — 상위 카테고리 + hover/focus flyout 구조.
+// 사이드바에는 6 카테고리만 보이고, 마우스/포커스가 가까이 가면 오른쪽으로 서브탭 패널이 열린다.
 function renderNav() {
   const nav = document.getElementById('nav');
-  nav.setAttribute('role', 'menu');
+  nav.setAttribute('role', 'menubar');
   nav.setAttribute('aria-label', t('메인 네비게이션'));
   nav.innerHTML = '';
   GROUPS.forEach(g => {
     const items = NAV.filter(n => n.group === g.id);
     if (!items.length) return;
-    const label = document.createElement('div');
-    label.className = 'group-label text-[10px] uppercase tracking-widest text-[var(--text-dim)] px-3 mt-3 mb-1';
-    label.setAttribute('role', 'presentation');
-    label.textContent = g.label;
-    nav.appendChild(label);
+    const activeHere = items.some(n => n.id === state.view);
+    const cat = document.createElement('div');
+    cat.className = 'nav-category' + (activeHere ? ' has-active' : '');
+    cat.setAttribute('role', 'menuitem');
+    cat.setAttribute('tabindex', '0');
+    cat.setAttribute('aria-haspopup', 'true');
+    cat.setAttribute('aria-expanded', 'false');
+    cat.setAttribute('aria-label', g.label + ' — ' + (g.desc || ''));
+    cat.dataset.cat = g.id;
+    const activeMark = activeHere
+      ? '<span class="nav-cat-dot" aria-hidden="true"></span>'
+      : '';
+    cat.innerHTML = `
+      <span class="nav-cat-icon" aria-hidden="true">${g.icon}</span>
+      <div class="nav-cat-meta flex-1 min-w-0">
+        <div class="nav-cat-label flex items-center gap-1">
+          ${activeMark}<span>${escapeHtml(t(g.label))}</span>
+        </div>
+        <div class="nav-cat-desc text-[10px] text-[var(--text-dim)] truncate">${escapeHtml(t(g.desc || ''))}</div>
+      </div>
+      <span class="nav-cat-count text-[10px]" style="color:var(--text-dim)">${items.length}</span>
+      <span class="nav-cat-chevron" aria-hidden="true">›</span>
+    `;
+    const flyout = document.createElement('div');
+    flyout.className = 'nav-flyout';
+    flyout.setAttribute('role', 'menu');
+    flyout.setAttribute('aria-label', g.label);
+    flyout.innerHTML = `
+      <div class="nav-flyout-header text-[10px] uppercase tracking-widest" style="color:var(--text-dim);">
+        <span>${g.icon}</span>
+        <span class="ml-1">${escapeHtml(t(g.label))}</span>
+        <span class="ml-1 text-[9px]">· ${items.length}</span>
+      </div>`;
     items.forEach(n => {
       const el = document.createElement('div');
       el.className = 'nav-item' + (state.view === n.id ? ' active' : '');
       el.setAttribute('role', 'menuitem');
-      el.setAttribute('tabindex', '0');
+      el.setAttribute('tabindex', '-1');
       el.setAttribute('aria-label', n.label + (n.desc ? ' — ' + n.desc : ''));
       el.title = n.label + (n.desc ? ' — ' + n.desc : '');
       const descHtml = n.desc ? `<div class="nav-desc text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">${escapeHtml(t(n.desc))}</div>` : '';
       el.innerHTML = `
         <span class="w-5 text-center self-start mt-0.5 flex-shrink-0">${n.icon}</span>
         <div class="nav-label flex-1 min-w-0">
-          <div>${n.label}</div>
+          <div>${escapeHtml(t(n.label))}</div>
           ${descHtml}
         </div>`;
-      el.onclick = () => {
+      el.onclick = (e) => {
+        e.stopPropagation();
         go(n.id);
+        // flyout 닫기
+        document.querySelectorAll('.nav-category.open').forEach(c => c.classList.remove('open'));
         if (window.matchMedia('(max-width: 900px)').matches) {
           document.getElementById('sidebar').classList.remove('open');
           document.body.classList.remove('sidebar-open');
           _syncNavToggleVisibility();
         }
       };
-      el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } };
-      nav.appendChild(el);
+      el.onkeydown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+      };
+      flyout.appendChild(el);
     });
+    cat.appendChild(flyout);
+    // 카테고리 자체 클릭: open 토글 (다른 카테고리는 닫기)
+    cat.onclick = (e) => {
+      if (e.target.closest('.nav-item')) return;
+      const isOpen = cat.classList.contains('open');
+      document.querySelectorAll('.nav-category.open').forEach(c => c.classList.remove('open'));
+      if (!isOpen) {
+        cat.classList.add('open');
+        cat.setAttribute('aria-expanded', 'true');
+      } else {
+        cat.setAttribute('aria-expanded', 'false');
+      }
+    };
+    cat.onkeydown = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cat.click(); }
+      else if (e.key === 'Escape') {
+        document.querySelectorAll('.nav-category.open').forEach(c => {
+          c.classList.remove('open'); c.setAttribute('aria-expanded', 'false');
+        });
+      }
+    };
+    nav.appendChild(cat);
   });
   _translateDOM(nav);
 }
+
+// 사이드바 바깥 클릭 시 flyout 닫기
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.nav-category, .nav-flyout')) return;
+  document.querySelectorAll('.nav-category.open').forEach(c => {
+    c.classList.remove('open'); c.setAttribute('aria-expanded', 'false');
+  });
+});
 
 // 모바일 오버레이 클릭 → 사이드바 닫기
 document.addEventListener('click', (e) => {
