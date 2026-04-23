@@ -244,17 +244,19 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.18.1)
+## 🔢 통계 (v2.21.1)
 
 | 지표 | 값 |
 |---|---|
-| 백엔드 코드 | ~17,600줄 · 44 모듈 · stdlib only |
-| 프론트엔드 코드 | ~16,300줄 · 단일 HTML |
-| API 라우트 | **188** (GET 101 / POST 84 / PUT 3 + regex webhook) |
-| 탭 수 | **51** (6 그룹) |
+| 백엔드 코드 | ~18,000줄 · 46 모듈 · stdlib only |
+| 프론트엔드 코드 | ~16,600줄 · 단일 HTML |
+| API 라우트 | **190** (GET 102 / POST 85 / PUT 3 + regex webhook) |
+| 탭 수 | **52** (6 그룹) |
 | 워크플로우 노드 타입 | **16** |
 | AI 프로바이더 | **8** 빌트인 + 커스텀 무제한 |
 | Claude API 플레이그라운드 탭 | **11** (프롬프트 캐시 · Extended Thinking · Tool Use · Batch · Files · Vision · 모델 벤치 · Server Tools · Citations · Agent SDK 스캐폴드 · Embedding Lab) |
+| 통합 비용 타임라인 | ✓ (모든 플레이그라운드 + 워크플로우, 일별 스택) |
+| 워크플로우 run diff / rerun | ✓ (per-node Δ) |
 | Prompt Library | ✓ (태그 검색 + 워크플로우로 복제) |
 | Batch 비용 가드 | ✓ (Batch 당 USD/토큰 임계치) |
 | 공식 문서 색인 | **33** 페이지 |
