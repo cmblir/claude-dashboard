@@ -10,6 +10,38 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.10.3] — 2026-04-23
+
+### 🎭 Playwright E2E 스모크 스크립트
+
+자동화 테스트로 회귀 방지. 모든 스크립트는 **라이브 서버(127.0.0.1:8080)** 를 대상으로 동작.
+
+**scripts/e2e-tabs-smoke.mjs** (45 탭 전수 검사)
+- `server/nav_catalog.py::TAB_CATALOG` 를 정적 파싱해 탭 id 목록 추출
+- 각 탭으로 `window.state.view` 전환 + `renderView()` 호출 후
+  - "뷰 렌더 실패" / "View render failed" 텍스트 검출 시 실패
+  - `console.error` 발생 시 실패
+- 단일 탭 검사: `TAB_ID=workflows npm run test:e2e:smoke`
+
+**scripts/e2e-workflow.mjs** (빌트인 템플릿 실행 E2E)
+- `bt-multi-ai-compare` 템플릿 조회 → `POST /api/workflows/save` 로 E2E 워크플로우 생성 → `POST /api/workflows/run`
+- 5초간 `run-status` 폴링 + `#wfRunBanner.visible` 등장 여부 체크
+- 완료 후 `POST /api/workflows/delete` 로 자동 정리
+- critical error (`is not defined`, `View render failed`, `뷰 렌더 실패`) 발견 시 실패
+
+**package.json**
+- `scripts.test:e2e:smoke` / `test:e2e:workflow` / `test:e2e:headed` / `verify:i18n`
+- `name`, `type:"module"`, `private:true` 추가 (ESM 스크립트 지원)
+
+**.gitignore**
+- `test-results/`, `playwright-report/`, `playwright/.cache/`, `node_modules/`
+
+**README 3종**: `🎭 E2E 테스트` 섹션 (Troubleshooting 과 Contributing 사이) — `npx playwright install chromium` 안내 + 스크립트 사용법.
+
+**주의**
+- 최초 실행 전 `npx playwright install chromium` 필요 (약 150MB).
+- 서버가 기동 중이 아니면 timeout 후 실패 — 테스트 실행 전 수동 기동.
+
 ## [2.10.2] — 2026-04-23
 
 ### 💬 노드 hover 결과 tooltip

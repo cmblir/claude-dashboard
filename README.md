@@ -273,6 +273,27 @@ Atomic writes via `server/utils.py::_safe_write` (`.tmp → rename`), threading 
 
 ---
 
+## 🎭 E2E Testing (Playwright)
+
+Playwright is pre-installed as a devDependency. First-time browser setup:
+
+```bash
+npx playwright install chromium
+```
+
+Then with the dashboard running (`python3 server.py`):
+
+```bash
+npm run test:e2e:smoke       # 45 tabs — view-render-fail / console-error detection
+npm run test:e2e:workflow    # builtin template create → run → banner observed
+npm run test:e2e:headed      # show the browser window
+TAB_ID=workflows npm run test:e2e:smoke   # only one tab
+```
+
+Scripts live under `scripts/e2e-*.mjs` and run zero-dependency against a live `127.0.0.1:8080`.
+
+---
+
 ## 🤝 Contributing
 
 PRs and issues welcome at [github.com/cmblir/claude-dashboard](https://github.com/cmblir/claude-dashboard).

@@ -273,6 +273,27 @@ claude-dashboard/
 
 ---
 
+## 🎭 E2E 테스트 (Playwright)
+
+Playwright 는 devDependency 로 이미 포함. 최초 1회 브라우저 설치:
+
+```bash
+npx playwright install chromium
+```
+
+대시보드 서버가 실행 중인 상태에서 (`python3 server.py`):
+
+```bash
+npm run test:e2e:smoke       # 45 탭 — 뷰 렌더 실패 / console error 검출
+npm run test:e2e:workflow    # 빌트인 템플릿 생성 → 실행 → 배너 등장 관찰
+npm run test:e2e:headed      # 브라우저 창 띄워서 실행
+TAB_ID=workflows npm run test:e2e:smoke   # 단일 탭만
+```
+
+스크립트: `scripts/e2e-*.mjs`. 의존성 없이 `127.0.0.1:8080` 라이브 서버를 대상으로 동작.
+
+---
+
 ## 🤝 기여하기
 
 이슈 · PR 환영: [github.com/cmblir/claude-dashboard](https://github.com/cmblir/claude-dashboard).

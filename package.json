@@ -1,4 +1,13 @@
 {
+  "name": "claude-dashboard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e:smoke": "node scripts/e2e-tabs-smoke.mjs",
+    "test:e2e:workflow": "node scripts/e2e-workflow.mjs",
+    "test:e2e:headed": "HEADLESS=0 node scripts/e2e-tabs-smoke.mjs",
+    "verify:i18n": "python3 tools/extract_ko_strings.py && (cd tools && python3 build_locales.py) && node scripts/verify-translations.js"
+  },
   "devDependencies": {
     "playwright": "^1.59.1"
   }

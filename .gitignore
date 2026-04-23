@@ -58,3 +58,9 @@ node_modules/
 
 # 번역 작업 파일 (검증 보고)
 _missing.json
+
+# E2E / Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+node_modules/
