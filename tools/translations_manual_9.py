@@ -1102,6 +1102,14 @@ NEW_EN = {
     "mcp_self_desc": "Register LazyClaude as a stdio MCP server so you can call dashboard features from inside a Claude Code session. Exposes 6 tools: tab catalog · cost summary · security scan · learner patterns · RTK status · workflow templates.",
     "mcp_self_cmd": "Install command (Terminal):",
     "mcp_self_tools_heading": "6 tools exposed",
+
+    # v2.33.0 — Artifacts Viewer
+    "art_subtitle": "Preview workflow outputs safely with 4-layer security: sandbox iframe + CSP + postMessage whitelist + static filter — scripts, external network, and cookies all blocked.",
+    "art_recent": "Recent 50 runs",
+    "art_no_outputs": "No runs with output yet.",
+    "art_pick": "Pick a run from the left.",
+    "art_sec_hint": "sandbox attribute = \"\" (all permissions denied) + CSP default-src:none + static filter (script/iframe/on*/javascript: removed).",
+    "art_sandbox_note": "iframe sandbox=\"\" — scripts, forms, cookies, navigation, plugins all blocked. CSP default-src:none, only img-src:data allowed.",
 }
 
 NEW_ZH = {
@@ -2199,4 +2207,12 @@ NEW_ZH = {
     "mcp_self_desc": "将 LazyClaude 注册为 stdio MCP 服务器，以便在 Claude Code 会话中调用仪表板功能。暴露 6 个工具：标签目录、费用摘要、安全扫描、学习器模式、RTK 状态、工作流模板。",
     "mcp_self_cmd": "安装命令 (Terminal)：",
     "mcp_self_tools_heading": "暴露的 6 个工具",
+
+    # v2.33.0 — Artifacts Viewer
+    "art_subtitle": "以 sandbox iframe + CSP + postMessage 白名单 + 静态过滤的 4 层安全机制安全预览工作流输出 — 脚本、外部网络、cookies 全部阻止。",
+    "art_recent": "最近 50 次运行",
+    "art_no_outputs": "暂无包含输出的运行记录。",
+    "art_pick": "请在左侧选择一次运行。",
+    "art_sec_hint": "sandbox 属性 = \"\"（全部权限拒绝）+ CSP default-src:none + 静态过滤（移除 script/iframe/on*/javascript:）。",
+    "art_sandbox_note": "iframe sandbox=\"\" — 脚本、表单、cookies、导航、插件全部阻止。CSP default-src:none，仅允许 img-src:data。",
 }
