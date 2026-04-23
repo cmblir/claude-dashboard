@@ -10,6 +10,31 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.21.0] — 2026-04-23
+
+### 📐 Docs — Artifacts 로컬 뷰어 설계 문서 (구현 X)
+
+B6 (Claude.ai Artifacts 의 로컬 대안) 을 안전하게 구현하기 위한 **설계 선행**. 실제 코드는 다음 세션 (T20~T23, v2.22~v2.24) 에 나누어 진행.
+
+**저장 위치**: `Obsidian/Projects/claude-dashboard/decisions/2026-04-23-artifacts-design.md`
+
+**핵심 보안 4중 방어**
+1. **iframe sandbox**: `srcdoc` 로 origin = null · `sandbox="allow-scripts"` (allow-same-origin 제외) → cookie / localStorage / IndexedDB 불가
+2. **CSP via srcdoc meta**: `default-src 'none'; script-src 'unsafe-inline'; connect-src 'none'` → 외부 fetch 차단 (CSS exfiltration 포함)
+3. **postMessage 화이트리스트**: `artifact:ready` / `artifact:resize` / `artifact:error` / `artifact:theme` 외 모두 무시. `event.origin` 검사
+4. **정적 코드 필터**: `import from 'https://'`, `navigator.credentials`, `document.cookie`, `localStorage`, `indexedDB` 패턴 발견 시 거부 + confirmModal 승인 필요
+
+**릴리스 로드맵**
+- v2.22.0 — `server/artifacts_lab.py` (extract/save/list/delete) + 4 라우트
+- v2.23.0 — `VIEWS.artifacts` UI + 샌드박스 iframe + postMessage 프로토콜
+- v2.24.0 — Babel standalone **로컬 번들** (supply chain 면역) + React/JSX 지원
+- v2.24.1 — Playwright `e2e-artifacts.mjs` 5 테스트 케이스 (CSP 차단 · sandboxed origin · postMessage 필터 · 금지 패턴 · 강제 렌더)
+
+**의사결정 (Open → Closed)**
+- Babel: CDN ❌ · **로컬 번들** ✅ (공급망 안전)
+- Artifact 외부 공유: **완전 불가**. 로컬 JSON export 만
+- 강제 렌더: 매번 confirmModal (세션 skip 옵션 없음)
+
 ## [2.20.0] — 2026-04-23
 
 ### 💸 비용 타임라인 통합 탭 — 신규 `costsTimeline` (system 그룹)
