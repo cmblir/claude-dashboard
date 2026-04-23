@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.18.1] — 2026-04-23
+
+### Docs — README 3종 통계 갱신 (세션 4 결과 반영)
+
+T10~T13 (v2.15.0 ~ v2.18.0) 신규 3 탭(embeddingLab + promptLibrary + Batch 가드 UI) + E2E 확장이 README 본문에 반영되도록 일괄 갱신.
+
+- 버전 배지 v2.14.1 → **v2.18.1**
+- 49 → **51 tabs / 51 탭 / 51 个标签页**
+- work 그룹 테이블에 🆕 `embeddingLab` · `promptLibrary` 추가 (serverTools/citationsLab/agentSdkScaffold 는 기존으로 이동)
+- Architecture 트리: routes 178 → **188**, nav 49 → **51 tabs**, locales 3,157 → **3,212 keys**
+- Stats 섹션을 **v2.18.1** 기준으로 전면 갱신:
+  * 백엔드 ~17k/42 → **~17,600줄/44 모듈**
+  * 프론트 ~15,500줄 → **~16,300줄**
+  * API 라우트 178 → **188** (GET 101 / POST 84 / PUT 3)
+  * 플레이그라운드 탭 10 → **11** (+ Embedding Lab)
+  * **신규 행**: Prompt Library ✓, Batch 비용 가드 ✓, E2E 테스트 스크립트 **3**
+- E2E 테스트 섹션에 `test:e2e:ui` · `test:e2e:all` 추가 (smoke 51 tabs 재반영)
+- README ko/en/zh 3종 동등 갱신
+
 ## [2.18.0] — 2026-04-23
 
 ### 🎭 E2E 커버리지 확장 (v2.10.x UX 회귀 방지)
