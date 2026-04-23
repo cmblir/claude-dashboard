@@ -71,6 +71,11 @@ from .agent_sdk_scaffold import api_scaffold_catalog, api_scaffold_create
 from .embedding_lab import (
     api_embedding_compare, api_embedding_examples, api_embedding_providers,
 )
+from .prompt_library import (
+    api_prompt_library_delete, api_prompt_library_duplicate,
+    api_prompt_library_list, api_prompt_library_save,
+    api_prompt_library_to_workflow,
+)
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -242,6 +247,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/scaffold/catalog": api_scaffold_catalog,
     "/api/embedding-lab/providers": api_embedding_providers,
     "/api/embedding-lab/examples": api_embedding_examples,
+    "/api/prompt-library/list": api_prompt_library_list,
 }
 
 
@@ -342,6 +348,10 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/citations-lab/test": api_citations_test,
     "/api/scaffold/create": api_scaffold_create,
     "/api/embedding-lab/compare": api_embedding_compare,
+    "/api/prompt-library/save": api_prompt_library_save,
+    "/api/prompt-library/delete": api_prompt_library_delete,
+    "/api/prompt-library/duplicate": api_prompt_library_duplicate,
+    "/api/prompt-library/to-workflow": api_prompt_library_to_workflow,
 }
 
 

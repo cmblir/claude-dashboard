@@ -937,6 +937,9 @@ const NAV = [
   { id: 'embeddingLab', icon: '🧬', label: 'Embedding 비교', group: 'work',
     desc: 'Voyage / OpenAI / Ollama 임베딩 cosine rank 매트릭스 비교',
     docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/embeddings' },
+  { id: 'promptLibrary', icon: '📝', label: '프롬프트 라이브러리', group: 'work',
+    desc: '자주 쓰는 프롬프트 저장 · 태그 검색 · 워크플로우로 복제',
+    docUrl: null },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -8282,6 +8285,178 @@ function mbDownload() {
   const a = document.createElement('a');
   a.href = url; a.download = `model-bench-${Date.now()}.json`; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ────────────────────────────────────────────────────────────────
+// PROMPT LIBRARY (v2.16.0) — 프롬프트 템플릿 CRUD + 태그 검색
+// ────────────────────────────────────────────────────────────────
+VIEWS.promptLibrary = async () => {
+  const data = await api('/api/prompt-library/list');
+  state.data.pl = state.data.pl || { q: '', tag: '', editing: null };
+  const pl = state.data.pl;
+  const items = data.items || [];
+  const allTags = data.tags || [];
+
+  const q = (pl.q || '').toLowerCase();
+  const filtered = items.filter(it => {
+    if (pl.tag && !(it.tags||[]).includes(pl.tag)) return false;
+    if (q) {
+      const hay = (it.title + ' ' + it.body + ' ' + (it.tags||[]).join(' ')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const tagChips = allTags.map(tg => `
+    <button class="chip ${pl.tag===tg?'chip-accent':''}" onclick="plSet('tag', '${pl.tag===tg?'':tg}'); renderView()">#${escapeHtml(tg)}</button>
+  `).join('');
+
+  const editing = pl.editing;
+  const editorPanel = editing ? `
+    <div class="card p-3" style="border-left:3px solid var(--accent);">
+      <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${editing.id ? t('수정') : t('새 프롬프트')}</div>
+      <input class="input mb-2" placeholder="${t('제목')}" value="${escapeHtml(editing.title||'')}" oninput="plSetEdit('title', this.value)">
+      <textarea class="input font-mono text-[11px] mb-2" rows="6" placeholder="${t('본문')}" oninput="plSetEdit('body', this.value)">${escapeHtml(editing.body||'')}</textarea>
+      <input class="input mb-2" placeholder="${t('태그 (쉼표 구분)')}" value="${escapeHtml((editing.tags||[]).join(', '))}" oninput="plSetEdit('tagsRaw', this.value)">
+      <div class="flex gap-2 items-center">
+        <select class="input" onchange="plSetEdit('model', this.value)">
+          <option value="">${t('모델 미지정')}</option>
+          <option value="claude-opus-4-7" ${editing.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
+          <option value="claude-sonnet-4-6" ${editing.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
+          <option value="claude-haiku-4-5" ${editing.model==='claude-haiku-4-5'?'selected':''}>Haiku 4.5</option>
+        </select>
+        <button class="btn btn-primary" onclick="plSave()">💾 ${t('저장')}</button>
+        <button class="btn" onclick="plSet('editing', null); renderView()">${t('취소')}</button>
+      </div>
+    </div>
+  ` : `
+    <button class="btn btn-primary w-full" onclick="plNew()">+ ${t('새 프롬프트')}</button>
+  `;
+
+  const list = filtered.length ? filtered.map(it => `
+    <div class="card p-3 flex flex-col gap-2" style="border-left:3px solid var(--accent);">
+      <div class="flex items-start justify-between gap-2">
+        <div class="font-semibold text-[13px]">${escapeHtml(it.title)}</div>
+        <div class="flex gap-1">
+          <button class="btn btn-sm" onclick="plCopy('${it.id}')" title="${t('본문 복사')}">📋</button>
+          <button class="btn btn-sm" onclick="plEdit('${it.id}')" title="${t('수정')}">✏️</button>
+          <button class="btn btn-sm" onclick="plDuplicate('${it.id}')" title="${t('복제')}">🗂️</button>
+          <button class="btn btn-sm" onclick="plToWorkflow('${it.id}')" title="${t('워크플로우로')}">🔀</button>
+          <button class="btn btn-sm btn-danger" onclick="plDelete('${it.id}')" title="${t('삭제')}">🗑️</button>
+        </div>
+      </div>
+      <pre class="text-[11px] whitespace-pre-wrap max-h-32 overflow-auto text-[var(--text-mute)]">${escapeHtml(it.body||'').slice(0,800)}${(it.body||'').length>800?'…':''}</pre>
+      <div class="flex items-center gap-1 flex-wrap">
+        ${(it.tags||[]).map(tg => `<span class="chip" style="font-size:10px;">#${escapeHtml(tg)}</span>`).join('')}
+        ${it.model ? `<span class="chip chip-sm" style="font-size:10px; background:rgba(217,119,87,0.1);">${escapeHtml(it.model)}</span>` : ''}
+      </div>
+    </div>
+  `).join('') : `<div class="card p-6 text-center text-[11px] text-[var(--text-dim)]">${t('일치하는 프롬프트 없음')}</div>`;
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">📝 ${t('프롬프트 라이브러리')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('자주 쓰는 프롬프트를 태그와 함께 저장하고, 복사/복제/워크플로우 복제 버튼으로 바로 재활용합니다.')}
+      </p>
+    </div>
+
+    <div class="flex items-center gap-2 mb-4 flex-wrap">
+      <input class="input flex-1" style="min-width:240px;" placeholder="${t('제목/본문/태그 검색')}"
+             value="${escapeHtml(pl.q||'')}" oninput="plSet('q', this.value); plDebouncedRender()">
+      ${pl.tag ? `<button class="btn btn-sm" onclick="plSet('tag',''); renderView()">✕ #${escapeHtml(pl.tag)}</button>` : ''}
+      <span class="text-[11px] text-[var(--text-dim)]">${filtered.length}/${items.length}</span>
+    </div>
+    ${allTags.length ? `<div class="flex items-center gap-1 flex-wrap mb-4">${tagChips}</div>` : ''}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="space-y-3">${editorPanel}</div>
+      <div class="space-y-3 max-h-[720px] overflow-auto pr-1">${list}</div>
+    </div>
+  `;
+};
+
+function plSet(k, v) { state.data.pl = state.data.pl || {}; state.data.pl[k] = v; }
+function plSetEdit(k, v) {
+  state.data.pl = state.data.pl || { editing: {} };
+  state.data.pl.editing = state.data.pl.editing || {};
+  state.data.pl.editing[k] = v;
+}
+let _plDebounce = null;
+function plDebouncedRender() {
+  if (_plDebounce) clearTimeout(_plDebounce);
+  _plDebounce = setTimeout(() => { _plDebounce = null; renderView(); }, 250);
+}
+function plNew() {
+  plSet('editing', { title: '', body: '', tags: [], tagsRaw: '', model: '' });
+  renderView();
+}
+async function plEdit(pid) {
+  const r = await api('/api/prompt-library/list');
+  const it = (r.items || []).find(x => x.id === pid);
+  if (!it) return;
+  plSet('editing', { id: it.id, title: it.title, body: it.body, tags: it.tags || [], tagsRaw: (it.tags||[]).join(', '), model: it.model || '' });
+  renderView();
+}
+async function plSave() {
+  const e = state.data.pl.editing || {};
+  if (!(e.title||'').trim()) { toast(t('제목을 입력하세요'), 'err'); return; }
+  if (!(e.body||'').trim()) { toast(t('본문을 입력하세요'), 'err'); return; }
+  const tags = (e.tagsRaw != null ? String(e.tagsRaw) : (e.tags||[]).join(','))
+    .split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
+  const body = { id: e.id || null, title: e.title, body: e.body, tags, model: e.model || null };
+  const r = await fetch('/api/prompt-library/save', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body),
+  }).then(x => x.json());
+  if (r.ok) {
+    toast(t('저장 완료'), 'ok');
+    plSet('editing', null);
+    renderView();
+  } else {
+    toast(r.error || t('저장 실패'), 'err');
+  }
+}
+async function plDelete(pid) {
+  const ok = await confirmModal({ title: t('삭제'), message: t('이 프롬프트를 삭제할까요?'), confirmLabel: t('삭제'), danger: true });
+  if (!ok) return;
+  const r = await fetch('/api/prompt-library/delete', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id: pid }),
+  }).then(x => x.json());
+  if (r.ok) { toast(t('삭제 완료'), 'ok'); renderView(); }
+  else toast(r.error || t('삭제 실패'), 'err');
+}
+async function plDuplicate(pid) {
+  const r = await fetch('/api/prompt-library/duplicate', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id: pid }),
+  }).then(x => x.json());
+  if (r.ok) { toast(t('복제 완료'), 'ok'); renderView(); }
+  else toast(r.error || t('복제 실패'), 'err');
+}
+async function plCopy(pid) {
+  const r = await api('/api/prompt-library/list');
+  const it = (r.items || []).find(x => x.id === pid);
+  if (!it) return;
+  try {
+    await navigator.clipboard.writeText(it.body || '');
+    toast(t('클립보드에 복사됨'), 'ok');
+  } catch (e) {
+    toast(t('복사 실패'), 'err');
+  }
+}
+async function plToWorkflow(pid) {
+  const r = await fetch('/api/prompt-library/to-workflow', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id: pid }),
+  }).then(x => x.json());
+  if (r.ok) {
+    toast(t('워크플로우 생성') + ': ' + escapeHtml(r.workflowName||''), 'ok');
+    setTimeout(() => go('workflows'), 800);
+  } else {
+    toast(r.error || t('생성 실패'), 'err');
+  }
 }
 
 // ────────────────────────────────────────────────────────────────
