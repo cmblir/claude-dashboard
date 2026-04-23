@@ -496,6 +496,15 @@ NEW_EN = {
     "ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요": "ANTHROPIC_API_KEY not set — save it in the AI Providers tab",
     "네트워크 오류": "Network error",
     "실행 실패": "Execution failed",
+
+    # ── v2.10.0 실행 배너 / 진행 가시성 ─────────────────────────
+    "실행 중": "Running",
+    "대기 중": "Idle",
+    "완료": "Done",
+    "실패": "Failed",
+    "위치로 이동": "Jump to node",
+    "닫기": "Close",
+
     "입력 비용": "Input cost",
     "캐시 쓰기": "Cache write",
     "캐시 읽기": "Cache read",
@@ -1128,6 +1137,15 @@ NEW_ZH = {
     "ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요": "未设置 ANTHROPIC_API_KEY — 请在 AI 供应商标签页中保存",
     "네트워크 오류": "网络错误",
     "실행 실패": "执行失败",
+
+    # ── v2.10.0 运行横幅 / 进度可视化 ─────────────────────────
+    "실행 중": "运行中",
+    "대기 중": "空闲",
+    "완료": "完成",
+    "실패": "失败",
+    "위치로 이동": "跳转到节点",
+    "닫기": "关闭",
+
     "입력 비용": "输入费用",
     "캐시 쓰기": "缓存写入",
     "캐시 읽기": "缓存读取",

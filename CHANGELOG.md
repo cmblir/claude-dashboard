@@ -10,6 +10,49 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.10.0] — 2026-04-23
+
+### 🔦 워크플로우 실행 가시성 강화
+
+사용자 피드백: "**워크플로우가 지금 어느 노드에서 실행 중인지 보기 어렵다**".
+
+기존 `data-status` CSS 는 작동했지만 시각적 강조가 약했고, 큰 캔버스에서 running 노드가 화면 밖이면 전혀 알 수 없었음.
+
+**상단 플로팅 실행 배너 (신규)**
+- `#wfRunBanner` — 캔버스 상단 중앙 고정
+- 포맷: `⏳ [노드명] · {완료}/{전체} · {경과초}s · 진행률 바 · 📍 위치로 이동`
+- 상태별 색: running (보라 · pulse) / ok (초록) / err (빨강)
+- 완료·실패 3.5초 후 자동 페이드아웃
+- 수동 닫기 버튼
+
+**Running 노드 시각 강화**
+- 외곽 점선 링 (`.wf-node-ring`, stroke-dasharray 6 6) + 회전 애니메이션 (`@keyframes wfSpinDash`, 2.5s linear)
+- `drop-shadow` 보라 글로우 추가
+- 라벨 옆 `⏱ {초}s` 실시간 카운터 (`.wf-node-elapsed`)
+
+**미니맵 상태 색 반영**
+- running/ok/err/skipped 색을 node dot 에 우선 적용
+- running 노드는 dot 크기 3px → 5px 로 강조
+
+**서버 SSE 폴링 1.0s → 0.5s**
+- `handle_workflow_run_stream`: `time.sleep(0.5)` + `max_polls = 3600` (30분 유지)
+- 서버 노드 실행 시작 시 `nodeResults[nid].startedAt` 기록 → 프론트 elapsed 계산
+
+**위치로 이동 (`_wfFocusNode`)**
+- 배너의 📍 버튼 또는 직접 호출로 해당 노드를 뷰포트 중앙에 pan (zoom 유지)
+
+**i18n** — 6 키 × ko/en/zh (실행 중 / 대기 중 / 완료 / 실패 / 위치로 이동 / 닫기). 총 **3,092 키** · 누락 0.
+
+**Architecture**
+- `server/workflows.py`: `handle_workflow_run_stream` sleep 0.5s, `_run_one_iteration` running 상태에 `startedAt` 포함
+- `dist/index.html`:
+  * CSS: `#wfRunBanner` 스타일, `.wf-node-ring` / `.wf-node-elapsed` 추가, `wfSpinDash` keyframe
+  * JS: `_wfApplyRunStatus` 확장 (배너/미니맵 호출), `_wfRenderRunBanner`, `_wfHideRunBanner`, `_wfFocusNode` 신규
+  * `_wfRenderNode` SVG 템플릿에 `<rect class="wf-node-ring">` + `<text class="wf-node-elapsed">` 삽입
+  * `_wfRenderMinimap` node dot 에 실행 상태 색 우선 적용
+- `tools/translations_manual_9.py`: 6 키 ko/en/zh
+- `dist/locales/{ko,en,zh}.json`: 3,092 키 재빌드
+
 ## [2.9.3] — 2026-04-23
 
 ### Fixed — 빌트인 워크플로우 템플릿 조회 실패 (404 → "템플릿 생성 에러")
