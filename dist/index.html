@@ -1058,6 +1058,9 @@ const NAV = [
   { id: 'team',        icon: '👨‍👩‍👧', label: '팀 / 조직',
     group: 'observe', desc: '워크스페이스 / 조직 정보 (claude.ai)', docUrl: 'https://claude.ai/settings/organization' },
   { id: 'system',      icon: '🖥️', label: '시스템 상태',       group: 'observe', docUrl: DOCS_BASE+'troubleshooting' },
+  { id: 'securityScan', icon: '🛡️', label: 'Security Scan',
+    group: 'observe', desc: '~/.claude 정적 검사 — 시크릿 / 위험 훅 / 과도한 권한 / 신뢰 불가 MCP',
+    docUrl: DOCS_BASE+'security' },
 ];
 const GROUPS = [
   { id: 'learn',      icon: '🆕', label: 'Learn',      desc: '신기능 · 온보딩 · 공식 문서 · 가이드' },
@@ -13825,6 +13828,62 @@ function formatBytes(n) {
   if (n < 1024*1024*1024) return (n/1024/1024).toFixed(2) + 'MB';
   return (n/1024/1024/1024).toFixed(2) + 'GB';
 }
+
+// ────────────────────────────────────────────────────────────────
+// SECURITY SCAN (v2.31.0) — ECC AgentShield 스타일 ~/.claude 정적 검사
+// ────────────────────────────────────────────────────────────────
+VIEWS.securityScan = async () => {
+  const d = await api('/api/security-scan');
+  if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}</div>`;
+  const counts = d.counts || {};
+  const sev = counts.bySeverity || {};
+  const cat = counts.byCategory || {};
+  const issues = d.issues || [];
+
+  const sevColor = { critical: '#f87171', high: '#fbbf24', medium: '#a78bfa', low: '#60a5fa', info: '#9ca3af' };
+  const sevEmoji = { critical: '🔴', high: '🟠', medium: '🟣', low: '🔵', info: '⚪' };
+
+  const summary = `
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4">
+      ${['critical','high','medium','low','info'].map(s => `
+        <div class="card p-3 text-center">
+          <div class="text-[10px] uppercase" style="color:${sevColor[s]}">${sevEmoji[s]} ${s}</div>
+          <div class="text-2xl font-bold mt-1 font-mono" style="color:${sevColor[s]}">${sev[s] || 0}</div>
+        </div>`).join('')}
+    </div>`;
+
+  const issueRows = issues.length ? issues.map(iss => `
+    <div class="card p-3 mb-2" style="border-left:3px solid ${sevColor[iss.severity]||'#888'};">
+      <div class="flex items-start gap-2">
+        <span>${sevEmoji[iss.severity]||'⚪'}</span>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1 flex-wrap">
+            <span class="text-[11px] font-semibold">${escapeHtml(iss.title)}</span>
+            <span class="chip text-[9px]" style="background:rgba(255,255,255,0.06);color:${sevColor[iss.severity]}">${iss.severity}</span>
+            <span class="chip text-[9px]" style="background:rgba(255,255,255,0.04);color:var(--text-dim)">${escapeHtml(iss.category)}</span>
+          </div>
+          ${iss.detail ? `<div class="text-[10px] mb-1" style="color:var(--text-mute)">${escapeHtml(iss.detail)}</div>` : ''}
+          ${iss.location ? `<div class="text-[9px] font-mono" style="color:var(--text-dim)">📍 ${escapeHtml(iss.location)}</div>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('') : `<div class="card p-6 text-center text-[12px]" style="color:var(--success)">✅ ${t('sec_no_issues', '감지된 이슈 없음 — 깨끗합니다!')}</div>`;
+
+  return `
+    ${viewHeader('🛡️ Security Scan', t('sec_subtitle', '~/.claude 전체(설정·훅·에이전트·MCP)를 정적 검사 — 시크릿 · 위험 훅 · 과도한 권한 · 신뢰 불가 MCP. AI 호출 없음, 100% 로컬.'), 'securityScan')}
+    ${summary}
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-base font-semibold">${t('sec_issues_heading', '감지된 이슈')} (${issues.length})</h3>
+        <button class="btn text-[11px]" onclick="renderView()">🔄 ${t('다시 검사')}</button>
+      </div>
+      ${issueRows}
+    </div>
+    <div class="text-[10px]" style="color:var(--text-dim)">
+      ${t('sec_hint', '검사 대상: settings.json · CLAUDE.md · settings.hooks · ~/.claude/agents · mcp.json. ECC AgentShield 방식에서 영감. 발견된 시크릿은 rotate 후 env var 로 옮기세요.')}
+    </div>
+  `;
+};
 
 // ────────────────────────────────────────────────────────────────
 // LEARNER (v2.30.0) — 세션 JSONL 에서 반복 패턴 추출 → skill/prompt/workflow 제안

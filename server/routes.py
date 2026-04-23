@@ -90,6 +90,7 @@ from .event_forwarder import (
     api_event_forwarder_remove, api_event_forwarder_meta,
 )
 from .learner import api_learner_patterns
+from .security_scan import api_security_scan
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -275,6 +276,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/event-forwarder/list": api_event_forwarder_list,
     "/api/event-forwarder/meta": api_event_forwarder_meta,
     "/api/learner/patterns": api_learner_patterns,
+    "/api/security-scan": api_security_scan,
 }
 
 

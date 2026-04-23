@@ -10,6 +10,44 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.31.0] — 2026-04-24
+
+### 🛡️ Security Scan 탭 — ECC AgentShield 스타일 정적 검사 (observe 그룹)
+
+사용자 요청: ECC(everything-claude-code) 의 좋은 기능 흡수. 가장 가치 높은 **AgentShield** 를 우리 대시보드 형태로 재구현.
+
+**신규 모듈 `server/security_scan.py` — 로컬 휴리스틱, AI 호출 없음**
+- 스캔 대상: `~/.claude/settings.json` · `~/.claude/CLAUDE.md` · hooks · agents · `~/.claude/mcp.json`
+- 이슈 카테고리 (severity: critical/high/medium/low/info):
+  - **secrets**: API 키/토큰 평문 노출 (OpenAI / Anthropic / Google / GitHub PAT / AWS / Slack / PEM 등 8 패턴)
+  - **permissions**: `Bash(*)` · `Bash(sudo *)` · `Bash(* | sh)` 같은 위험 allow 규칙
+  - **hooks**: `sudo` / `rm -rf /` / `curl | sh` / `wget | sh` / `eval $()` / `chmod 777` 등 훅 내 위험 명령
+  - **mcp**: `npx -y` / `uvx` 자동 설치 (신뢰 안된 패키지 시 RCE), MCP env 내 평문 시크릿
+  - **tokens**: autocompact threshold 미설정, CLAUDE.md 50KB+ (토큰 낭비)
+  - **integrity**: settings.json 파싱 실패
+
+**신규 탭 `securityScan` (observe 그룹)**
+- 상단 severity 카운터 (critical/high/medium/low/info 5 색상 카드)
+- 이슈 카드 리스트 (좌측 3px 색상 바 · 심각도 이모지 · 카테고리 chip · 상세 · 파일 경로)
+- "다시 검사" 버튼으로 재실행
+- 이슈 0건 시 "✅ 깨끗합니다" 빈 상태
+
+**API**
+- GET `/api/security-scan` — 이슈 리스트 + severity/category 집계
+
+**ECC 와의 차이**
+- ECC AgentShield: 1282 tests · 102 정적 규칙 · `/security-scan` skill + `npx ecc-agentshield scan --opus` CLI
+- 우리: **정적 휴리스틱 중심** (~~50 규칙) · GUI 탭 · 즉시 실행 · Python stdlib
+- 향후 v2.32+ 에서 AI 보조 판단 (Opus scan) 옵션 추가 가능
+
+**탭 57개** (56 → 57). i18n 6 키 × ko/en/zh.
+
+**검증**
+- 57/57 탭 smoke 통과
+- 실환경 스캔: 1 info 감지 (autocompact threshold 미설정 권장)
+- 8 secret 패턴 + 6 shell 위험 패턴 + 4 MCP 패턴 unit 커버리지
+
+---
 ## [2.30.0] — 2026-04-24
 
 ### 🎓 Learner 탭 — 세션 패턴 추출 (B8, 마지막 backlog medium 항목 소화)
