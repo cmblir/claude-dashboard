@@ -10,6 +10,36 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.12.0] — 2026-04-23
+
+### 📖 Claude Docs Hub — 신규 탭 `claudeDocs` (new 그룹)
+
+docs.anthropic.com 의 주요 페이지를 대시보드 안에서 카테고리별 카드로 색인 + 검색.
+
+**카테고리 5**
+- **Claude Code** — Overview / Sub-agents / Skills / Hooks / MCP / Plugins / Output Styles / Status Line / Slash Commands / Memory / Interactive / IAM / Settings / Troubleshooting (14)
+- **Claude API** — Messages / Prompt Caching / Extended Thinking / Tool Use / Message Batches / Files / Vision / Citations / Web Search Tool / Code Execution Tool / Embeddings (11)
+- **Agent SDK** — Overview / Python / TypeScript (3)
+- **Models** — Models / Deprecations / Pricing (3)
+- **Account & Policy** — Team / Glossary (2)
+
+총 **33개 공식 페이지** 카드.
+
+**기능**
+- 제목/요약/URL 필터 (300ms debounce)
+- 각 카드 2 버튼: `🔗 외부 열기` · `→ 관련 탭` (해당하는 대시보드 탭 id 가 있으면 `go(...)` 호출)
+- 결과 없으면 친절한 empty state
+
+**Architecture**
+- `server/claude_docs.py` 신설 — 정적 `CATALOG` dict + `api_claude_docs_{list,search}`
+- `server/routes.py` 2 라우트 (GET list/search)
+- `server/nav_catalog.py` `claudeDocs` 탭 등록 (`new` 그룹) + en/zh
+- `dist/index.html` NAV (icon 📖) + `VIEWS.claudeDocs` · `cdSet` · `cdRender` (debounce)
+- `tools/translations_manual_9.py` 7 키 × ko/en/zh
+
+**주의**
+- URL 은 2026-04 시점 기준 추정. Anthropic 이 경로를 바꾸면 `CATALOG` 만 갱신하면 됨.
+
 ## [2.11.0] — 2026-04-23
 
 ### 🧰 Claude 공식 내장 Tools 플레이그라운드 — 신규 탭 `serverTools`

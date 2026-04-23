@@ -884,6 +884,9 @@ const NAV = [
   // 🚀 가이드 — 온보딩 체크리스트 + 외부 툴/가이드 허브
   { id: 'onboarding', icon: '🚀', label: '시작하기', group: 'new',
     desc: '처음 사용자를 위한 단계별 체크리스트 (현재 셋업 자동 감지)' },
+  { id: 'claudeDocs', icon: '📖', label: 'Claude Docs', group: 'new',
+    desc: 'docs.anthropic.com 공식 문서 색인 + 검색',
+    docUrl: 'https://docs.anthropic.com/' },
   { id: 'guideHub',   icon: '📚', label: '가이드 & 툴', group: 'new',
     desc: '외부 가이드 · 유용한 툴 · 베스트 프랙티스 · 치트시트' },
 
@@ -8270,6 +8273,71 @@ function mbDownload() {
   const a = document.createElement('a');
   a.href = url; a.download = `model-bench-${Date.now()}.json`; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ────────────────────────────────────────────────────────────────
+// CLAUDE DOCS HUB (v2.12.0) — docs.anthropic.com 색인 + 검색
+// ────────────────────────────────────────────────────────────────
+VIEWS.claudeDocs = async () => {
+  state.data.cd = state.data.cd || { q: '' };
+  const cd = state.data.cd;
+  const url = cd.q ? `/api/claude-docs/search?q=${encodeURIComponent(cd.q)}` : '/api/claude-docs/list';
+  const data = await api(url);
+  const cats = data.categories || [];
+  const total = cats.reduce((a, c) => a + (c.items||[]).length, 0);
+
+  const renderCard = (it) => `
+    <div class="card p-3 flex flex-col gap-1" style="border-left:3px solid var(--accent);">
+      <div class="flex items-start justify-between gap-2">
+        <div class="font-semibold text-[13px]" style="color:var(--text);">${escapeHtml(it.title)}</div>
+      </div>
+      <div class="text-[11px] text-[var(--text-mute)] flex-1">${escapeHtml(it.summary)}</div>
+      <div class="flex items-center gap-2 mt-1">
+        <a href="${it.url}" target="_blank" class="btn btn-sm">🔗 ${t('외부 열기')}</a>
+        ${it.relatedTab ? `<button class="btn btn-sm" onclick="go('${it.relatedTab}')">→ ${t('관련 탭')}</button>` : ''}
+      </div>
+      <div class="text-[9px] text-[var(--text-dim)] font-mono truncate">${escapeHtml(it.url)}</div>
+    </div>
+  `;
+
+  const sections = cats.map(cat => `
+    <div class="mb-6">
+      <h2 class="text-sm font-semibold mb-2" style="color:var(--text);">${escapeHtml(cat.label)} <span class="text-[10px] text-[var(--text-dim)]">(${(cat.items||[]).length})</span></h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        ${(cat.items||[]).map(renderCard).join('')}
+      </div>
+    </div>
+  `).join('') || `<div class="card p-6 text-center text-[11px] text-[var(--text-dim)]">${t('검색 결과 없음')}</div>`;
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">📖 Claude Docs Hub</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('Anthropic 공식 문서 주요 페이지를 카테고리별로 색인. 검색어로 필터링하고 관련 대시보드 탭으로 바로 이동할 수 있습니다.')}
+      </p>
+    </div>
+
+    <div class="flex items-center gap-2 mb-4">
+      <input class="input flex-1" placeholder="${t('키워드로 검색 (제목/요약/URL)')}"
+             value="${escapeHtml(cd.q || '')}"
+             oninput="cdSet('q', this.value); cdRender()">
+      <span class="text-[11px] text-[var(--text-dim)]">${total}${t('건')}</span>
+      ${cd.q ? `<button class="btn btn-sm" onclick="cdSet('q',''); renderView()">✕ ${t('지우기')}</button>` : ''}
+    </div>
+
+    ${sections}
+  `;
+};
+
+function cdSet(k, v) {
+  state.data.cd = state.data.cd || {};
+  state.data.cd[k] = v;
+}
+let _cdRenderTimer = null;
+function cdRender() {
+  // 검색 debounce — 300ms
+  if (_cdRenderTimer) clearTimeout(_cdRenderTimer);
+  _cdRenderTimer = setTimeout(() => { _cdRenderTimer = null; renderView(); }, 300);
 }
 
 // ────────────────────────────────────────────────────────────────

@@ -552,6 +552,16 @@ NEW_EN = {
     "현재 모델에서 미지원": "Not supported on current model",
     "도구를 1개 이상 활성화하세요": "Enable at least one tool",
 
+    # ── v2.12.0 Claude Docs Hub ────────────────────────────────
+    "Anthropic 공식 문서 주요 페이지를 카테고리별로 색인. 검색어로 필터링하고 관련 대시보드 탭으로 바로 이동할 수 있습니다.":
+        "Curated index of docs.anthropic.com pages — filter by keyword and jump to related dashboard tabs.",
+    "키워드로 검색 (제목/요약/URL)": "Search by keyword (title / summary / URL)",
+    "지우기": "Clear",
+    "외부 열기": "Open external",
+    "관련 탭": "Related tab",
+    "검색 결과 없음": "No results",
+    "docs.anthropic.com 공식 문서 색인 + 검색": "docs.anthropic.com curated index + search",
+
     "입력 비용": "Input cost",
     "캐시 쓰기": "Cache write",
     "캐시 읽기": "Cache read",
@@ -1239,6 +1249,16 @@ NEW_ZH = {
     "도구를 활용할 질문": "需要使用工具的问题",
     "현재 모델에서 미지원": "当前模型不支持",
     "도구를 1개 이상 활성화하세요": "请至少启用一个工具",
+
+    # ── v2.12.0 Claude 文档中心 ──────────────────────────────
+    "Anthropic 공식 문서 주요 페이지를 카테고리별로 색인. 검색어로 필터링하고 관련 대시보드 탭으로 바로 이동할 수 있습니다.":
+        "按类别整理 docs.anthropic.com 官方文档,支持关键字过滤和跳转到相关仪表板标签页。",
+    "키워드로 검색 (제목/요약/URL)": "按关键字搜索（标题/摘要/URL）",
+    "지우기": "清除",
+    "외부 열기": "打开外部链接",
+    "관련 탭": "相关标签页",
+    "검색 결과 없음": "无搜索结果",
+    "docs.anthropic.com 공식 문서 색인 + 검색": "docs.anthropic.com 官方文档索引与搜索",
 
     "입력 비용": "输入费用",
     "캐시 쓰기": "缓存写入",
