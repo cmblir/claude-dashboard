@@ -10,6 +10,59 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.25.0] — 2026-04-23
+
+### 🆕 OMC/OMX gap 흡수 세션 (자율모드 큐 소진)
+
+사용자 요청: `oh-my-claudecode` (OMC) / `oh-my-codex` (OMX) 분석 후 LazyClaude 에 없는 기능 중 low 위험도 항목을 자율모드로 일괄 반영.  
+분석 노트: `docs/plans/analysis-omc-omx-gap.md`, 큐: `docs/plans/today-queue.md`, 로그: `docs/logs/2026-04-23.md`.
+
+**B1 · 실행 모드 빌트인 템플릿 4종 (work 그룹)**
+- `bt-autopilot` — 요구사항 → 계획 → 실행 → 검증 단일 흐름 (OMC `/autopilot`)
+- `bt-ralph` — verify → fix 루프 (repeat enabled, max 5, feedback auto-inject · OMC `/ralph`)
+- `bt-ultrawork` — 5 병렬 에이전트 → merge (Sonnet×2, Haiku×3 · OMC `/ultrawork`)
+- `bt-deep-interview` — Socratic 명확화 → 설계 문서 (OMC `/deep-interview`)
+- 총 빌트인 템플릿 5→9
+
+**B2 · Prompt Library 키워드 트리거 (OMC `ultrathink`/`deepsearch` 대응)**
+- `keywords: string[]` 필드 추가 (최대 10)
+- 워크플로우 session 노드 실행 시 입력 텍스트에 키워드 매칭되면 해당 프롬프트 body 가 systemPrompt 앞에 자동 prepend
+- 에디터에 키워드 입력란 + 설명
+
+**B3 · 워크플로우 완료 알림 — Slack / Discord (OMC `config-stop-callback` 대응)**
+- 신규 모듈 `server/notify.py` — `hooks.slack.com` / `discord.com` / `discordapp.com` 호스트 화이트리스트, https-only
+- 워크플로우 저장 스키마에 `notify: {slack, discord}` 필드 (sanitize 에서 URL 검증)
+- run 성공/실패 시 이모지 + 상태 + 실행 시간 + 비용 + 요약 500자 전송
+- `POST /api/notify/test` — UI 테스트 버튼 (`target: slack|discord`, `url`)
+- 에디터 인스펙터에 Webhook URL 섹션 + 테스트 버튼
+
+**B4 · session 노드 modelHint — 자동 모델 라우팅 (OMC smart routing 대응)**
+- session 노드 data 에 `modelHint: "" | "auto" | "fast" | "deep"`
+- assignee 가 비어있을 때만 적용 (명시적 지정이 우선, backward compat)
+- fast → haiku, deep → opus, auto → 휴리스틱 (길이 + 키워드)
+  - 3000+ 문자 또는 architect/design/deep 키워드 → opus
+  - 500- 문자 + list/summary/quick 키워드 → haiku
+  - 그 외 → sonnet
+- 실행 결과에 `chosenModel` 필드 노출
+
+**B5 · Session Replay Lab 신규 탭 (`sessionReplay`, work 그룹)**
+- 신규 모듈 `server/session_replay.py` — `~/.claude/projects/**/*.jsonl` 스캔
+- 최근 50 세션 목록 + 개별 파싱 (최대 2000 events) — role · 요약 · tool_use 마커 · tokens · timestamp
+- 좌측 세션 목록 + 우측 타임라인 (색상별 role · 툴 호출 하이라이트)
+- 누적 토큰 스파크라인 (600×40 SVG path)
+- 54 탭으로 확장
+
+**분석 문서 (기록)**
+- `docs/plans/analysis-omc-omx-gap.md` — OMC/OMX vs LazyClaude 매트릭스 + 흡수 후보 HIGH/MED/LOW 분류 + 추가 최적화 포인트
+- `docs/plans/backlog.md` — 자율모드 제외(medium 위험) 항목 + MCP 서버 모드 등 향후 후보
+
+**통계**
+- 탭: 53 → 54
+- API 라우트: 192 → 198
+- 빌트인 템플릿: 5 → 9
+- 54/54 탭 smoke 통과 · i18n ko/en/zh 정합성 통과 (키 추가 ~15)
+
+---
 ## [2.24.1] — 2026-04-23
 
 ### 🔁 RTK 자동화 — 설치/훅 완료 자동 감지 + y/n 자동 응답

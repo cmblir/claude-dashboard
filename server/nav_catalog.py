@@ -147,6 +147,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "(rtk-ai/rtk) 를 한 탭에서 설치·활성화·통계 조회.",
         ["rtk", "token", "토큰 최적화", "rust token killer", "claude token",
          "token optimization", "비용 절감", "cost reduction", "rtk-ai"]),
+    ("sessionReplay", "work",
+        "Session Replay — Claude Code JSONL 세션 로그를 타임라인으로 재생 · "
+        "툴 호출 하이라이트 · 누적 토큰 차트.",
+        ["session replay", "jsonl", "세션 리플레이", "timeline", "타임라인",
+         "replay", "session log", "세션 로그"]),
     ("claudeDocs",    "new",
         "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
         "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "
@@ -255,6 +260,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                     "zh": "嵌入实验室 — 通过余弦相似度 rank 矩阵比较 Voyage / OpenAI / Ollama 嵌入"},
     "rtk": {"en": "RTK Optimizer — install & activate the rtk-ai/rtk proxy to cut Claude tokens by 60-90%",
             "zh": "RTK 优化器 — 在本标签页内安装/激活 rtk-ai/rtk 代理，将 Claude token 消耗减少 60-90%"},
+    "sessionReplay": {"en": "Session Replay — replay Claude Code JSONL session logs as a timeline with tool-use highlights and cumulative token chart",
+                      "zh": "会话重放 — 将 Claude Code JSONL 会话日志作为时间线重放，高亮工具调用并显示累计 token 图表"},
     "promptLibrary": {"en": "Prompt Library — save/search/duplicate prompts, convert to workflow",
                      "zh": "提示库 — 保存/搜索/复制提示,转换为工作流"},
     "claudeDocs": {"en": "Claude Docs Hub — curated docs.anthropic.com index with cross-links to dashboard tabs",

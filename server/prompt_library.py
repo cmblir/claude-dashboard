@@ -91,6 +91,11 @@ def api_prompt_library_save(body: dict) -> dict:
     tags = [t.strip() for t in tags_raw if isinstance(t, str) and t.strip()][:10]
     model = (body.get("model") or "").strip() or None
 
+    # v2.25.0 — keyword triggers: 입력 텍스트에 이 키워드가 포함되면 워크플로우
+    # session 노드 실행 시 해당 프롬프트 body 가 system slot 에 prepend 됨.
+    keywords_raw = body.get("keywords") or []
+    keywords = [k.strip() for k in keywords_raw if isinstance(k, str) and k.strip()][:10]
+
     store = _load()
     items = store.get("items") or []
     pid = body.get("id")
@@ -104,6 +109,7 @@ def api_prompt_library_save(body: dict) -> dict:
         found["title"] = title
         found["body"] = content
         found["tags"] = tags
+        found["keywords"] = keywords
         if model:
             found["model"] = model
         else:
@@ -114,12 +120,34 @@ def api_prompt_library_save(body: dict) -> dict:
         pid = f"p-{uuid.uuid4().hex[:10]}"
         items.insert(0, {
             "id": pid, "title": title, "body": content, "tags": tags,
+            "keywords": keywords,
             "model": model, "createdAt": now, "updatedAt": now,
         })
         store["items"] = items
 
     _save(store)
     return {"ok": True, "id": pid}
+
+
+def find_keyword_triggers(input_text: str) -> list[dict]:
+    """입력 텍스트에 키워드가 포함된 prompt library 항목 리스트 반환.
+
+    대소문자 무시 부분 문자열 매칭. 여러 항목이 매칭되면 순서대로 반환.
+    워크플로우 session 노드에서 자동 주입 여부 결정에 사용.
+    """
+    if not isinstance(input_text, str) or not input_text:
+        return []
+    text_lower = input_text.lower()
+    out = []
+    for it in _load().get("items") or []:
+        kws = it.get("keywords") or []
+        if not isinstance(kws, list):
+            continue
+        for kw in kws:
+            if isinstance(kw, str) and kw and kw.lower() in text_lower:
+                out.append(it)
+                break
+    return out
 
 
 def api_prompt_library_delete(body: dict) -> dict:
