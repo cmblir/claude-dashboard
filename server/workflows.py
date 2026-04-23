@@ -2408,11 +2408,18 @@ def api_workflow_run_diff(body: dict) -> dict:
     nrb = rb.get("nodeResults") or {}
     all_ids = sorted(set(list(nra.keys()) + list(nrb.keys())))
     out = []
+    total_a_in = total_a_out = total_b_in = total_b_out = 0
+    total_a_cost = total_b_cost = 0.0
     for nid in all_ids:
         ax = nra.get(nid) or {}
         bx = nrb.get(nid) or {}
         ad = ax.get("durationMs") or 0
         bd = bx.get("durationMs") or 0
+        ati = int(ax.get("tokensIn") or 0); ato = int(ax.get("tokensOut") or 0)
+        bti = int(bx.get("tokensIn") or 0); bto = int(bx.get("tokensOut") or 0)
+        aco = float(ax.get("costUsd") or 0); bco = float(bx.get("costUsd") or 0)
+        total_a_in += ati; total_a_out += ato; total_a_cost += aco
+        total_b_in += bti; total_b_out += bto; total_b_cost += bco
         out.append({
             "nodeId": nid,
             "aStatus": ax.get("status"),
@@ -2420,16 +2427,34 @@ def api_workflow_run_diff(body: dict) -> dict:
             "aDurationMs": ad,
             "bDurationMs": bd,
             "durationDelta": bd - ad,
+            "aTokensIn": ati, "aTokensOut": ato,
+            "bTokensIn": bti, "bTokensOut": bto,
+            "tokensInDelta": bti - ati,
+            "tokensOutDelta": bto - ato,
+            "aCostUsd": round(aco, 6),
+            "bCostUsd": round(bco, 6),
+            "costDelta": round(bco - aco, 6),
             "statusChanged": ax.get("status") != bx.get("status"),
             "onlyA": nid not in nrb,
             "onlyB": nid not in nra,
         })
     # 요약 집계
     summary = {
-        "a": {"status": ra.get("status"), "duration": max(0, (ra.get("finishedAt") or 0) - (ra.get("startedAt") or 0))},
-        "b": {"status": rb.get("status"), "duration": max(0, (rb.get("finishedAt") or 0) - (rb.get("startedAt") or 0))},
+        "a": {
+            "status": ra.get("status"),
+            "duration": max(0, (ra.get("finishedAt") or 0) - (ra.get("startedAt") or 0)),
+            "tokensIn": total_a_in, "tokensOut": total_a_out, "costUsd": round(total_a_cost, 6),
+        },
+        "b": {
+            "status": rb.get("status"),
+            "duration": max(0, (rb.get("finishedAt") or 0) - (rb.get("startedAt") or 0)),
+            "tokensIn": total_b_in, "tokensOut": total_b_out, "costUsd": round(total_b_cost, 6),
+        },
     }
     summary["durationDelta"] = summary["b"]["duration"] - summary["a"]["duration"]
+    summary["tokensInDelta"] = total_b_in - total_a_in
+    summary["tokensOutDelta"] = total_b_out - total_a_out
+    summary["costDelta"] = round(total_b_cost - total_a_cost, 6)
     return {"ok": True, "summary": summary, "nodes": out}
 
 

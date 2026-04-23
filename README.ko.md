@@ -12,7 +12,7 @@ _50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.25.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.25.1-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-아키텍처)
 
 </div>
@@ -40,7 +40,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.25.0 🇰🇷│
+│  💤  LazyClaude                                     v2.25.1 🇰🇷│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 신기능│   🔀 워크플로우                                       │
 │ 🏠 메인 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -86,6 +86,12 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 | ![Claude Docs](./docs/screenshots/ko/claudeDocs.png) | ![Prompt Library](./docs/screenshots/ko/promptLibrary.png) |
 | 👥 프로젝트 서브에이전트 | 🔗 MCP 커넥터 |
 | ![Project Agents](./docs/screenshots/ko/projectAgents.png) | ![MCP](./docs/screenshots/ko/mcp.png) |
+
+**토큰 최적화**
+
+| 🦀 RTK Optimizer (설치 · 활성 · 통계) |
+|---|
+| ![RTK Optimizer](./docs/screenshots/ko/rtk.png) |
 
 _모든 스크린샷은 `scripts/capture-screenshots.mjs` (Playwright · 1440×900 @2x) 로 자동 생성. UI 변경 후 재생성._
 
@@ -300,7 +306,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.25.0)
+## 🔢 통계 (v2.25.1)
 
 | 지표 | 값 |
 |---|---|

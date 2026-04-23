@@ -940,6 +940,14 @@ NEW_EN = {
     "이벤트": "Events",
     "토큰 입력": "Tokens in",
     "토큰 출력": "Tokens out",
+    # v2.25.1 — Costs bucket toggle + Run diff token delta
+    "costs_month_header": "Monthly costs (source stack)",
+    "costs_week_header": "Weekly costs (source stack)",
+    "costs_bucket_day": "Day",
+    "costs_bucket_week": "Week",
+    "costs_bucket_month": "Month",
+    "diff_highlight_hint": "Nodes with status or token changes are highlighted.",
+    "토큰": "Tokens",
 }
 
 NEW_ZH = {
@@ -1876,4 +1884,12 @@ NEW_ZH = {
     "이벤트": "事件",
     "토큰 입력": "输入 Token",
     "토큰 출력": "输出 Token",
+    # v2.25.1 — Costs bucket toggle + Run diff token delta
+    "costs_month_header": "月度费用（按源堆叠）",
+    "costs_week_header": "周费用（按源堆叠）",
+    "costs_bucket_day": "日",
+    "costs_bucket_week": "周",
+    "costs_bucket_month": "月",
+    "diff_highlight_hint": "状态或 token 变化的节点已高亮。",
+    "토큰": "Token",
 }

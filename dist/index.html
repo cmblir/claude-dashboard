@@ -5557,8 +5557,21 @@ async function _wfDiffRuns(aId, bId) {
     const color = d > 0 ? 'var(--warn)' : 'var(--ok)';
     return `<span style="color:${color}">${sign}${fmtDur(Math.abs(d))}</span>`;
   };
+  const fmtTokDelta = (d) => {
+    if (!d) return '<span class="text-[var(--text-dim)]">=</span>';
+    const sign = d > 0 ? '+' : '';
+    const color = d > 0 ? 'var(--warn)' : 'var(--ok)';
+    return `<span style="color:${color}">${sign}${d.toLocaleString()}</span>`;
+  };
+  const fmtCostDelta = (d) => {
+    if (!d) return '<span class="text-[var(--text-dim)]">=</span>';
+    const sign = d > 0 ? '+' : '';
+    const color = d > 0 ? 'var(--warn)' : 'var(--ok)';
+    return `<span style="color:${color}">${sign}$${Math.abs(d).toFixed(4)}</span>`;
+  };
   const rows = (r.nodes || []).map(n => {
-    const changed = n.statusChanged || n.onlyA || n.onlyB;
+    const changed = n.statusChanged || n.onlyA || n.onlyB || n.tokensInDelta || n.tokensOutDelta;
+    const tokDelta = (n.tokensInDelta||0) + (n.tokensOutDelta||0);
     return `
       <tr class="${changed?'bg-[var(--bg-hover)]':''}">
         <td class="py-1 px-2 font-mono text-[10px]">${escapeHtml(n.nodeId)}</td>
@@ -5567,15 +5580,20 @@ async function _wfDiffRuns(aId, bId) {
         <td class="py-1 px-2 text-center">${iconFor(n.bStatus)}</td>
         <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtDur(n.bDurationMs||0)}</td>
         <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtDelta(n.durationDelta)}</td>
+        <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtTokDelta(tokDelta)}</td>
+        <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtCostDelta(n.costDelta||0)}</td>
       </tr>
     `;
   }).join('');
   const s = r.summary;
+  const totalTokDelta = (s.tokensInDelta||0) + (s.tokensOutDelta||0);
   const summaryHtml = `
-    <div class="flex items-center gap-4 text-[11px] mb-3 pb-2 border-b border-[var(--border)]">
-      <div>A: ${iconFor(s.a.status)} <span class="font-mono">${fmtDur(s.a.duration)}</span></div>
-      <div>B: ${iconFor(s.b.status)} <span class="font-mono">${fmtDur(s.b.duration)}</span></div>
-      <div>Δ: ${fmtDelta(s.durationDelta)}</div>
+    <div class="flex items-center gap-4 text-[11px] mb-3 pb-2 border-b border-[var(--border)] flex-wrap">
+      <div>A: ${iconFor(s.a.status)} <span class="font-mono">${fmtDur(s.a.duration)}</span> <span class="text-[var(--text-dim)]">· ${(s.a.tokensIn||0)+(s.a.tokensOut||0)} tok · $${(s.a.costUsd||0).toFixed(4)}</span></div>
+      <div>B: ${iconFor(s.b.status)} <span class="font-mono">${fmtDur(s.b.duration)}</span> <span class="text-[var(--text-dim)]">· ${(s.b.tokensIn||0)+(s.b.tokensOut||0)} tok · $${(s.b.costUsd||0).toFixed(4)}</span></div>
+      <div>Δ ${t('지연')}: ${fmtDelta(s.durationDelta)}</div>
+      <div>Δ ${t('토큰')}: ${fmtTokDelta(totalTokDelta)}</div>
+      <div>Δ ${t('비용')}: ${fmtCostDelta(s.costDelta||0)}</div>
     </div>
   `;
   showModal(`
@@ -5595,13 +5613,15 @@ async function _wfDiffRuns(aId, bId) {
               <th class="text-right py-1 px-2">A ${t('지연')}</th>
               <th class="text-center py-1 px-2">B</th>
               <th class="text-right py-1 px-2">B ${t('지연')}</th>
-              <th class="text-right py-1 px-2">Δ</th>
+              <th class="text-right py-1 px-2">Δ ${t('지연')}</th>
+              <th class="text-right py-1 px-2">Δ ${t('토큰')}</th>
+              <th class="text-right py-1 px-2">Δ ${t('비용')}</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
-      <div class="text-[10px] text-[var(--text-dim)] mt-2">${t('상태가 달라지거나 한쪽에만 있는 노드는 하이라이트.')}</div>
+      <div class="text-[10px] text-[var(--text-dim)] mt-2">${t('diff_highlight_hint', '상태/토큰 변화가 있는 노드는 하이라이트.')}</div>
     </div>
   `, { narrow: false });
 }
@@ -13908,12 +13928,48 @@ async function _rtkViewConfig() {
 // ────────────────────────────────────────────────────────────────
 // COSTS TIMELINE (v2.20.0) — 모든 플레이그라운드/워크플로우 비용 통합
 // ────────────────────────────────────────────────────────────────
+function _costsSetBucket(mode) {
+  state.data._costsBucket = mode;
+  renderView();
+}
+
+function _costsBucket(days, mode) {
+  // days: [{day:'YYYY-MM-DD', count, usd, sources:{...}}]
+  if (mode === 'day' || !mode) return days;
+  const buckets = new Map();
+  for (const d of days) {
+    let key;
+    if (mode === 'month') {
+      key = d.day.slice(0, 7);  // YYYY-MM
+    } else {
+      // week: ISO week key (Monday-start)
+      const dt = new Date(d.day + 'T00:00:00Z');
+      const tmp = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
+      const dayNum = (tmp.getUTCDay() + 6) % 7;  // Mon=0
+      tmp.setUTCDate(tmp.getUTCDate() - dayNum + 3);
+      const jan4 = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 4));
+      const week = 1 + Math.round(((tmp - jan4) / 86400000 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
+      key = `${tmp.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+    }
+    let b = buckets.get(key);
+    if (!b) { b = { day: key, count: 0, usd: 0, sources: {} }; buckets.set(key, b); }
+    b.count += d.count || 0;
+    b.usd = +(b.usd + (d.usd || 0)).toFixed(6);
+    for (const [src, usd] of Object.entries(d.sources || {})) {
+      b.sources[src] = +(((b.sources[src] || 0) + usd)).toFixed(6);
+    }
+  }
+  return [...buckets.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
 VIEWS.costsTimeline = async () => {
   const d = await api('/api/cost-timeline/summary');
   if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml(d.error||'')}</div>`;
 
   const fmtUsd = (v) => '$' + (v||0).toFixed(4);
-  const days = d.days || [];
+  const bucketMode = state.data._costsBucket || 'day';
+  const allDays = d.days || [];
+  const days = _costsBucket(allDays, bucketMode);
   const maxDay = Math.max(1, ...days.map(x => x.usd));
   const sourceColors = {
     promptCache: '#a78bfa', thinkingLab: '#818cf8', toolUseLab: '#f472b6',
@@ -14008,7 +14064,18 @@ VIEWS.costsTimeline = async () => {
     </div>
 
     <div class="card p-4 mb-4">
-      <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('일별 비용 (최근 60일, 소스별 스택)')}</div>
+      <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">
+          ${bucketMode === 'month' ? t('costs_month_header', '월별 비용 (소스별 스택)')
+            : bucketMode === 'week' ? t('costs_week_header', '주별 비용 (소스별 스택)')
+            : t('일별 비용 (최근 60일, 소스별 스택)')}
+        </div>
+        <div class="flex gap-1 text-[10px]">
+          <button class="btn ${bucketMode==='day'?'btn-primary':''}" onclick="_costsSetBucket('day')">${t('costs_bucket_day', '일')}</button>
+          <button class="btn ${bucketMode==='week'?'btn-primary':''}" onclick="_costsSetBucket('week')">${t('costs_bucket_week', '주')}</button>
+          <button class="btn ${bucketMode==='month'?'btn-primary':''}" onclick="_costsSetBucket('month')">${t('costs_bucket_month', '월')}</button>
+        </div>
+      </div>
       ${chart}
       <div class="flex items-center gap-3 flex-wrap mt-2 text-[10px] text-[var(--text-dim)]">
         ${Object.keys(sourceColors).map(s => `

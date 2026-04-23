@@ -10,6 +10,36 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.25.1] — 2026-04-23
+
+### ⚡ 자율모드 빠른 개선 3건 (C1~C3)
+
+v2.25.0 이후 backlog 의 "quick wins" 를 자율모드로 일괄 반영.
+
+**C1 · RTK 탭 스크린샷을 README 3종에 반영**
+- 이미 생성되어 있던 `docs/screenshots/{ko,en,zh}/rtk.png` (각 200KB+) 가 README 에서 참조되지 않고 있던 것을 정리.
+- 영문/한글/중문 README 의 스크린샷 섹션 하단에 "Token Optimization / 토큰 최적화 / Token 优化" 섹션 추가.
+
+**C2 · CostsTimeline 주/월별 뷰 토글**
+- `VIEWS.costsTimeline` 차트 헤더에 `일 / 주 / 월` 토글 버튼 추가.
+- 클라이언트 사이드에서 일별 `days` 데이터를 ISO 주(월요일 시작) / YYYY-MM 단위로 재집계 (`_costsBucket` 헬퍼).
+- `state.data._costsBucket` 으로 선택 상태 유지, 탭 재진입 시 복원.
+
+**C3 · Workflow run diff 에 토큰/비용 변화량**
+- `api_workflow_run_diff` 응답 확장:
+  - 노드별: `aTokensIn/Out`, `bTokensIn/Out`, `tokensInDelta`, `tokensOutDelta`, `aCostUsd`, `bCostUsd`, `costDelta`
+  - 요약: `a/b.tokensIn/Out/costUsd`, `tokensInDelta`, `tokensOutDelta`, `costDelta`
+- UI 테이블에 `Δ 토큰` `Δ 비용` 컬럼 추가, 하이라이트 조건에 토큰 변화 반영.
+- 요약 줄에 `A tok $` · `B tok $` · `Δ 토큰` · `Δ 비용` 모두 노출.
+
+**i18n** — costs_bucket_day/week/month · 토큰 · diff_highlight_hint 등 8 키 추가 × ko/en/zh.
+
+**검증**
+- 54/54 탭 smoke 통과
+- CostsTimeline Playwright smoke — day/week/month 헤더 전환 모두 확인
+- i18n 정합성 통과
+
+---
 ## [2.25.0] — 2026-04-23
 
 ### 🆕 OMC/OMX gap 흡수 세션 (자율모드 큐 소진)
