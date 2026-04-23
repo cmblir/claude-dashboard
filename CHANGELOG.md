@@ -10,6 +10,42 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.17.0] — 2026-04-23
+
+### 🚨 Batch 비용 가드 (batchJobs 확장)
+
+Message Batches 제출 전 **예상 비용/토큰**을 계산해 임계치 초과 시 거부.
+
+**설정**
+- `~/.claude-dashboard-batch-budget.json` — `{enabled, maxPerBatchUsd, maxPerBatchTokens}`
+- 기본: **disabled** · $1.00 · 100,000 tokens
+- 사용자가 명시 활성화해야 작동 (기존 동작 유지)
+
+**예상 비용 계산 (`_estimate_batch_cost`)**
+- input_tokens 근사치 = Σ `len(prompt) // 4`
+- output_tokens = `max_tokens × len(prompts)`
+- 가격표: Opus/Sonnet/Haiku 3 모델 per-1M-token 단가
+- **50% 할인 적용** (Anthropic Message Batches 공식 정책, 2026-04 기준)
+
+**제출 시 플로우**
+1. `api_batch_create` 상단에서 예상 계산
+2. `budget.enabled` 이면 USD · tokens 두 임계치 모두 체크
+3. 초과 시 `{ok:False, budgetExceeded:True, estimate, budget}` 반환
+4. 프론트에서 confirmModal 로 차단 사유 + 예상 비용 · 토큰 상세 표시
+
+**UI 추가**
+- batchJobs 탭 상단에 **가드 상태 배너** (ON/OFF + 한도 표시 + ⚙️ 임계치 편집 버튼)
+- "임계치 편집" 모달: enabled 토글 · maxPerBatchUsd · maxPerBatchTokens
+- 제출 시 budgetExceeded 응답 오면 상세 모달 자동 노출
+
+**Architecture**
+- `server/batch_jobs.py` 확장: `_load_budget` · `_save_budget` · `_estimate_batch_cost` · `_PRICING` · `_BATCH_DISCOUNT=0.5` · `api_batch_budget_{get,set}`
+- `api_batch_create` 에 pre-submit 가드
+- `server/routes.py` 2 라우트 (GET budget · POST budget/set)
+- `dist/index.html::VIEWS.batchJobs`: 가드 상태 배너 + `bjEditBudget` modal
+- `bjSubmit` 에 `budgetExceeded` 분기
+- `tools/translations_manual_9.py` 11 키 × ko/en/zh
+
 ## [2.16.0] — 2026-04-23
 
 ### 📝 Prompt Library — 신규 탭 `promptLibrary`

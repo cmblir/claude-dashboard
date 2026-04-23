@@ -652,6 +652,28 @@ NEW_EN = {
     "제목/본문/태그 검색": "Search by title / body / tag",
     "일치하는 프롬프트 없음": "No matching prompts",
     "이 프롬프트를 삭제할까요?": "Delete this prompt?",
+
+    # ── v2.17.0 Batch 비용 가드 ─────────────────────────────────
+    "비용 가드 ON": "Cost guard ON",
+    "비용 가드 OFF": "Cost guard OFF",
+    "비용 가드 활성화": "Enable cost guard",
+    "Batch 당 한도": "Per-batch limit",
+    "Batch 당 최대 비용": "Per-batch max USD",
+    "Batch 당 최대 토큰": "Per-batch max tokens",
+    "임계치 편집": "Edit limits",
+    "Batch 비용 가드": "Batch cost guard",
+    "비용 가드 차단": "Cost guard blocked",
+    "활성화 시 제출 전에 예상 비용/토큰을 계산해 한도 초과면 거부합니다. Anthropic Message Batches 는 정가의 50% 이므로 예상은 이미 할인가입니다.":
+        "When enabled, estimated cost/tokens are checked before submit and blocked if over limit. Anthropic Message Batches is 50% of list price, so the estimate is already the discounted price.",
+    "임계치 편집 버튼으로 한도를 올리거나 프롬프트 수를 줄이세요.":
+        "Raise the limits via Edit or reduce the prompt count.",
+    # extractor noise — 모달 조각 (t() 호출 대상 아님)
+    "(입력": "(in",
+    "(정가": "(list",
+    "+ 출력": "+ out",
+    "n예상 비용": "n expected cost",
+    "n예상 토큰": "n expected tokens",
+    "× 50% 배치 할인)": "× 50% batch discount)",
     "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
         "Provide a document and use citations.enabled to get answers with precise citation spans. Hover [N] in the answer to highlight the matching range in the source.",
     "문서 제목 (선택)": "Document title (optional)",
@@ -1457,6 +1479,28 @@ NEW_ZH = {
     "제목/본문/태그 검색": "按标题/正文/标签搜索",
     "일치하는 프롬프트 없음": "无匹配的提示",
     "이 프롬프트를 삭제할까요?": "删除此提示?",
+
+    # ── v2.17.0 Batch 费用保护 ────────────────────────────────
+    "비용 가드 ON": "费用保护 ON",
+    "비용 가드 OFF": "费用保护 OFF",
+    "비용 가드 활성화": "启用费用保护",
+    "Batch 당 한도": "每批次限额",
+    "Batch 당 최대 비용": "每批次最大 USD",
+    "Batch 당 최대 토큰": "每批次最大 Token",
+    "임계치 편집": "编辑限额",
+    "Batch 비용 가드": "批次费用保护",
+    "비용 가드 차단": "费用保护阻止",
+    "활성화 시 제출 전에 예상 비용/토큰을 계산해 한도 초과면 거부합니다. Anthropic Message Batches 는 정가의 50% 이므로 예상은 이미 할인가입니다.":
+        "启用后将在提交前估算费用/令牌并在超限时拒绝。Anthropic Message Batches 为定价的 50%,估算值已是折扣价。",
+    "임계치 편집 버튼으로 한도를 올리거나 프롬프트 수를 줄이세요.":
+        "通过编辑按钮提高限额或减少提示数量。",
+    # extractor noise
+    "(입력": "(in",
+    "(정가": "(list",
+    "+ 출력": "+ out",
+    "n예상 비용": "n expected cost",
+    "n예상 토큰": "n expected tokens",
+    "× 50% 배치 할인)": "× 50% batch discount)",
     "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
         "提供文档并启用 citations.enabled 以获得带精确引用片段的答案。将鼠标悬停在答案中的 [N] 上可高亮原文对应区间。",
     "문서 제목 (선택)": "文档标题（可选）",

@@ -7642,9 +7642,10 @@ async function tuSubmitToolResult(msgIdx, _blockIdx, toolUseId) {
 // 대용량 프롬프트 배치 제출 · 상태 폴링 · JSONL 결과 다운로드
 // ────────────────────────────────────────────────────────────────
 VIEWS.batchJobs = async () => {
-  const [ex, lst] = await Promise.all([
+  const [ex, lst, bud] = await Promise.all([
     api('/api/batch/examples'),
     api('/api/batch/list'),
+    api('/api/batch/budget'),
   ]);
   state.data.bj = state.data.bj || {
     model: 'claude-haiku-4-5',
@@ -7654,6 +7655,7 @@ VIEWS.batchJobs = async () => {
     lastResults: null,
   };
   const bj = state.data.bj;
+  const budget = (bud && bud.budget) || { enabled: false, maxPerBatchUsd: 1.0, maxPerBatchTokens: 100000 };
 
   const exBtns = (ex.examples || []).map(e =>
     `<button class="chip" onclick="bjLoadExample('${e.id}')">${t(e.label)}</button>`
@@ -7693,6 +7695,16 @@ VIEWS.batchJobs = async () => {
         ${t('Message Batches API 로 여러 프롬프트를 병렬 제출하고 상태 · JSONL 결과를 확인.')}
       </p>
       ${needKey ? `<div class="mt-2 text-[11px] text-[var(--warn)]">⚠️ ${t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요')}</div>` : ''}
+    </div>
+
+    <div class="card p-3 mb-4 flex items-center gap-3 flex-wrap" style="border-left:3px solid ${budget.enabled?'var(--accent)':'var(--border)'};">
+      <div class="text-[11px] ${budget.enabled?'':'text-[var(--text-dim)]'}">
+        <span class="font-semibold">${budget.enabled ? '🚨 ' + t('비용 가드 ON') : '🔒 ' + t('비용 가드 OFF')}</span>
+      </div>
+      <div class="text-[11px] text-[var(--text-dim)] font-mono">
+        ${t('Batch 당 한도')} · $${(budget.maxPerBatchUsd||0).toFixed(2)} · ${(budget.maxPerBatchTokens||0).toLocaleString()} tokens
+      </div>
+      <button class="btn btn-sm ml-auto" onclick="bjEditBudget()">⚙️ ${t('임계치 편집')}</button>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -7776,6 +7788,16 @@ async function bjSubmit() {
       body: JSON.stringify({ model: bj.model, maxTokens: bj.maxTokens, prompts }),
     }).then(x => x.json());
     if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent=''; return; }
+    if (r.budgetExceeded) {
+      const est = r.estimate || {};
+      await confirmModal({
+        title: '🚨 ' + t('비용 가드 차단'),
+        message: `${r.error}\n\n예상 비용: $${(est.usd||0).toFixed(4)} (정가 $${(est.usdFull||0).toFixed(4)} × 50% 배치 할인)\n예상 토큰: ${(est.totalTokens||0).toLocaleString()} (입력 ${(est.inputTokens||0).toLocaleString()} + 출력 ${(est.outputTokens||0).toLocaleString()})\n\n${t('임계치 편집 버튼으로 한도를 올리거나 프롬프트 수를 줄이세요.')}`,
+        confirmLabel: t('확인'),
+      });
+      if (st) st.textContent = '';
+      return;
+    }
     if (!r.ok) { toast(r.error || t('제출 실패'), 'err'); if (st) st.textContent=''; return; }
     toast(t('배치 제출 완료') + ': ' + (r.batchId||''), 'ok');
     if (st) st.textContent = '';
@@ -7787,6 +7809,48 @@ async function bjSubmit() {
 }
 async function bjRefresh() {
   await renderView();
+}
+async function bjEditBudget() {
+  const r = await api('/api/batch/budget');
+  const cur = (r && r.budget) || { enabled: false, maxPerBatchUsd: 1.0, maxPerBatchTokens: 100000 };
+  const html = `
+    <div class="space-y-3 text-[12px]">
+      <label class="flex items-center gap-2 cursor-pointer select-none">
+        <input type="checkbox" id="bjBudEnabled" ${cur.enabled?'checked':''}>
+        <span>${t('비용 가드 활성화')}</span>
+      </label>
+      <div>
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('Batch 당 최대 비용')} ($)</label>
+        <input type="text" inputmode="decimal" id="bjBudUsd" class="input" value="${cur.maxPerBatchUsd}">
+      </div>
+      <div>
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('Batch 당 최대 토큰')}</label>
+        <input type="text" inputmode="numeric" id="bjBudTokens" class="input" value="${cur.maxPerBatchTokens}">
+      </div>
+      <div class="text-[10px] text-[var(--text-dim)]">
+        ${t('활성화 시 제출 전에 예상 비용/토큰을 계산해 한도 초과면 거부합니다. Anthropic Message Batches 는 정가의 50% 이므로 예상은 이미 할인가입니다.')}
+      </div>
+    </div>
+  `;
+  showModal(html, {
+    title: '⚙️ ' + t('Batch 비용 가드'),
+    narrow: true,
+    buttons: [
+      { label: t('취소'), action: 'cancel' },
+      { label: t('저장'), primary: true, action: async () => {
+          const enabled = document.getElementById('bjBudEnabled').checked;
+          const usd = parseFloat(document.getElementById('bjBudUsd').value) || 0;
+          const tokens = parseInt((document.getElementById('bjBudTokens').value||'').replace(/\D/g,'')) || 0;
+          const r = await fetch('/api/batch/budget/set', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ enabled, maxPerBatchUsd: usd, maxPerBatchTokens: tokens }),
+          }).then(x => x.json());
+          if (r.ok) { toast(t('저장 완료'), 'ok'); closeModal(); renderView(); }
+          else toast(r.error || t('저장 실패'), 'err');
+        }
+      },
+    ],
+  });
 }
 async function bjSelect(id) {
   state.data.bj = state.data.bj || {};

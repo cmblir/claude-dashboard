@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from pathlib import Path
 from typing import Any
 
 from .ai_keys import load_api_keys
@@ -21,6 +22,102 @@ from .logger import log
 
 _BASE = "https://api.anthropic.com/v1/messages/batches"
 _TIMEOUT = 60
+
+# ───────── 비용 가드 (v2.17.0) ─────────
+
+from .config import _env_path  # noqa: E402
+
+_BUDGET_PATH = _env_path(
+    "CLAUDE_DASHBOARD_BATCH_BUDGET",
+    Path.home() / ".claude-dashboard-batch-budget.json",
+) if False else None  # 아래에서 import 후 재정의
+
+
+# 모델별 per-1M-tokens 단가 (promptCache/modelBench 에서 쓰는 값과 동기)
+_PRICING = {
+    "claude-opus-4-7":    {"in": 15.0, "out": 75.0},
+    "claude-sonnet-4-6":  {"in": 3.0,  "out": 15.0},
+    "claude-haiku-4-5":   {"in": 0.8,  "out": 4.0},
+}
+
+# batch 는 50% 할인 적용 (Anthropic Message Batches 공식 가격 정책, 2026-04 기준)
+_BATCH_DISCOUNT = 0.5
+
+
+def _budget_path() -> Path:
+    from .config import _env_path as _ep
+    return _ep(
+        "CLAUDE_DASHBOARD_BATCH_BUDGET",
+        Path.home() / ".claude-dashboard-batch-budget.json",
+    )
+
+
+def _load_budget() -> dict:
+    p = _budget_path()
+    if not p.exists():
+        return {"enabled": False, "maxPerBatchUsd": 1.00, "maxPerBatchTokens": 100000}
+    try:
+        import json as _json
+        data = _json.loads(p.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return {"enabled": False, "maxPerBatchUsd": 1.00, "maxPerBatchTokens": 100000}
+        data.setdefault("enabled", False)
+        data.setdefault("maxPerBatchUsd", 1.00)
+        data.setdefault("maxPerBatchTokens", 100000)
+        return data
+    except Exception:
+        return {"enabled": False, "maxPerBatchUsd": 1.00, "maxPerBatchTokens": 100000}
+
+
+def _save_budget(data: dict) -> bool:
+    import json as _json
+    try:
+        p = _budget_path()
+        p.write_text(_json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except Exception as e:
+        log.warning("batch budget save failed: %s", e)
+        return False
+
+
+def _estimate_batch_cost(model: str, prompts: list[str], max_tokens: int) -> dict:
+    """prompt 길이(char) / 4 를 input 토큰 근사치로 사용."""
+    price = _PRICING.get(model, {"in": 3.0, "out": 15.0})
+    input_tokens = sum(max(1, len(p) // 4) for p in prompts if isinstance(p, str))
+    output_tokens = max_tokens * len(prompts)
+    total_tokens = input_tokens + output_tokens
+    usd_full = (input_tokens / 1_000_000) * price["in"] + (output_tokens / 1_000_000) * price["out"]
+    usd = usd_full * _BATCH_DISCOUNT
+    return {
+        "inputTokens": input_tokens,
+        "outputTokens": output_tokens,
+        "totalTokens": total_tokens,
+        "usd": round(usd, 6),
+        "usdFull": round(usd_full, 6),
+    }
+
+
+def api_batch_budget_get(_q: dict | None = None) -> dict:
+    return {"ok": True, "budget": _load_budget(), "pricing": _PRICING, "discount": _BATCH_DISCOUNT}
+
+
+def api_batch_budget_set(body: dict) -> dict:
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "body must be object"}
+    cur = _load_budget()
+    cur["enabled"] = bool(body.get("enabled", cur.get("enabled", False)))
+    try:
+        cur["maxPerBatchUsd"] = float(body.get("maxPerBatchUsd", cur.get("maxPerBatchUsd", 1.0)))
+    except Exception:
+        return {"ok": False, "error": "maxPerBatchUsd must be number"}
+    try:
+        cur["maxPerBatchTokens"] = int(body.get("maxPerBatchTokens", cur.get("maxPerBatchTokens", 100000)))
+    except Exception:
+        return {"ok": False, "error": "maxPerBatchTokens must be int"}
+    if cur["maxPerBatchUsd"] < 0 or cur["maxPerBatchTokens"] < 0:
+        return {"ok": False, "error": "limits must be non-negative"}
+    _save_budget(cur)
+    return {"ok": True, "budget": cur}
 
 BATCH_EXAMPLES: list[dict] = [
     {
@@ -131,9 +228,28 @@ def api_batch_create(body: dict) -> dict:
     if len(prompts) > 1000:
         return {"ok": False, "error": "prompts 최대 1000 건까지"}
 
+    # v2.17.0 — 비용 가드: 활성화 시 예상 cost/tokens > 임계치 이면 거부
+    budget = _load_budget()
+    estimate = _estimate_batch_cost(model, prompts, max_tokens)
+    if budget.get("enabled"):
+        reasons = []
+        if estimate["usd"] > budget.get("maxPerBatchUsd", 1.0):
+            reasons.append(f"예상 ${estimate['usd']:.4f} > 한도 ${budget['maxPerBatchUsd']:.2f}")
+        if estimate["totalTokens"] > budget.get("maxPerBatchTokens", 100000):
+            reasons.append(f"예상 {estimate['totalTokens']:,} tokens > 한도 {budget['maxPerBatchTokens']:,}")
+        if reasons:
+            return {
+                "ok": False,
+                "budgetExceeded": True,
+                "estimate": estimate,
+                "budget": budget,
+                "error": "Batch 가드: " + " · ".join(reasons),
+            }
+
     api_key = _anthropic_key()
     if not api_key:
-        return {"ok": False, "needKey": True, "error": "ANTHROPIC_API_KEY 미설정"}
+        return {"ok": False, "needKey": True, "error": "ANTHROPIC_API_KEY 미설정",
+                "estimate": estimate}
 
     requests_list = []
     for i, p in enumerate(prompts):
@@ -166,6 +282,7 @@ def api_batch_create(body: dict) -> dict:
         "createdAt": data.get("created_at"),
         "count": len(requests_list),
         "durationMs": duration,
+        "estimate": estimate,
         "raw": data,
     }
 
