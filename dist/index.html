@@ -2851,6 +2851,12 @@ function _wfBindCanvas() {
     // Ctrl/Cmd 단축키
     const mod = e.ctrlKey || e.metaKey;
 
+    // Alt+C → 노드 편집기 카테고리 접기/펴기
+    if (e.altKey && (e.key === 'c' || e.key === 'C')) {
+      const topWin = document.querySelector('.feat-win[id^="wfNodeEdit_"]');
+      if (topWin && topWin._wfDraft) { e.preventDefault(); _wfToggleCat(topWin.id); return; }
+    }
+
     // Ctrl+Z → 실행 취소
     if (mod && e.key === 'z' && !e.shiftKey && !inInput) {
       e.preventDefault(); _wfUndo(); return;
@@ -3258,6 +3264,34 @@ function _wfPickNodeType(winId, type) {
   else if (type === 'delay') draft.data = { delayMs:1000, delayType:'fixed', maxDelayMs:5000 };
   else draft.data = {};
   if (!draft.title) draft.title = WF_TYPE_MAP[type].label;
+  // 타입 선택 직후 카테고리 그리드 자동 접힘 (UX 개선)
+  try { localStorage.setItem('wfEditorCatExpanded', 'false'); } catch(e) {}
+  _wfRenderEditorBody(winId);
+  // 첫 입력 필드에 포커스 (제목 또는 subject)
+  setTimeout(() => {
+    const w2 = document.getElementById(winId);
+    if (!w2) return;
+    const first = w2.querySelector('.feat-win-body input, .feat-win-body textarea, .feat-win-body select');
+    if (first) first.focus();
+  }, 50);
+}
+
+function _wfCatIsExpanded(draft) {
+  // 기존 노드(type 이미 정해짐)는 기본 접힘, 신규는 펼침.
+  // 사용자 토글은 localStorage 에 per-type 기억.
+  if (!draft.type) return true;
+  const saved = localStorage.getItem('wfEditorCatExpanded');
+  if (saved === 'true') return true;
+  if (saved === 'false') return false;
+  return false; // 기존 노드 기본 접힘
+}
+
+function _wfToggleCat(winId) {
+  const w = document.getElementById(winId);
+  if (!w) return;
+  const draft = w._wfDraft;
+  const cur = _wfCatIsExpanded(draft);
+  localStorage.setItem('wfEditorCatExpanded', (!cur).toString());
   _wfRenderEditorBody(winId);
 }
 
@@ -3269,19 +3303,46 @@ function _wfRenderEditorBody(winId) {
   const formHost = document.getElementById(winId + '-form');
   if (!catHost || !formHost) return;
 
-  catHost.innerHTML = `
-    <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('카테고리')}</div>
-    <div class="grid grid-cols-3 gap-2">
-      ${WF_NODE_TYPES.map(tp => `
-        <button class="btn text-[11px] ${draft.type === tp.id ? 'btn-active' : ''}"
-                onclick="_wfPickNodeType('${winId}','${tp.id}')"
-                title="${escapeHtml(t(tp.desc))}"
-                style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;">
-          <div style="font-size:1.4rem;line-height:1;">${tp.icon}</div>
-          <div style="font-size:11px;">${t(tp.label)}</div>
-        </button>`).join('')}
-    </div>
-  `;
+  const expanded = _wfCatIsExpanded(draft);
+  const curMeta = draft.type ? WF_TYPE_MAP[draft.type] : null;
+
+  if (expanded) {
+    catHost.innerHTML = `
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('카테고리')}</div>
+        ${curMeta ? `<button class="btn text-[11px]" onclick="_wfToggleCat('${winId}')" title="Alt+C">▾ ${t('접기')}</button>` : ''}
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        ${WF_NODE_TYPES.map(tp => `
+          <button class="btn text-[11px] ${draft.type === tp.id ? 'btn-active' : ''}"
+                  onclick="_wfPickNodeType('${winId}','${tp.id}')"
+                  title="${escapeHtml(t(tp.desc))}"
+                  style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;">
+            <div style="font-size:1.4rem;line-height:1;">${tp.icon}</div>
+            <div style="font-size:11px;">${t(tp.label)}</div>
+          </button>`).join('')}
+      </div>
+    `;
+  } else if (curMeta) {
+    // 접힌 상태: 현재 타입 칩 + "타입 변경" 버튼
+    catHost.innerHTML = `
+      <div class="flex items-center gap-2 flex-wrap py-1">
+        <span class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('타입')}</span>
+        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg"
+              style="background:rgba(217,119,87,0.12);border:1px solid rgba(217,119,87,0.35);">
+          <span style="font-size:1.1rem;line-height:1;">${curMeta.icon}</span>
+          <span class="text-[12px] font-semibold" style="color:var(--text)">${t(curMeta.label)}</span>
+        </span>
+        <button class="btn text-[11px]" onclick="_wfToggleCat('${winId}')" title="Alt+C">
+          ▸ ${t('타입 변경')}
+        </button>
+      </div>
+    `;
+  } else {
+    // type 없는데 접힘 상태로 진입한 경우 — 펼침 강제
+    localStorage.setItem('wfEditorCatExpanded', 'true');
+    return _wfRenderEditorBody(winId);
+  }
 
   if (!draft.type) {
     formHost.innerHTML = `

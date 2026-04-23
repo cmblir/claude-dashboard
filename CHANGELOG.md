@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.10.1] — 2026-04-23
+
+### 🪟 노드 편집 모달 — 카테고리 그리드 접기
+
+사용자 피드백 스크린샷: 노드 편집 모달 하단의 제목/모델/subject 등 필드가 항상 스크롤해야만 보임.
+
+**원인**: `_wfRenderEditorBody` 가 타입 선택 여부와 무관하게 16개 노드 타입 그리드를 3열 × 4~6행으로 **항상 펼쳐서** 표시 → 720px 모달에서 약 160~200px(25~30%) 를 카테고리가 점유.
+
+**수정**
+- **기존 노드 편집** (type 이미 세팅): 기본 **접힘** — `[아이콘] [타입 라벨] 칩 · ▸ 타입 변경` 한 줄(≈48px)만 표시. 폼 영역에 +110~150px 추가 확보.
+- **신규 노드 추가** (type 없음): 기본 **펼침** (기존 UX 유지).
+- **타입 선택 직후 자동 접힘** + 첫 입력 필드(제목/subject 등) autofocus.
+- **토글 버튼** `▾ 접기` / `▸ 타입 변경` (tooltip: `Alt+C`).
+- **단축키** `Alt+C` — 워크플로우 탭에서 노드 편집 창이 열려 있을 때 토글.
+- **localStorage 기억** (`wfEditorCatExpanded`): 사용자 취향 영속.
+
+**Architecture**
+- `dist/index.html`:
+  * `_wfCatIsExpanded(draft)` · `_wfToggleCat(winId)` 신규
+  * `_wfRenderEditorBody` 가 expanded 분기로 재구성 (접힘 시 칩 + 변경 버튼)
+  * `_wfPickNodeType` 종료 후 localStorage 접힘 + first-field autofocus
+  * 워크플로우 키보드 핸들러에 `Alt+C` 토글 분기 추가
+- `tools/translations_manual_9.py`: 4 키 × ko/en/zh (타입 / 타입 변경 / 접기 / 펼치기)
+
 ## [2.10.0] — 2026-04-23
 
 ### 🔦 워크플로우 실행 가시성 강화
