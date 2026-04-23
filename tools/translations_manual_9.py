@@ -566,6 +566,36 @@ NEW_EN = {
     "Citations 플레이그라운드": "Citations Playground",
     "문서 + citations.enabled → 인용 span 하이라이트":
         "document + citations.enabled → highlight cited spans",
+
+    # ── v2.14.0 Agent SDK Scaffold ─────────────────────────────
+    "Agent SDK 스캐폴드": "Agent SDK Scaffold",
+    "claude-agent-sdk Python/TS 프로젝트 뼈대 생성": "Scaffold claude-agent-sdk Python/TS projects",
+    "claude-agent-sdk Python/TS 프로젝트 뼈대를 생성합니다. 생성 후 Terminal 새 창에 초기화 명령이 붙여넣기되고, Enter 로 실제 설치를 실행합니다.":
+        "Scaffold a claude-agent-sdk Python/TS project skeleton. A new Terminal window pops up with the init commands ready — press Enter to actually install.",
+    "프로젝트 이름": "Project name",
+    "영숫자/밑줄/하이픈 2~64자": "Alphanumeric / underscore / hyphen, 2~64 chars",
+    "부모 경로 (홈 내부)": "Parent path (inside $HOME)",
+    "언어": "Language",
+    "템플릿": "Template",
+    "기본": "Basic",
+    "Messages API 를 1 번 호출하고 응답을 출력하는 최소 예시.": "Minimal example that calls Messages API once and prints the response.",
+    "사용자 정의 tool 1 개를 정의하고 tool_use → tool_result 라운드 트립.": "Define one tool and do a tool_use → tool_result round-trip.",
+    "대화 히스토리를 JSON 파일에 저장하며 이어가는 예시.": "Persist conversation history to a JSON file and continue.",
+    "생성": "Create",
+    "생성 완료": "Created",
+    "생성 실패": "Create failed",
+    "생성 중…": "Creating…",
+    "프로젝트 생성 완료": "Project created",
+    "경로": "Path",
+    "Terminal 열림": "Terminal opened",
+    "AppleScript 실패": "AppleScript failed",
+    "실행할 명령 (Terminal 에서 Enter)": "Next command (press Enter in Terminal)",
+    "폴더 열기": "Open folder",
+    "폼을 작성하고 생성을 눌러주세요.": "Fill in the form and click Create.",
+    "요구 도구": "Required tools",
+    "자동 설치하지 않습니다. 없으면 생성 단계에서 친절한 에러 메시지가 표시됩니다.":
+        "Not installed automatically. A friendly error is shown if a tool is missing.",
+    "이름을 입력하세요": "Enter a name",
     "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
         "Provide a document and use citations.enabled to get answers with precise citation spans. Hover [N] in the answer to highlight the matching range in the source.",
     "문서 제목 (선택)": "Document title (optional)",
@@ -1285,6 +1315,36 @@ NEW_ZH = {
     "Citations 플레이그라운드": "引用实验室",
     "문서 + citations.enabled → 인용 span 하이라이트":
         "文档 + citations.enabled → 高亮引用片段",
+
+    # ── v2.14.0 Agent SDK 脚手架 ───────────────────────────────
+    "Agent SDK 스캐폴드": "Agent SDK 脚手架",
+    "claude-agent-sdk Python/TS 프로젝트 뼈대 생성": "生成 claude-agent-sdk Python/TS 项目骨架",
+    "claude-agent-sdk Python/TS 프로젝트 뼈대를 생성합니다. 생성 후 Terminal 새 창에 초기화 명령이 붙여넣기되고, Enter 로 실제 설치를 실행합니다.":
+        "生成 claude-agent-sdk Python/TS 项目骨架。生成后 Terminal 新窗口会显示初始化命令,按 Enter 实际安装。",
+    "프로젝트 이름": "项目名称",
+    "영숫자/밑줄/하이픈 2~64자": "字母数字/下划线/连字符,2~64 字符",
+    "부모 경로 (홈 내부)": "父路径（主目录内）",
+    "언어": "语言",
+    "템플릿": "模板",
+    "기본": "基础",
+    "Messages API 를 1 번 호출하고 응답을 출력하는 최소 예시.": "调用一次 Messages API 并打印响应的最小示例。",
+    "사용자 정의 tool 1 개를 정의하고 tool_use → tool_result 라운드 트립.": "定义一个工具并完成 tool_use → tool_result 往返。",
+    "대화 히스토리를 JSON 파일에 저장하며 이어가는 예시.": "将对话历史保存到 JSON 文件并继续的示例。",
+    "생성": "创建",
+    "생성 완료": "已创建",
+    "생성 실패": "创建失败",
+    "생성 중…": "创建中…",
+    "프로젝트 생성 완료": "项目已创建",
+    "경로": "路径",
+    "Terminal 열림": "Terminal 已打开",
+    "AppleScript 실패": "AppleScript 失败",
+    "실행할 명령 (Terminal 에서 Enter)": "接下来的命令（在 Terminal 中按 Enter）",
+    "폴더 열기": "打开文件夹",
+    "폼을 작성하고 생성을 눌러주세요.": "请填写表单并点击创建。",
+    "요구 도구": "所需工具",
+    "자동 설치하지 않습니다. 없으면 생성 단계에서 친절한 에러 메시지가 표시됩니다.":
+        "不会自动安装。缺失时在创建阶段会显示友好错误。",
+    "이름을 입력하세요": "请输入名称",
     "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
         "提供文档并启用 citations.enabled 以获得带精确引用片段的答案。将鼠标悬停在答案中的 [N] 上可高亮原文对应区间。",
     "문서 제목 (선택)": "文档标题（可选）",

@@ -931,6 +931,9 @@ const NAV = [
   { id: 'citationsLab', icon: '📑', label: 'Citations', group: 'work',
     desc: '문서 + citations.enabled → 인용 span 하이라이트',
     docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/citations' },
+  { id: 'agentSdkScaffold', icon: '🧪', label: 'Agent SDK 스캐폴드', group: 'work',
+    desc: 'claude-agent-sdk Python/TS 프로젝트 뼈대 생성',
+    docUrl: 'https://docs.anthropic.com/en/docs/claude-code/sdk/sdk-overview' },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -8276,6 +8279,154 @@ function mbDownload() {
   const a = document.createElement('a');
   a.href = url; a.download = `model-bench-${Date.now()}.json`; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ────────────────────────────────────────────────────────────────
+// AGENT SDK SCAFFOLD (v2.14.0) — claude-agent-sdk 프로젝트 뼈대 생성
+// ────────────────────────────────────────────────────────────────
+VIEWS.agentSdkScaffold = async () => {
+  const cat = await api('/api/scaffold/catalog');
+  state.data.sc = state.data.sc || {
+    name: 'my-claude-agent',
+    path: '~/code',
+    language: 'python',
+    template: 'basic',
+    lastResult: null,
+  };
+  const sc = state.data.sc;
+  const langs = cat.languages || [];
+  const templates = cat.templates || [];
+
+  const last = sc.lastResult;
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">🧪 ${t('Agent SDK 스캐폴드')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('claude-agent-sdk Python/TS 프로젝트 뼈대를 생성합니다. 생성 후 Terminal 새 창에 초기화 명령이 붙여넣기되고, Enter 로 실제 설치를 실행합니다.')}
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="space-y-3">
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('프로젝트 이름')}</label>
+          <input class="input font-mono" value="${escapeHtml(sc.name||'')}" oninput="scSet('name', this.value)" placeholder="my-claude-agent">
+          <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('영숫자/밑줄/하이픈 2~64자')}</div>
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('부모 경로 (홈 내부)')}</label>
+          <input class="input font-mono" value="${escapeHtml(sc.path||'')}" oninput="scSet('path', this.value)" placeholder="~/code">
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('언어')}</label>
+          <div class="flex gap-2 flex-wrap">
+            ${langs.map(l => `
+              <button class="chip ${sc.language===l.id?'chip-accent':''}" onclick="scSet('language','${l.id}'); renderView()">
+                ${escapeHtml(l.label)} <span class="text-[9px] text-[var(--text-dim)]">${escapeHtml(l.tool)}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('템플릿')}</label>
+          <div class="space-y-2">
+            ${templates.map(tp => `
+              <label class="card p-2 flex items-start gap-2 cursor-pointer text-[11px]" style="${sc.template===tp.id?'border-color:rgba(217,119,87,0.5);background:rgba(217,119,87,0.06);':''}">
+                <input type="radio" name="scTpl" ${sc.template===tp.id?'checked':''} onchange="scSet('template','${tp.id}'); renderView()" style="margin-top:2px;">
+                <div style="flex:1;">
+                  <div class="font-semibold">${t(tp.label)}</div>
+                  <div class="text-[var(--text-dim)] mt-0.5">${t(tp.description)}</div>
+                </div>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary" onclick="scCreate()">🚀 ${t('생성')}</button>
+          <button class="btn" onclick="scReset()">${t('초기화')}</button>
+          <span id="scStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        ${last ? (last.ok ? `
+          <div class="card p-3" style="border-left:3px solid #4ade80;">
+            <div class="font-semibold text-[13px] mb-1" style="color:#4ade80;">✅ ${t('생성 완료')}</div>
+            <div class="text-[11px] mb-2">
+              <span class="text-[var(--text-dim)]">${t('경로')}:</span>
+              <code class="font-mono ml-1">${escapeHtml(last.path||'')}</code>
+            </div>
+            <div class="text-[11px] mb-2">
+              <span class="text-[var(--text-dim)]">${t('언어')}:</span> ${escapeHtml(last.language||'')}
+              <span class="ml-3 text-[var(--text-dim)]">${t('템플릿')}:</span> ${escapeHtml(last.template||'')}
+            </div>
+            <div class="text-[11px] mb-2">
+              <span class="text-[var(--text-dim)]">${t('Terminal 열림')}:</span>
+              ${last.terminalSpawned ? '✅' : '❌ (' + t('AppleScript 실패') + ')'}
+            </div>
+            <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 mb-1">${t('실행할 명령 (Terminal 에서 Enter)')}</div>
+            <pre class="text-[10px] font-mono whitespace-pre-wrap bg-[var(--bg-alt)] p-2 rounded border border-[var(--border)]">${escapeHtml(last.nextCommand||'')}</pre>
+            <div class="mt-3">
+              <button class="btn btn-sm" onclick="openFolderFromPath('${escapeHtml(last.path||'')}')">📂 ${t('폴더 열기')}</button>
+            </div>
+          </div>
+        ` : `
+          <div class="card p-3" style="border-left:3px solid #f87171;">
+            <div class="font-semibold text-[13px] mb-1" style="color:#f87171;">❌ ${t('생성 실패')}</div>
+            <div class="text-[11px] whitespace-pre-wrap">${escapeHtml(last.error||'')}</div>
+          </div>
+        `) : `
+          <div class="card p-6 text-center text-[11px] text-[var(--text-dim)]">
+            ${t('폼을 작성하고 생성을 눌러주세요.')}
+          </div>
+        `}
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('요구 도구')}</div>
+          <div class="text-[11px] space-y-1">
+            ${langs.map(l => `
+              <div>
+                <span class="font-mono font-semibold">${escapeHtml(l.tool)}</span> —
+                <span class="text-[var(--text-dim)]">${escapeHtml(l.installHint)}</span>
+              </div>
+            `).join('')}
+          </div>
+          <div class="text-[10px] text-[var(--text-dim)] mt-2">
+            ${t('자동 설치하지 않습니다. 없으면 생성 단계에서 친절한 에러 메시지가 표시됩니다.')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+function scSet(k, v) { state.data.sc = state.data.sc || {}; state.data.sc[k] = v; }
+function scReset() { state.data.sc = null; renderView(); }
+async function scCreate() {
+  const sc = state.data.sc || {};
+  if (!(sc.name||'').trim()) { toast(t('이름을 입력하세요'), 'err'); return; }
+  const st = document.getElementById('scStatus');
+  if (st) st.textContent = t('생성 중…');
+  try {
+    const r = await fetch('/api/scaffold/create', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(sc),
+    }).then(x => x.json());
+    state.data.sc.lastResult = r;
+    if (st) st.textContent = r.ok ? t('생성 완료') : '';
+    renderView();
+    if (r.ok) toast(t('프로젝트 생성 완료'), 'ok');
+    else toast(r.error || t('생성 실패'), 'err');
+  } catch (e) {
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (st) st.textContent = '';
+  }
+}
+function openFolderFromPath(p) {
+  fetch('/api/open-folder', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ folderPath: p }),
+  });
 }
 
 // ────────────────────────────────────────────────────────────────
