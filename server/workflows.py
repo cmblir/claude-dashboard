@@ -1386,12 +1386,15 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
         if not active_nodes:
             continue
 
-        # 진행 상황: running 표시
+        # 진행 상황: running 표시 (프론트에서 elapsed 계산을 위해 startedAt 포함)
         with _LOCK:
             s = _load_all()
             if runId in s["runs"]:
+                now_ms = int(time.time() * 1000)
                 for nid in active_nodes:
-                    s["runs"][runId]["nodeResults"][nid] = {"status": "running"}
+                    s["runs"][runId]["nodeResults"][nid] = {
+                        "status": "running", "startedAt": now_ms,
+                    }
                 s["runs"][runId]["currentNodeId"] = active_nodes[0]
                 _dump_all(s)
 
@@ -1714,7 +1717,7 @@ def handle_workflow_run_stream(handler, query: dict) -> None:
             return False
 
     prev_snapshot = ""
-    max_polls = 1800  # 최대 30분 (1초 × 1800)
+    max_polls = 3600  # 최대 30분 (0.5초 × 3600)
 
     for _ in range(max_polls):
         snap = _run_status_snapshot(rid)
@@ -1733,7 +1736,7 @@ def handle_workflow_run_stream(handler, query: dict) -> None:
             _sse("done", snap_json)
             return
 
-        time.sleep(1)
+        time.sleep(0.5)
 
     # 타임아웃
     _sse("timeout", json.dumps({"error": "stream timeout"}))

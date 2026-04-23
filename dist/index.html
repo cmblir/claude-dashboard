@@ -396,11 +396,43 @@ tailwind.config = {
   .wf-node[data-type="delay"].selected .wf-node-body { stroke: #94a3b8; stroke-width: 2.5; }
   .wf-node[data-type="session"] .wf-node-body { stroke: var(--accent); stroke-width: 1.5; }
   .wf-node[data-type="subagent"] .wf-node-body { stroke: var(--accent); stroke-width: 1.5; }
-  .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2; animation: wfPulse 1.4s infinite; }
+  .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2.5; animation: wfPulse 1.2s infinite; filter: drop-shadow(0 0 8px rgba(167,139,250,0.6)); }
   .wf-node[data-status="ok"] .wf-node-body { stroke: #4ade80; stroke-width: 2; }
   .wf-node[data-status="err"] .wf-node-body { stroke: #f87171; stroke-width: 2; }
   .wf-node[data-status="skipped"] .wf-node-body { stroke: rgba(255,255,255,0.1); stroke-dasharray: 4 4; }
-  @keyframes wfPulse { 0%,100%{stroke-opacity:0.5} 50%{stroke-opacity:1} }
+  /* 회전하는 점선 외곽 링 — running 상태만 표시 */
+  .wf-node-ring { stroke: #a78bfa; stroke-width: 2; stroke-dasharray: 6 6; fill: none; opacity: 0; pointer-events: none; }
+  .wf-node[data-status="running"] .wf-node-ring { opacity: 0.8; animation: wfSpinDash 2.5s linear infinite; }
+  .wf-node-elapsed { fill: #a78bfa; font-size: 10px; font-weight: 700; pointer-events: none; opacity: 0; }
+  .wf-node[data-status="running"] .wf-node-elapsed { opacity: 1; }
+  @keyframes wfPulse { 0%,100%{stroke-opacity:0.55} 50%{stroke-opacity:1} }
+  @keyframes wfSpinDash { to { stroke-dashoffset: -24; } }
+  /* 실행 상태 배너 (캔버스 상단 플로팅) */
+  #wfRunBanner {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    z-index: 7; min-width: 360px; max-width: 640px;
+    background: var(--card); border: 1.5px solid #a78bfa;
+    border-radius: 10px; padding: 10px 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 12px rgba(167,139,250,0.3);
+    backdrop-filter: blur(8px);
+    display: flex; flex-direction: column; gap: 6px;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    font-size: 12px;
+  }
+  #wfRunBanner.visible { opacity: 1; pointer-events: auto; }
+  #wfRunBanner.state-ok { border-color: #4ade80; box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 12px rgba(74,222,128,0.3); }
+  #wfRunBanner.state-err { border-color: #f87171; box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 12px rgba(248,113,113,0.3); }
+  #wfRunBanner .wfrb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #wfRunBanner .wfrb-title { font-weight: 600; color: var(--text); }
+  #wfRunBanner .wfrb-meta { color: var(--text-dim); font-size: 11px; font-family: ui-monospace, Menlo, monospace; }
+  #wfRunBanner .wfrb-bar { flex: 1; height: 6px; background: rgba(167,139,250,0.15); border-radius: 3px; overflow: hidden; min-width: 120px; }
+  #wfRunBanner .wfrb-bar-fill { height: 100%; background: linear-gradient(90deg, #a78bfa, #c4b5fd); transition: width 0.3s; }
+  #wfRunBanner.state-ok .wfrb-bar-fill { background: linear-gradient(90deg, #4ade80, #86efac); }
+  #wfRunBanner.state-err .wfrb-bar-fill { background: linear-gradient(90deg, #f87171, #fca5a5); }
+  #wfRunBanner .wfrb-focus { padding: 4px 10px; border-radius: 6px; background: rgba(167,139,250,0.2); color: #a78bfa; font-size: 11px; cursor: pointer; border: 1px solid rgba(167,139,250,0.4); white-space: nowrap; }
+  #wfRunBanner .wfrb-focus:hover { background: rgba(167,139,250,0.35); }
+  #wfRunBanner .wfrb-close { margin-left: auto; padding: 2px 6px; border-radius: 4px; cursor: pointer; color: var(--text-dim); font-size: 14px; line-height: 1; background: transparent; border: none; }
+  #wfRunBanner .wfrb-close:hover { color: var(--text); background: rgba(255,255,255,0.08); }
   .wf-node-title { fill: var(--text); font-size: 13px; font-weight: 600; pointer-events: none; }
   .wf-node-sub { fill: var(--text-dim); font-size: 10px; pointer-events: none; }
   .wf-node-icon { font-size: 18px; pointer-events: none; }
@@ -2183,11 +2215,18 @@ function _wfRenderMinimap() {
     const b = toMini(toN.x + WF_NODE_W / 2, toN.y + WF_NODE_H / 2);
     ctx.beginPath(); ctx.moveTo(a.mx, a.my); ctx.lineTo(b.mx, b.my); ctx.stroke();
   });
-  // nodes as dots
+  // nodes as dots — 실행 상태가 있으면 status 색 우선, 없으면 node 타입 색
+  const statusColors = { running: '#a78bfa', ok: '#4ade80', err: '#f87171', skipped: 'rgba(255,255,255,0.25)' };
+  const lastResults = __wf.lastRunResults || {};
   nodes.forEach(n => {
     const c = toMini(n.x + WF_NODE_W / 2, n.y + WF_NODE_H / 2);
-    ctx.fillStyle = _WF_NODE_COLORS[n.type] || '#d97757';
-    ctx.fillRect(c.mx - 1, c.my - 1, 3, 3);
+    const r = lastResults[n.id];
+    const color = (r && statusColors[r.status]) || _WF_NODE_COLORS[n.type] || '#d97757';
+    ctx.fillStyle = color;
+    // running 은 살짝 더 크게
+    const size = (r && r.status === 'running') ? 5 : 3;
+    const offset = size / 2;
+    ctx.fillRect(c.mx - offset, c.my - offset, size, size);
   });
   // viewport rect
   const host = document.getElementById('wfCanvasHost');
@@ -2278,8 +2317,10 @@ function _wfRenderNode(n) {
   return `
     <g class="wf-node${sel}" data-node="${n.id}" data-type="${n.type}" transform="translate(${n.x},${n.y})">
       <rect class="wf-node-body" width="${WF_NODE_W}" height="${WF_NODE_H}" rx="12" ry="12"></rect>
+      <rect class="wf-node-ring" x="-4" y="-4" width="${WF_NODE_W+8}" height="${WF_NODE_H+8}" rx="14" ry="14"></rect>
       <text class="wf-node-icon" x="14" y="30">${meta.icon}</text>
       <text class="wf-node-title" x="40" y="28">${escapeHtml(n.title || meta.label)}</text>
+      <text class="wf-node-elapsed" x="${WF_NODE_W-12}" y="${WF_NODE_H-8}" text-anchor="end"></text>
       ${sub}
       ${spawnBtn}
       ${portIn}${portsOut}
@@ -3797,12 +3838,23 @@ async function _wfRun() {
 function _wfApplyRunStatus(run) {
   const results = run.nodeResults || {};
   __wf.lastRunResults = results;
+  __wf.lastRun = run;
   document.querySelectorAll('.wf-node').forEach(el => {
     const nid = el.getAttribute('data-node');
     const r = results[nid];
     if (r) el.setAttribute('data-status', r.status);
+    // running 노드 라벨 옆 elapsed 초 업데이트
+    if (r && r.status === 'running' && r.startedAt) {
+      const secs = Math.max(0, Math.floor((Date.now() - r.startedAt) / 1000));
+      const el2 = el.querySelector('.wf-node-elapsed');
+      if (el2) el2.textContent = '⏱ ' + secs + 's';
+    }
   });
+  _wfRenderRunBanner(run);
   _wfRenderInspector();
+  // 미니맵 상태 색 반영 (색상만 갱신 — 저비용 재렌더)
+  if (_wfMinimapTimer) cancelAnimationFrame(_wfMinimapTimer);
+  _wfMinimapTimer = requestAnimationFrame(() => { _wfMinimapTimer = null; _wfRenderMinimap(); });
   // Task 3: 브라우저 Notification — 실행 완료/실패 알림
   if (run.status === 'ok') {
     const wfName = (__wf.current && __wf.current.name) || t('워크플로우');
@@ -3811,6 +3863,95 @@ function _wfApplyRunStatus(run) {
     const wfName = (__wf.current && __wf.current.name) || t('워크플로우');
     _sendBrowserNotification(t('워크플로우 실패'), wfName + ' — ' + (run.error || t('실행 중 오류가 발생했습니다')));
   }
+}
+
+// 실행 배너 — workflows 탭 캔버스 상단 플로팅
+function _wfRenderRunBanner(run) {
+  const host = document.getElementById('wfCanvasHost');
+  if (!host) return;
+  let el = document.getElementById('wfRunBanner');
+  const status = run && run.status;
+  const results = (run && run.nodeResults) || {};
+  const nodes = (__wf.current && __wf.current.nodes) || [];
+  const total = nodes.length;
+  const done = Object.values(results).filter(r => r && (r.status === 'ok' || r.status === 'err' || r.status === 'skipped')).length;
+  const runningNid = run && run.currentNodeId;
+  const runningNode = nodes.find(n => n.id === runningNid);
+  const subject = (runningNode && ((runningNode.data && runningNode.data.subject) || runningNode.id)) || t('대기 중');
+  const startedAt = (run && run.startedAt) || 0;
+  const now = Date.now();
+  const finishedAt = (run && run.finishedAt) || 0;
+  const elapsedMs = status === 'running' ? (startedAt ? now - startedAt : 0) : Math.max(0, finishedAt - startedAt);
+  const elapsedStr = (elapsedMs / 1000).toFixed(1) + 's';
+  const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+
+  if (!status || status === 'idle') {
+    if (el) el.classList.remove('visible');
+    return;
+  }
+
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'wfRunBanner';
+    host.appendChild(el);
+  }
+
+  let icon = '⏳';
+  let stateClass = '';
+  let title = t('실행 중');
+  if (status === 'ok') { icon = '✅'; stateClass = 'state-ok'; title = t('완료'); }
+  else if (status === 'err') { icon = '❌'; stateClass = 'state-err'; title = t('실패'); }
+
+  el.className = 'visible ' + stateClass;
+  el.innerHTML = `
+    <div class="wfrb-row">
+      <span style="font-size:16px;">${icon}</span>
+      <span class="wfrb-title">${title}: <span style="color:var(--accent)">${escapeHtml(subject)}</span></span>
+      <span class="wfrb-meta">${done}/${total} · ${elapsedStr}</span>
+      ${status === 'running' && runningNid
+        ? `<button class="wfrb-focus" onclick="_wfFocusNode('${runningNid}')">📍 ${t('위치로 이동')}</button>`
+        : ''}
+      <button class="wfrb-close" onclick="_wfHideRunBanner()" title="${t('닫기')}">×</button>
+    </div>
+    <div class="wfrb-row">
+      <div class="wfrb-bar"><div class="wfrb-bar-fill" style="width:${pct}%"></div></div>
+      <span class="wfrb-meta">${pct}%</span>
+    </div>
+  `;
+
+  // 완료/실패 3.5초 후 자동 숨김
+  if (status === 'ok' || status === 'err') {
+    if (__wf._bannerTimer) clearTimeout(__wf._bannerTimer);
+    __wf._bannerTimer = setTimeout(() => _wfHideRunBanner(), 3500);
+  }
+}
+
+function _wfHideRunBanner() {
+  const el = document.getElementById('wfRunBanner');
+  if (el) el.classList.remove('visible');
+}
+
+// running 노드를 뷰포트 중앙으로 pan (zoom 유지)
+function _wfFocusNode(nid) {
+  const wf = __wf.current;
+  if (!wf) return;
+  const n = (wf.nodes || []).find(x => x.id === nid);
+  if (!n) return;
+  const host = document.getElementById('wfCanvasHost');
+  if (!host) return;
+  const rect = host.getBoundingClientRect();
+  const zoom = (wf.viewport && wf.viewport.zoom) || 1;
+  const cx = n.x + WF_NODE_W / 2;
+  const cy = n.y + WF_NODE_H / 2;
+  const panX = rect.width / 2 - cx * zoom;
+  const panY = rect.height / 2 - cy * zoom;
+  wf.viewport = { panX, panY, zoom };
+  const vp = document.getElementById('wfViewport');
+  if (vp) vp.setAttribute('transform', `translate(${panX},${panY}) scale(${zoom})`);
+  _wfSchedulePatch && _wfSchedulePatch();
+  // 미니맵 뷰포트 사각형도 업데이트
+  if (_wfMinimapTimer) cancelAnimationFrame(_wfMinimapTimer);
+  _wfMinimapTimer = requestAnimationFrame(() => { _wfMinimapTimer = null; _wfRenderMinimap(); });
 }
 
 function _wfStopSSE() {
