@@ -1198,6 +1198,7 @@ document.addEventListener('click', (e) => {
   document.body.classList.remove('sidebar-open');
 });
 function go(id) {
+  if (state.view === 'rtk' && id !== 'rtk' && typeof _rtkStopPolling === 'function') _rtkStopPolling();
   state.view = id;
   location.hash = '#/' + id;
   renderNav();
@@ -1205,7 +1206,10 @@ function go(id) {
 }
 window.addEventListener('hashchange', () => {
   const h = location.hash.replace(/^#\//, '') || 'overview';
-  if (h !== state.view) { state.view = h; renderNav(); renderView(); }
+  if (h !== state.view) {
+    if (state.view === 'rtk' && h !== 'rtk' && typeof _rtkStopPolling === 'function') _rtkStopPolling();
+    state.view = h; renderNav(); renderView();
+  }
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -13638,6 +13642,47 @@ VIEWS.rtk = async () => {
   `;
 };
 
+// Terminal 설치/훅 완료를 polling 으로 감지해 자동 renderView (v2.24.1)
+let _rtkPollTimer = null;
+
+function _rtkStopPolling() {
+  if (_rtkPollTimer) { clearInterval(_rtkPollTimer); _rtkPollTimer = null; }
+}
+
+function _rtkStartPolling(mode) {
+  _rtkStopPolling();
+  const started = Date.now();
+  const timeout = mode === 'hook' ? 120000 : 300000;   // 훅 2분, 설치 5분
+  const interval = mode === 'hook' ? 1500 : 2500;
+  toast(
+    mode === 'hook'
+      ? t('rtk_polling_hook', '훅 활성화 감지 중 — 완료되면 자동 새로고침')
+      : t('rtk_polling_install', '설치 완료 감지 중 — 완료되면 자동 새로고침'),
+    'info',
+  );
+  _rtkPollTimer = setInterval(async () => {
+    if (Date.now() - started > timeout) {
+      _rtkStopPolling();
+      toast(t('rtk_polling_timeout', '감지 시간 초과 — 직접 새로고침해 주세요'), 'warn');
+      return;
+    }
+    try {
+      const r = await api('/api/rtk/status');
+      const hit = mode === 'hook' ? !!r.hookInstalled : !!r.installed;
+      if (hit) {
+        _rtkStopPolling();
+        toast(
+          mode === 'hook'
+            ? t('rtk_detected_hook', '훅 활성 감지 — 탭 새로고침')
+            : t('rtk_detected_install', 'rtk 설치 감지 — 탭 새로고침'),
+          'ok',
+        );
+        if (state.view === 'rtk') renderView();
+      }
+    } catch {}
+  }, interval);
+}
+
 async function _rtkInstall(method) {
   const ok = await confirmModal(t('rtk_install_confirm', `Terminal 창을 열고 ${method} 로 설치합니다. 계속할까요?`));
   if (!ok) return;
@@ -13649,6 +13694,7 @@ async function _rtkInstall(method) {
     if (!r.ok) { toast(errMsg(r), 'err'); return; }
     if (r.already) { toast(t('이미 설치됨'), 'info'); return; }
     toast(t('rtk_install_launched', 'Terminal 창이 열렸습니다 — 설치 완료 후 이 탭을 새로고침하세요'), 'ok');
+    _rtkStartPolling('install');
   } catch (e) { toast(String(e), 'err'); }
 }
 
@@ -13660,7 +13706,8 @@ async function _rtkInit() {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
     });
     if (!r.ok) { toast(errMsg(r), 'err'); return; }
-    toast(t('rtk_init_launched', 'rtk init -g 가 Terminal 에서 실행됩니다'), 'ok');
+    toast(t('rtk_init_launched', 'rtk init -g 가 Terminal 에서 실행됩니다 (y/n 자동 응답)'), 'ok');
+    _rtkStartPolling('hook');
   } catch (e) { toast(String(e), 'err'); }
 }
 

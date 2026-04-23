@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.24.1] — 2026-04-23
+
+### 🔁 RTK 자동화 — 설치/훅 완료 자동 감지 + y/n 자동 응답
+
+사용자 피드백 2건 반영:
+1. 설치 완료 후 탭 새로고침을 수동으로 해야 함 → 자동 감지 + renderView
+2. `rtk init -g` 가 묻는 y/n 프롬프트를 수동 응답해야 함 → `yes` 파이프로 자동
+
+**백엔드 (`server/rtk_lab.py::api_rtk_init`)**
+- 명령 변경: `rtk init -g` → `yes | rtk init -g`
+- `yes` 는 모든 확인 프롬프트에 `y` 자동 응답. rtk 가 stdin 을 쓰지 않으면 `yes` 가 SIGPIPE 로 조기 종료되어 부작용 없음.
+
+**프런트 (`dist/index.html::_rtkStartPolling`)**
+- `_rtkInstall()` 완료 시 `install` 모드 polling 시작 (2.5s 간격, 5분 타임아웃)
+- `_rtkInit()` 완료 시 `hook` 모드 polling 시작 (1.5s 간격, 2분 타임아웃)
+- polling 은 `/api/rtk/status` 를 주기 호출 → `installed` / `hookInstalled` true 되면 `renderView()` + toast
+- RTK 탭을 떠나면 `go()` / `hashchange` 에서 `_rtkStopPolling()` 호출로 polling 정리
+- 현재 탭이 RTK 가 아니면 renderView 없이 toast 알림만
+
+**i18n** 10 키 추가 × ko/en/zh (rtk_polling_* / rtk_detected_*).
+
+---
 ## [2.24.0] — 2026-04-23
 
 ### 🦀 New tab: RTK Optimizer (`work` group)
