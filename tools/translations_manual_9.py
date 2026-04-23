@@ -912,7 +912,34 @@ NEW_EN = {
     "rtk_polling_timeout": "Detection timed out — please refresh manually",
     "rtk_detected_install": "rtk install detected — refreshing tab",
     "rtk_detected_hook": "Hook activation detected — refreshing tab",
+    "rtk_uninstall_hook": "Remove hook",
+    "rtk_uninstall_hook_tip": "Remove rtk hook entries from Claude Code settings.json (binary stays)",
+    "rtk_uninstall_confirm": "This removes rtk hook entries from settings.json (automatic backup). The rtk binary stays. Continue?",
+    "rtk_no_hook_to_remove": "No rtk hook to remove",
+    "rtk_hook_removed": "Removed ${r.removed} rtk hook(s) (backup preserved)",
+    "rtk_hooks_tab_hint": "Installed hooks appear in the 🪝 Hooks tab.",
     "이미 설치됨": "Already installed",
+
+    # v2.25.0 — Prompt Library keywords
+    "pl_keywords_placeholder": "Trigger keywords (comma-separated, e.g. ultrathink, deepsearch)",
+    "pl_keywords_hint": "When a workflow session node input contains any of these keywords, this prompt is auto-injected into the system slot.",
+
+    # v2.25.0 — Workflow notify
+    "notify_heading": "Completion notify",
+    "notify_hint": "On workflow run success/failure, send status/cost/duration to the configured channel. Only hooks.slack.com / discord.com hosts are allowed.",
+    "notify_test_slack": "Test Slack",
+    "notify_test_discord": "Test Discord",
+    "notify_url_empty": "Enter a URL first",
+    "notify_test_sent": "Test message sent",
+
+    # v2.25.0 — Session Replay
+    "sr_subtitle": "Replay Claude Code JSONL session logs as a timeline — tool-use highlights · cumulative token chart.",
+    "sr_recent": "Recent 50 sessions",
+    "sr_no_sessions": "No session JSONL found. Use Claude Code at least once.",
+    "sr_pick": "Pick a session from the left.",
+    "이벤트": "Events",
+    "토큰 입력": "Tokens in",
+    "토큰 출력": "Tokens out",
 }
 
 NEW_ZH = {
@@ -1821,5 +1848,32 @@ NEW_ZH = {
     "rtk_polling_timeout": "检测超时 — 请手动刷新",
     "rtk_detected_install": "检测到 rtk 安装 — 正在刷新标签页",
     "rtk_detected_hook": "检测到钩子激活 — 正在刷新标签页",
+    "rtk_uninstall_hook": "移除钩子",
+    "rtk_uninstall_hook_tip": "从 Claude Code settings.json 移除 rtk 钩子（保留二进制文件）",
+    "rtk_uninstall_confirm": "将从 settings.json 移除 rtk 钩子（自动备份）。rtk 二进制文件保留。继续吗？",
+    "rtk_no_hook_to_remove": "没有可移除的 rtk 钩子",
+    "rtk_hook_removed": "已移除 ${r.removed} 个 rtk 钩子（备份已保留）",
+    "rtk_hooks_tab_hint": "已安装的钩子显示在 🪝 钩子 标签页。",
     "이미 설치됨": "已安装",
+
+    # v2.25.0 — Prompt Library keywords
+    "pl_keywords_placeholder": "触发关键词（逗号分隔，如 ultrathink、deepsearch）",
+    "pl_keywords_hint": "工作流 session 节点输入包含这些关键词时，本提示会自动注入到 system 槽。",
+
+    # v2.25.0 — Workflow notify
+    "notify_heading": "完成通知",
+    "notify_hint": "工作流 run 成功/失败时，将状态/费用/耗时推送到配置的频道。仅允许 hooks.slack.com / discord.com 主机。",
+    "notify_test_slack": "测试 Slack",
+    "notify_test_discord": "测试 Discord",
+    "notify_url_empty": "请先填写 URL",
+    "notify_test_sent": "测试消息已发送",
+
+    # v2.25.0 — Session Replay
+    "sr_subtitle": "将 Claude Code JSONL 会话日志作为时间线重放 — 工具调用高亮 · 累计 token 图表。",
+    "sr_recent": "最近 50 次会话",
+    "sr_no_sessions": "未找到会话 JSONL。请至少使用一次 Claude Code。",
+    "sr_pick": "请在左侧选择一个会话。",
+    "이벤트": "事件",
+    "토큰 입력": "输入 Token",
+    "토큰 출력": "输出 Token",
 }

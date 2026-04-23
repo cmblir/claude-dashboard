@@ -187,6 +187,9 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
             "subject":     _clamp_str(d.get("subject"), 200),
             "description": _clamp_str(d.get("description"), 4000),
             "assignee":    _clamp_str(d.get("assignee"), 40),
+            # v2.25.0 — modelHint: assignee 가 비어있을 때 프롬프트 길이/키워드 기반
+            # 자동 모델 선택. "auto" · "fast" · "deep" · "" (비활성)
+            "modelHint":   (d.get("modelHint") or "") if (d.get("modelHint") or "") in ("", "auto", "fast", "deep") else "",
             "agentRole":   _clamp_str(d.get("agentRole"), 80),
             "cwd":         _clamp_str(d.get("cwd"), 500),
             "inputsMode":  d.get("inputsMode") if d.get("inputsMode") in _INPUT_MODES else "concat",
@@ -357,8 +360,27 @@ def _sanitize_workflow(raw: Any) -> Optional[dict]:
             "zoom": max(0.25, min(3.0, _clamp_float(vp.get("zoom"), 1.0))),
         },
         "repeat":      _sanitize_repeat(raw.get("repeat")),
+        "notify":      _sanitize_notify(raw.get("notify")),  # v2.25.0 Slack/Discord
     }
     return out
+
+
+def _sanitize_notify(raw: Any) -> dict:
+    """알림 webhook URL sanitize. Slack/Discord 화이트리스트 호스트만 허용."""
+    if not isinstance(raw, dict):
+        return {"slack": "", "discord": ""}
+    def _clean(url: str) -> str:
+        url = (url or "").strip()
+        if not url:
+            return ""
+        # 길이/형태 제한
+        if len(url) > 400 or not url.startswith("https://"):
+            return ""
+        return url
+    return {
+        "slack":   _clean(raw.get("slack") or ""),
+        "discord": _clean(raw.get("discord") or ""),
+    }
 
 
 def _check_dag(nodes: list[dict], edges: list[dict]) -> list[str]:
@@ -802,7 +824,48 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     cwd_safe = _under_home(cwd_raw) or str(Path.home())
 
     sys_prompt = (data.get("systemPrompt") or "").strip()
+
+    # v2.25.0 — Prompt Library 키워드 트리거: 입력 텍스트에 매칭되는 라이브러리
+    # 항목이 있으면 그 body 를 systemPrompt 앞에 prepend 한다 (OMC ultrathink 대응).
+    try:
+        from .prompt_library import find_keyword_triggers
+        triggered = find_keyword_triggers(prompt)
+        if triggered:
+            trigger_blocks = "\n\n".join(
+                f"# [auto-injected: {it.get('title', '?')}]\n{it.get('body', '')}"
+                for it in triggered
+            )
+            sys_prompt = (trigger_blocks + ("\n\n" + sys_prompt if sys_prompt else "")).strip()
+    except Exception:
+        pass
+
     assignee = (data.get("assignee") or "").strip()
+
+    # v2.25.0 — modelHint 기반 자동 모델 선택. 명시적 assignee 가 비어있을 때만 적용.
+    model_hint = (data.get("modelHint") or "").strip()
+    chosen_model = ""
+    if not assignee and model_hint:
+        if model_hint == "fast":
+            chosen_model = "claude:haiku"
+        elif model_hint == "deep":
+            chosen_model = "claude:opus"
+        elif model_hint == "auto":
+            # 휴리스틱: 길이 + 키워드
+            plen = len(prompt)
+            text_lower = prompt.lower()
+            deep_keywords = ("architect", "design", "deep", "complex", "reason", "proof",
+                             "설계", "구조", "분석", "철저", "심층")
+            fast_keywords = ("list", "summary", "quick", "extract", "요약", "간단")
+            has_deep = any(k in text_lower for k in deep_keywords)
+            has_fast = any(k in text_lower for k in fast_keywords)
+            if plen > 3000 or has_deep:
+                chosen_model = "claude:opus"
+            elif plen < 500 and has_fast:
+                chosen_model = "claude:haiku"
+            else:
+                chosen_model = "claude:sonnet"
+        if chosen_model:
+            assignee = chosen_model
 
     # resume 대상 session_id 결정
     resume_id = (data.get("resumeSessionId") or "").strip()
@@ -847,6 +910,7 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
             "tokensIn": resp.tokens_in,
             "tokensOut": resp.tokens_out,
             "costUsd": resp.cost_usd,
+            "chosenModel": chosen_model,  # modelHint 로 자동 선택된 경우에만 non-empty
         }
     except Exception as e:
         log.exception("execute_with_assignee failed: %s", e)
@@ -1671,6 +1735,7 @@ def _run_workflow_background(wfId: str, runId: str) -> None:
                 s["runs"][runId]["finishedAt"] = int(time.time()*1000)
                 s["runs"][runId]["currentNodeId"] = None
                 _dump_all(s)
+        _notify_run_completion(wfId, runId, "ok", prev_output)
     except Exception as e:
         log.exception("workflow run failed: %s", e)
         with _LOCK:
@@ -1680,6 +1745,45 @@ def _run_workflow_background(wfId: str, runId: str) -> None:
                 s["runs"][runId]["error"] = f"internal: {e}"
                 s["runs"][runId]["finishedAt"] = int(time.time()*1000)
                 _dump_all(s)
+        _notify_run_completion(wfId, runId, "err", str(e))
+
+
+def _notify_run_completion(wfId: str, runId: str, status: str, summary: str = "") -> None:
+    """run 종료 시 workflow 에 설정된 Slack/Discord 채널로 알림 전송.
+
+    workflows store 를 읽어 현재 wf 의 notify 필드를 확인, 설정된 채널만 전송.
+    실패해도 조용히 로그만 (워크플로우 결과에 영향 없음).
+    """
+    try:
+        store = _load_all()
+        wf = store["workflows"].get(wfId) or {}
+        notify = wf.get("notify") or {}
+        slack_url = (notify.get("slack") or "").strip()
+        discord_url = (notify.get("discord") or "").strip()
+        if not slack_url and not discord_url:
+            return
+        run = (store.get("runs") or {}).get(runId) or {}
+        started = run.get("startedAt") or 0
+        finished = run.get("finishedAt") or int(time.time() * 1000)
+        duration_ms = max(0, finished - started)
+        # 비용 집계: store costs 에서 해당 run 합산
+        cost_usd = 0.0
+        for row in store.get("costs") or []:
+            if row.get("runId") == runId:
+                try:
+                    cost_usd += float(row.get("usdEst") or 0)
+                except Exception:
+                    pass
+        from .notify import notify_workflow_completion
+        notify_workflow_completion(
+            slack_url=slack_url, discord_url=discord_url,
+            wf_name=wf.get("name", "Untitled"),
+            run_id=runId, status=status,
+            duration_ms=duration_ms, cost_usd=round(cost_usd, 6),
+            summary=(summary or "")[:500],
+        )
+    except Exception as e:
+        log.warning("notify dispatch failed: %s", e)
 
 
 def api_workflow_run(body: dict) -> dict:
@@ -2016,6 +2120,119 @@ BUILTIN_TEMPLATES: list[dict] = [
             {"id": "e2", "from": "n-retry", "to": "n-work", "fromPort": "out", "toPort": "in"},
             {"id": "e3", "from": "n-work", "to": "n-out", "fromPort": "out", "toPort": "in"},
             {"id": "e4", "from": "n-work", "to": "n-err", "fromPort": "out", "toPort": "in"},
+        ],
+    },
+
+    # ── v2.25.0: OMC 실행 모드 4종 (autopilot / ralph / ultrawork / deep-interview) ──
+    {
+        "id": "bt-autopilot", "name": "Autopilot", "icon": "🚀", "builtin": True,
+        "description": "사용자 확인 없이 요구사항 → 실행 → 검증까지 단일 흐름으로 끝까지 돌리는 자율 파이프라인 (OMC /autopilot 에 대응).",
+        "category": "pattern",
+        "nodes": [
+            {"id": "n-start", "type": "start", "x": 80, "y": 200, "title": "요구사항", "data": {}},
+            {"id": "n-plan", "type": "session", "x": 300, "y": 200, "title": "계획 수립",
+             "data": {"subject": "요구사항을 받아 실행 계획 수립 — 단계별 체크리스트 생성",
+                      "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-exec", "type": "session", "x": 520, "y": 200, "title": "실행",
+             "data": {"subject": "계획에 따라 작업 수행 — 코드/문서 결과물 출력",
+                      "assignee": "claude:opus", "inputsMode": "concat"}},
+            {"id": "n-verify", "type": "session", "x": 740, "y": 200, "title": "검증",
+             "data": {"subject": "결과물이 요구사항을 만족하는지 검증 — PASS/FAIL 과 근거 리포트",
+                      "assignee": "claude:haiku", "inputsMode": "concat"}},
+            {"id": "n-out", "type": "output", "x": 960, "y": 200, "title": "최종 결과", "data": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": "n-start",  "to": "n-plan",   "fromPort": "out", "toPort": "in"},
+            {"id": "e2", "from": "n-plan",   "to": "n-exec",   "fromPort": "out", "toPort": "in"},
+            {"id": "e3", "from": "n-exec",   "to": "n-verify", "fromPort": "out", "toPort": "in"},
+            {"id": "e4", "from": "n-verify", "to": "n-out",    "fromPort": "out", "toPort": "in"},
+        ],
+    },
+    {
+        "id": "bt-ralph", "name": "Ralph — verify until pass", "icon": "🔁", "builtin": True,
+        "description": "완료 기준 통과할 때까지 verify → fix 루프를 반복 (OMC /ralph 에 대응). 최대 5회 반복, 피드백 자동 주입.",
+        "category": "pattern",
+        "nodes": [
+            {"id": "n-start", "type": "start", "x": 80, "y": 200, "title": "작업 지시", "data": {}},
+            {"id": "n-do", "type": "session", "x": 300, "y": 200, "title": "작업/수정",
+             "data": {"subject": "피드백이 있으면 반영해 수정, 없으면 초기 작업 수행",
+                      "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-verify", "type": "session", "x": 520, "y": 200, "title": "검증",
+             "data": {"subject": "결과물이 요구사항을 만족하면 'PASS' 로 시작, 아니면 'FAIL — <이유>' 로 시작",
+                      "assignee": "claude:haiku", "inputsMode": "concat"}},
+            {"id": "n-branch", "type": "branch", "x": 740, "y": 200, "title": "PASS?",
+             "data": {"conditionType": "contains", "conditionValue": "PASS"}},
+            {"id": "n-out", "type": "output", "x": 960, "y": 120, "title": "완료", "data": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": "n-start",  "to": "n-do",     "fromPort": "out",   "toPort": "in"},
+            {"id": "e2", "from": "n-do",     "to": "n-verify", "fromPort": "out",   "toPort": "in"},
+            {"id": "e3", "from": "n-verify", "to": "n-branch", "fromPort": "out",   "toPort": "in"},
+            {"id": "e4", "from": "n-branch", "to": "n-out",    "fromPort": "true",  "toPort": "in"},
+        ],
+        "repeat": {
+            "enabled": True,
+            "maxIterations": 5,
+            "intervalSeconds": 0,
+            "feedbackNote": "이전 검증에서 FAIL 로 판정된 항목을 해결하도록 수정 방향을 제시하세요.",
+            "feedbackNodeId": "n-do",
+        },
+    },
+    {
+        "id": "bt-ultrawork", "name": "Ultrawork (5병렬)", "icon": "⚡", "builtin": True,
+        "description": "동일 작업을 5개 병렬 에이전트로 분할 실행 후 취합 (OMC /ultrawork 에 대응). 속도 우선, 비용 5배.",
+        "category": "pattern",
+        "nodes": [
+            {"id": "n-start", "type": "start", "x": 80, "y": 280, "title": "작업 입력", "data": {}},
+            {"id": "n-a", "type": "session", "x": 300, "y":  80, "title": "Agent A (Sonnet)",
+             "data": {"subject": "작업의 1/5 담당 — 섹션 A 처리", "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-b", "type": "session", "x": 300, "y": 180, "title": "Agent B (Sonnet)",
+             "data": {"subject": "작업의 2/5 담당 — 섹션 B 처리", "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-c", "type": "session", "x": 300, "y": 280, "title": "Agent C (Haiku)",
+             "data": {"subject": "작업의 3/5 담당 — 섹션 C 처리", "assignee": "claude:haiku", "inputsMode": "concat"}},
+            {"id": "n-d", "type": "session", "x": 300, "y": 380, "title": "Agent D (Haiku)",
+             "data": {"subject": "작업의 4/5 담당 — 섹션 D 처리", "assignee": "claude:haiku", "inputsMode": "concat"}},
+            {"id": "n-e", "type": "session", "x": 300, "y": 480, "title": "Agent E (Haiku)",
+             "data": {"subject": "작업의 5/5 담당 — 섹션 E 처리", "assignee": "claude:haiku", "inputsMode": "concat"}},
+            {"id": "n-merge", "type": "merge", "x": 540, "y": 280, "title": "취합", "data": {"mergeMode": "all"}},
+            {"id": "n-out", "type": "output", "x": 760, "y": 280, "title": "통합 결과", "data": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": "n-start", "to": "n-a", "fromPort": "out", "toPort": "in"},
+            {"id": "e2", "from": "n-start", "to": "n-b", "fromPort": "out", "toPort": "in"},
+            {"id": "e3", "from": "n-start", "to": "n-c", "fromPort": "out", "toPort": "in"},
+            {"id": "e4", "from": "n-start", "to": "n-d", "fromPort": "out", "toPort": "in"},
+            {"id": "e5", "from": "n-start", "to": "n-e", "fromPort": "out", "toPort": "in"},
+            {"id": "e6", "from": "n-a", "to": "n-merge", "fromPort": "out", "toPort": "in"},
+            {"id": "e7", "from": "n-b", "to": "n-merge", "fromPort": "out", "toPort": "in"},
+            {"id": "e8", "from": "n-c", "to": "n-merge", "fromPort": "out", "toPort": "in"},
+            {"id": "e9", "from": "n-d", "to": "n-merge", "fromPort": "out", "toPort": "in"},
+            {"id": "e10","from": "n-e", "to": "n-merge", "fromPort": "out", "toPort": "in"},
+            {"id": "e11","from": "n-merge", "to": "n-out", "fromPort": "out", "toPort": "in"},
+        ],
+    },
+    {
+        "id": "bt-deep-interview", "name": "Deep Interview", "icon": "🧐", "builtin": True,
+        "description": "모호한 요구사항을 Socratic 질문으로 명확화한 후 설계까지 (OMC /deep-interview 에 대응).",
+        "category": "pattern",
+        "nodes": [
+            {"id": "n-start", "type": "start", "x": 80, "y": 200, "title": "초기 요청", "data": {}},
+            {"id": "n-clarify", "type": "session", "x": 300, "y": 200, "title": "1차 질문",
+             "data": {"subject": "요구사항에서 모호한 부분을 찾아 3~5개의 구체적 질문 생성",
+                      "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-answer", "type": "session", "x": 520, "y": 200, "title": "예상 답변",
+             "data": {"subject": "질문에 대해 합리적인 기본값/권장 답변을 제시하고 각각 근거 표기",
+                      "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-spec", "type": "session", "x": 740, "y": 200, "title": "설계 문서",
+             "data": {"subject": "명확화된 요구사항을 기반으로 기술 설계 문서 작성 (섹션: 목표/제약/아키/리스크)",
+                      "assignee": "claude:opus", "inputsMode": "concat"}},
+            {"id": "n-out", "type": "output", "x": 960, "y": 200, "title": "설계 보고서", "data": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": "n-start",   "to": "n-clarify", "fromPort": "out", "toPort": "in"},
+            {"id": "e2", "from": "n-clarify", "to": "n-answer",  "fromPort": "out", "toPort": "in"},
+            {"id": "e3", "from": "n-answer",  "to": "n-spec",    "fromPort": "out", "toPort": "in"},
+            {"id": "e4", "from": "n-spec",    "to": "n-out",     "fromPort": "out", "toPort": "in"},
         ],
     },
 ]

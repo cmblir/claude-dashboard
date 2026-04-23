@@ -81,7 +81,10 @@ from .cost_timeline import api_cost_timeline_summary
 from .rtk_lab import (
     api_rtk_status, api_rtk_install, api_rtk_init,
     api_rtk_config, api_rtk_gain, api_rtk_session,
+    api_rtk_uninstall_hook,
 )
+from .notify import api_notify_test
+from .session_replay import api_session_replay_list, api_session_replay_load
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -262,6 +265,8 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/rtk/config": api_rtk_config,
     "/api/rtk/gain": api_rtk_gain,
     "/api/rtk/session": api_rtk_session,
+    "/api/session-replay/list": api_session_replay_list,
+    "/api/session-replay/load": api_session_replay_load,
 }
 
 
@@ -336,6 +341,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/webhook-secret": api_workflow_webhook_secret,
     "/api/rtk/install": api_rtk_install,
     "/api/rtk/init": api_rtk_init,
+    "/api/rtk/uninstall-hook": api_rtk_uninstall_hook,
+    "/api/notify/test": api_notify_test,
     "/api/session/spawn": api_session_spawn,
     "/api/ai-providers/test": api_provider_test,
     "/api/ai-providers/compare": api_provider_compare,

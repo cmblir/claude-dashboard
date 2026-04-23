@@ -943,6 +943,9 @@ const NAV = [
   { id: 'rtk', icon: '🦀', label: 'RTK Optimizer', group: 'work',
     desc: 'rtk-ai/rtk Rust 프록시로 Claude 토큰 60-90% 절감 · 설치/훅 활성/통계 조회',
     docUrl: 'https://www.rtk-ai.app/guide' },
+  { id: 'sessionReplay', icon: '🎞️', label: 'Session Replay', group: 'work',
+    desc: 'Claude Code JSONL 세션 로그 타임라인 재생 · 툴 호출 강조 · 누적 토큰 차트',
+    docUrl: null },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -3052,6 +3055,26 @@ function _wfRenderInspector() {
   -H "X-Webhook-Secret: &lt;${t('webhook_secret_placeholder', '위 Generate 버튼으로 발급')}&gt;" \\
   -d '{"input": "your text"}'</pre>
       </details>
+    </div>
+
+    <div class="mb-4 pt-3 border-t border-[var(--border)]">
+      <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">🔔 ${t('notify_heading', '완료 알림')}</div>
+      ${(() => {
+        const nf = __wf.current.notify || { slack: '', discord: '' };
+        return `
+          <input class="input w-full text-[11px] font-mono mb-1" placeholder="https://hooks.slack.com/..." value="${escapeHtml(nf.slack||'')}"
+                 oninput="__wf.current.notify = __wf.current.notify || {}; __wf.current.notify.slack=this.value; __wf.dirty=true; _wfUpdateToolbar();">
+          <div class="flex gap-1 mb-2">
+            <button class="btn text-[10px] flex-1" onclick="_wfNotifyTest('slack')">💬 ${t('notify_test_slack', 'Slack 테스트')}</button>
+          </div>
+          <input class="input w-full text-[11px] font-mono mb-1" placeholder="https://discord.com/api/webhooks/..." value="${escapeHtml(nf.discord||'')}"
+                 oninput="__wf.current.notify = __wf.current.notify || {}; __wf.current.notify.discord=this.value; __wf.dirty=true; _wfUpdateToolbar();">
+          <div class="flex gap-1 mb-2">
+            <button class="btn text-[10px] flex-1" onclick="_wfNotifyTest('discord')">🎮 ${t('notify_test_discord', 'Discord 테스트')}</button>
+          </div>
+          <div class="text-[10px]" style="color:var(--text-dim)">${t('notify_hint', '워크플로우 run 완료/실패 시 지정 채널로 상태·비용·실행 시간 전송. Slack hooks.slack.com / Discord discord.com 호스트만 허용.')}</div>
+        `;
+      })()}
     </div>
 
     <div class="mb-4 pt-3 border-t border-[var(--border)]">
@@ -8584,6 +8607,8 @@ VIEWS.promptLibrary = async () => {
       <input class="input mb-2" placeholder="${t('제목')}" value="${escapeHtml(editing.title||'')}" oninput="plSetEdit('title', this.value)">
       <textarea class="input font-mono text-[11px] mb-2" rows="6" placeholder="${t('본문')}" oninput="plSetEdit('body', this.value)">${escapeHtml(editing.body||'')}</textarea>
       <input class="input mb-2" placeholder="${t('태그 (쉼표 구분)')}" value="${escapeHtml((editing.tags||[]).join(', '))}" oninput="plSetEdit('tagsRaw', this.value)">
+      <input class="input mb-1" placeholder="${t('pl_keywords_placeholder', '트리거 키워드 (쉼표 구분, 예: ultrathink, deepsearch)')}" value="${escapeHtml((editing.keywords||[]).join(', '))}" oninput="plSetEdit('keywordsRaw', this.value)">
+      <div class="text-[10px] mb-2" style="color:var(--text-dim)">${t('pl_keywords_hint', '워크플로우 session 노드 입력에 이 키워드가 포함되면 본 프롬프트가 시스템 프롬프트에 자동 주입됩니다.')}</div>
       <div class="flex gap-2 items-center">
         <select class="input" onchange="plSetEdit('model', this.value)">
           <option value="">${t('모델 미지정')}</option>
@@ -8654,14 +8679,19 @@ function plDebouncedRender() {
   _plDebounce = setTimeout(() => { _plDebounce = null; renderView(); }, 250);
 }
 function plNew() {
-  plSet('editing', { title: '', body: '', tags: [], tagsRaw: '', model: '' });
+  plSet('editing', { title: '', body: '', tags: [], tagsRaw: '', keywords: [], keywordsRaw: '', model: '' });
   renderView();
 }
 async function plEdit(pid) {
   const r = await api('/api/prompt-library/list');
   const it = (r.items || []).find(x => x.id === pid);
   if (!it) return;
-  plSet('editing', { id: it.id, title: it.title, body: it.body, tags: it.tags || [], tagsRaw: (it.tags||[]).join(', '), model: it.model || '' });
+  plSet('editing', {
+    id: it.id, title: it.title, body: it.body,
+    tags: it.tags || [], tagsRaw: (it.tags||[]).join(', '),
+    keywords: it.keywords || [], keywordsRaw: (it.keywords||[]).join(', '),
+    model: it.model || '',
+  });
   renderView();
 }
 async function plSave() {
@@ -8670,7 +8700,9 @@ async function plSave() {
   if (!(e.body||'').trim()) { toast(t('본문을 입력하세요'), 'err'); return; }
   const tags = (e.tagsRaw != null ? String(e.tagsRaw) : (e.tags||[]).join(','))
     .split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
-  const body = { id: e.id || null, title: e.title, body: e.body, tags, model: e.model || null };
+  const keywords = (e.keywordsRaw != null ? String(e.keywordsRaw) : (e.keywords||[]).join(','))
+    .split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
+  const body = { id: e.id || null, title: e.title, body: e.body, tags, keywords, model: e.model || null };
   const r = await fetch('/api/prompt-library/save', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify(body),
@@ -13531,6 +13563,96 @@ function formatBytes(n) {
 }
 
 // ────────────────────────────────────────────────────────────────
+// SESSION REPLAY LAB (v2.25.0) — Claude Code JSONL 타임라인 재생
+// ────────────────────────────────────────────────────────────────
+VIEWS.sessionReplay = async () => {
+  const d = await api('/api/session-replay/list');
+  if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}</div>`;
+  const files = d.files || [];
+  const sel = state.data._srSelected || '';
+  const fmt = (n) => n < 1024 ? n + 'B' : n < 1048576 ? (n/1024).toFixed(1) + 'KB' : (n/1048576).toFixed(2) + 'MB';
+  const fmtTime = (ms) => new Date(ms).toLocaleString();
+  const fileList = files.length
+    ? files.map(f => `
+        <div class="card p-2 flex items-center justify-between gap-2 ${sel === f.path ? 'border-[var(--accent)]' : ''}" style="border-width:1px;cursor:pointer;" onclick="_srSelect('${escapeHtml(f.path)}')">
+          <div class="min-w-0 flex-1">
+            <div class="text-[11px] font-mono truncate">${escapeHtml(f.project)}</div>
+            <div class="text-[10px] text-[var(--text-dim)] truncate">${escapeHtml(f.path.split('/').pop())}</div>
+          </div>
+          <div class="text-[10px] text-[var(--text-mute)] flex-shrink-0 text-right">
+            <div>${fmt(f.size)}</div>
+            <div>${fmtTime(f.mtime)}</div>
+          </div>
+        </div>`).join('')
+    : `<div class="text-[11px]" style="color:var(--text-dim)">${t('sr_no_sessions', '세션 JSONL 이 없습니다. Claude Code 를 최소 한 번 사용해 주세요.')}</div>`;
+
+  return `
+    ${viewHeader('🎞️ Session Replay', t('sr_subtitle', 'Claude Code 세션 로그(JSONL)를 시간순으로 재생 · 툴 호출 강조 · 누적 토큰 차트'), 'sessionReplay')}
+    <div class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
+      <div class="space-y-2" style="max-height:70vh;overflow-y:auto;">
+        <div class="text-[10px] uppercase tracking-wider" style="color:var(--text-dim)">${t('sr_recent', '최근 50 세션')}</div>
+        ${fileList}
+      </div>
+      <div id="srDetail">
+        ${sel ? '<div class="text-[11px]" style="color:var(--text-dim)">로딩 중...</div>' : `<div class="card p-6 text-[12px]" style="color:var(--text-dim)">${t('sr_pick', '왼쪽에서 세션을 선택하세요.')}</div>`}
+      </div>
+    </div>
+  `;
+};
+
+function _srSelect(path) {
+  state.data._srSelected = path;
+  renderView();
+  setTimeout(() => _srLoad(path), 20);
+}
+
+async function _srLoad(path) {
+  const host = document.getElementById('srDetail');
+  if (!host) return;
+  try {
+    const r = await api('/api/session-replay/load?path=' + encodeURIComponent(path));
+    if (!r.ok) { host.innerHTML = `<div class="card p-4 text-[12px]" style="color:var(--danger)">${escapeHtml(r.error||'error')}</div>`; return; }
+    const events = r.events || [];
+    // 토큰 누적 스파크라인 계산
+    let acc = 0;
+    const points = events.map(e => { acc += (e.tokensIn||0) + (e.tokensOut||0); return acc; });
+    const maxAcc = Math.max(1, ...points);
+    const spark = points.length ? events.map((e, i) => {
+      const x = (i / Math.max(1, points.length - 1)) * 600;
+      const y = 40 - (points[i] / maxAcc) * 36;
+      return `${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ') : '';
+    const evtRows = events.map(e => {
+      const roleColor = e.role === 'assistant' ? '#60a5fa' : e.role === 'user' ? '#fbbf24' : '#9ca3af';
+      const time = e.ts ? new Date(e.ts).toLocaleTimeString() : '';
+      const hasToolUse = (e.summary||'').includes('[tool_use:');
+      const bg = hasToolUse ? 'background:rgba(168, 139, 250, 0.08);' : '';
+      return `
+        <div class="text-[10px] flex gap-2 py-1 border-b border-[var(--border)]" style="${bg}">
+          <span class="font-mono flex-shrink-0" style="color:var(--text-dim);width:80px;">${time}</span>
+          <span class="font-semibold flex-shrink-0" style="color:${roleColor};width:70px;">${escapeHtml(e.role || e.type || '-')}</span>
+          <span class="flex-1 break-all">${escapeHtml(e.summary || e.operation || '')}</span>
+          <span class="flex-shrink-0 font-mono" style="color:var(--text-mute);">${e.tokensIn||0}↓ ${e.tokensOut||0}↑</span>
+        </div>`;
+    }).join('');
+    host.innerHTML = `
+      <div class="card p-3 mb-3">
+        <div class="grid grid-cols-3 gap-3 mb-2">
+          <div><div class="text-[10px]" style="color:var(--text-dim)">${t('이벤트')}</div><div class="text-lg font-semibold">${events.length}${r.truncated?'+':''}</div></div>
+          <div><div class="text-[10px]" style="color:var(--text-dim)">${t('토큰 입력')}</div><div class="text-lg font-semibold" style="color:#60a5fa">${(r.totalTokensIn||0).toLocaleString()}</div></div>
+          <div><div class="text-[10px]" style="color:var(--text-dim)">${t('토큰 출력')}</div><div class="text-lg font-semibold" style="color:#f472b6">${(r.totalTokensOut||0).toLocaleString()}</div></div>
+        </div>
+        ${spark ? `<svg viewBox="0 0 600 40" width="100%" height="40"><path d="${spark}" fill="none" stroke="var(--accent)" stroke-width="1.5" /></svg>` : ''}
+        <div class="text-[10px] font-mono break-all" style="color:var(--text-dim)">${escapeHtml(r.path)}</div>
+      </div>
+      <div class="card p-3" style="max-height:60vh;overflow-y:auto;">
+        ${evtRows || `<div class="text-[11px]" style="color:var(--text-dim)">(empty)</div>`}
+      </div>
+    `;
+  } catch (e) { host.innerHTML = `<div class="card p-4 text-[12px]" style="color:var(--danger)">${escapeHtml(String(e))}</div>`; }
+}
+
+// ────────────────────────────────────────────────────────────────
 // RTK OPTIMIZER (v2.24.0) — rtk-ai/rtk 토큰 절감 프록시 통합
 // ────────────────────────────────────────────────────────────────
 VIEWS.rtk = async () => {
@@ -13600,10 +13722,20 @@ VIEWS.rtk = async () => {
         <p class="text-[12px] text-[var(--text-mute)] mb-3">
           ${t('rtk_hook_desc', 'rtk init -g 를 실행하면 Claude Code 의 Bash 명령(예: git status)이 자동으로 rtk 로 감싸져 토큰 사용량이 줄어듭니다.')}
         </p>
-        <button class="btn btn-primary text-[12px]" onclick="_rtkInit()">
-          ⚙️ ${t('rtk_run_init', 'rtk init -g 실행')}
-        </button>
-        ${d.hookInstalled ? `<span class="ml-2 text-[11px]" style="color:var(--success)">✓ ${t('rtk_hook_detected', '이미 감지됨')}</span>` : ''}
+        <div class="flex items-center gap-2 flex-wrap">
+          <button class="btn btn-primary text-[12px]" onclick="_rtkInit()">
+            ⚙️ ${t('rtk_run_init', 'rtk init -g 실행')}
+          </button>
+          ${d.hookInstalled ? `
+            <span class="text-[11px]" style="color:var(--success)">✓ ${t('rtk_hook_detected', '이미 감지됨')}</span>
+            <button class="btn text-[12px]" onclick="_rtkUninstallHook()" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);" title="${escapeHtml(t('rtk_uninstall_hook_tip', 'Claude Code settings.json 에서 rtk 훅 항목만 제거 (바이너리는 유지)'))}">
+              🗑 ${t('rtk_uninstall_hook', '훅 제거')}
+            </button>
+          ` : ''}
+        </div>
+        <div class="text-[10px] mt-2" style="color:var(--text-dim)">
+          ${t('rtk_hooks_tab_hint', '설치된 훅은 🪝 훅 탭에서 확인할 수 있습니다.')}
+        </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
@@ -13695,6 +13827,35 @@ async function _rtkInstall(method) {
     if (r.already) { toast(t('이미 설치됨'), 'info'); return; }
     toast(t('rtk_install_launched', 'Terminal 창이 열렸습니다 — 설치 완료 후 이 탭을 새로고침하세요'), 'ok');
     _rtkStartPolling('install');
+  } catch (e) { toast(String(e), 'err'); }
+}
+
+async function _wfNotifyTest(target) {
+  if (!__wf.current) return;
+  const nf = __wf.current.notify || {};
+  const url = (target === 'slack' ? nf.slack : nf.discord) || '';
+  if (!url.trim()) { toast(t('notify_url_empty', 'URL 을 먼저 입력하세요'), 'err'); return; }
+  try {
+    const r = await api('/api/notify/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target, url }),
+    });
+    if (r.ok) toast(t('notify_test_sent', '테스트 메시지 전송됨'), 'ok');
+    else toast(errMsg(r), 'err');
+  } catch (e) { toast(String(e), 'err'); }
+}
+
+async function _rtkUninstallHook() {
+  const ok = await confirmModal(t('rtk_uninstall_confirm', 'Claude Code settings.json 에서 rtk 훅 항목만 제거합니다 (백업 자동 생성). rtk 바이너리는 유지됩니다. 계속할까요?'));
+  if (!ok) return;
+  try {
+    const r = await api('/api/rtk/uninstall-hook', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    if (!r.ok) { toast(errMsg(r), 'err'); return; }
+    if (r.removed === 0) { toast(t('rtk_no_hook_to_remove', '제거할 rtk 훅이 없습니다'), 'info'); return; }
+    toast(t('rtk_hook_removed', `rtk 훅 ${r.removed}개 제거됨 (백업 보존)`).replace('${r.removed}', r.removed), 'ok');
+    if (state.view === 'rtk') renderView();
   } catch (e) { toast(String(e), 'err'); }
 }
 
