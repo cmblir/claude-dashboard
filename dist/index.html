@@ -13524,6 +13524,177 @@ function formatBytes(n) {
 }
 
 // ────────────────────────────────────────────────────────────────
+// RTK OPTIMIZER (v2.24.0) — rtk-ai/rtk 토큰 절감 프록시 통합
+// ────────────────────────────────────────────────────────────────
+VIEWS.rtk = async () => {
+  const d = await api('/api/rtk/status');
+  if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml(d.error||'')}</div>`;
+  // 설치된 경우 gain/session 자동 로드 (VIEWS 가 반환 후 렌더 완료 시점에 실행)
+  if (d.installed) {
+    setTimeout(() => { _rtkFetchGain(); _rtkFetchSession(); }, 50);
+  }
+
+  const installedChip = d.installed
+    ? `<span class="chip chip-ok">${t('rtk_installed', '설치됨')}</span>`
+    : `<span class="chip chip-err">${t('rtk_not_installed', '미설치')}</span>`;
+  const hookChip = d.hookInstalled
+    ? `<span class="chip chip-ok">${t('rtk_hook_active', '훅 활성')}</span>`
+    : `<span class="chip">${t('rtk_hook_inactive', '훅 비활성')}</span>`;
+
+  const installMethods = [];
+  if (d.brewAvailable) installMethods.push({ id: 'brew', label: 'Homebrew', cmd: 'brew install rtk' });
+  installMethods.push({ id: 'curl', label: 'curl | sh', cmd: 'curl -fsSL .../install.sh | sh' });
+  if (d.cargoAvailable) installMethods.push({ id: 'cargo', label: 'Cargo', cmd: 'cargo install --git ...' });
+
+  const groups = d.commandGroups || [];
+
+  return `
+    ${viewHeader('🦀 RTK Optimizer', t('rtk_subtitle', 'Claude 토큰 60-90% 절감 Rust CLI 프록시 (rtk-ai/rtk) — 설치·활성화·통계를 한 탭에서.'), 'rtk')}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${t('상태')}</div>
+        <div class="text-sm mb-2">${installedChip} ${hookChip}</div>
+        <div class="text-[11px] text-[var(--text-mute)] font-mono break-all">${escapeHtml(d.binPath || '(not on PATH)')}</div>
+        <div class="text-[11px] text-[var(--text-mute)]">${escapeHtml(d.version || '')}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${t('rtk_config_label', '설정 파일')}</div>
+        <div class="text-[11px] text-[var(--text-mute)] font-mono break-all mb-2">${escapeHtml(d.configPath)}</div>
+        <div class="text-[11px] ${d.configExists ? '' : 'text-[var(--text-dim)]'}">${d.configExists ? '✓ exists' : '(not yet created)'}</div>
+        ${d.configExists ? `<button class="btn text-[11px] mt-2" onclick="_rtkViewConfig()">📄 ${t('rtk_view_config', '내용 보기')}</button>` : ''}
+      </div>
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${t('rtk_links_label', '참고')}</div>
+        <div class="text-[11px] space-y-1">
+          <a href="${escapeHtml(d.homepage)}" target="_blank" rel="noopener" style="color:var(--accent);">📦 rtk-ai/rtk (GitHub)</a><br>
+          <a href="${escapeHtml(d.guide)}" target="_blank" rel="noopener" style="color:var(--accent);">📘 ${t('rtk_guide', '공식 가이드')}</a>
+        </div>
+      </div>
+    </div>
+
+    ${!d.installed ? `
+      <div class="card p-5 mb-6">
+        <h3 class="text-lg font-semibold mb-2">🚀 ${t('rtk_install_heading', '설치')}</h3>
+        <p class="text-[12px] text-[var(--text-mute)] mb-3">${t('rtk_install_desc', '아래 방법 중 하나를 선택하면 Terminal 창이 열리고 실제 설치가 진행됩니다.')}</p>
+        <div class="flex gap-2 flex-wrap">
+          ${installMethods.map(m => `
+            <button class="btn btn-primary text-[12px]" onclick="_rtkInstall('${m.id}')">
+              ${escapeHtml(m.label)}
+              <span class="text-[10px] opacity-70 ml-1 font-mono">${escapeHtml(m.cmd)}</span>
+            </button>
+          `).join('')}
+        </div>
+        ${!d.brewAvailable ? `<div class="text-[10px] mt-2" style="color:var(--text-dim)">${t('rtk_no_brew', 'Homebrew 미설치 — curl/cargo 경로로 진행 가능.')}</div>` : ''}
+      </div>
+    ` : `
+      <div class="card p-5 mb-6">
+        <h3 class="text-lg font-semibold mb-2">🔧 ${t('rtk_hook_heading', 'Claude Code 훅')}</h3>
+        <p class="text-[12px] text-[var(--text-mute)] mb-3">
+          ${t('rtk_hook_desc', 'rtk init -g 를 실행하면 Claude Code 의 Bash 명령(예: git status)이 자동으로 rtk 로 감싸져 토큰 사용량이 줄어듭니다.')}
+        </p>
+        <button class="btn btn-primary text-[12px]" onclick="_rtkInit()">
+          ⚙️ ${t('rtk_run_init', 'rtk init -g 실행')}
+        </button>
+        ${d.hookInstalled ? `<span class="ml-2 text-[11px]" style="color:var(--success)">✓ ${t('rtk_hook_detected', '이미 감지됨')}</span>` : ''}
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div class="card p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-base font-semibold">📊 ${t('rtk_gain_heading', '누적 토큰 절감 (rtk gain)')}</h3>
+            <button class="btn text-[10px]" onclick="_rtkFetchGain()">🔄</button>
+          </div>
+          <pre id="rtkGainOutput" class="text-[10px] font-mono" style="background:var(--code-bg);padding:0.5rem;border-radius:4px;max-height:280px;overflow:auto;white-space:pre-wrap;">${t('로딩 중...')}</pre>
+        </div>
+        <div class="card p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-base font-semibold">📍 ${t('rtk_session_heading', '현재 세션 (rtk session)')}</h3>
+            <button class="btn text-[10px]" onclick="_rtkFetchSession()">🔄</button>
+          </div>
+          <pre id="rtkSessionOutput" class="text-[10px] font-mono" style="background:var(--code-bg);padding:0.5rem;border-radius:4px;max-height:280px;overflow:auto;white-space:pre-wrap;">${t('로딩 중...')}</pre>
+        </div>
+      </div>
+    `}
+
+    <div class="card p-5">
+      <h3 class="text-lg font-semibold mb-3">📖 ${t('rtk_commands_heading', '명령 레퍼런스')}</h3>
+      <p class="text-[11px] text-[var(--text-mute)] mb-3">${t('rtk_commands_desc', 'rtk 는 자주 쓰는 dev 명령에 대한 출력 압축 프록시입니다. 예: git status → rtk git status.')}</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        ${groups.map(g => `
+          <div>
+            <div class="text-[10px] uppercase tracking-wider mb-1" style="color:var(--text-dim)">${escapeHtml(g.label)}</div>
+            <div class="flex flex-wrap gap-1">
+              ${g.commands.map(c => `<span class="chip text-[10px] font-mono">${escapeHtml(c)}</span>`).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="text-[10px] mt-3" style="color:var(--text-dim)">${t('rtk_ultra_hint', '💡 -u/--ultra-compact 플래그로 ASCII 아이콘 사용 + 추가 절감.')}</div>
+    </div>
+  `;
+};
+
+async function _rtkInstall(method) {
+  const ok = await confirmModal(t('rtk_install_confirm', `Terminal 창을 열고 ${method} 로 설치합니다. 계속할까요?`));
+  if (!ok) return;
+  try {
+    const r = await api('/api/rtk/install', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method }),
+    });
+    if (!r.ok) { toast(errMsg(r), 'err'); return; }
+    if (r.already) { toast(t('이미 설치됨'), 'info'); return; }
+    toast(t('rtk_install_launched', 'Terminal 창이 열렸습니다 — 설치 완료 후 이 탭을 새로고침하세요'), 'ok');
+  } catch (e) { toast(String(e), 'err'); }
+}
+
+async function _rtkInit() {
+  const ok = await confirmModal(t('rtk_init_confirm', 'rtk init -g 를 실행하면 Claude Code settings.json 이 수정됩니다. 계속할까요?'));
+  if (!ok) return;
+  try {
+    const r = await api('/api/rtk/init', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    if (!r.ok) { toast(errMsg(r), 'err'); return; }
+    toast(t('rtk_init_launched', 'rtk init -g 가 Terminal 에서 실행됩니다'), 'ok');
+  } catch (e) { toast(String(e), 'err'); }
+}
+
+async function _rtkFetchGain() {
+  const el = document.getElementById('rtkGainOutput');
+  if (!el) return;
+  el.textContent = t('로딩 중...');
+  try {
+    const r = await api('/api/rtk/gain');
+    el.textContent = r.output || r.stderr || r.error || '(no output)';
+  } catch (e) { el.textContent = String(e); }
+}
+
+async function _rtkFetchSession() {
+  const el = document.getElementById('rtkSessionOutput');
+  if (!el) return;
+  el.textContent = t('로딩 중...');
+  try {
+    const r = await api('/api/rtk/session');
+    el.textContent = r.output || r.stderr || r.error || '(no output)';
+  } catch (e) { el.textContent = String(e); }
+}
+
+async function _rtkViewConfig() {
+  try {
+    const r = await api('/api/rtk/config');
+    if (!r.ok) { toast(errMsg(r), 'err'); return; }
+    const body = `<pre class="text-[10px] font-mono" style="max-height:60vh;overflow:auto;white-space:pre-wrap;">${escapeHtml(r.content || '(empty)')}</pre>
+      <div class="text-[10px] mt-2" style="color:var(--text-dim)">${escapeHtml(r.path)}</div>`;
+    if (typeof showModal === 'function') showModal(t('rtk_config_label', '설정 파일'), body);
+    else alert(r.content || '(empty)');
+  } catch (e) { toast(String(e), 'err'); }
+}
+
+// 탭이 렌더된 직후(DOM 삽입 후) gain/session 자동 fetch — VIEWS.rtk 에서 setTimeout 호출
+
+// ────────────────────────────────────────────────────────────────
 // COSTS TIMELINE (v2.20.0) — 모든 플레이그라운드/워크플로우 비용 통합
 // ────────────────────────────────────────────────────────────────
 VIEWS.costsTimeline = async () => {

@@ -2,6 +2,8 @@
 
 # 💤 LazyClaude
 
+<img src="./docs/logo/mascot.svg" alt="LazyClaude mascot — pixel character napping with closed eyes" width="200" height="171" />
+
 **The lazy, elegant dashboard for everything Claude.**
 
 _Don't memorize 50+ CLI commands. Just click._
@@ -10,7 +12,7 @@ _Don't memorize 50+ CLI commands. Just click._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.23.2-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.24.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-architecture)
 
 </div>
@@ -38,7 +40,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.23.2 🇺🇸│
+│  💤  LazyClaude                                     v2.24.0 🇺🇸│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 New │   🔀 Workflows                                         │
 │ 🏠 Main│   ┌──────┐      ┌──────┐      ┌──────┐                │
@@ -198,13 +200,23 @@ API keys can also be saved via the `🧠 AI Providers` tab — stored in `~/.cla
 - **Default model picker** — per-provider chat / embedding defaults
 - **Modelfile editor** — create custom models from the UI
 
-### 🤝 Claude Code Integration (52 tabs)
+### 🦀 RTK Optimizer — cut Claude tokens 60-90% (v2.24.0)
+
+Integrates [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk), a Rust CLI proxy that compresses command output before it reaches the LLM (a medium TS/Rust session went from 118K → 24K tokens in their benchmark).
+
+- **One-click install** — Homebrew / `curl | sh` / Cargo, launched in a Terminal window
+- **Claude Code hook activation** — run `rtk init -g` from the dashboard to auto-wrap Bash commands (`git status` → `rtk git status`)
+- **Live savings** — `rtk gain` (cumulative) + `rtk session` (current session) rendered as cards with refresh
+- **Config viewer** — read `~/Library/Application Support/rtk/config.toml` (macOS) or `~/.config/rtk/config.toml` (Linux)
+- **Command reference** — 30+ subcommands grouped into 6 categories (file ops · git · test · build/lint · analytics · utility), with the `-u/--ultra-compact` flag hint
+
+### 🤝 Claude Code Integration (53 tabs)
 
 | Group | Tabs |
 |---|---|
 | 🆕 New | `features` · `onboarding` · `guideHub` · `claudeDocs` |
 | 🏠 Main | `overview` · `projects` · `analytics` · `aiEval` · `sessions` |
-| 🛠️ Work | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` · `promptCache` · `thinkingLab` · `toolUseLab` · `batchJobs` · `apiFiles` · `visionLab` · `modelBench` · `serverTools` · `citationsLab` · `agentSdkScaffold` · 🆕 `embeddingLab` · 🆕 `promptLibrary` |
+| 🛠️ Work | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` · `promptCache` · `thinkingLab` · `toolUseLab` · `batchJobs` · `apiFiles` · `visionLab` · `modelBench` · `serverTools` · `citationsLab` · `agentSdkScaffold` · `embeddingLab` · `promptLibrary` · 🆕 `rtk` |
 | ⚙️ Config | `hooks` · `permissions` · `mcp` · `plugins` · `settings` · `claudemd` |
 | 🎛️ Advanced | `outputStyles` · `statusline` · `plans` · `envConfig` · `modelConfig` · `ideStatus` · `marketplaces` · `scheduled` |
 | 📈 System | `usage` · `metrics` · `memory` · `tasks` · `backups` · `bashHistory` · `telemetry` · `homunculus` · `team` · `system` |
@@ -288,7 +300,7 @@ Atomic writes via `server/utils.py::_safe_write` (`.tmp → rename`), threading 
 
 ---
 
-## 🔢 Stats (v2.23.2)
+## 🔢 Stats (v2.24.0)
 
 | Metric | Value |
 |---|---|
