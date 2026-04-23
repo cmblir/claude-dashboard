@@ -70,12 +70,17 @@ def api_session_replay_load(query: dict | None = None) -> dict:
     full = _PROJECTS / rel
     if not full.exists() or not full.is_file() or full.suffix != ".jsonl":
         return {"ok": False, "error": "file not found"}
-    # 상위 탈출 방어
+    # 상위 탈출 방어 (v2.28.0, 보안 감사) — realpath 로 symlink 포함 최종 경로가
+    # _PROJECTS 하위에 있는지 확실히 검증. 이전엔 pass 로 무력화되어 있었음.
     try:
-        if _PROJECTS.resolve() not in full.resolve().parents and full.resolve().parent != _PROJECTS.resolve().parent:
-            pass  # path 이미 _PROJECTS 기준이므로 필요 없음
+        real_full = full.resolve(strict=True)
+        real_base = _PROJECTS.resolve(strict=True)
     except Exception:
         return {"ok": False, "error": "resolve failed"}
+    try:
+        real_full.relative_to(real_base)
+    except ValueError:
+        return {"ok": False, "error": "path outside projects directory"}
 
     events = []
     total_tokens_in = 0

@@ -14023,7 +14023,7 @@ async function _rtkInit() {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
     });
     if (!r.ok) { toast(errMsg(r), 'err'); return; }
-    toast(t('rtk_init_launched', 'rtk init -g 가 Terminal 에서 실행됩니다 (y/n 자동 응답)'), 'ok');
+    toast(t('rtk_init_launched', 'rtk init -g --auto-patch 실행 — settings.json 자동 패치'), 'ok');
     _rtkStartPolling('hook');
   } catch (e) { toast(String(e), 'err'); }
 }
