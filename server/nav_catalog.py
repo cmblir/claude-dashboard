@@ -142,6 +142,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "워크플로우로 변환. 시드 3종 포함.",
         ["prompt library", "프롬프트 템플릿", "프롬프트 저장", "library",
          "template", "스니펫"]),
+    ("rtk",           "work",
+        "RTK Optimizer — Claude 토큰 60-90% 절감하는 Rust CLI 프록시 "
+        "(rtk-ai/rtk) 를 한 탭에서 설치·활성화·통계 조회.",
+        ["rtk", "token", "토큰 최적화", "rust token killer", "claude token",
+         "token optimization", "비용 절감", "cost reduction", "rtk-ai"]),
     ("claudeDocs",    "new",
         "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
         "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "
@@ -248,6 +253,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                         "zh": "Agent SDK 脚手架 — 生成 claude-agent-sdk Python/TS 项目骨架"},
     "embeddingLab": {"en": "Embedding Lab — compare Voyage / OpenAI / Ollama embeddings via cosine-sim rank matrix",
                     "zh": "嵌入实验室 — 通过余弦相似度 rank 矩阵比较 Voyage / OpenAI / Ollama 嵌入"},
+    "rtk": {"en": "RTK Optimizer — install & activate the rtk-ai/rtk proxy to cut Claude tokens by 60-90%",
+            "zh": "RTK 优化器 — 在本标签页内安装/激活 rtk-ai/rtk 代理，将 Claude token 消耗减少 60-90%"},
     "promptLibrary": {"en": "Prompt Library — save/search/duplicate prompts, convert to workflow",
                      "zh": "提示库 — 保存/搜索/复制提示,转换为工作流"},
     "claudeDocs": {"en": "Claude Docs Hub — curated docs.anthropic.com index with cross-links to dashboard tabs",

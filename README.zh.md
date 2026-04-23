@@ -2,6 +2,8 @@
 
 # 💤 LazyClaude
 
+<img src="./docs/logo/mascot.svg" alt="LazyClaude 吉祥物 — 闭眼打盹的像素小家伙" width="200" height="171" />
+
 **你的 Claude 全家桶，一个标签页搞定。**
 
 _别死记 50+ CLI 命令，点一下就行。_
@@ -10,7 +12,7 @@ _别死记 50+ CLI 命令，点一下就行。_
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.23.2-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.24.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-架构)
 
 </div>
@@ -38,7 +40,7 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.23.2 🇨🇳│
+│  💤  LazyClaude                                     v2.24.0 🇨🇳│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 新功能│   🔀 工作流                                          │
 │ 🏠 主要 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -198,13 +200,23 @@ API 密钥也可以在 `🧠 AI 供应商` 标签页中保存 — 存储于 `~/.
 - **默认模型选择** — 每供应商聊天 / 嵌入默认值
 - **Modelfile 编辑器** — 在 UI 中创建自定义模型
 
-### 🤝 Claude Code 集成（52 个标签页）
+### 🦀 RTK 优化器 — 将 Claude token 削减 60-90%（v2.24.0）
+
+集成 [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk)，一款在命令输出到达 LLM 之前对其进行压缩的 Rust CLI 代理（官方基准中一个中等规模的 TS/Rust 会话从 118K → 24K token）。
+
+- **一键安装** — Homebrew / `curl | sh` / Cargo，在 Terminal 窗口中交互执行
+- **Claude Code 钩子激活** — 在仪表板中运行 `rtk init -g`，Bash 命令（如 `git status`）自动包装为 `rtk git status`
+- **实时节省数据** — `rtk gain`（累计）+ `rtk session`（当前会话）以卡片渲染，支持手动刷新
+- **配置文件查看器** — `~/Library/Application Support/rtk/config.toml`（macOS）/ `~/.config/rtk/config.toml`（Linux）
+- **命令参考** — 30+ 子命令按 6 个分类（文件 · Git · Test · Build/Lint · Analytics · Utility）分组 + `-u/--ultra-compact` 提示
+
+### 🤝 Claude Code 集成（53 个标签页）
 
 | 分组 | 标签页 |
 |---|---|
 | 🆕 新功能 | `features` · `onboarding` · `guideHub` · 🆕 `claudeDocs` |
 | 🏠 主要 | `overview` · `projects` · `analytics` · `aiEval` · `sessions` |
-| 🛠️ 工作 | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` · `promptCache` · `thinkingLab` · `toolUseLab` · `batchJobs` · `apiFiles` · `visionLab` · `modelBench` · `serverTools` · `citationsLab` · `agentSdkScaffold` · 🆕 `embeddingLab` · 🆕 `promptLibrary` |
+| 🛠️ 工作 | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` · `promptCache` · `thinkingLab` · `toolUseLab` · `batchJobs` · `apiFiles` · `visionLab` · `modelBench` · `serverTools` · `citationsLab` · `agentSdkScaffold` · `embeddingLab` · `promptLibrary` · 🆕 `rtk` |
 | ⚙️ 配置 | `hooks` · `permissions` · `mcp` · `plugins` · `settings` · `claudemd` |
 | 🎛️ 高级 | `outputStyles` · `statusline` · `plans` · `envConfig` · `modelConfig` · `ideStatus` · `marketplaces` · `scheduled` |
 | 📈 系统 | `usage` · `metrics` · `memory` · `tasks` · `backups` · `bashHistory` · `telemetry` · `homunculus` · `team` · `system` |
@@ -288,7 +300,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 统计（v2.23.2）
+## 🔢 统计（v2.24.0）
 
 | 指标 | 值 |
 |---|---|

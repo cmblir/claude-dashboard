@@ -2,6 +2,8 @@
 
 # 💤 LazyClaude
 
+<img src="./docs/logo/mascot.svg" alt="LazyClaude 마스코트 — 눈을 감고 낮잠 자는 픽셀 캐릭터" width="200" height="171" />
+
 **모든 Claude 작업을, 게으르고 우아하게.**
 
 _50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요._
@@ -10,7 +12,7 @@ _50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.23.2-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.24.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-아키텍처)
 
 </div>
@@ -38,7 +40,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.23.2 🇰🇷│
+│  💤  LazyClaude                                     v2.24.0 🇰🇷│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 신기능│   🔀 워크플로우                                       │
 │ 🏠 메인 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -198,13 +200,23 @@ API 키는 `🧠 AI 프로바이더` 탭에서 저장해도 됩니다 — `~/.cl
 - **기본 모델 지정** — 프로바이더별 채팅/임베딩 기본값
 - **Modelfile 편집기** — UI 에서 커스텀 모델 생성
 
-### 🤝 Claude Code 통합 (52 탭)
+### 🦀 RTK Optimizer — Claude 토큰 60-90% 절감 (v2.24.0)
+
+[`rtk-ai/rtk`](https://github.com/rtk-ai/rtk) — Rust 로 작성된 CLI 프록시로, LLM 이 보기 전에 커맨드 출력을 압축합니다 (그들 벤치에서 중간 규모 TS/Rust 세션이 118K → 24K 토큰으로 감소).
+
+- **원클릭 설치** — Homebrew / `curl | sh` / Cargo, Terminal 창에서 대화형 실행
+- **Claude Code 훅 활성화** — 대시보드에서 `rtk init -g` 실행 → `git status` 등 Bash 명령이 자동으로 `rtk git status` 로 감싸짐
+- **실시간 절감 통계** — `rtk gain`(누적) + `rtk session`(현재 세션) 을 카드로 렌더, 수동 새로고침
+- **설정 파일 뷰어** — `~/Library/Application Support/rtk/config.toml` (macOS) / `~/.config/rtk/config.toml` (Linux)
+- **명령 레퍼런스** — 30+ 서브커맨드를 6 카테고리(파일 · Git · Test · Build/Lint · Analytics · Utility)로 그룹핑 + `-u/--ultra-compact` 힌트
+
+### 🤝 Claude Code 통합 (53 탭)
 
 | 그룹 | 탭 |
 |---|---|
 | 🆕 신기능 | `features` · `onboarding` · `guideHub` · 🆕 `claudeDocs` |
 | 🏠 메인 | `overview` · `projects` · `analytics` · `aiEval` · `sessions` |
-| 🛠️ 작업 | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` · `promptCache` · `thinkingLab` · `toolUseLab` · `batchJobs` · `apiFiles` · `visionLab` · `modelBench` · `serverTools` · `citationsLab` · `agentSdkScaffold` · 🆕 `embeddingLab` · 🆕 `promptLibrary` |
+| 🛠️ 작업 | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` · `promptCache` · `thinkingLab` · `toolUseLab` · `batchJobs` · `apiFiles` · `visionLab` · `modelBench` · `serverTools` · `citationsLab` · `agentSdkScaffold` · `embeddingLab` · `promptLibrary` · 🆕 `rtk` |
 | ⚙️ 설정 | `hooks` · `permissions` · `mcp` · `plugins` · `settings` · `claudemd` |
 | 🎛️ 고급 | `outputStyles` · `statusline` · `plans` · `envConfig` · `modelConfig` · `ideStatus` · `marketplaces` · `scheduled` |
 | 📈 시스템 | `usage` · `metrics` · `memory` · `tasks` · `backups` · `bashHistory` · `telemetry` · `homunculus` · `team` · `system` |
@@ -288,7 +300,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.23.2)
+## 🔢 통계 (v2.24.0)
 
 | 지표 | 값 |
 |---|---|

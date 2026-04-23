@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.24.0] — 2026-04-23
+
+### 🦀 New tab: RTK Optimizer (`work` group)
+
+Claude 토큰 **60-90% 절감** 하는 Rust CLI 프록시 [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk) 를 대시보드에서 바로 설치·활성화·통계 조회 가능한 탭으로 통합.
+
+**신규 모듈: `server/rtk_lab.py`**
+- 설치 여부 감지 — `_which("rtk")` 로 PATH + homebrew/cargo 경로 fallback
+- 설정 파일 경로 OS 분기 (macOS: `~/Library/Application Support/rtk/config.toml`, Linux: `$XDG_CONFIG_HOME/rtk/config.toml`)
+- Claude Code settings.json 내 `rtk` 참조 탐지로 훅 활성 상태 체크
+- 6가지 명령 그룹 카탈로그 (file · git · test · build · analytics · utility)
+
+**신규 라우트 6건**
+- GET `/api/rtk/status` · `/api/rtk/config` · `/api/rtk/gain` · `/api/rtk/session`
+- POST `/api/rtk/install` · `/api/rtk/init`
+- 설치/init 은 기존 `cli_tools._run_in_terminal` 재사용 → AppleScript 로 Terminal 창 대화형 실행
+
+**설치 경로 3종**
+- `brew install rtk` (Homebrew 있을 때 기본)
+- `curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh`
+- `cargo install --git https://github.com/rtk-ai/rtk`
+
+**UI — `VIEWS.rtk`**
+- 상태 카드 3열 (설치 상태 + 훅 활성 / 설정 파일 경로 / 참고 링크)
+- 미설치 시: 설치 방법 버튼 (Homebrew · curl · Cargo — 환경별 노출)
+- 설치 시: `rtk init -g` 훅 설치 버튼 + 누적 절감 통계 (`rtk gain`) + 세션 내역 (`rtk session`) 실시간 조회
+- 명령 레퍼런스 6 그룹 그리드 — chip 단위 빠른 참조 + `-u/--ultra-compact` 힌트
+
+**i18n** 28 키 추가 × ko/en/zh → 3,281 키 정합성 통과.
+
+**LazyClaude 마스코트 (`docs/logo/mascot.svg`)**
+- 기존 오렌지 픽셀 캐릭터 (`#E07C4C`) 를 정적 로고로 변환
+- "lazy" 정체성 강조 — 눈을 감은 표정 (sleeping slits) + `Zzz` 인디케이터 + 볼 홍조
+- 애니메이션 제거 (GitHub README 는 SVG `<style>` 차단) → 정적 포즈만
+- README 3종 Hero 섹션 아래에 `<img>` 임베드
+
+**기타**
+- `dist/index.html`: 잔여 `Claude Control Center` 4곳 (title · 사이드바 · 온보딩 모달) → `LazyClaude`
+- nav 카탈로그 · TAB_DESC_I18N 갱신 (52탭 → 53탭)
+- e2e-tabs-smoke 53/53 통과
+
+---
 ## [2.23.2] — 2026-04-23
 
 ### 📸 Docs — 언어별 스크린샷 36장 + UI 브랜드 텍스트 정리

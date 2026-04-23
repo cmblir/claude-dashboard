@@ -78,6 +78,10 @@ from .prompt_library import (
     api_prompt_library_to_workflow,
 )
 from .cost_timeline import api_cost_timeline_summary
+from .rtk_lab import (
+    api_rtk_status, api_rtk_install, api_rtk_init,
+    api_rtk_config, api_rtk_gain, api_rtk_session,
+)
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -254,6 +258,10 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/embedding-lab/examples": api_embedding_examples,
     "/api/prompt-library/list": api_prompt_library_list,
     "/api/cost-timeline/summary": api_cost_timeline_summary,
+    "/api/rtk/status": api_rtk_status,
+    "/api/rtk/config": api_rtk_config,
+    "/api/rtk/gain": api_rtk_gain,
+    "/api/rtk/session": api_rtk_session,
 }
 
 
@@ -326,6 +334,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/run-diff": api_workflow_run_diff,
     "/api/workflows/node-clipboard": api_workflow_node_clipboard,
     "/api/workflows/webhook-secret": api_workflow_webhook_secret,
+    "/api/rtk/install": api_rtk_install,
+    "/api/rtk/init": api_rtk_init,
     "/api/session/spawn": api_session_spawn,
     "/api/ai-providers/test": api_provider_test,
     "/api/ai-providers/compare": api_provider_compare,
