@@ -77,6 +77,7 @@ from .prompt_library import (
     api_prompt_library_list, api_prompt_library_save,
     api_prompt_library_to_workflow,
 )
+from .cost_timeline import api_cost_timeline_summary
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -251,6 +252,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/embedding-lab/providers": api_embedding_providers,
     "/api/embedding-lab/examples": api_embedding_examples,
     "/api/prompt-library/list": api_prompt_library_list,
+    "/api/cost-timeline/summary": api_cost_timeline_summary,
 }
 
 

@@ -13,7 +13,9 @@ Claude Control Center is a **local-first dashboard** that manages your entire `~
 
 **No cloud. No telemetry. No dependencies to install.** Just Python stdlib and one HTML file.
 
-🆕 **v2.19.0** — [Workflow run diff/rerun](https://github.com/cmblir/claude-dashboard): compare two runs node-by-node, rerun current workflow in one click.
+🆕 **v2.20.0** — 💸 Costs Timeline tab: unified cost dashboard across all Claude API playground tabs + workflow runs, daily stacked chart by source.
+
+🆕 **v2.19.0** — Workflow run diff/rerun: compare two runs node-by-node, rerun current workflow in one click.
 
 🆕 **v2.3.0 ~ v2.9.0 (2026-04-23)** — Seven Claude API playground tabs added to the **work** group:
 - [🧊 Prompt Cache Lab](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) (v2.3.0) — `cache_control` measurement + USD savings

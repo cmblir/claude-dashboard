@@ -10,6 +10,29 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.20.0] — 2026-04-23
+
+### 💸 비용 타임라인 통합 탭 — 신규 `costsTimeline` (system 그룹)
+
+Claude API 플레이그라운드 10종 + 워크플로우 실행 비용을 **한 화면**에 통합.
+
+**기능**
+- 상단 카드 3개: 총 비용 · 총 호출 수 · 활성 소스 (10 플레이그라운드 + workflows)
+- **일별 비용 차트** (최근 60일) — SVG 수평 막대 · 소스별 스택 색상
+- **소스별 집계 테이블**: 호출 수 · 토큰 in/out · USD
+- **모델별 집계** (Top 20)
+- **최근 30건 리스트**
+
+**Architecture**
+- `server/cost_timeline.py` 신설 — 각 `~/.claude-dashboard-*.json` 히스토리를 통합 집계
+- 처리 소스 (10 + workflows):
+  * promptCache / thinkingLab / toolUseLab / batchJobs / apiFiles / visionLab / modelBench / serverTools / citationsLab + workflows(store costs 배열)
+- 엔트리 없는 USD 값은 `_estimate(model, ti, to)` 로 재계산 (Opus/Sonnet/Haiku 가격표)
+- `server/routes.py` 라우트 1 추가 (`GET /api/cost-timeline/summary`)
+- `server/nav_catalog.py` `costsTimeline` 탭 등록 (system 그룹) + en/zh
+- `dist/index.html` NAV (icon 💸) + `VIEWS.costsTimeline` — SVG 스택 차트 + 3 테이블
+- `tools/translations_manual_9.py` 18 키 × ko/en/zh
+
 ## [2.19.0] — 2026-04-23
 
 ### 📜 워크플로우 실행 이력 diff / 재실행

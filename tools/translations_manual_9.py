@@ -686,6 +686,27 @@ NEW_EN = {
     "상태가 달라지거나 한쪽에만 있는 노드는 하이라이트.":
         "Nodes with status change or present in only one run are highlighted.",
 
+    # ── v2.20.0 Costs Timeline ─────────────────────────────────
+    "비용 타임라인": "Costs Timeline",
+    "모든 플레이그라운드/워크플로우 비용 통합 타임라인": "Unified cost timeline across all playgrounds & workflows",
+    "Claude API 플레이그라운드 + 워크플로우 실행의 모든 비용을 통합 조회. 로컬 히스토리 JSON 파일들에서 자동 수집.":
+        "Unified view across Claude API playground tabs + workflow runs. Automatically collected from local history JSON files.",
+    "총 비용": "Total cost",
+    "총 호출": "Total calls",
+    "활성 소스": "Active sources",
+    "일별 비용 (최근 60일, 소스별 스택)": "Daily cost (last 60 days, stacked by source)",
+    "아직 데이터가 없습니다. 플레이그라운드 탭을 사용하면 자동으로 축적됩니다.":
+        "No data yet. Usage in playground tabs is tracked automatically.",
+    "아직 데이터가 없습니다": "No data yet",
+    "소스별 집계": "By source",
+    "모델별 집계 (Top 20)": "By model (top 20)",
+    "최근 30건": "Recent 30",
+    "소스": "Source",
+    "호출": "Calls",
+    "토큰 in/out": "Tokens in/out",
+    "시각": "Time",
+    "데이터를 불러오지 못했습니다": "Failed to load data",
+
     "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
         "Provide a document and use citations.enabled to get answers with precise citation spans. Hover [N] in the answer to highlight the matching range in the source.",
     "문서 제목 (선택)": "Document title (optional)",
@@ -1524,6 +1545,27 @@ NEW_ZH = {
     "실행 비교": "运行比较",
     "상태가 달라지거나 한쪽에만 있는 노드는 하이라이트.":
         "状态变化或只出现在一方的节点会高亮显示。",
+
+    # ── v2.20.0 费用时间线 ───────────────────────────────────
+    "비용 타임라인": "费用时间线",
+    "모든 플레이그라운드/워크플로우 비용 통합 타임라인": "所有实验室/工作流费用统一时间线",
+    "Claude API 플레이그라운드 + 워크플로우 실행의 모든 비용을 통합 조회. 로컬 히스토리 JSON 파일들에서 자동 수집.":
+        "统一查看所有 Claude API 实验室标签 + 工作流运行的费用。自动从本地历史 JSON 文件收集。",
+    "총 비용": "总费用",
+    "총 호출": "总调用",
+    "활성 소스": "活跃源",
+    "일별 비용 (최근 60일, 소스별 스택)": "每日费用（最近 60 天，按源堆叠）",
+    "아직 데이터가 없습니다. 플레이그라운드 탭을 사용하면 자동으로 축적됩니다.":
+        "暂无数据。使用实验室标签后会自动累积。",
+    "아직 데이터가 없습니다": "暂无数据",
+    "소스별 집계": "按源汇总",
+    "모델별 집계 (Top 20)": "按模型汇总（前 20）",
+    "최근 30건": "最近 30 条",
+    "소스": "源",
+    "호출": "调用",
+    "토큰 in/out": "Token in/out",
+    "시각": "时间",
+    "데이터를 불러오지 못했습니다": "加载数据失败",
 
     "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
         "提供文档并启用 citations.enabled 以获得带精确引用片段的答案。将鼠标悬停在答案中的 [N] 上可高亮原文对应区间。",
