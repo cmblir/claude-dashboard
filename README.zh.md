@@ -124,7 +124,7 @@ _所有截图由 `scripts/capture-screenshots.mjs`（Playwright · 1440×900 @2x
 
 **1 · 克隆**
 ```bash
-git clone https://github.com/cmblir/claude-dashboard.git && cd claude-dashboard
+git clone https://github.com/cmblir/LazyClaude.git && cd LazyClaude
 ```
 
 **2 · 运行**
@@ -348,7 +348,7 @@ TAB_ID=workflows npm run test:e2e:smoke   # 仅单个标签页
 
 ## 🤝 贡献
 
-LazyClaude 是单人维护的个人项目，但欢迎提交 Issue 和 PR：[github.com/cmblir/claude-dashboard](https://github.com/cmblir/claude-dashboard)。
+LazyClaude 是单人维护的个人项目，但欢迎提交 Issue 和 PR：[github.com/cmblir/LazyClaude](https://github.com/cmblir/LazyClaude)。
 
 小修复（错别字、i18n 缺失、明显 bug）可直接提 PR。大型功能或重构请先开 Issue，避免重复工作。
 

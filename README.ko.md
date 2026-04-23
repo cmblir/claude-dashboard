@@ -124,7 +124,7 @@ _모든 스크린샷은 `scripts/capture-screenshots.mjs` (Playwright · 1440×9
 
 **1 · 클론**
 ```bash
-git clone https://github.com/cmblir/claude-dashboard.git && cd claude-dashboard
+git clone https://github.com/cmblir/LazyClaude.git && cd LazyClaude
 ```
 
 **2 · 실행**
@@ -350,7 +350,7 @@ TAB_ID=workflows npm run test:e2e:smoke   # 단일 탭만
 
 ## 🤝 기여하기
 
-LazyClaude 는 1인 메인테이너 개인 프로젝트이지만, 이슈와 PR 모두 환영합니다: [github.com/cmblir/claude-dashboard](https://github.com/cmblir/claude-dashboard).
+LazyClaude 는 1인 메인테이너 개인 프로젝트이지만, 이슈와 PR 모두 환영합니다: [github.com/cmblir/LazyClaude](https://github.com/cmblir/LazyClaude).
 
 오탈자·i18n 누락·자명한 버그는 바로 PR 보내주세요. 큰 기능/리팩터링은 중복 작업 방지를 위해 이슈 먼저 열어주시면 좋습니다.
 
