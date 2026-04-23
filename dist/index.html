@@ -10159,7 +10159,11 @@ async function setPermAndSave(kind, op, value) {
 // MCP / PLUGINS
 // ────────────────────────────────────────────────────────────────
 VIEWS.mcp = async () => {
-  const [conn, cat] = await Promise.all([api('/api/connectors'), api('/api/mcp/catalog')]);
+  const [conn, cat, selfMcp] = await Promise.all([
+    api('/api/connectors'),
+    api('/api/mcp/catalog'),
+    api('/api/mcp-server/info').catch(() => ({ path: '', tools: [] })),
+  ]);
   state.data.mcpCatalog = cat.catalog;
   const q = (state.data.mcpFilter || '').toLowerCase();
   const filteredCat = cat.catalog.filter(x =>
@@ -10176,6 +10180,37 @@ VIEWS.mcp = async () => {
         <a class="btn text-xs" href="${DOCS_BASE}mcp" target="_blank" rel="noopener">📖</a>
       </div>
     </div>
+
+    ${selfMcp.path ? `
+      <div class="card p-5 mb-4" style="border-left:3px solid var(--accent);">
+        <div class="flex items-start justify-between gap-3 mb-2 flex-wrap">
+          <div>
+            <h3 class="font-semibold text-sm">💤 ${t('mcp_self_heading', 'LazyClaude 자체를 MCP 서버로 (v2.32.0)')}</h3>
+            <p class="text-[11px] mt-1" style="color:var(--text-mute)">
+              ${t('mcp_self_desc', 'Claude Code 세션 안에서 대시보드 기능을 호출할 수 있게 LazyClaude 를 stdio MCP 서버로 등록합니다. 6 tool 노출: 탭 카탈로그 · 비용 요약 · 보안 스캔 · 러너 패턴 · RTK 상태 · 워크플로우 템플릿.')}
+            </p>
+          </div>
+          <span class="chip text-[10px]">${selfMcp.tools?.length || 0} tools · MCP ${selfMcp.protocolVersion || '2024-11-05'}</span>
+        </div>
+        <div class="text-[10px] mb-1" style="color:var(--text-dim)">${t('mcp_self_cmd', '설치 명령 (Terminal):')}</div>
+        <div class="flex items-center gap-1 mb-2">
+          <input id="mcpSelfInstallCmd" class="input flex-1 text-[11px] font-mono" readonly
+                 value="claude mcp add lazyclaude -- python3 ${escapeHtml(selfMcp.path)}" />
+          <button class="btn text-[11px] flex-shrink-0"
+                  onclick="navigator.clipboard.writeText(document.getElementById('mcpSelfInstallCmd').value).then(()=>toast(t('복사됨'),'ok'))">📋</button>
+        </div>
+        <details class="text-[10px]">
+          <summary class="cursor-pointer select-none" style="color:var(--text-dim)">${t('mcp_self_tools_heading', '노출되는 6 tool')}</summary>
+          <div class="mt-2 space-y-1">
+            ${(selfMcp.tools || []).map(tl => `
+              <div class="text-[10px]">
+                <code class="text-[10px] font-mono" style="color:var(--accent)">${escapeHtml(tl.name)}</code>
+                <span style="color:var(--text-mute);"> — ${escapeHtml(tl.description)}</span>
+              </div>`).join('')}
+          </div>
+        </details>
+      </div>
+    ` : ''}
 
     <div class="card p-5 mb-4">
       <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">

@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.32.0] — 2026-04-24
+
+### 🔌 MCP 서버 모드 — LazyClaude 를 Claude Code 에서 직접 호출
+
+Claude Code 세션 안에서 대시보드 기능을 MCP tool 로 호출할 수 있게 LazyClaude 를 stdio MCP 서버로 노출.
+
+**신규 파일**
+- `server/mcp_server.py` — stdio JSON-RPC 2.0 루프 (MCP 2024-11-05 protocol)
+- `scripts/lazyclaude_mcp.py` — 진입점 스크립트
+
+**노출 tools (6)**
+- `lazyclaude_tabs` — 6 상위 카테고리별 탭 카탈로그
+- `lazyclaude_cost_summary` — 비용 타임라인 요약 (총 USD · 소스별 · 모델별)
+- `lazyclaude_security_scan` — `~/.claude` 정적 보안 검사 결과
+- `lazyclaude_learner_patterns` — 세션 반복 패턴 + 누적 토큰
+- `lazyclaude_rtk_status` — RTK 설치/훅 상태
+- `lazyclaude_workflow_templates` — 10 빌트인 템플릿 목록
+
+**특징**
+- Python stdlib 만 사용 (외부 MCP SDK 없음), newline-delimited JSON-RPC
+- Transport: stdio · No network · No auth · 100% local
+- Initialize → tools/list → tools/call → shutdown 완전 지원
+- Unknown method 는 `-32601` error code 로 응답
+
+**설치**
+```bash
+claude mcp add lazyclaude -- python3 /<path>/LazyClaude/scripts/lazyclaude_mcp.py
+```
+
+**대시보드 UI**
+- MCP 탭 상단에 "💤 LazyClaude 자체를 MCP 서버로" 카드 추가
+- `/api/mcp-server/info` 로 스크립트 절대경로 + 노출 tool 목록 동적 제공
+- 설치 명령 readonly input + 📋 클립보드 복사 버튼
+- 6 tool 설명 접힘 섹션
+
+**검증**
+- stdio 통신 테스트: `initialize` + `tools/list` + `tools/call` × 2 + `shutdown` 모두 정상 응답
+- 실제 rtk 0.37.2 설치 감지 · workflow templates 10개 반환 확인
+- 57/57 탭 smoke 통과
+- i18n 4 키 × ko/en/zh
+
+---
 ## [2.31.0] — 2026-04-24
 
 ### 🛡️ Security Scan 탭 — ECC AgentShield 스타일 정적 검사 (observe 그룹)
