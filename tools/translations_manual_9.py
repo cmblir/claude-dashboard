@@ -686,6 +686,11 @@ NEW_EN = {
     "상태가 달라지거나 한쪽에만 있는 노드는 하이라이트.":
         "Nodes with status change or present in only one run are highlighted.",
 
+    # ── v2.22.0 SSRF 가드 ───────────────────────────────────────
+    "내부/사설 호스트 허용 (SSRF 가드 해제)": "Allow internal/private hosts (disable SSRF guard)",
+    "기본값은 localhost/127.x/10.x/169.254.x/클라우드 메타데이터 호스트 호출을 차단합니다. 자기 로컬 서비스를 의도적으로 호출할 때만 체크.":
+        "Default blocks localhost/127.x/10.x/169.254.x/cloud-metadata hosts. Enable only to intentionally hit your local services.",
+
     # ── v2.20.0 Costs Timeline ─────────────────────────────────
     "비용 타임라인": "Costs Timeline",
     "모든 플레이그라운드/워크플로우 비용 통합 타임라인": "Unified cost timeline across all playgrounds & workflows",
@@ -1545,6 +1550,11 @@ NEW_ZH = {
     "실행 비교": "运行比较",
     "상태가 달라지거나 한쪽에만 있는 노드는 하이라이트.":
         "状态变化或只出现在一方的节点会高亮显示。",
+
+    # ── v2.22.0 SSRF 防护 ──────────────────────────────────────
+    "내부/사설 호스트 허용 (SSRF 가드 해제)": "允许内部/私有主机（解除 SSRF 防护）",
+    "기본값은 localhost/127.x/10.x/169.254.x/클라우드 메타데이터 호스트 호출을 차단합니다. 자기 로컬 서비스를 의도적으로 호출할 때만 체크.":
+        "默认阻止 localhost/127.x/10.x/169.254.x/云元数据主机调用。仅在有意访问本地服务时勾选。",
 
     # ── v2.20.0 费用时间线 ───────────────────────────────────
     "비용 타임라인": "费用时间线",

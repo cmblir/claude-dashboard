@@ -10,6 +10,32 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.22.0] — 2026-04-23
+
+### 🔒 Security — 워크플로우 HTTP 노드 SSRF 가드 (Finding 1 fix)
+
+보안 감사에서 발견된 **HIGH** 급 SSRF 취약점 수정. 기존 `_execute_http_node` 가 URL 의 scheme/host 검증 없이 `urllib.request.urlopen` 을 호출해 **DNS rebinding / CSRF / 악성 워크플로우 import** 시 다음 공격이 가능했음:
+
+- 클라우드 메타데이터 (`http://169.254.169.254/`) 접근 → 자격 증명 유출
+- 로컬/사설 네트워크 포트 스캔 (`http://127.0.0.1:6379`, `http://192.168.x.x:*`)
+- `file://`, `ftp://`, `gopher://` 등 비-HTTP 스킴을 통한 파일 읽기 / 내부 호출
+
+**수정 내역**
+- `server/workflows.py::_execute_http_node`:
+  * scheme 화이트리스트: `http`, `https` 만 허용. 그 외는 `"scheme blocked"` 에러.
+  * 호스트 블랙리스트: `127.0.0.1 · 0.0.0.0 · ::1 · localhost · 169.254.169.254 · metadata.google.internal · metadata.goog · fd00:ec2::254`
+  * 사설/링크로컬 프리픽스 차단: `10.*`, `127.*`, `169.254.*`, `172.16~31.*`, `192.168.*`, IPv6 `fc*/fd*/fe80~feb*`
+  * **DNS rebinding 방어**: 호스트가 DNS 이름일 때 `getaddrinfo` 로 실제 IP 를 해석 후 재검사. 해석 실패 시 `fail-closed`.
+- **옵트인 우회**: 노드 `data.allowInternal = true` 로 체크 시만 내부 호출 허용. UI 에 경고 박스 + 체크박스 (기본 off).
+- `dist/index.html::VIEWS.workflows` HTTP 노드 에디터에 체크박스 추가 + 신규 HTTP 노드 data 기본값에 `allowInternal: false` 명시.
+- `tools/translations_manual_9.py`: 2 키 × ko/en/zh 추가.
+
+**영향도**
+- **공격 차단**: 외부 공격자의 DNS rebinding 이나 악성 워크플로우 JSON import 를 통한 내부 네트워크 접근 원천 차단.
+- **호환성**: 기존 워크플로우의 외부 API 호출 (`api.openai.com`, `api.anthropic.com` 등) 은 영향 없음. 로컬 테스트용 호출(`http://localhost:3000`) 은 UI 에서 체크박스 켜야 동작.
+
+**감사 출처**: `/security-review` 스킬 · `Obsidian/logs/2026-04-23-security-audit.md` 에 상세 기록.
+
 ## [2.21.1] — 2026-04-23
 
 ### Docs — README 3종 통계 v2.21.1 기준 갱신 (세션 5 결과)

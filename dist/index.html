@@ -2624,7 +2624,7 @@ function _wfAddNode(type) {
   } else if (type === 'branch') newNode.data = { condition: '' };
   else if (type === 'aggregate') newNode.data = { mode: 'concat' };
   else if (type === 'output') newNode.data = { exportTo: '' };
-  else if (type === 'http') newNode.data = { url:'', method:'GET', headers:{}, body:'', extractPath:'' };
+  else if (type === 'http') newNode.data = { url:'', method:'GET', headers:{}, body:'', extractPath:'', allowInternal: false };
   else if (type === 'transform') newNode.data = { transformType:'template', template:'{{input}}', jsonPath:'', regexPattern:'', regexReplacement:'', separator:'\\n' };
   else if (type === 'variable') newNode.data = { varName:'var1', defaultValue:'' };
   else if (type === 'subworkflow') newNode.data = { workflowId:'', passInput:true };
@@ -3294,7 +3294,7 @@ function _wfPickNodeType(winId, type) {
   } else if (type === 'branch')    draft.data = { condition:'', conditionType:'contains' };
   else if (type === 'aggregate') draft.data = { mode:'concat' };
   else if (type === 'output')    draft.data = { exportTo:'' };
-  else if (type === 'http')      draft.data = { url:'', method:'GET', headers:{}, body:'', extractPath:'' };
+  else if (type === 'http')      draft.data = { url:'', method:'GET', headers:{}, body:'', extractPath:'', allowInternal: false };
   else if (type === 'transform') draft.data = { transformType:'template', template:'{{input}}', jsonPath:'', regexPattern:'', regexReplacement:'', separator:'\\n' };
   else if (type === 'variable')  draft.data = { varName:'var1', defaultValue:'', scope:'global' };
   else if (type === 'subworkflow') draft.data = { workflowId:'', passInput:true };
@@ -3536,6 +3536,15 @@ function _wfRenderEditorBody(winId) {
       <textarea class="input w-full mt-1" rows="3" oninput="_wfDraftSetData('${winId}','body',this.value)" placeholder='{"query": "{{input}}"}'>${escapeHtml(d.body||'')}</textarea>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('응답 추출 경로 (JSON dot path, 비우면 전체)')}</label>
       <input class="input w-full mt-1" value="${escapeHtml(d.extractPath||'')}" oninput="_wfDraftSetData('${winId}','extractPath',this.value)" placeholder="data.result">
+      <div class="mt-3 p-3 rounded" style="background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.3);">
+        <label class="flex items-start gap-2 cursor-pointer select-none text-[11px]">
+          <input type="checkbox" ${d.allowInternal?'checked':''} onchange="_wfDraftSetData('${winId}','allowInternal',this.checked)" style="margin-top:2px;">
+          <div>
+            <div class="font-semibold">⚠️ ${t('내부/사설 호스트 허용 (SSRF 가드 해제)')}</div>
+            <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('기본값은 localhost/127.x/10.x/169.254.x/클라우드 메타데이터 호스트 호출을 차단합니다. 자기 로컬 서비스를 의도적으로 호출할 때만 체크.')}</div>
+          </div>
+        </label>
+      </div>
     `;
   } else if (draft.type === 'transform') {
     body += `
