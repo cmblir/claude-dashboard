@@ -32,7 +32,7 @@ Claude Control Center is a **local-first dashboard** that manages your entire `~
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  🧭  Claude Control Center                          v2.1.1 🇰🇷│
+│  🧭  Claude Control Center                          v2.21.1 🇰🇷│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 New │   🔀 Workflows                                         │
 │ 🏠 Main│   ┌──────┐      ┌──────┐      ┌──────┐                │
