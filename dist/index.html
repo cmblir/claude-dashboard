@@ -3180,6 +3180,20 @@ function _wfRenderInspector() {
     </div>
 
     <div class="mb-4 pt-3 border-t border-[var(--border)]">
+      <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">🛡 ${t('policy_heading', '실행 정책')}</div>
+      ${(() => {
+        const pol = __wf.current.policy || { tokenBudgetTotal: 0 };
+        return `
+          <label class="text-[10px]" style="color:var(--text-dim)">${t('policy_budget_label', '토큰 예산 (누적, 0 = 무제한)')}</label>
+          <input class="input w-full text-[11px] font-mono mt-1 mb-1" type="text" inputmode="numeric" pattern="[0-9]*"
+                 value="${Number(pol.tokenBudgetTotal||0)}"
+                 oninput="const n=parseInt(this.value.replace(/\\D/g,''))||0; __wf.current.policy = __wf.current.policy || {}; __wf.current.policy.tokenBudgetTotal=n; __wf.dirty=true; _wfUpdateToolbar();">
+          <div class="text-[10px]" style="color:var(--text-dim)">${t('policy_budget_hint', '누적 tokensIn+Out 이 이 값에 도달하면 이후 노드는 budget_exceeded 로 스킵. 부분 결과는 유지.')}</div>
+        `;
+      })()}
+    </div>
+
+    <div class="mb-4 pt-3 border-t border-[var(--border)]">
       <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">🔔 ${t('notify_heading', '완료 알림')}</div>
       ${(() => {
         const nf = __wf.current.notify || { slack: '', discord: '' };

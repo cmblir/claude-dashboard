@@ -948,6 +948,10 @@ NEW_EN = {
     "costs_bucket_month": "Month",
     "diff_highlight_hint": "Nodes with status or token changes are highlighted.",
     "토큰": "Tokens",
+    # v2.27.0 — Workflow policy
+    "policy_heading": "Execution policy",
+    "policy_budget_label": "Token budget (cumulative, 0 = unlimited)",
+    "policy_budget_hint": "When cumulative tokensIn+Out reaches this value, the remaining nodes are skipped as budget_exceeded. Partial results are preserved.",
 }
 
 NEW_ZH = {
@@ -1892,4 +1896,8 @@ NEW_ZH = {
     "costs_bucket_month": "月",
     "diff_highlight_hint": "状态或 token 变化的节点已高亮。",
     "토큰": "Token",
+    # v2.27.0 — Workflow policy
+    "policy_heading": "执行策略",
+    "policy_budget_label": "Token 预算（累计，0 = 无限）",
+    "policy_budget_hint": "当累计 tokensIn+Out 达到该值时，剩余节点会被标记为 budget_exceeded 并跳过。部分结果得以保留。",
 }

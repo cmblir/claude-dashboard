@@ -10,6 +10,34 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.27.0] — 2026-04-23
+
+### 🏗️ Team Sprint 템플릿 + 워크플로우 전역 토큰 예산 정책 (backlog B6 + Policy)
+
+**B6 · Team Sprint 빌트인 템플릿 (`bt-team-sprint`)**
+- OMC `omc team 3:executor` 의 5단계 파이프라인을 단일 DAG 로:
+  - 🧭 Plan (Opus) → 📋 PRD (Sonnet) → 👷 Exec ×3 병렬 (Sonnet) → 🔀 Merge → 🔎 Verify (Haiku) → Branch `PASS?` → ✅ Out / 🛠️ Fix
+- Verify 실패 시 피드백 자동 주입해 Plan 단계부터 최대 3회 repeat 루프 (bt-ralph 패턴 응용).
+- 11 노드 · 12 엣지 · repeat(maxIterations=3, feedbackNodeId=n-plan).
+- 빌트인 템플릿 9 → 10.
+
+**Policy 프리셋 — 워크플로우 전역 토큰 예산 (`workflow.policy.tokenBudgetTotal`)**
+- `_sanitize_workflow` 에 `policy` 필드 추가:
+  - `tokenBudgetTotal`: 0 (unlimited) ~ 100,000,000 토큰
+  - `onBudgetExceeded`: `"stop"` (기본) | `"warn"` — 현재는 stop 만 동작
+- `_run_one_iteration` 의 level 루프 시작부에 누적 토큰 집계:
+  - `sum(tokensIn + tokensOut for 완료된 노드)` ≥ 예산 → 남은 모든 노드를 `budget_exceeded` 상태로 표시 후 iteration 조기 종료
+  - 부분 결과는 유지 (status="ok" 로 종료, `budgetExceeded: true` 플래그)
+- 에디터 인스펙터에 **🛡 실행 정책** 섹션 — 예산 입력 필드 + 힌트
+
+**i18n** — `policy_heading` / `policy_budget_label` / `policy_budget_hint` 3 키 × ko/en/zh.
+
+**검증**
+- 54/54 탭 smoke · 템플릿 10건 조회 확인
+- Policy round-trip: `{tokenBudgetTotal: 1234}` 저장 → 조회 시 `{tokenBudgetTotal: 1234, onBudgetExceeded: "stop"}` 정상 반환
+- Sanitize 3 케이스 (정상/음수/거대값) 경계 확인
+
+---
 ## [2.26.0] — 2026-04-23
 
 ### 🧭 사이드바 UX 개편 — 6 상위 카테고리 + hover flyout

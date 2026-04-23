@@ -361,8 +361,24 @@ def _sanitize_workflow(raw: Any) -> Optional[dict]:
         },
         "repeat":      _sanitize_repeat(raw.get("repeat")),
         "notify":      _sanitize_notify(raw.get("notify")),  # v2.25.0 Slack/Discord
+        "policy":      _sanitize_policy(raw.get("policy")),  # v2.27.0 전역 토큰 예산
     }
     return out
+
+
+def _sanitize_policy(raw: Any) -> dict:
+    """워크플로우 전역 정책. 현재는 tokenBudgetTotal 만. 0 = unlimited."""
+    if not isinstance(raw, dict):
+        return {"tokenBudgetTotal": 0, "onBudgetExceeded": "stop"}
+    try:
+        budget = int(raw.get("tokenBudgetTotal") or 0)
+    except Exception:
+        budget = 0
+    budget = max(0, min(budget, 100_000_000))  # 1억 토큰 상한
+    on_exc = raw.get("onBudgetExceeded")
+    if on_exc not in ("stop", "warn"):
+        on_exc = "stop"
+    return {"tokenBudgetTotal": budget, "onBudgetExceeded": on_exc}
 
 
 def _sanitize_notify(raw: Any) -> dict:
@@ -1543,6 +1559,10 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
         res = _execute_node(node, input_strs, prev_sids)
         return (nid, res)
 
+    # v2.27.0 — 워크플로우 전역 토큰 예산 정책
+    policy = wf.get("policy") or {}
+    token_budget = int(policy.get("tokenBudgetTotal") or 0)
+
     for level in levels:
         # 전체 timeout 체크
         if time.time() - total_t0 > _DEFAULT_TOTAL_TIMEOUT:
@@ -1554,6 +1574,34 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                     s["runs"][runId]["finishedAt"] = int(time.time()*1000)
                     _dump_all(s)
             return (False, results, "")
+
+        # 토큰 예산 체크 — 초과 시 이후 모든 노드를 budget_exceeded 로 마크하고 종료
+        if token_budget > 0:
+            total_tokens = sum(
+                (r.get("tokensIn", 0) or 0) + (r.get("tokensOut", 0) or 0)
+                for r in results.values() if isinstance(r, dict)
+            )
+            if total_tokens >= token_budget:
+                with _LOCK:
+                    s = _load_all()
+                    if runId in s["runs"]:
+                        for nid in order:
+                            if nid not in s["runs"][runId].get("nodeResults", {}):
+                                s["runs"][runId]["nodeResults"][nid] = {
+                                    "status": "budget_exceeded",
+                                    "output": "",
+                                    "durationMs": 0,
+                                }
+                        s["runs"][runId]["budgetExceeded"] = True
+                        s["runs"][runId]["totalTokens"] = total_tokens
+                        _dump_all(s)
+                log.info("workflow %s run %s stopped — token budget %d exceeded (%d)",
+                         wf.get("id"), runId, token_budget, total_tokens)
+                # ok=True (부분 완료) 로 종료, 마지막 노드 결과를 final_out 으로
+                final_node = next((nid for nid in reversed(order) if nid in results
+                                   and results[nid].get("status") == "ok"), None)
+                final_out = results.get(final_node, {}).get("output", "") if final_node else ""
+                return (True, results, final_out)
 
         # disabled 노드 제외
         active_nodes = [nid for nid in level if nid not in disabled]
@@ -2234,6 +2282,64 @@ BUILTIN_TEMPLATES: list[dict] = [
             {"id": "e3", "from": "n-answer",  "to": "n-spec",    "fromPort": "out", "toPort": "in"},
             {"id": "e4", "from": "n-spec",    "to": "n-out",     "fromPort": "out", "toPort": "in"},
         ],
+    },
+
+    # v2.27.0 — OMC /team 5단계 파이프라인 (Plan → PRD → 3-병렬 Exec → Verify → Fix 루프)
+    {
+        "id": "bt-team-sprint", "name": "Team Sprint (Plan→PRD→Exec×3→Verify→Fix)",
+        "icon": "🏗️", "builtin": True,
+        "description": "OMC /team 스타일 5단계: 계획(Opus)→요구사항명세(Sonnet)→3-병렬 실행(Sonnet)→취합→검증(Haiku)→실패 시 수정. Repeat 3회까지 자동 verify-fix 루프.",
+        "category": "pattern",
+        "nodes": [
+            {"id": "n-start", "type": "start", "x":  80, "y": 300, "title": "스프린트 요청", "data": {}},
+            {"id": "n-plan",  "type": "session", "x": 260, "y": 300, "title": "🧭 Plan",
+             "data": {"subject": "전체 아키텍처 · 범위 · 리스크를 5섹션으로 설계 (목표/제약/접근/모듈/순서)",
+                      "assignee": "claude:opus", "inputsMode": "concat"}},
+            {"id": "n-prd",   "type": "session", "x": 460, "y": 300, "title": "📋 PRD",
+             "data": {"subject": "계획을 받아 각 모듈별 세부 요구사항·수용 조건(Acceptance Criteria)·테스트 포인트 작성",
+                      "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-exec-a", "type": "session", "x": 680, "y": 180, "title": "👷 Exec A",
+             "data": {"subject": "PRD 의 모듈 1/3 담당 — 코드/문서 결과물과 실행 결과 보고",
+                      "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-exec-b", "type": "session", "x": 680, "y": 300, "title": "👷 Exec B",
+             "data": {"subject": "PRD 의 모듈 2/3 담당 — 코드/문서 결과물과 실행 결과 보고",
+                      "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-exec-c", "type": "session", "x": 680, "y": 420, "title": "👷 Exec C",
+             "data": {"subject": "PRD 의 모듈 3/3 담당 — 코드/문서 결과물과 실행 결과 보고",
+                      "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-merge", "type": "merge", "x": 880, "y": 300, "title": "🔀 취합",
+             "data": {"mergeMode": "all"}},
+            {"id": "n-verify", "type": "session", "x": 1080, "y": 300, "title": "🔎 Verify",
+             "data": {"subject": "취합된 결과물을 PRD 수용 조건과 대조. 통과면 'PASS', 아니면 'FAIL — <실패 항목 목록>' 으로 시작",
+                      "assignee": "claude:haiku", "inputsMode": "concat"}},
+            {"id": "n-branch", "type": "branch", "x": 1280, "y": 300, "title": "PASS?",
+             "data": {"conditionType": "contains", "conditionValue": "PASS"}},
+            {"id": "n-fix",   "type": "session", "x": 1280, "y": 460, "title": "🛠️ Fix",
+             "data": {"subject": "실패한 항목만 선택적으로 수정. 변경점과 근거 명시.",
+                      "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-out",   "type": "output", "x": 1480, "y": 220, "title": "✅ 완료", "data": {}},
+        ],
+        "edges": [
+            {"id": "e01", "from": "n-start",  "to": "n-plan",   "fromPort": "out",   "toPort": "in"},
+            {"id": "e02", "from": "n-plan",   "to": "n-prd",    "fromPort": "out",   "toPort": "in"},
+            {"id": "e03", "from": "n-prd",    "to": "n-exec-a", "fromPort": "out",   "toPort": "in"},
+            {"id": "e04", "from": "n-prd",    "to": "n-exec-b", "fromPort": "out",   "toPort": "in"},
+            {"id": "e05", "from": "n-prd",    "to": "n-exec-c", "fromPort": "out",   "toPort": "in"},
+            {"id": "e06", "from": "n-exec-a", "to": "n-merge",  "fromPort": "out",   "toPort": "in"},
+            {"id": "e07", "from": "n-exec-b", "to": "n-merge",  "fromPort": "out",   "toPort": "in"},
+            {"id": "e08", "from": "n-exec-c", "to": "n-merge",  "fromPort": "out",   "toPort": "in"},
+            {"id": "e09", "from": "n-merge",  "to": "n-verify", "fromPort": "out",   "toPort": "in"},
+            {"id": "e10", "from": "n-verify", "to": "n-branch", "fromPort": "out",   "toPort": "in"},
+            {"id": "e11", "from": "n-branch", "to": "n-out",    "fromPort": "true",  "toPort": "in"},
+            {"id": "e12", "from": "n-branch", "to": "n-fix",    "fromPort": "false", "toPort": "in"},
+        ],
+        "repeat": {
+            "enabled": True,
+            "maxIterations": 3,
+            "intervalSeconds": 0,
+            "feedbackNote": "이전 Fix 결과를 반영해 Exec 단계에서 실패 항목을 우선 처리하세요.",
+            "feedbackNodeId": "n-plan",
+        },
     },
 ]
 
