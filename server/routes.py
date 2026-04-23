@@ -85,6 +85,10 @@ from .rtk_lab import (
 )
 from .notify import api_notify_test
 from .session_replay import api_session_replay_list, api_session_replay_load
+from .event_forwarder import (
+    api_event_forwarder_list, api_event_forwarder_add,
+    api_event_forwarder_remove, api_event_forwarder_meta,
+)
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -267,6 +271,8 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/rtk/session": api_rtk_session,
     "/api/session-replay/list": api_session_replay_list,
     "/api/session-replay/load": api_session_replay_load,
+    "/api/event-forwarder/list": api_event_forwarder_list,
+    "/api/event-forwarder/meta": api_event_forwarder_meta,
 }
 
 
@@ -343,6 +349,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/rtk/init": api_rtk_init,
     "/api/rtk/uninstall-hook": api_rtk_uninstall_hook,
     "/api/notify/test": api_notify_test,
+    "/api/event-forwarder/add": api_event_forwarder_add,
+    "/api/event-forwarder/remove": api_event_forwarder_remove,
     "/api/session/spawn": api_session_spawn,
     "/api/ai-providers/test": api_provider_test,
     "/api/ai-providers/compare": api_provider_compare,

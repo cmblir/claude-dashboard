@@ -10,6 +10,36 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.29.0] — 2026-04-24
+
+### ⚙️ Policy fallbackProvider 확장 + 📤 Event Forwarder 신규 탭 (B7)
+
+**Policy · fallbackProvider 확장 (`workflow.policy.fallbackProvider`)**
+- session 노드가 assignee 로 실패할 때 설정된 프로바이더로 **1회 재시도**
+- 허용값: `""`(none) · `claude-api` · `openai-api` · `gemini-api` · `ollama-api`
+- 실행 결과에 `fallbackUsed` 필드로 어떤 프로바이더가 쓰였는지 기록 (빈 문자열이면 원래 assignee 로 처리됨)
+- 재귀 방지: 폴백 호출은 `fallback=False` 로 넘겨 ai-providers chain 가 또 타지 않음
+- 에디터 인스펙터 🛡 실행 정책 섹션에 select UI 추가
+
+**B7 · Event Forwarder 신규 탭 (`eventForwarder`, config 그룹)**
+- Claude Code hook 이벤트(`PostToolUse`, `Stop`, `SessionStart` 등 9종)를 외부 HTTP endpoint 로 포워딩
+- 신규 모듈 `server/event_forwarder.py`:
+  - `~/.claude/settings.json` 의 hooks 섹션에 `curl -sS -X POST --data-binary @- '<URL>' # __lazyclaude_forwarder__` 엔트리 add/remove
+  - 매 변경 시 `settings.json.bak.<ts>` 자동 백업
+  - `__lazyclaude_forwarder__` 마커로 우리 엔트리만 필터 — 사용자가 직접 추가한 hook 은 건드리지 않음
+- **SSRF 방어 (호스트 화이트리스트 11종)**: `hooks.slack.com` · `discord.com` · `webhook.site` · `requestbin.com` · `pipedream.net` · `zapier.com` · `api.github.com` · `maker.ifttt.com` · `n8n.cloud` 등 + 루트 도메인 매칭 (예: `subdomain.webhook.site` OK)
+- https-only · URL 길이 500 이하 · shell metacharacter 금지 (`'`, `"`, `\\`, `$`, `` ` ``, newline) → single-quote 래핑으로 안전하게 shell escape
+- 4개 라우트: GET `/api/event-forwarder/{list,meta}`, POST `/api/event-forwarder/{add,remove}`
+- UI: 이벤트 타입 select + matcher input + URL input + 허용 호스트 안내 + 등록된 forwarder 테이블 + 삭제 버튼
+
+**검증**
+- 55/55 탭 smoke (신규 `eventForwarder` 추가로 54→55)
+- Policy fallback sanitize 경계 케이스 3종 (정상 / evil / claude-api)
+- Event Forwarder E2E: http 거부 · evil.com 거부 · webhook.site 정상 add→list→remove round-trip
+- settings.json 자동 백업 후 정상 JSON 쓰기 확인
+- i18n 26 키 추가 × ko/en/zh (policy_fallback_* · fwd_*)
+
+---
 ## [2.28.0] — 2026-04-23
 
 ### 🔧 RTK init 근본 수정 + 🌐 번역 완전성 + 🛡 보안 감사

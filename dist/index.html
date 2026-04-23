@@ -1005,6 +1005,9 @@ const NAV = [
   // config — Claude Code 설정 전반 (13, advanced 흡수)
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
+  { id: 'eventForwarder', icon: '📤', label: 'Event Forwarder',
+    group: 'config', desc: 'Claude Code hook 이벤트를 외부 HTTP endpoint 로 포워딩 · 호스트 화이트리스트',
+    docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
     group: 'config', desc: '허용/차단할 도구·명령 규칙. deny가 안전도를 높입니다', docUrl: DOCS_BASE+'iam' },
   { id: 'mcp',         icon: '🔗', label: 'MCP 커넥터',
@@ -3182,13 +3185,25 @@ function _wfRenderInspector() {
     <div class="mb-4 pt-3 border-t border-[var(--border)]">
       <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">🛡 ${t('policy_heading', '실행 정책')}</div>
       ${(() => {
-        const pol = __wf.current.policy || { tokenBudgetTotal: 0 };
+        const pol = __wf.current.policy || { tokenBudgetTotal: 0, fallbackProvider: '' };
+        const fp = pol.fallbackProvider || '';
         return `
           <label class="text-[10px]" style="color:var(--text-dim)">${t('policy_budget_label', '토큰 예산 (누적, 0 = 무제한)')}</label>
           <input class="input w-full text-[11px] font-mono mt-1 mb-1" type="text" inputmode="numeric" pattern="[0-9]*"
                  value="${Number(pol.tokenBudgetTotal||0)}"
                  oninput="const n=parseInt(this.value.replace(/\\D/g,''))||0; __wf.current.policy = __wf.current.policy || {}; __wf.current.policy.tokenBudgetTotal=n; __wf.dirty=true; _wfUpdateToolbar();">
-          <div class="text-[10px]" style="color:var(--text-dim)">${t('policy_budget_hint', '누적 tokensIn+Out 이 이 값에 도달하면 이후 노드는 budget_exceeded 로 스킵. 부분 결과는 유지.')}</div>
+          <div class="text-[10px] mb-2" style="color:var(--text-dim)">${t('policy_budget_hint', '누적 tokensIn+Out 이 이 값에 도달하면 이후 노드는 budget_exceeded 로 스킵. 부분 결과는 유지.')}</div>
+
+          <label class="text-[10px]" style="color:var(--text-dim)">${t('policy_fallback_label', '실패 시 fallback 프로바이더')}</label>
+          <select class="input w-full text-[11px] mt-1 mb-1"
+                  onchange="__wf.current.policy = __wf.current.policy || {}; __wf.current.policy.fallbackProvider=this.value; __wf.dirty=true; _wfUpdateToolbar();">
+            <option value="" ${fp===''?'selected':''}>${t('policy_fallback_none', '(없음)')}</option>
+            <option value="claude-api" ${fp==='claude-api'?'selected':''}>Claude API</option>
+            <option value="openai-api" ${fp==='openai-api'?'selected':''}>OpenAI API</option>
+            <option value="gemini-api" ${fp==='gemini-api'?'selected':''}>Gemini API</option>
+            <option value="ollama-api" ${fp==='ollama-api'?'selected':''}>Ollama (local)</option>
+          </select>
+          <div class="text-[10px]" style="color:var(--text-dim)">${t('policy_fallback_hint', 'session 노드가 assignee 로 실패 시 선택한 프로바이더로 1회 재시도. 노드 결과에 fallbackUsed 기록.')}</div>
         `;
       })()}
     </div>
@@ -9688,6 +9703,96 @@ async function stRun() {
 // HOOKS + PERMISSIONS
 // ────────────────────────────────────────────────────────────────
 const HOOK_EVENTS = ['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SubagentStop', 'Notification'];
+// ────────────────────────────────────────────────────────────────
+// EVENT FORWARDER (v2.29.0) — Claude Code hooks → 외부 HTTP POST
+// ────────────────────────────────────────────────────────────────
+VIEWS.eventForwarder = async () => {
+  const [meta, list] = await Promise.all([
+    api('/api/event-forwarder/meta'),
+    api('/api/event-forwarder/list'),
+  ]);
+  if (!meta.ok || !list.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}</div>`;
+  const events = meta.events || [];
+  const allowed = meta.allowedHosts || [];
+  const forwarders = list.forwarders || [];
+
+  const rows = forwarders.map((f, i) => `
+    <tr class="border-b border-[var(--border)]">
+      <td class="py-1 px-2 font-mono text-[11px]">${escapeHtml(f.event)}</td>
+      <td class="py-1 px-2 font-mono text-[10px]" style="color:var(--text-dim)">${escapeHtml(f.matcher||'-')}</td>
+      <td class="py-1 px-2 font-mono text-[10px] break-all">${escapeHtml(f.url)}</td>
+      <td class="py-1 px-2 text-right">
+        <button class="btn text-[10px]" onclick="_fwdRemove('${escapeHtml(f.event)}',${f.groupIdx},${f.subIdx})" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);">🗑</button>
+      </td>
+    </tr>
+  `).join('') || `<tr><td colspan="4" class="py-4 text-center text-[11px]" style="color:var(--text-dim)">${t('fwd_empty', '등록된 forwarder 가 없습니다')}</td></tr>`;
+
+  return `
+    ${viewHeader('📤 Event Forwarder', t('fwd_subtitle', 'Claude Code hooks 이벤트를 외부 HTTP endpoint 로 포워딩 — 화이트리스트 호스트만 허용, settings.json 자동 백업.'), 'eventForwarder')}
+
+    <div class="card p-5 mb-4">
+      <h3 class="text-base font-semibold mb-3">➕ ${t('fwd_add_heading', '새 Forwarder 추가')}</h3>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
+        <select id="fwdEvent" class="input text-[12px]">
+          ${events.map(e => `<option value="${e}">${e}</option>`).join('')}
+        </select>
+        <input id="fwdMatcher" class="input text-[12px]" placeholder="${t('fwd_matcher_placeholder', 'matcher (예: Bash, *, 비워두면 all)')}">
+        <input id="fwdUrl" class="input text-[12px] md:col-span-2" placeholder="https://hooks.slack.com/... 또는 https://webhook.site/...">
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button class="btn btn-primary text-[12px]" onclick="_fwdAdd()">📤 ${t('fwd_add_btn', 'Forwarder 추가')}</button>
+        <span class="text-[10px]" style="color:var(--text-dim)">${t('fwd_allowed_hosts', '허용 호스트')}: ${allowed.map(h => `<code>${escapeHtml(h)}</code>`).join(' · ')}</span>
+      </div>
+    </div>
+
+    <div class="card p-4">
+      <h3 class="text-base font-semibold mb-2">📋 ${t('fwd_list_heading', '등록된 Forwarder')}</h3>
+      <table class="w-full text-[11px] border-collapse">
+        <thead><tr class="border-b border-[var(--border)]">
+          <th class="text-left py-1 px-2">${t('이벤트')}</th>
+          <th class="text-left py-1 px-2">${t('fwd_matcher_col', '매처')}</th>
+          <th class="text-left py-1 px-2">URL</th>
+          <th class="text-right py-1 px-2">${t('fwd_action_col', '작업')}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="text-[10px] mt-3" style="color:var(--text-dim)">
+        ${t('fwd_hint', 'forwarder 는 settings.json 의 hooks 섹션에 curl 명령으로 등록됩니다. 매 변경 시 자동 백업 생성.')}
+      </div>
+    </div>
+  `;
+};
+
+async function _fwdAdd() {
+  const event = document.getElementById('fwdEvent').value;
+  const matcher = document.getElementById('fwdMatcher').value.trim();
+  const url = document.getElementById('fwdUrl').value.trim();
+  if (!url) { toast(t('URL 을 먼저 입력하세요'), 'err'); return; }
+  try {
+    const r = await api('/api/event-forwarder/add', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, matcher, url }),
+    });
+    if (!r.ok) { toast(errMsg(r), 'err'); return; }
+    toast(t('fwd_added', 'Forwarder 추가됨'), 'ok');
+    renderView();
+  } catch (e) { toast(String(e), 'err'); }
+}
+
+async function _fwdRemove(event, groupIdx, subIdx) {
+  const ok = await confirmModal(t('fwd_remove_confirm', '이 forwarder 를 settings.json 에서 제거합니다. 계속할까요?'));
+  if (!ok) return;
+  try {
+    const r = await api('/api/event-forwarder/remove', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, groupIdx, subIdx }),
+    });
+    if (!r.ok) { toast(errMsg(r), 'err'); return; }
+    toast(t('fwd_removed', '제거됨'), 'ok');
+    renderView();
+  } catch (e) { toast(String(e), 'err'); }
+}
+
 VIEWS.hooks = async () => {
   const [s, hooksAll] = await Promise.all([api('/api/settings'), api('/api/hooks')]);
   window.__settingsSnapshot = s;

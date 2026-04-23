@@ -161,6 +161,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "툴 호출 하이라이트 · 누적 토큰 차트.",
         ["session replay", "jsonl", "세션 리플레이", "timeline", "타임라인",
          "replay", "session log", "세션 로그"]),
+    ("eventForwarder", "config",
+        "Event Forwarder — Claude Code hooks 이벤트(PostToolUse 등)를 "
+        "외부 HTTP endpoint 로 포워딩. 호스트 화이트리스트 적용.",
+        ["event forwarder", "이벤트 포워더", "hooks", "webhook", "외부 전송",
+         "event", "integration", "outbound"]),
     ("claudeDocs",    "new",
         "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
         "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "
@@ -271,6 +276,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
             "zh": "RTK 优化器 — 在本标签页内安装/激活 rtk-ai/rtk 代理，将 Claude token 消耗减少 60-90%"},
     "sessionReplay": {"en": "Session Replay — replay Claude Code JSONL session logs as a timeline with tool-use highlights and cumulative token chart",
                       "zh": "会话重放 — 将 Claude Code JSONL 会话日志作为时间线重放，高亮工具调用并显示累计 token 图表"},
+    "eventForwarder": {"en": "Event Forwarder — forward Claude Code hook events (PostToolUse, etc.) to an external HTTP endpoint with host allow-list",
+                       "zh": "事件转发器 — 将 Claude Code hook 事件（如 PostToolUse）转发到外部 HTTP 端点，采用主机白名单"},
     "promptLibrary": {"en": "Prompt Library — save/search/duplicate prompts, convert to workflow",
                      "zh": "提示库 — 保存/搜索/复制提示,转换为工作流"},
     "claudeDocs": {"en": "Claude Docs Hub — curated docs.anthropic.com index with cross-links to dashboard tabs",

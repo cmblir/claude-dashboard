@@ -366,19 +366,36 @@ def _sanitize_workflow(raw: Any) -> Optional[dict]:
     return out
 
 
+_FALLBACK_PROVIDERS = {"", "claude-api", "openai-api", "gemini-api", "ollama-api"}
+
+
 def _sanitize_policy(raw: Any) -> dict:
-    """워크플로우 전역 정책. 현재는 tokenBudgetTotal 만. 0 = unlimited."""
+    """워크플로우 전역 정책.
+
+    필드:
+    - `tokenBudgetTotal`: 누적 토큰 예산 (0=unlimited, max 1억)
+    - `onBudgetExceeded`: "stop" (기본) | "warn"
+    - `fallbackProvider` (v2.29.0): session 노드 실행 실패 시 재시도 프로바이더.
+      `""` · `claude-api` · `openai-api` · `gemini-api` · `ollama-api` 중 하나.
+    """
     if not isinstance(raw, dict):
-        return {"tokenBudgetTotal": 0, "onBudgetExceeded": "stop"}
+        return {"tokenBudgetTotal": 0, "onBudgetExceeded": "stop", "fallbackProvider": ""}
     try:
         budget = int(raw.get("tokenBudgetTotal") or 0)
     except Exception:
         budget = 0
-    budget = max(0, min(budget, 100_000_000))  # 1억 토큰 상한
+    budget = max(0, min(budget, 100_000_000))
     on_exc = raw.get("onBudgetExceeded")
     if on_exc not in ("stop", "warn"):
         on_exc = "stop"
-    return {"tokenBudgetTotal": budget, "onBudgetExceeded": on_exc}
+    fb = (raw.get("fallbackProvider") or "").strip()
+    if fb not in _FALLBACK_PROVIDERS:
+        fb = ""
+    return {
+        "tokenBudgetTotal": budget,
+        "onBudgetExceeded": on_exc,
+        "fallbackProvider": fb,
+    }
 
 
 def _sanitize_notify(raw: Any) -> dict:
@@ -716,7 +733,8 @@ def _run_status_snapshot(runId: str) -> dict:
     return {"ok": True, "run": r}
 
 
-def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | None = None) -> dict:
+def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | None = None,
+                  fallback_provider: str = "") -> dict:
     """단일 노드 실행. 동기. (subject/description + inputs) → stdout.
 
     prev_session_ids: 이 노드로 들어오는 엣지의 from 노드들의 lastRun.sessionId 리스트.
@@ -903,18 +921,8 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
         "resumeSessionId": resume_id,
     }
 
-    # 멀티 프로바이더 실행
-    try:
-        from .ai_providers import execute_with_assignee
-        resp = execute_with_assignee(
-            assignee or "claude-cli",  # 빈 값이면 기존과 동일하게 Claude CLI
-            prompt,
-            system_prompt=sys_prompt,
-            cwd=cwd_safe,
-            timeout=_DEFAULT_NODE_TIMEOUT,
-            extra=extra,
-            fallback=True,
-        )
+    # 멀티 프로바이더 실행 — 실패 시 policy.fallbackProvider 로 1회 재시도 (v2.29.0)
+    def _pack(resp, fallback_used: str = "") -> dict:
         return {
             "status": resp.status,
             "output": resp.output,
@@ -926,8 +934,38 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
             "tokensIn": resp.tokens_in,
             "tokensOut": resp.tokens_out,
             "costUsd": resp.cost_usd,
-            "chosenModel": chosen_model,  # modelHint 로 자동 선택된 경우에만 non-empty
+            "chosenModel": chosen_model,
+            "fallbackUsed": fallback_used,  # 비어있으면 원래 assignee 로 성공/실패
         }
+
+    try:
+        from .ai_providers import execute_with_assignee
+        resp = execute_with_assignee(
+            assignee or "claude-cli",
+            prompt,
+            system_prompt=sys_prompt,
+            cwd=cwd_safe,
+            timeout=_DEFAULT_NODE_TIMEOUT,
+            extra=extra,
+            fallback=True,
+        )
+        # 실패 + policy.fallbackProvider 설정 → 해당 provider 로 1회 재시도
+        if resp.status == "err" and fallback_provider and fallback_provider != (assignee or "claude-cli"):
+            try:
+                resp2 = execute_with_assignee(
+                    fallback_provider,
+                    prompt,
+                    system_prompt=sys_prompt,
+                    cwd=cwd_safe,
+                    timeout=_DEFAULT_NODE_TIMEOUT,
+                    extra=extra,
+                    fallback=False,  # 이미 fallback 단계, 재귀 방지
+                )
+                if resp2.status == "ok":
+                    return _pack(resp2, fallback_used=fallback_provider)
+            except Exception as e:
+                log.warning("policy fallback provider failed: %s", e)
+        return _pack(resp)
     except Exception as e:
         log.exception("execute_with_assignee failed: %s", e)
         return {"status": "err", "output": "", "durationMs": _elapsed(),
@@ -1551,17 +1589,19 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                 prev_sids.append(src["sessionId"])
         return prev_sids
 
+    # v2.27.0 — 워크플로우 전역 토큰 예산 정책
+    # v2.29.0 — + fallbackProvider (session 노드 실패 시 재시도 프로바이더)
+    policy = wf.get("policy") or {}
+    token_budget = int(policy.get("tokenBudgetTotal") or 0)
+    fallback_provider = (policy.get("fallbackProvider") or "").strip()
+
     def _run_single_node(nid: str) -> tuple[str, dict]:
         """단일 노드 실행 (병렬 워커에서 호출)."""
         node = node_by_id[nid]
         input_strs = _collect_inputs(nid)
         prev_sids = _collect_prev_sids(nid)
-        res = _execute_node(node, input_strs, prev_sids)
+        res = _execute_node(node, input_strs, prev_sids, fallback_provider=fallback_provider)
         return (nid, res)
-
-    # v2.27.0 — 워크플로우 전역 토큰 예산 정책
-    policy = wf.get("policy") or {}
-    token_budget = int(policy.get("tokenBudgetTotal") or 0)
 
     for level in levels:
         # 전체 timeout 체크
