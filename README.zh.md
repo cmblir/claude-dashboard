@@ -6,7 +6,7 @@
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.21.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.23.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#技术栈)
 
 Claude Control Center 是一款**本地优先的仪表板**，统一管理你的整个 `~/.claude/` 目录（代理、技能、钩子、插件、MCP、会话、项目），并内置一个强大的 **n8n 风格工作流引擎** 用于多 AI 供应商编排——全部包含在一行 `python3 server.py` 中。
@@ -32,7 +32,7 @@ Claude Control Center 是一款**本地优先的仪表板**，统一管理你的
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  🧭  Claude Control Center                          v2.21.1 🇨🇳│
+│  🧭  Claude Control Center                          v2.23.0 🇨🇳│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 新功能│   🔀 工作流                                          │
 │ 🏠 主要 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -157,7 +157,7 @@ API 密钥也可以在 `🧠 AI 供应商` 标签页中保存 — 存储于 `~/.
 - **SSE 流式** — 节点级实时进度
 - **🔁 Repeat** — 最大次数 · 间隔 · 调度窗口（`HH:MM~HH:MM`）· 反馈笔记自动注入
 - **Cron 调度器** — 5 字段 cron 表达式，分钟级精度
-- **Webhook 触发** — `POST /api/workflows/webhook/{wfId}` 供任意外部系统调用
+- **Webhook 触发** — `POST /api/workflows/webhook/{wfId}` + `X-Webhook-Secret` 标头（v2.23 起强制 · 可在编辑器发放/更换/清除）
 - **Export / Import** — 以 JSON 共享工作流
 - **版本历史** — 自动保留最近 20 个版本 + 一键恢复
 - **条件执行** — 11 种（contains · equals · regex · length · 带 AND/OR 的 expression ...）
@@ -276,7 +276,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 统计（v2.21.1）
+## 🔢 统计（v2.23.0）
 
 | 指标 | 值 |
 |---|---|

@@ -90,7 +90,8 @@ from .workflows import (
     api_workflow_stats,
     api_workflow_template_delete, api_workflow_template_get,
     api_workflow_template_save, api_workflow_templates_list,
-    api_workflow_webhook, api_workflows_list, handle_workflow_run_stream,
+    api_workflow_webhook, api_workflow_webhook_secret,
+    api_workflows_list, handle_workflow_run_stream,
 )
 from .ai_keys import (
     api_providers_list, api_provider_test, api_provider_save_key,
@@ -324,6 +325,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/clone": api_workflow_clone,
     "/api/workflows/run-diff": api_workflow_run_diff,
     "/api/workflows/node-clipboard": api_workflow_node_clipboard,
+    "/api/workflows/webhook-secret": api_workflow_webhook_secret,
     "/api/session/spawn": api_session_spawn,
     "/api/ai-providers/test": api_provider_test,
     "/api/ai-providers/compare": api_provider_compare,
@@ -504,7 +506,8 @@ class Handler(BaseHTTPRequestHandler):
         # regex POST routes — webhook
         m = re.match(r"^/api/workflows/webhook/(wf-[0-9]{10,14}-[a-z0-9]{3,6})$", path)
         if m:
-            self._send_json(api_workflow_webhook(m.group(1), self._read_body())); return
+            secret_header = self.headers.get("X-Webhook-Secret", "") or ""
+            self._send_json(api_workflow_webhook(m.group(1), self._read_body(), secret_header)); return
         self._drain()
         self._send_json({"ok": False, "error": "unknown route"}, 404)
 

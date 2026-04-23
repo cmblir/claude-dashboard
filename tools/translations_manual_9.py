@@ -869,6 +869,17 @@ NEW_EN = {
     "지연": "Latency",
     "비용": "Cost",
     "JSON 다운로드": "Download JSON",
+
+    # v2.23.0 — Webhook secret
+    "webhook_secret_label": "Webhook Secret (X-Webhook-Secret header)",
+    "webhook_secret_placeholder": "generate with the button above",
+    "webhook_secret_not_set": "Not set — calls will be blocked",
+    "webhook_secret_generate": "Generate",
+    "webhook_secret_rotate_tip": "Rotate — all existing callers will get 401",
+    "webhook_secret_clear_tip": "Clear — webhook disabled",
+    "webhook_secret_rotate_confirm": "Rotating will 401 all existing callers. Continue?",
+    "webhook_secret_clear_confirm": "Clearing the secret disables the webhook. Continue?",
+    "표시/숨김": "Show / hide",
 }
 
 NEW_ZH = {
@@ -1734,4 +1745,15 @@ NEW_ZH = {
     "지연": "延迟",
     "비용": "费用",
     "JSON 다운로드": "下载 JSON",
+
+    # v2.23.0 — Webhook secret
+    "webhook_secret_label": "Webhook Secret (X-Webhook-Secret 标头)",
+    "webhook_secret_placeholder": "请先用上方 Generate 按钮发放",
+    "webhook_secret_not_set": "未发放 — 调用将被拒绝",
+    "webhook_secret_generate": "发放",
+    "webhook_secret_rotate_tip": "更换 — 现有调用方全部 401",
+    "webhook_secret_clear_tip": "清除 — webhook 完全停用",
+    "webhook_secret_rotate_confirm": "更换 secret 后现有调用全部 401。继续?",
+    "webhook_secret_clear_confirm": "清除 secret 会停用 webhook。继续?",
+    "표시/숨김": "显示 / 隐藏",
 }

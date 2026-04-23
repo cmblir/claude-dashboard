@@ -7,9 +7,11 @@
 """
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import threading
@@ -117,6 +119,47 @@ def _under_home(raw_path: str) -> Optional[str]:
     if abs_p == home or abs_p.startswith(home + os.sep):
         return abs_p
     return None
+
+
+# ── Output 노드 export 경로 화이트리스트 (v2.23.0, Finding 3) ──
+# ~/Downloads, ~/Documents, ~/Desktop 만 허용. symlink 탈출 방지 위해 realpath 비교.
+_EXPORT_ALLOWED_DIRS = ("Downloads", "Documents", "Desktop")
+
+
+def _under_allowed_export(raw_path: str) -> Optional[str]:
+    """export 용 경로 화이트리스트. 허용 디렉터리 하위면 realpath, 아니면 None.
+
+    path traversal / symlink 탈출을 모두 방지:
+      1) expanduser + abspath 로 ~/ 해석
+      2) realpath 로 symlink 완전 해제 (파일이 존재하지 않아도 안전하게 동작)
+      3) 허용된 루트 (realpath) 와 prefix 매칭
+    """
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return None
+    try:
+        expanded = os.path.expanduser(raw_path.strip())
+        abs_p = os.path.abspath(expanded)
+        real_p = os.path.realpath(abs_p)
+    except Exception:
+        return None
+    home = str(Path.home())
+    for name in _EXPORT_ALLOWED_DIRS:
+        base_real = os.path.realpath(os.path.join(home, name))
+        if real_p == base_real or real_p.startswith(base_real + os.sep):
+            return real_p
+    return None
+
+
+# ── Webhook secret (v2.23.0, Finding 2) ──
+_WEBHOOK_SECRET_BYTES = 32  # 43자 안팎의 URL-safe base64
+
+
+def _gen_webhook_secret() -> str:
+    return secrets.token_urlsafe(_WEBHOOK_SECRET_BYTES)
+
+
+def _valid_secret(raw: Any) -> bool:
+    return isinstance(raw, str) and 16 <= len(raw) <= 128 and re.match(r"^[A-Za-z0-9_\-]+$", raw) is not None
 
 
 def _sanitize_node(raw: Any) -> Optional[dict]:
@@ -450,6 +493,9 @@ def api_workflow_save(body: dict) -> dict:
         wf_clean["id"] = wfId
         wf_clean["createdAt"] = (store["workflows"].get(wfId) or {}).get("createdAt") or now
         wf_clean["updatedAt"] = now
+        # webhookSecret 은 별도 API 로만 관리 — 저장 요청으로는 변경 불가, 기존값 보존만
+        prev_secret = (store["workflows"].get(wfId) or {}).get("webhookSecret") or ""
+        wf_clean["webhookSecret"] = prev_secret
         # ── 버전 히스토리 보관 (최근 20개) ──
         if not is_new and wfId in store["workflows"]:
             prev = store["workflows"][wfId]
@@ -676,13 +722,17 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
         final = inputs[0] if inputs else ""
         exp_raw = data.get("exportTo") or ""
         if exp_raw:
-            under = _under_home(exp_raw)
-            if under:
-                try:
-                    Path(under).parent.mkdir(parents=True, exist_ok=True)
-                    _safe_write(Path(under), final)
-                except Exception as e:
-                    return {"status": "err", "output": "", "durationMs": _elapsed(), "error": f"export failed: {e}"}
+            under = _under_allowed_export(exp_raw)
+            if not under:
+                return {
+                    "status": "err", "output": "", "durationMs": _elapsed(),
+                    "error": "exportTo must resolve under ~/Downloads, ~/Documents, or ~/Desktop",
+                }
+            try:
+                Path(under).parent.mkdir(parents=True, exist_ok=True)
+                _safe_write(Path(under), final)
+            except Exception as e:
+                return {"status": "err", "output": "", "durationMs": _elapsed(), "error": f"export failed: {e}"}
         return {"status": "ok", "output": final, "durationMs": _elapsed(), "sessionId": ""}
 
     # ── HTTP 노드 — 외부 API 호출 ──
@@ -1666,13 +1716,59 @@ def api_workflow_run(body: dict) -> dict:
     return {"ok": True, "runId": runId, "workflowId": wfId}
 
 
-def api_workflow_webhook(wfId: str, body: dict | None = None) -> dict:
+def api_workflow_webhook_secret(body: dict) -> dict:
+    """워크플로우 webhook secret 조회/생성/재생성.
+
+    body:
+      - {id: "wf-..."}                    → 현재 secret 조회 (없으면 빈 문자열)
+      - {id: "wf-...", action: "generate"} → 미발급 시 발급 (이미 있으면 기존값 반환)
+      - {id: "wf-...", action: "rotate"}   → 항상 새 값으로 교체
+      - {id: "wf-...", action: "clear"}    → secret 제거 (웹훅 비활성화)
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    wfId = body.get("id")
+    if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
+        return {"ok": False, "error": "invalid id", "error_key": "err_invalid_id"}
+    action = body.get("action") or "get"
+    if action not in ("get", "generate", "rotate", "clear"):
+        return {"ok": False, "error": "invalid action"}
+    now = int(time.time() * 1000)
+    with _LOCK:
+        store = _load_all()
+        wf = store["workflows"].get(wfId)
+        if not wf:
+            return {"ok": False, "error": "not found", "error_key": "err_workflow_not_found"}
+        current = wf.get("webhookSecret") or ""
+        changed = False
+        if action == "generate":
+            if not current:
+                current = _gen_webhook_secret(); changed = True
+        elif action == "rotate":
+            current = _gen_webhook_secret(); changed = True
+        elif action == "clear":
+            if current:
+                current = ""; changed = True
+        if changed:
+            wf["webhookSecret"] = current
+            wf["updatedAt"] = now
+            store["workflows"][wfId] = wf
+            _dump_all(store)
+    return {"ok": True, "id": wfId, "secret": current, "changed": changed, "updatedAt": now if changed else wf.get("updatedAt", 0)}
+
+
+def api_workflow_webhook(wfId: str, body: dict | None = None, secret_header: str = "") -> dict:
     """외부 Webhook 트리거 — POST /api/workflows/webhook/{wfId}.
 
     외부 시스템(GitHub Actions, Slack, cron 등)에서 HTTP 호출로 워크플로우 실행.
     body 의 내용은 start 노드 다음의 첫 session/subagent 노드 입력으로 주입됨.
 
     body: {input?: "텍스트", metadata?: {...}} (선택)
+
+    인증 (v2.23.0~):
+      - 워크플로우마다 `webhookSecret` 필드가 저장되며, 호출 시 `X-Webhook-Secret` 헤더가 필수.
+      - secret 이 비어있으면 (생성 전) 401 거부. 에디터에서 먼저 secret 을 발급해야 함.
+      - 비교는 `hmac.compare_digest` 로 타이밍 공격 방지.
     """
     if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
         return {"ok": False, "error": "invalid workflow id", "error_key": "err_invalid_id"}
@@ -1682,6 +1778,13 @@ def api_workflow_webhook(wfId: str, body: dict | None = None) -> dict:
         wf = store["workflows"].get(wfId)
         if not wf:
             return {"ok": False, "error": "workflow not found", "error_key": "err_workflow_not_found"}
+        expected_secret = wf.get("webhookSecret") or ""
+        if not expected_secret:
+            return {"ok": False, "error": "webhook secret not configured — generate one in the editor",
+                    "error_key": "err_webhook_no_secret"}
+        provided = secret_header or ""
+        if not hmac.compare_digest(expected_secret, provided):
+            return {"ok": False, "error": "invalid webhook secret", "error_key": "err_webhook_bad_secret"}
         cyc = _check_dag(wf.get("nodes", []), wf.get("edges", []))
         if cyc:
             return {"ok": False, "error": cyc[0], "error_key": "err_workflow_cycle"}

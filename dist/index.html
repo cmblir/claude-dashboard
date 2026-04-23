@@ -3034,10 +3034,15 @@ function _wfRenderInspector() {
         <input class="input w-full text-[11px] font-mono" readonly value="http://localhost:8080/api/workflows/webhook/${escapeHtml(__wf.current.id)}" id="wfWebhookUrl" />
         <button class="btn text-[10px] flex-shrink-0" onclick="navigator.clipboard.writeText(document.getElementById('wfWebhookUrl').value).then(()=>toast(t('복사됨'),'ok')).catch(()=>toast(t('복사 실패'),'err'))" title="${t('복사')}">📋</button>
       </div>
-      <details class="text-[10px]">
+      <div id="wfWebhookSecretPanel" class="mt-2 p-2 rounded" style="background:var(--code-bg);border:1px solid var(--border);">
+        <div class="text-[10px] text-[var(--text-dim)] mb-1">${t('webhook_secret_label', 'Webhook Secret (X-Webhook-Secret 헤더)')}</div>
+        <div id="wfWebhookSecretBody" class="text-[10px]" style="color:var(--text-dim)">${t('로딩 중...')}</div>
+      </div>
+      <details class="text-[10px] mt-2">
         <summary class="text-[var(--text-dim)] cursor-pointer select-none">${t('curl 예시')}</summary>
-        <pre class="mt-1 p-2 rounded text-[10px] font-mono overflow-x-auto" style="background:var(--code-bg);color:var(--text-mute);white-space:pre-wrap;word-break:break-all;">curl -X POST http://localhost:8080/api/workflows/webhook/${escapeHtml(__wf.current.id)} \\
+        <pre id="wfWebhookCurl" class="mt-1 p-2 rounded text-[10px] font-mono overflow-x-auto" style="background:var(--code-bg);color:var(--text-mute);white-space:pre-wrap;word-break:break-all;">curl -X POST http://localhost:8080/api/workflows/webhook/${escapeHtml(__wf.current.id)} \\
   -H "Content-Type: application/json" \\
+  -H "X-Webhook-Secret: &lt;${t('webhook_secret_placeholder', '위 Generate 버튼으로 발급')}&gt;" \\
   -d '{"input": "your text"}'</pre>
       </details>
     </div>
@@ -3190,6 +3195,97 @@ function _wfRenderInspector() {
     </div>`;
   }
   host.innerHTML = meta + nodeBlock;
+  _wfRefreshWebhookSecret();
+}
+
+// ─── Webhook secret 패널 (v2.23.0) ────────────────────────
+async function _wfRefreshWebhookSecret() {
+  if (!__wf.current) return;
+  const body = document.getElementById('wfWebhookSecretBody');
+  const curl = document.getElementById('wfWebhookCurl');
+  if (!body) return;
+  try {
+    const r = await api('/api/workflows/webhook-secret', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: __wf.current.id, action: 'get' }),
+    });
+    if (!r || !r.ok) {
+      body.innerHTML = `<span style="color:var(--danger);">${escapeHtml(r && r.error || t('오류'))}</span>`;
+      return;
+    }
+    const sec = r.secret || '';
+    _wfRenderWebhookSecret(sec);
+    if (curl) curl.textContent = _wfBuildCurlExample(__wf.current.id, sec);
+  } catch (e) {
+    body.innerHTML = `<span style="color:var(--danger);">${escapeHtml(String(e))}</span>`;
+  }
+}
+
+function _wfRenderWebhookSecret(sec) {
+  const body = document.getElementById('wfWebhookSecretBody');
+  if (!body) return;
+  if (!sec) {
+    body.innerHTML = `
+      <div class="flex items-center gap-2 flex-wrap">
+        <span style="color:var(--danger);">⚠ ${escapeHtml(t('webhook_secret_not_set', '미발급 — 호출이 차단됩니다'))}</span>
+        <button class="btn text-[10px]" onclick="_wfWebhookSecretAction('generate')">🔐 ${escapeHtml(t('webhook_secret_generate', '발급'))}</button>
+      </div>`;
+    return;
+  }
+  const masked = sec.slice(0, 4) + '••••••••' + sec.slice(-4);
+  body.innerHTML = `
+    <div class="flex items-center gap-1 flex-wrap">
+      <input id="wfWebhookSecretInput" class="input flex-1 text-[11px] font-mono" readonly type="password" value="${escapeHtml(sec)}" style="min-width:140px;">
+      <button class="btn text-[10px] flex-shrink-0" id="wfWebhookSecretToggle" onclick="_wfWebhookSecretToggleVis()" title="${escapeHtml(t('표시/숨김', '표시/숨김'))}">👁</button>
+      <button class="btn text-[10px] flex-shrink-0" onclick="navigator.clipboard.writeText(document.getElementById('wfWebhookSecretInput').value).then(()=>toast(t('복사됨'),'ok')).catch(()=>toast(t('복사 실패'),'err'))" title="${escapeHtml(t('복사'))}">📋</button>
+      <button class="btn text-[10px] flex-shrink-0" onclick="_wfWebhookSecretAction('rotate')" title="${escapeHtml(t('webhook_secret_rotate_tip', '새 값으로 교체 — 기존 호출자 모두 401'))}">🔄</button>
+      <button class="btn text-[10px] flex-shrink-0" onclick="_wfWebhookSecretAction('clear')" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);" title="${escapeHtml(t('webhook_secret_clear_tip', '제거 — webhook 완전 비활성화'))}">🚫</button>
+    </div>
+    <div class="text-[10px] mt-1" style="color:var(--text-dim)">${escapeHtml(masked)}</div>`;
+}
+
+function _wfWebhookSecretToggleVis() {
+  const inp = document.getElementById('wfWebhookSecretInput');
+  if (!inp) return;
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+async function _wfWebhookSecretAction(action) {
+  if (!__wf.current) return;
+  if (action === 'rotate') {
+    const ok = await confirmModal(t('webhook_secret_rotate_confirm', '새 secret 으로 교체하면 기존 호출은 모두 401 이 됩니다. 계속할까요?'));
+    if (!ok) return;
+  }
+  if (action === 'clear') {
+    const ok = await confirmModal(t('webhook_secret_clear_confirm', 'secret 을 제거하면 webhook 이 비활성화됩니다. 계속할까요?'));
+    if (!ok) return;
+  }
+  try {
+    const r = await api('/api/workflows/webhook-secret', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: __wf.current.id, action }),
+    });
+    if (!r || !r.ok) {
+      toast(r && r.error || t('오류'), 'err');
+      return;
+    }
+    const sec = r.secret || '';
+    _wfRenderWebhookSecret(sec);
+    const curl = document.getElementById('wfWebhookCurl');
+    if (curl) curl.textContent = _wfBuildCurlExample(__wf.current.id, sec);
+    if (r.changed) toast(t('저장됨'), 'ok');
+  } catch (e) {
+    toast(String(e), 'err');
+  }
+}
+
+function _wfBuildCurlExample(wfId, sec) {
+  const placeholder = t('webhook_secret_placeholder', '위 Generate 버튼으로 발급');
+  const secPart = sec || `<${placeholder}>`;
+  return `curl -X POST http://localhost:8080/api/workflows/webhook/${wfId} \\
+  -H "Content-Type: application/json" \\
+  -H "X-Webhook-Secret: ${secPart}" \\
+  -d '{"input": "your text"}'`;
 }
 
 // ─── 노드 에디터 — 맥 스타일 플로팅 창 ───────────────────────

@@ -6,7 +6,7 @@
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.21.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.23.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#tech-stack)
 
 Claude Control Center is a **local-first dashboard** that manages your entire `~/.claude/` directory (agents, skills, hooks, plugins, MCP, sessions, projects) and ships a powerful **n8n-style workflow engine** with multi-AI provider orchestration — all in a single `python3 server.py` command.
@@ -32,7 +32,7 @@ Claude Control Center is a **local-first dashboard** that manages your entire `~
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  🧭  Claude Control Center                          v2.21.1 🇰🇷│
+│  🧭  Claude Control Center                          v2.23.0 🇰🇷│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 New │   🔀 Workflows                                         │
 │ 🏠 Main│   ┌──────┐      ┌──────┐      ┌──────┐                │
@@ -157,7 +157,7 @@ API keys can also be saved via the `🧠 AI Providers` tab — stored in `~/.cla
 - **SSE streaming** for live node progress
 - **🔁 Repeat** — max iterations · interval · schedule window (`HH:MM~HH:MM`) · feedback-note injection
 - **Cron scheduler** — 5-field `cron` expression, minute-granularity
-- **Webhook trigger** — `POST /api/workflows/webhook/{wfId}` from any external system
+- **Webhook trigger** — `POST /api/workflows/webhook/{wfId}` with `X-Webhook-Secret` header (mandatory since v2.23, generate/rotate/clear from editor)
 - **Export / Import** — share workflows as JSON
 - **Version history** — last 20 versions auto-saved + one-click restore
 - **Conditional execution** — 11 condition types (contains, equals, regex, length, expression with AND/OR, ...)
@@ -276,7 +276,7 @@ Atomic writes via `server/utils.py::_safe_write` (`.tmp → rename`), threading 
 
 ---
 
-## 🔢 Stats (v2.21.1)
+## 🔢 Stats (v2.23.0)
 
 | Metric | Value |
 |---|---|
