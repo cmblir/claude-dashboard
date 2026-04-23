@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.28.0] — 2026-04-23
+
+### 🔧 RTK init 근본 수정 + 🌐 번역 완전성 + 🛡 보안 감사
+
+사용자 리포트 3건: RTK 자동 설치가 N 으로 되어버림, 번역 누락, 신규 코드 보안 점검.
+
+**🔧 RTK `init` 근본 수정 — `--auto-patch` 플래그로 교체**
+- 기존 `yes | rtk init -g` 는 오히려 rtk 의 `is_terminal()` 감지로 "stdin not a terminal → default No" 로 빠져 훅이 설치되지 않았음
+- [`rtk-ai/rtk/src/hooks/init.rs`](https://github.com/rtk-ai/rtk/blob/master/src/hooks/init.rs) 소스 확인: `--auto-patch` 공식 플래그로 프롬프트 스킵 가능
+- `api_rtk_init` → `rtk init -g --auto-patch` 로 변경 + UI 토스트 문구 조정
+
+**🌐 번역 완전성 — 71 한국어 잔여 제거**
+- `t('key', '한국어 fallback')` 의 긴 한국어 fallback 들이 `extract_ko_strings.py` 에 의해 audit 에 수집되어 `locales/{en,zh}.json` 에 `key=한국어 identity / value=한국어` 로 등록되어 있었음 (ko 원문 그대로 노출)
+- `translations_manual_9.py` 의 `NEW_EN` / `NEW_ZH` 양쪽에 71 항목 × 3 언어 추가 번역 일괄 등록
+- 결과: `en.json` · `zh.json` 내 한국어 잔여 **71 → 0**
+- 전수 검증: `python re '[가-힣]'` 매칭 0건
+
+**🛡 보안 감사 — v2.24~v2.27 신규 코드 방어 강화**
+
+1. **`session_replay.py` 경로 boundary 체크 강화** (v2.25.0 에 `pass` 로 무력화되어 있었음)
+   - `try/pass` 블록을 실제 `resolve(strict=True)` + `relative_to(_PROJECTS)` 검증으로 교체
+   - symlink 경유 경로 탈출 차단
+   - 공격 시도 테스트: `../../../../etc/passwd` · `/etc/passwd` · `abc/..` · `..` 모두 `invalid path` 반환
+
+2. **`notify.py` HTTP redirect 차단** (defense-in-depth)
+   - 기존 `urllib.request.urlopen` 은 3xx 자동 추종 → 이론상 화이트리스트 호스트에서 다른 호스트로 redirect 유도 가능
+   - `_NoRedirect` 핸들러 + 전용 opener 로 리다이렉트 전면 차단
+   - Slack/Discord webhook 은 일반적으로 리다이렉트 없음 → 기능 영향 없음
+
+3. **감사 대상** (조치 불필요):
+   - `rtk_lab.api_rtk_uninstall_hook` — 백업 자동 생성 + `_is_rtk_hook` 휴리스틱 OK
+   - `prompt_library.find_keyword_triggers` — 로컬 단일 사용자 전제, UI 에서 키워드 가시 관리
+   - `policy.tokenBudgetTotal` sanitize 0~1억 경계 OK
+
+**검증**
+- 54/54 탭 smoke 통과
+- i18n 3 언어 정합성 + 한국어 잔여 0
+- 공격 시도 4 경로 · 잘못된 host 1 케이스 모두 차단
+
+---
 ## [2.27.0] — 2026-04-23
 
 ### 🏗️ Team Sprint 템플릿 + 워크플로우 전역 토큰 예산 정책 (backlog B6 + Policy)

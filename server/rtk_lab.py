@@ -126,15 +126,17 @@ def api_rtk_install(body: dict | None = None) -> dict:
 
 
 def api_rtk_init(_body: dict | None = None) -> dict:
-    """`rtk init -g` — Claude Code 에 Bash 자동 재작성 훅 설치.
+    """`rtk init -g --auto-patch` — Claude Code 에 Bash 자동 재작성 훅 설치.
 
-    대화형 y/n 프롬프트는 `yes` 파이프로 자동 응답한다. rtk 가 stdin 을
-    쓰지 않는다면 yes 는 SIGPIPE 로 조기 종료되므로 부작용 없음.
+    rtk 가 stdin 을 `is_terminal()` 로 감지하므로 `yes | rtk init -g` 는
+    오히려 "is not a terminal → default No" 로 빠져 훅이 설치되지 않는다.
+    공식 `--auto-patch` 플래그로 프롬프트를 스킵하고 무조건 패치하도록 한다.
+    참고: https://github.com/rtk-ai/rtk/blob/master/src/hooks/init.rs
     """
     if not _which("rtk"):
         return {"ok": False, "error": "rtk not installed", "error_key": "err_rtk_not_installed"}
-    # 모든 확인 프롬프트에 자동 y 응답
-    cmd = "yes | rtk init -g"
+    # --auto-patch: settings.json 패치 프롬프트 자동 수락
+    cmd = "rtk init -g --auto-patch"
     result = _run_in_terminal(cmd)
     return {**result, "command": cmd}
 

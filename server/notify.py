@@ -28,6 +28,17 @@ def _validate(url: str) -> bool:
     return p.scheme == "https" and p.hostname in _ALLOWED_HOSTS
 
 
+# v2.28.0 보안 감사: 기본 urlopen 은 3xx 리다이렉트를 자동 추종 → 화이트리스트 호스트가
+# 다른 호스트로 redirect 시키면 우회 가능. defense-in-depth 로 리다이렉트 전면 차단.
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, hdrs, newurl):
+        log.warning("notify: blocked redirect to %s (from %s)", newurl, req.full_url)
+        return None  # redirect 중단
+
+
+_NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirect())
+
+
 def _post_json(url: str, payload: dict) -> bool:
     if not _validate(url):
         log.warning("notify: rejected URL (not in whitelist): %s", urlparse(url).hostname)
@@ -36,10 +47,10 @@ def _post_json(url: str, payload: dict) -> bool:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
             url, data=data, method="POST",
-            headers={"Content-Type": "application/json", "User-Agent": "LazyClaude/2.25"},
+            headers={"Content-Type": "application/json", "User-Agent": "LazyClaude/2.28"},
         )
         ctx = ssl.create_default_context()
-        with urllib.request.urlopen(req, timeout=_TIMEOUT, context=ctx) as resp:
+        with _NO_REDIRECT_OPENER.open(req, timeout=_TIMEOUT) as resp:
             return 200 <= resp.status < 300
     except Exception as e:
         log.warning("notify send failed to %s: %s", urlparse(url).hostname, e)

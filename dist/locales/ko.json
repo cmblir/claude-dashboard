@@ -655,7 +655,7 @@
   "resume 대상 노드": "resume 대상 노드",
   "right": "오른쪽",
   "rm -rf, sudo, .env 편집 등을 deny 목록에 추가하세요.": "rm -rf, sudo, .env 편집 등을 deny 목록에 추가하세요.",
-  "rtk init -g 가 Terminal 에서 실행됩니다 (y/n 자동 응답)": "rtk init -g 가 Terminal 에서 실행됩니다 (y/n 자동 응답)",
+  "rtk init -g --auto-patch 실행 — settings.json 자동 패치": "rtk init -g --auto-patch 실행 — settings.json 자동 패치",
   "rtk init -g 를 실행하면 Claude Code settings.json 이 수정됩니다. 계속할까요?": "rtk init -g 를 실행하면 Claude Code settings.json 이 수정됩니다. 계속할까요?",
   "rtk init -g 를 실행하면 Claude Code 의 Bash 명령(예: git status)이 자동으로 rtk 로 감싸져 토큰 사용량이 줄어듭니다.": "rtk init -g 를 실행하면 Claude Code 의 Bash 명령(예: git status)이 자동으로 rtk 로 감싸져 토큰 사용량이 줄어듭니다.",
   "rtk init -g 실행": "rtk init -g 실행",

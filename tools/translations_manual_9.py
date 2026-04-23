@@ -952,6 +952,108 @@ NEW_EN = {
     "policy_heading": "Execution policy",
     "policy_budget_label": "Token budget (cumulative, 0 = unlimited)",
     "policy_budget_hint": "When cumulative tokensIn+Out reaches this value, the remaining nodes are skipped as budget_exceeded. Partial results are preserved.",
+
+    # v2.28.0 — t(key, ko-fallback) 이 audit 에 수집되어 locales 에 identity 로 들어간 잔여 번역 일괄 등록
+    "Claude API 실험 12종 + 프로바이더":
+        "12 Claude API experiments + providers",
+    "Claude Code JSONL 세션 로그 타임라인 재생 · 툴 호출 강조 · 누적 토큰 차트":
+        "Replay Claude Code JSONL session logs as a timeline — tool-use highlights · cumulative token chart",
+    "Claude Code settings.json 에서 rtk 훅 항목만 제거 (바이너리는 유지)":
+        "Remove rtk hook entries from Claude Code settings.json (binary stays)",
+    "Claude Code settings.json 에서 rtk 훅 항목만 제거합니다 (백업 자동 생성). rtk 바이너리는 유지됩니다. 계속할까요?":
+        "This removes rtk hook entries from settings.json (automatic backup). The rtk binary stays. Continue?",
+    "Claude Code 세션 로그(JSONL)를 시간순으로 재생 · 툴 호출 강조 · 누적 토큰 차트":
+        "Replay Claude Code JSONL session logs as a timeline — tool-use highlights · cumulative token chart.",
+    "Claude Code 훅": "Claude Code hook",
+    "Claude 토큰 60-90% 절감 Rust CLI 프록시 (rtk-ai/rtk) — 설치·활성화·통계를 한 탭에서.":
+        "A Rust CLI proxy that cuts Claude token usage by 60-90% (rtk-ai/rtk) — install, activate, and inspect savings in one tab.",
+    "Discord 테스트": "Test Discord",
+    "Homebrew 미설치 — curl/cargo 경로로 진행 가능.":
+        "Homebrew not installed — use curl or cargo instead.",
+    "LazyClaude — 최적화 대시보드": "LazyClaude — optimization dashboard",
+    "Slack 테스트": "Test Slack",
+    "Terminal 창을 열고": "Open Terminal and",
+    "Terminal 창이 열렸습니다 — 설치 완료 후 이 탭을 새로고침하세요":
+        "Terminal window opened — refresh this tab once the install finishes.",
+    "URL 을 먼저 입력하세요": "Enter a URL first",
+    "Webhook Secret (X-Webhook-Secret 헤더)":
+        "Webhook Secret (X-Webhook-Secret header)",
+    "rtk init -g --auto-patch 실행 — settings.json 자동 패치":
+        "Running rtk init -g --auto-patch — settings.json auto-patched",
+    "rtk init -g 를 실행하면 Claude Code settings.json 이 수정됩니다. 계속할까요?":
+        "Running rtk init -g will modify Claude Code's settings.json. Continue?",
+    "rtk init -g 를 실행하면 Claude Code 의 Bash 명령(예: git status)이 자동으로 rtk 로 감싸져 토큰 사용량이 줄어듭니다.":
+        "Running rtk init -g wraps Claude Code's Bash commands (e.g. git status) so the LLM sees compressed output, reducing token usage.",
+    "rtk init -g 실행": "Run rtk init -g",
+    "rtk 는 자주 쓰는 dev 명령에 대한 출력 압축 프록시입니다. 예: git status → rtk git status.":
+        "rtk is an output-compression proxy for common dev commands. E.g. git status → rtk git status.",
+    "rtk 설치 감지 — 탭 새로고침": "rtk install detected — refreshing tab",
+    "rtk 훅": "rtk hook",
+    "rtk-ai/rtk Rust 프록시로 Claude 토큰 60-90% 절감 · 설치/훅 활성/통계 조회":
+        "rtk-ai/rtk Rust proxy to cut Claude tokens 60-90% — install, activate hook, view savings",
+    "secret 을 제거하면 webhook 이 비활성화됩니다. 계속할까요?":
+        "Clearing the secret disables the webhook. Continue?",
+    "감지 시간 초과 — 직접 새로고침해 주세요": "Detection timed out — please refresh manually",
+    "개 제거됨 (백업 보존)": "hook(s) removed (backup preserved)",
+    "공식 가이드": "Official guide",
+    "내용 보기": "View content",
+    "누적 tokensIn+Out 이 이 값에 도달하면 이후 노드는 budget_exceeded 로 스킵. 부분 결과는 유지.":
+        "When cumulative tokensIn+Out reaches this value, the remaining nodes are skipped as budget_exceeded. Partial results are preserved.",
+    "누적 토큰 절감 (rtk gain)": "Cumulative token savings (rtk gain)",
+    "대시보드 · 프로젝트 · 플랜 · 세션": "Dashboard · projects · plans · sessions",
+    "로 설치합니다. 계속할까요?": "to install. Continue?",
+    "명령 레퍼런스": "Command reference",
+    "미발급 — 호출이 차단됩니다": "Not set — calls will be blocked",
+    "발급": "Generate",
+    "비용 · 메트릭 · 시스템 관측": "Costs · metrics · system observability",
+    "상태/토큰 변화가 있는 노드는 하이라이트.": "Nodes with status or token changes are highlighted.",
+    "새 secret 으로 교체하면 기존 호출은 모두 401 이 됩니다. 계속할까요?":
+        "Rotating will 401 all existing callers. Continue?",
+    "새 값으로 교체 — 기존 호출자 모두 401":
+        "Rotate — all existing callers will get 401",
+    "설정 파일": "Config file",
+    "설치 완료 감지 중 — 완료되면 자동 새로고침":
+        "Watching for install completion — tab will auto-refresh",
+    "설치된 훅은 🪝 훅 탭에서 확인할 수 있습니다.":
+        "Installed hooks appear in the 🪝 Hooks tab.",
+    "세션 JSONL 이 없습니다. Claude Code 를 최소 한 번 사용해 주세요.":
+        "No session JSONL found. Use Claude Code at least once.",
+    "신기능 · 온보딩 · 공식 문서 · 가이드":
+        "What's new · onboarding · official docs · guides",
+    "실행 정책": "Execution policy",
+    "아래 방법 중 하나를 선택하면 Terminal 창이 열리고 실제 설치가 진행됩니다.":
+        "Pick a method — a Terminal window opens and runs the real installer.",
+    "완료 알림": "Completion notify",
+    "왼쪽에서 세션을 선택하세요.": "Pick a session from the left.",
+    "워크플로우 run 완료/실패 시 지정 채널로 상태·비용·실행 시간 전송. Slack hooks.slack.com / Discord discord.com 호스트만 허용.":
+        "On workflow run success/failure, send status/cost/duration to the configured channel. Only hooks.slack.com / discord.com hosts are allowed.",
+    "워크플로우 session 노드 입력에 이 키워드가 포함되면 본 프롬프트가 시스템 프롬프트에 자동 주입됩니다.":
+        "When a workflow session node input contains any of these keywords, this prompt is auto-injected into the system slot.",
+    "워크플로우 · 에이전트 · 프롬프트": "Workflows · agents · prompts",
+    "월": "Month",
+    "월별 비용 (소스별 스택)": "Monthly costs (source stack)",
+    "위 Generate 버튼으로 발급": "generate with the button above",
+    "이미 감지됨": "Already detected",
+    "제거 — webhook 완전 비활성화": "Clear — webhook disabled",
+    "제거할 rtk 훅이 없습니다": "No rtk hook to remove",
+    "주": "Week",
+    "주별 비용 (소스별 스택)": "Weekly costs (source stack)",
+    "최근 50 세션": "Recent 50 sessions",
+    "테스트 메시지 전송됨": "Test message sent",
+    "토큰 예산 (누적, 0 = 무제한)": "Token budget (cumulative, 0 = unlimited)",
+    "트리거 키워드 (쉼표 구분, 예: ultrathink, deepsearch)":
+        "Trigger keywords (comma-separated, e.g. ultrathink, deepsearch)",
+    "현재 세션 (rtk session)": "Current session (rtk session)",
+    "훅 · 권한 · MCP · 플러그인 · 설정":
+        "Hooks · permissions · MCP · plugins · settings",
+    "훅 비활성": "Hook inactive",
+    "훅 제거": "Remove hook",
+    "훅 활성": "Hook active",
+    "훅 활성 감지 — 탭 새로고침": "Hook activation detected — refreshing tab",
+    "훅 활성화 감지 중 — 완료되면 자동 새로고침":
+        "Watching for hook activation — tab will auto-refresh",
+    "💡 -u/--ultra-compact 플래그로 ASCII 아이콘 사용 + 추가 절감.":
+        "💡 Use -u / --ultra-compact for ASCII icons + extra savings.",
 }
 
 NEW_ZH = {
@@ -1900,4 +2002,105 @@ NEW_ZH = {
     "policy_heading": "执行策略",
     "policy_budget_label": "Token 预算（累计，0 = 无限）",
     "policy_budget_hint": "当累计 tokensIn+Out 达到该值时，剩余节点会被标记为 budget_exceeded 并跳过。部分结果得以保留。",
+
+    # v2.28.0 — audit 누락 번역 일괄 등록
+    "Claude API 실험 12종 + 프로바이더": "12 Claude API 实验 + 供应商",
+    "Claude Code JSONL 세션 로그 타임라인 재생 · 툴 호출 강조 · 누적 토큰 차트":
+        "将 Claude Code JSONL 会话日志作为时间线重放 — 工具调用高亮 · 累计 token 图表",
+    "Claude Code settings.json 에서 rtk 훅 항목만 제거 (바이너리는 유지)":
+        "从 Claude Code settings.json 移除 rtk 钩子（保留二进制文件）",
+    "Claude Code settings.json 에서 rtk 훅 항목만 제거합니다 (백업 자동 생성). rtk 바이너리는 유지됩니다. 계속할까요?":
+        "将从 settings.json 移除 rtk 钩子（自动备份）。rtk 二进制文件保留。继续吗？",
+    "Claude Code 세션 로그(JSONL)를 시간순으로 재생 · 툴 호출 강조 · 누적 토큰 차트":
+        "将 Claude Code JSONL 会话日志作为时间线重放 — 工具调用高亮 · 累计 token 图表。",
+    "Claude Code 훅": "Claude Code 钩子",
+    "Claude 토큰 60-90% 절감 Rust CLI 프록시 (rtk-ai/rtk) — 설치·활성화·통계를 한 탭에서.":
+        "将 Claude token 消耗减少 60-90% 的 Rust CLI 代理（rtk-ai/rtk）— 在一个标签页中安装、激活、查看节省。",
+    "Discord 테스트": "测试 Discord",
+    "Homebrew 미설치 — curl/cargo 경로로 진행 가능.":
+        "未安装 Homebrew — 请使用 curl 或 cargo。",
+    "LazyClaude — 최적화 대시보드": "LazyClaude — 优化仪表板",
+    "Slack 테스트": "测试 Slack",
+    "Terminal 창을 열고": "打开 Terminal 并",
+    "Terminal 창이 열렸습니다 — 설치 완료 후 이 탭을 새로고침하세요":
+        "已打开 Terminal 窗口 — 安装完成后请刷新此标签页。",
+    "URL 을 먼저 입력하세요": "请先填写 URL",
+    "Webhook Secret (X-Webhook-Secret 헤더)":
+        "Webhook Secret (X-Webhook-Secret 标头)",
+    "rtk init -g --auto-patch 실행 — settings.json 자동 패치":
+        "正在运行 rtk init -g --auto-patch — settings.json 自动修补",
+    "rtk init -g 를 실행하면 Claude Code settings.json 이 수정됩니다. 계속할까요?":
+        "rtk init -g 将修改 Claude Code 的 settings.json。继续吗？",
+    "rtk init -g 를 실행하면 Claude Code 의 Bash 명령(예: git status)이 자동으로 rtk 로 감싸져 토큰 사용량이 줄어듭니다.":
+        "运行 rtk init -g 会自动包装 Claude Code 的 Bash 命令（如 git status），让 LLM 看到压缩后的输出，从而减少 token 使用量。",
+    "rtk init -g 실행": "运行 rtk init -g",
+    "rtk 는 자주 쓰는 dev 명령에 대한 출력 압축 프록시입니다. 예: git status → rtk git status.":
+        "rtk 是常见开发命令的输出压缩代理。例如：git status → rtk git status。",
+    "rtk 설치 감지 — 탭 새로고침": "检测到 rtk 安装 — 正在刷新标签页",
+    "rtk 훅": "rtk 钩子",
+    "rtk-ai/rtk Rust 프록시로 Claude 토큰 60-90% 절감 · 설치/훅 활성/통계 조회":
+        "rtk-ai/rtk Rust 代理将 Claude token 削减 60-90% · 安装/激活钩子/查看统计",
+    "secret 을 제거하면 webhook 이 비활성화됩니다. 계속할까요?":
+        "清除 secret 会停用 webhook。继续吗？",
+    "감지 시간 초과 — 직접 새로고침해 주세요": "检测超时 — 请手动刷新",
+    "개 제거됨 (백업 보존)": "个钩子已移除（已保留备份）",
+    "공식 가이드": "官方指南",
+    "내용 보기": "查看内容",
+    "누적 tokensIn+Out 이 이 값에 도달하면 이후 노드는 budget_exceeded 로 스킵. 부분 결과는 유지.":
+        "当累计 tokensIn+Out 达到该值时，剩余节点会被标记为 budget_exceeded 并跳过。部分结果得以保留。",
+    "누적 토큰 절감 (rtk gain)": "累计 token 节省 (rtk gain)",
+    "대시보드 · 프로젝트 · 플랜 · 세션": "仪表板 · 项目 · 计划 · 会话",
+    "로 설치합니다. 계속할까요?": "进行安装。继续吗？",
+    "명령 레퍼런스": "命令参考",
+    "미발급 — 호출이 차단됩니다": "未发放 — 调用将被拒绝",
+    "발급": "发放",
+    "비용 · 메트릭 · 시스템 관측": "费用 · 指标 · 系统观测",
+    "상태/토큰 변화가 있는 노드는 하이라이트.": "状态或 token 变化的节点已高亮。",
+    "새 secret 으로 교체하면 기존 호출은 모두 401 이 됩니다. 계속할까요?":
+        "更换 secret 后现有调用全部 401。继续？",
+    "새 값으로 교체 — 기존 호출자 모두 401":
+        "更换 — 现有调用方全部 401",
+    "설정 파일": "配置文件",
+    "설치 완료 감지 중 — 완료되면 자동 새로고침":
+        "正在检测安装完成 — 标签页将自动刷新",
+    "설치된 훅은 🪝 훅 탭에서 확인할 수 있습니다.":
+        "已安装的钩子显示在 🪝 钩子 标签页。",
+    "세션 JSONL 이 없습니다. Claude Code 를 최소 한 번 사용해 주세요.":
+        "未找到会话 JSONL。请至少使用一次 Claude Code。",
+    "신기능 · 온보딩 · 공식 문서 · 가이드":
+        "新功能 · 入门 · 官方文档 · 指南",
+    "실행 정책": "执行策略",
+    "아래 방법 중 하나를 선택하면 Terminal 창이 열리고 실제 설치가 진행됩니다.":
+        "选择一种方法 — 将打开 Terminal 窗口并运行真实安装程序。",
+    "완료 알림": "完成通知",
+    "왼쪽에서 세션을 선택하세요.": "请在左侧选择一个会话。",
+    "워크플로우 run 완료/실패 시 지정 채널로 상태·비용·실행 시간 전송. Slack hooks.slack.com / Discord discord.com 호스트만 허용.":
+        "工作流 run 成功/失败时，将状态/费用/耗时推送到配置的频道。仅允许 hooks.slack.com / discord.com 主机。",
+    "워크플로우 session 노드 입력에 이 키워드가 포함되면 본 프롬프트가 시스템 프롬프트에 자동 주입됩니다.":
+        "工作流 session 节点输入包含这些关键词时，本提示会自动注入到 system 槽。",
+    "워크플로우 · 에이전트 · 프롬프트": "工作流 · 代理 · 提示",
+    "월": "月",
+    "월별 비용 (소스별 스택)": "月度费用（按源堆叠）",
+    "위 Generate 버튼으로 발급": "请先用上方 Generate 按钮发放",
+    "이미 감지됨": "已检测到",
+    "제거 — webhook 완전 비활성화": "清除 — webhook 完全停用",
+    "제거할 rtk 훅이 없습니다": "没有可移除的 rtk 钩子",
+    "주": "周",
+    "주별 비용 (소스별 스택)": "周费用（按源堆叠）",
+    "최근 50 세션": "最近 50 次会话",
+    "테스트 메시지 전송됨": "测试消息已发送",
+    "토큰 예산 (누적, 0 = 무제한)": "Token 预算（累计，0 = 无限）",
+    "트리거 키워드 (쉼표 구분, 예: ultrathink, deepsearch)":
+        "触发关键词（逗号分隔，如 ultrathink、deepsearch）",
+    "현재 세션 (rtk session)": "当前会话 (rtk session)",
+    "훅 · 권한 · MCP · 플러그인 · 설정":
+        "钩子 · 权限 · MCP · 插件 · 设置",
+    "훅 비활성": "钩子未启用",
+    "훅 제거": "移除钩子",
+    "훅 활성": "钩子已启用",
+    "훅 활성 감지 — 탭 새로고침": "检测到钩子激活 — 正在刷新标签页",
+    "훅 활성화 감지 중 — 완료되면 자동 새로고침":
+        "正在检测钩子激活 — 标签页将自动刷新",
+    "💡 -u/--ultra-compact 플래그로 ASCII 아이콘 사용 + 추가 절감.":
+        "💡 使用 -u / --ultra-compact 可启用 ASCII 图标并进一步节省。",
 }
