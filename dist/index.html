@@ -968,6 +968,8 @@ const NAV = [
     group: 'advanced', desc: '플러그인 마켓 추가/삭제 (git URL)', docUrl: DOCS_BASE+'plugins' },
   { id: 'scheduled',   icon: '⏰', label: '예약된 작업',
     group: 'advanced', desc: '~/.claude/scheduled-tasks/ 정의 스킬', docUrl: DOCS_BASE+'overview' },
+  { id: 'costsTimeline', icon: '💸', label: '비용 타임라인', group: 'system',
+    desc: '모든 플레이그라운드/워크플로우 비용 통합 타임라인' },
   { id: 'usage',       icon: '💳', label: '사용량 / 비용',
     group: 'system', desc: '최근 도구 호출 통계 + 일자별 그래프', docUrl: DOCS_BASE+'costs' },
   { id: 'metrics',     icon: '📉', label: '토큰 메트릭',
@@ -13415,6 +13417,162 @@ function formatBytes(n) {
   if (n < 1024*1024*1024) return (n/1024/1024).toFixed(2) + 'MB';
   return (n/1024/1024/1024).toFixed(2) + 'GB';
 }
+
+// ────────────────────────────────────────────────────────────────
+// COSTS TIMELINE (v2.20.0) — 모든 플레이그라운드/워크플로우 비용 통합
+// ────────────────────────────────────────────────────────────────
+VIEWS.costsTimeline = async () => {
+  const d = await api('/api/cost-timeline/summary');
+  if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml(d.error||'')}</div>`;
+
+  const fmtUsd = (v) => '$' + (v||0).toFixed(4);
+  const days = d.days || [];
+  const maxDay = Math.max(1, ...days.map(x => x.usd));
+  const sourceColors = {
+    promptCache: '#a78bfa', thinkingLab: '#818cf8', toolUseLab: '#f472b6',
+    batchJobs: '#60a5fa', apiFiles: '#fbbf24', visionLab: '#4ade80',
+    modelBench: '#fb7185', serverTools: '#22d3ee', citationsLab: '#f97316',
+    workflows: '#d97757',
+  };
+  const sourceLabel = (s) => ({
+    promptCache: 'Prompt Cache', thinkingLab: 'Extended Thinking',
+    toolUseLab: 'Tool Use', batchJobs: 'Batch Jobs', apiFiles: 'Files API',
+    visionLab: 'Vision/PDF', modelBench: 'Model Bench',
+    serverTools: 'Server Tools', citationsLab: 'Citations',
+    workflows: 'Workflows',
+  }[s] || s);
+
+  // 차트 SVG (수평 막대, 일별 스택)
+  const chartW = 800, chartH = Math.max(140, days.length * 18 + 30);
+  const barH = 14;
+  const chart = days.length ? `
+    <svg viewBox="0 0 ${chartW} ${chartH}" width="100%" height="${chartH}" preserveAspectRatio="none" style="font-family:inherit;">
+      ${days.map((d, i) => {
+        const y = 15 + i * 18;
+        let x = 120;
+        const segs = Object.entries(d.sources || {}).sort((a,b) => b[1]-a[1]);
+        const totalW = 560 * (d.usd / maxDay);
+        return `
+          <text x="115" y="${y+10}" text-anchor="end" font-size="10" fill="var(--text-dim)">${d.day}</text>
+          ${segs.map(([src, usd]) => {
+            const w = totalW * (usd / d.usd);
+            const seg = `<rect x="${x}" y="${y}" width="${w}" height="${barH}" fill="${sourceColors[src]||'#888'}" opacity="0.85"><title>${sourceLabel(src)}: ${fmtUsd(usd)}</title></rect>`;
+            x += w;
+            return seg;
+          }).join('')}
+          <text x="${Math.max(125, x + 4)}" y="${y+10}" font-size="10" fill="var(--text-dim)">${fmtUsd(d.usd)}</text>
+        `;
+      }).join('')}
+    </svg>
+  ` : `<div class="text-[11px] text-[var(--text-dim)]">${t('아직 데이터가 없습니다. 플레이그라운드 탭을 사용하면 자동으로 축적됩니다.')}</div>`;
+
+  const bySource = d.bySource || [];
+  const byModel = d.byModel || [];
+  const recent = d.recent || [];
+
+  const sourceRows = bySource.map(s => `
+    <tr class="border-b border-[var(--border)]">
+      <td class="py-1 px-2"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sourceColors[s.source]||'#888'};margin-right:6px;"></span>${sourceLabel(s.source)}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono">${s.count}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono">${(s.tokensIn||0).toLocaleString()} / ${(s.tokensOut||0).toLocaleString()}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono font-semibold">${fmtUsd(s.usd)}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="4" class="py-3 text-center text-[var(--text-dim)]">${t('아직 데이터가 없습니다')}</td></tr>`;
+
+  const modelRows = byModel.map(m => `
+    <tr class="border-b border-[var(--border)]">
+      <td class="py-1 px-2 font-mono text-[10px]">${escapeHtml(m.model)}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono">${m.count}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono">${fmtUsd(m.usd)}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="3" class="py-3 text-center text-[var(--text-dim)]">—</td></tr>`;
+
+  const recentRows = recent.map(e => `
+    <tr class="border-b border-[var(--border)]">
+      <td class="py-1 px-2 text-[10px] text-[var(--text-dim)] font-mono">${new Date(e.ts*1000).toLocaleString()}</td>
+      <td class="py-1 px-2"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${sourceColors[e.source]||'#888'};margin-right:4px;"></span>${sourceLabel(e.source)}</td>
+      <td class="py-1 px-2 font-mono text-[10px]">${escapeHtml(e.model || '-')}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono">${(e.tokensIn||0)} / ${(e.tokensOut||0)}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono">${fmtUsd(e.usd)}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="5" class="py-3 text-center text-[var(--text-dim)]">—</td></tr>`;
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">💸 ${t('비용 타임라인')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('Claude API 플레이그라운드 + 워크플로우 실행의 모든 비용을 통합 조회. 로컬 히스토리 JSON 파일들에서 자동 수집.')}
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('총 비용')}</div>
+        <div class="text-2xl font-bold mt-1 font-mono" style="color:var(--accent);">${fmtUsd(d.totalUsd)}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('총 호출')}</div>
+        <div class="text-2xl font-bold mt-1 font-mono">${d.totalCount.toLocaleString()}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('활성 소스')}</div>
+        <div class="text-2xl font-bold mt-1 font-mono">${bySource.length} / ${10 + 1}</div>
+      </div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('일별 비용 (최근 60일, 소스별 스택)')}</div>
+      ${chart}
+      <div class="flex items-center gap-3 flex-wrap mt-2 text-[10px] text-[var(--text-dim)]">
+        ${Object.keys(sourceColors).map(s => `
+          <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${sourceColors[s]};margin-right:3px;"></span>${sourceLabel(s)}</span>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div class="card p-3">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('소스별 집계')}</div>
+        <table class="w-full text-[11px] border-collapse">
+          <thead><tr class="border-b border-[var(--border)]">
+            <th class="text-left py-1 px-2">${t('소스')}</th>
+            <th class="text-right py-1 px-2">${t('호출')}</th>
+            <th class="text-right py-1 px-2">${t('토큰 in/out')}</th>
+            <th class="text-right py-1 px-2">USD</th>
+          </tr></thead>
+          <tbody>${sourceRows}</tbody>
+        </table>
+      </div>
+      <div class="card p-3">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('모델별 집계 (Top 20)')}</div>
+        <table class="w-full text-[11px] border-collapse">
+          <thead><tr class="border-b border-[var(--border)]">
+            <th class="text-left py-1 px-2">${t('모델')}</th>
+            <th class="text-right py-1 px-2">${t('호출')}</th>
+            <th class="text-right py-1 px-2">USD</th>
+          </tr></thead>
+          <tbody>${modelRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card p-3">
+      <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('최근 30건')}</div>
+      <div class="max-h-96 overflow-auto">
+        <table class="w-full text-[11px] border-collapse">
+          <thead class="sticky top-0" style="background:var(--card);"><tr class="border-b border-[var(--border)]">
+            <th class="text-left py-1 px-2">${t('시각')}</th>
+            <th class="text-left py-1 px-2">${t('소스')}</th>
+            <th class="text-left py-1 px-2">${t('모델')}</th>
+            <th class="text-right py-1 px-2">${t('토큰')}</th>
+            <th class="text-right py-1 px-2">USD</th>
+          </tr></thead>
+          <tbody>${recentRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+};
 
 // ────────────────────────────────────────────────────────────────
 // USAGE / COST

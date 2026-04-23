@@ -183,6 +183,12 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
     # ── 시스템 & 관측 ───────────────────────────────
     ("usage",         "system",   "사용량 / 비용 추정",
         ["사용량", "비용", "usage"]),
+    ("costsTimeline", "system",
+        "비용 타임라인 통합 — 모든 플레이그라운드/워크플로우 비용을 "
+        "소스별/모델별/일별 집계 + 최근 30건. Claude Code 내부 + 대시보드 "
+        "플레이그라운드 10종 + 워크플로우 비용을 한 화면에.",
+        ["비용", "cost", "타임라인", "timeline", "spend",
+         "daily cost", "예산"]),
     ("metrics",       "system",   "토큰 메트릭 상세 시계열",
         ["메트릭", "token", "토큰"]),
     ("memory",        "system",   "프로젝트 메모리 관리",
@@ -261,6 +267,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
     "marketplaces": {"en": "Marketplace management", "zh": "市场管理"},
     "scheduled": {"en": "Scheduled tasks", "zh": "定时任务"},
     "usage": {"en": "Usage / Cost estimation", "zh": "使用量 / 费用估算"},
+    "costsTimeline": {"en": "Costs Timeline — unified cost dashboard (per-source / per-model / daily)",
+                     "zh": "费用时间线 — 统一费用仪表盘（按来源/模型/日）"},
     "metrics": {"en": "Token metrics time series", "zh": "Token 指标时序"},
     "memory": {"en": "Project memory management", "zh": "项目记忆管理"},
     "tasks": {"en": "Task / TODO management", "zh": "任务 / TODO 管理"},
