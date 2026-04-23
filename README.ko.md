@@ -49,6 +49,38 @@ Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claud
 
 6 그룹 52 탭 · 16 워크플로우 노드 타입 · 8 AI 프로바이더 · 5 테마 · 3 언어.
 
+### 📸 스크린샷
+
+**메인 + 워크플로우 에디터**
+
+| 개요 (최적화 점수 + 브리핑) | 워크플로우 DAG 에디터 (n8n 스타일) |
+|---|---|
+| ![Overview](./docs/screenshots/overview.png) | ![Workflows](./docs/screenshots/workflows.png) |
+
+**멀티 AI + 통합 비용**
+
+| AI 프로바이더 (Claude/GPT/Gemini/Ollama/Codex) | 비용 타임라인 (플레이그라운드 + 워크플로우 통합) |
+|---|---|
+| ![AI Providers](./docs/screenshots/aiProviders.png) | ![Costs Timeline](./docs/screenshots/costsTimeline.png) |
+
+**Claude API 플레이그라운드**
+
+| 🧊 Prompt Cache Lab | 🧠 Extended Thinking Lab |
+|---|---|
+| ![Prompt Cache](./docs/screenshots/promptCache.png) | ![Thinking Lab](./docs/screenshots/thinkingLab.png) |
+| 🛠️ Tool Use 플레이그라운드 | 🏁 모델 벤치마크 |
+| ![Tool Use](./docs/screenshots/toolUseLab.png) | ![Model Bench](./docs/screenshots/modelBench.png) |
+
+**지식 · 재사용**
+
+| 📖 Claude Docs Hub | 📝 프롬프트 라이브러리 |
+|---|---|
+| ![Claude Docs](./docs/screenshots/claudeDocs.png) | ![Prompt Library](./docs/screenshots/promptLibrary.png) |
+| 👥 프로젝트 서브에이전트 | 🔗 MCP 커넥터 |
+| ![Project Agents](./docs/screenshots/projectAgents.png) | ![MCP](./docs/screenshots/mcp.png) |
+
+_모든 스크린샷은 `scripts/capture-screenshots.mjs` (Playwright · 1440×900 @2x) 로 자동 생성. UI 변경 후 재생성._
+
 ---
 
 ## ✨ 왜 만들었나요?
