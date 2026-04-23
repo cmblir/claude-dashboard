@@ -10,6 +10,35 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.22.1] — 2026-04-23
+
+### 📸 Docs — README 3종에 스크린샷 12장 삽입
+
+사용자 피드백: "글만 보고 어떤식으로 나오는지 알 수 없잖아". 실제 UI 보여주는 스크린샷 자동 생성 + README 임베드.
+
+**신규: `scripts/capture-screenshots.mjs`**
+- Playwright 로 주요 12 탭을 1440×900 @2x (레티나) 로 캡처
+- `docs/screenshots/<tab>.png` 에 저장
+- workflows 탭은 `bt-multi-ai-compare` 템플릿 시드 후 `_wfFitView()` 로 전체 DAG 노출
+- promptCache 탭은 예시 1개 로드 후 캡처
+- 캡처 완료 시 `[Demo]` 시드 워크플로우 자동 정리
+
+**캡처 대상 (12)**
+- `overview` · `workflows` · `aiProviders` · `costsTimeline`
+- `promptCache` · `thinkingLab` · `toolUseLab` · `modelBench`
+- `claudeDocs` · `promptLibrary` · `projectAgents` · `mcp`
+
+**총 용량**: ~2.4MB (탭당 100~330KB · PNG 레티나). Git 저장소에 직접 commit.
+
+**README 3종 구조**
+- ASCII 미리보기 박스 바로 아래 `### 📸 Screenshots / 스크린샷 / 截图` 섹션 추가
+- 4개 카테고리 × 2열 markdown 표 (메인 / 멀티AI·비용 / API 플레이그라운드 / 지식·재사용)
+- `![label](./docs/screenshots/tab.png)` 상대 경로 → GitHub raw 렌더 호환
+
+**package.json scripts.screenshots** 추가: `npm run screenshots` 로 재생성.
+
+**사전 요건**: 서버가 `127.0.0.1:8080` 에서 기동 중이어야 함 + `npx playwright install chromium` 완료.
+
 ## [2.22.0] — 2026-04-23
 
 ### 🔒 Security — 워크플로우 HTTP 노드 SSRF 가드 (Finding 1 fix)

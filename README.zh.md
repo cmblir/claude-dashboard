@@ -49,6 +49,38 @@ Claude Control Center 是一款**本地优先的仪表板**，统一管理你的
 
 6 组 52 个标签页 · 16 种工作流节点 · 8 个 AI 供应商 · 5 种主题 · 3 种语言。
 
+### 📸 截图
+
+**主页 + 工作流编辑器**
+
+| 概览（优化评分 + 简报） | 工作流 DAG 编辑器（n8n 风格） |
+|---|---|
+| ![Overview](./docs/screenshots/overview.png) | ![Workflows](./docs/screenshots/workflows.png) |
+
+**多 AI + 统一费用**
+
+| AI 供应商（Claude/GPT/Gemini/Ollama/Codex） | 费用时间线（所有实验室 + 工作流统一） |
+|---|---|
+| ![AI Providers](./docs/screenshots/aiProviders.png) | ![Costs Timeline](./docs/screenshots/costsTimeline.png) |
+
+**Claude API 实验室**
+
+| 🧊 提示缓存实验室 | 🧠 扩展思维实验室 |
+|---|---|
+| ![Prompt Cache](./docs/screenshots/promptCache.png) | ![Thinking Lab](./docs/screenshots/thinkingLab.png) |
+| 🛠️ 工具使用实验室 | 🏁 模型基准测试 |
+| ![Tool Use](./docs/screenshots/toolUseLab.png) | ![Model Bench](./docs/screenshots/modelBench.png) |
+
+**知识 · 复用**
+
+| 📖 Claude 文档中心 | 📝 提示库 |
+|---|---|
+| ![Claude Docs](./docs/screenshots/claudeDocs.png) | ![Prompt Library](./docs/screenshots/promptLibrary.png) |
+| 👥 项目子代理 | 🔗 MCP 连接器 |
+| ![Project Agents](./docs/screenshots/projectAgents.png) | ![MCP](./docs/screenshots/mcp.png) |
+
+_所有截图由 `scripts/capture-screenshots.mjs`（Playwright · 1440×900 @2x）自动生成。UI 变更后请重新生成。_
+
 ---
 
 ## ✨ 为什么做这个项目？
