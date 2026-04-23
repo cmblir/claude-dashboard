@@ -922,6 +922,9 @@ const NAV = [
   { id: 'modelBench',  icon: '🏁', label: '모델 벤치마크', group: 'work',
     desc: '프롬프트 셋 × 모델 교차 실행 → 평균 지연/토큰/비용 집계',
     docUrl: 'https://docs.anthropic.com/en/docs/about-claude/models' },
+  { id: 'serverTools', icon: '🧰', label: '공식 내장 Tools', group: 'work',
+    desc: 'Anthropic hosted web_search / code_execution 실습',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use' },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -8267,6 +8270,174 @@ function mbDownload() {
   const a = document.createElement('a');
   a.href = url; a.download = `model-bench-${Date.now()}.json`; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ────────────────────────────────────────────────────────────────
+// SERVER-SIDE TOOLS (v2.11.0)
+// Anthropic hosted tools: web_search + code_execution
+// ────────────────────────────────────────────────────────────────
+VIEWS.serverTools = async () => {
+  const [cat, hist] = await Promise.all([
+    api('/api/server-tools/catalog'),
+    api('/api/server-tools/history'),
+  ]);
+  state.data.st = state.data.st || {
+    model: 'claude-sonnet-4-6',
+    maxTokens: 2048,
+    prompt: '',
+    enabled: ['web_search'],
+    lastResult: null,
+  };
+  const st = state.data.st;
+  const tools = cat.tools || [];
+  const examples = cat.examples || [];
+
+  const exBtns = examples.map(e =>
+    `<button class="chip" onclick="stLoadExample('${e.id}')">${t(e.label)}</button>`
+  ).join('');
+
+  const toolChecks = tools.map(tool => {
+    const checked = st.enabled.includes(tool.id);
+    const modelSupported = tool.supportedModels.includes(st.model);
+    return `<label class="flex items-start gap-2 text-[11px] cursor-pointer select-none p-2 rounded border border-[var(--border)] ${modelSupported?'':'opacity-50'}" style="${checked?'background:rgba(217,119,87,0.08);border-color:rgba(217,119,87,0.4);':''}">
+      <input type="checkbox" ${checked?'checked':''} ${modelSupported?'':'disabled'} onchange="stToggleTool('${tool.id}')" style="margin-top:2px;">
+      <div style="flex:1;">
+        <div class="font-semibold" style="font-size:12px;">${t(tool.label)}</div>
+        <div class="text-[var(--text-dim)] mt-0.5">${t(tool.description)}</div>
+        <div class="text-[10px] text-[var(--text-dim)] mt-1 font-mono">${tool.apiType}</div>
+        ${!modelSupported ? `<div class="text-[10px] text-[var(--warn)] mt-1">⚠ ${t('현재 모델에서 미지원')}</div>` : ''}
+      </div>
+    </label>`;
+  }).join('');
+
+  const last = st.lastResult;
+  const blocks = last && (last.output || last.serverToolUses?.length || last.toolResults?.length);
+
+  const histList = ((hist && hist.items) || []).slice(0, 8).map(h => {
+    const ts = new Date((h.ts||0)*1000).toLocaleString();
+    const icon = h.status === 'ok' ? '✅' : '❌';
+    return `<div class="text-[11px] py-1 border-b border-[var(--border)]">
+      ${icon} <span class="text-[var(--text-dim)]">${ts}</span> · ${(h.enabledTools||[]).join('+')} · ${h.durationMs||0}ms
+    </div>`;
+  }).join('') || `<div class="text-[11px] text-[var(--text-dim)]">${t('이력 없음')}</div>`;
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">🧰 ${t('Claude 공식 내장 Tools')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('Anthropic 서버가 직접 실행하는 hosted tool (web_search / code_execution) 을 활성화하고 응답 블록을 분류 시각화합니다.')}
+      </p>
+    </div>
+
+    <div class="mb-3 flex items-center gap-2 flex-wrap">
+      <span class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('예시')}</span>
+      ${exBtns}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="space-y-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider w-20">${t('모델')}</label>
+          <select class="input flex-1" onchange="stSet('model', this.value); renderView()">
+            <option value="claude-opus-4-7" ${st.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${st.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
+          </select>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">max_tokens</label>
+          <input type="text" inputmode="numeric" class="input w-24" value="${st.maxTokens}"
+                 oninput="stSet('maxTokens', parseInt((this.value||'').replace(/\\D/g,''))||2048)">
+        </div>
+        <div>
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('활성화할 도구')}</div>
+          <div class="space-y-2">${toolChecks}</div>
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('프롬프트')}</label>
+          <textarea class="input text-[12px]" rows="5" oninput="stSet('prompt', this.value)" placeholder="${t('도구를 활용할 질문')}">${escapeHtml(st.prompt||'')}</textarea>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary" onclick="stRun()">▶ ${t('실행')}</button>
+          <button class="btn" onclick="stReset()">${t('초기화')}</button>
+          <span id="stStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+        </div>
+      </div>
+
+      <div class="space-y-3 max-h-[720px] overflow-auto pr-1">
+        ${blocks ? `
+          ${(last.serverToolUses||[]).map(u => `
+            <div class="card p-3" style="border-left:3px solid #a78bfa;">
+              <div class="text-[11px] text-[var(--accent)] font-mono mb-1">🛠️ server_tool_use · ${escapeHtml(u.name||'')}</div>
+              <pre class="text-[10px] font-mono whitespace-pre-wrap text-[var(--text-dim)]">${escapeHtml(JSON.stringify(u.input||{}, null, 2))}</pre>
+            </div>
+          `).join('')}
+          ${(last.toolResults||[]).map(r => `
+            <div class="card p-3" style="border-left:3px solid #4ade80;">
+              <div class="text-[11px] font-mono mb-1" style="color:#4ade80;">✓ ${escapeHtml(r.kind||'tool_result')}</div>
+              <pre class="text-[10px] font-mono whitespace-pre-wrap max-h-60 overflow-auto">${escapeHtml(typeof r.content === 'string' ? r.content : JSON.stringify(r.content, null, 2)).slice(0, 2000)}</pre>
+            </div>
+          `).join('')}
+          ${last.output ? `
+            <div class="card p-3">
+              <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">💬 ${t('최종 응답')}</div>
+              <pre class="text-[11px] whitespace-pre-wrap">${escapeHtml(last.output)}</pre>
+              ${last.usage ? `<div class="text-[10px] text-[var(--text-dim)] font-mono mt-2">in=${last.usage.input_tokens||0} · out=${last.usage.output_tokens||0} · ${last.durationMs||0}ms</div>` : ''}
+            </div>
+          ` : ''}
+        ` : `<div class="card p-6 text-center text-[11px] text-[var(--text-dim)]">${t('아직 실행한 결과가 없습니다')}</div>`}
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('최근 히스토리')}</div>
+          ${histList}
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+function stSet(key, val) {
+  state.data.st = state.data.st || {};
+  state.data.st[key] = val;
+}
+function stReset() { state.data.st = null; renderView(); }
+function stToggleTool(tid) {
+  const st = state.data.st;
+  const i = st.enabled.indexOf(tid);
+  if (i >= 0) st.enabled.splice(i, 1);
+  else st.enabled.push(tid);
+  renderView();
+}
+async function stLoadExample(id) {
+  const r = await api('/api/server-tools/catalog');
+  const e = (r.examples || []).find(x => x.id === id);
+  if (!e) return;
+  state.data.st = {
+    model: e.model,
+    maxTokens: 2048,
+    prompt: e.prompt,
+    enabled: e.enabledTools.slice(),
+    lastResult: null,
+  };
+  renderView();
+}
+async function stRun() {
+  const st = state.data.st || {};
+  if (!(st.prompt||'').trim()) { toast(t('프롬프트를 입력하세요'), 'err'); return; }
+  if (!(st.enabled||[]).length) { toast(t('도구를 1개 이상 활성화하세요'), 'err'); return; }
+  const sEl = document.getElementById('stStatus');
+  if (sEl) sEl.textContent = t('호출 중…');
+  try {
+    const r = await fetch('/api/server-tools/run', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(st),
+    }).then(x => x.json());
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (sEl) sEl.textContent=''; return; }
+    if (r.unsupported) { toast(r.error, 'err'); if (sEl) sEl.textContent=''; return; }
+    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (sEl) sEl.textContent=''; return; }
+    state.data.st.lastResult = r;
+    if (sEl) sEl.textContent = `${r.durationMs||0}ms`;
+    renderView();
+  } catch (e) {
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (sEl) sEl.textContent = '';
+  }
 }
 
 // ────────────────────────────────────────────────────────────────

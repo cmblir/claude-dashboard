@@ -113,6 +113,12 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "개별 응답 매트릭스. 결과 JSON 다운로드.",
         ["benchmark", "벤치마크", "모델 비교", "model compare",
          "지연 비교", "cost compare"]),
+    ("serverTools",   "work",
+        "Claude 공식 hosted tool 플레이그라운드 — 🌐 web_search + "
+        "🧪 code_execution. Anthropic 서버가 직접 실행하는 도구를 체크박스로 "
+        "활성화하고 응답 블록(server_tool_use / *_tool_result / text)을 분류 시각화.",
+        ["web_search", "웹 검색", "code_execution", "코드 실행",
+         "hosted tool", "server tool", "공식 도구"]),
 
     # ── 설정 & 구성 ─────────────────────────────────
     ("hooks",         "config",   "이벤트 훅 설정",
@@ -200,6 +206,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                  "zh": "视觉/PDF 实验室 — 拖入图片或 PDF,并排比较 Opus/Sonnet/Haiku 响应"},
     "modelBench": {"en": "Model Benchmark — cross run prompt sets × models, aggregate latency/tokens/cost",
                   "zh": "模型基准测试 — 提示集 × 模型交叉运行,汇总延迟/令牌/费用"},
+    "serverTools": {"en": "Server-side Tools — web_search + code_execution hosted by Anthropic",
+                   "zh": "服务端工具 — Anthropic 托管的 web_search + code_execution"},
     "hooks": {"en": "Event hooks", "zh": "事件钩子"},
     "permissions": {"en": "Tool permissions", "zh": "工具权限"},
     "mcp": {"en": "MCP Connectors", "zh": "MCP 连接器"},

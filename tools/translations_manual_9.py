@@ -530,6 +530,28 @@ NEW_EN = {
     "팀 멤버 목록·사용량·결제는": "Team members / usage / billing at",
     "에서 직접 관리합니다": "are managed directly there",
 
+    # ── v2.11.0 serverTools (Anthropic hosted tools) ───────────
+    "Claude 공식 내장 Tools": "Claude Official Server Tools",
+    "공식 내장 Tools": "Server Tools",
+    "Anthropic hosted web_search / code_execution 실습":
+        "Anthropic-hosted web_search / code_execution practice",
+    "Anthropic 서버가 직접 실행하는 hosted tool (web_search / code_execution) 을 활성화하고 응답 블록을 분류 시각화합니다.":
+        "Enable Anthropic-hosted tools (web_search / code_execution) and visualize response blocks by type.",
+    "🌐 Web Search": "🌐 Web Search",
+    "🧪 Code Execution": "🧪 Code Execution",
+    "Anthropic 서버 측 웹 검색 + citation.": "Server-side web search + citations.",
+    "Anthropic 호스팅 Python sandbox (stdout/stderr/return_code).": "Anthropic-hosted Python sandbox (stdout/stderr/return_code).",
+    "최신 뉴스 검색": "Latest news search",
+    "Python 으로 계산": "Calculate with Python",
+    "검색 + 분석 결합": "Search + analyze",
+    "웹 검색으로 최근 뉴스를 요약하고 출처 citation 포함.": "Summarize latest news via web search with citations.",
+    "코드 실행으로 계산/분석 수행.": "Perform calculation via code execution.",
+    "웹 검색 + 코드 실행을 함께 사용.": "Use web search + code execution together.",
+    "활성화할 도구": "Enable tools",
+    "도구를 활용할 질문": "A question that needs these tools",
+    "현재 모델에서 미지원": "Not supported on current model",
+    "도구를 1개 이상 활성화하세요": "Enable at least one tool",
+
     "입력 비용": "Input cost",
     "캐시 쓰기": "Cache write",
     "캐시 읽기": "Cache read",
@@ -1195,6 +1217,28 @@ NEW_ZH = {
     "참고": "参考",
     "팀 멤버 목록·사용량·결제는": "团队成员/用量/账单在",
     "에서 직접 관리합니다": "中直接管理",
+
+    # ── v2.11.0 服务端工具 ────────────────────────────────────
+    "Claude 공식 내장 Tools": "Claude 官方内置工具",
+    "공식 내장 Tools": "内置工具",
+    "Anthropic hosted web_search / code_execution 실습":
+        "Anthropic 托管 web_search / code_execution 实战",
+    "Anthropic 서버가 직접 실행하는 hosted tool (web_search / code_execution) 을 활성화하고 응답 블록을 분류 시각화합니다.":
+        "启用 Anthropic 直接托管的工具 (web_search / code_execution) 并按类型可视化响应块。",
+    "🌐 Web Search": "🌐 网络搜索",
+    "🧪 Code Execution": "🧪 代码执行",
+    "Anthropic 서버 측 웹 검색 + citation.": "服务端网络搜索 + 引用。",
+    "Anthropic 호스팅 Python sandbox (stdout/stderr/return_code).": "Anthropic 托管 Python 沙盒 (stdout/stderr/return_code)。",
+    "최신 뉴스 검색": "最新新闻搜索",
+    "Python 으로 계산": "用 Python 计算",
+    "검색 + 분석 결합": "搜索 + 分析组合",
+    "웹 검색으로 최근 뉴스를 요약하고 출처 citation 포함.": "通过网络搜索总结最近新闻并附来源引用。",
+    "코드 실행으로 계산/분석 수행.": "通过代码执行进行计算/分析。",
+    "웹 검색 + 코드 실행을 함께 사용.": "同时使用网络搜索 + 代码执行。",
+    "활성화할 도구": "启用工具",
+    "도구를 활용할 질문": "需要使用工具的问题",
+    "현재 모델에서 미지원": "当前模型不支持",
+    "도구를 1개 이상 활성화하세요": "请至少启用一个工具",
 
     "입력 비용": "输入费用",
     "캐시 쓰기": "缓存写入",
