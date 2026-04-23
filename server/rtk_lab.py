@@ -123,11 +123,17 @@ def api_rtk_install(body: dict | None = None) -> dict:
 
 
 def api_rtk_init(_body: dict | None = None) -> dict:
-    """`rtk init -g` — Claude Code 에 Bash 자동 재작성 훅 설치."""
+    """`rtk init -g` — Claude Code 에 Bash 자동 재작성 훅 설치.
+
+    대화형 y/n 프롬프트는 `yes` 파이프로 자동 응답한다. rtk 가 stdin 을
+    쓰지 않는다면 yes 는 SIGPIPE 로 조기 종료되므로 부작용 없음.
+    """
     if not _which("rtk"):
         return {"ok": False, "error": "rtk not installed", "error_key": "err_rtk_not_installed"}
-    result = _run_in_terminal("rtk init -g")
-    return {**result, "command": "rtk init -g"}
+    # 모든 확인 프롬프트에 자동 y 응답
+    cmd = "yes | rtk init -g"
+    result = _run_in_terminal(cmd)
+    return {**result, "command": cmd}
 
 
 def api_rtk_config(_q: dict | None = None) -> dict:

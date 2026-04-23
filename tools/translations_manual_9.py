@@ -907,6 +907,11 @@ NEW_EN = {
     "rtk_install_launched": "Terminal window opened — refresh this tab once the install finishes.",
     "rtk_init_confirm": "rtk init -g will modify Claude Code's settings.json. Continue?",
     "rtk_init_launched": "rtk init -g is now running in Terminal.",
+    "rtk_polling_install": "Watching for install completion — tab will auto-refresh",
+    "rtk_polling_hook": "Watching for hook activation — tab will auto-refresh",
+    "rtk_polling_timeout": "Detection timed out — please refresh manually",
+    "rtk_detected_install": "rtk install detected — refreshing tab",
+    "rtk_detected_hook": "Hook activation detected — refreshing tab",
     "이미 설치됨": "Already installed",
 }
 
@@ -1811,5 +1816,10 @@ NEW_ZH = {
     "rtk_install_launched": "已打开 Terminal 窗口 — 安装完成后请刷新此标签页。",
     "rtk_init_confirm": "rtk init -g 将修改 Claude Code 的 settings.json。继续吗？",
     "rtk_init_launched": "rtk init -g 正在 Terminal 中运行。",
+    "rtk_polling_install": "正在检测安装完成 — 标签页将自动刷新",
+    "rtk_polling_hook": "正在检测钩子激活 — 标签页将自动刷新",
+    "rtk_polling_timeout": "检测超时 — 请手动刷新",
+    "rtk_detected_install": "检测到 rtk 安装 — 正在刷新标签页",
+    "rtk_detected_hook": "检测到钩子激活 — 正在刷新标签页",
     "이미 설치됨": "已安装",
 }
