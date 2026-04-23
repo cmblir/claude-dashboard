@@ -10,6 +10,33 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.23.2] — 2026-04-23
+
+### 📸 Docs — 언어별 스크린샷 36장 + UI 브랜드 텍스트 정리
+
+사용자 리포트 2건 반영:
+1. 영문 README 가 한글 UI 스크린샷을 참조
+2. `AI Providers` / `Costs Timeline` 이 빈 화면으로 캡처됨
+
+**`scripts/capture-screenshots.mjs` 전면 재작성**
+- 12 탭 × 3 언어 = 36장 → `docs/screenshots/{ko,en,zh}/<tab>.png`
+- `?lang=en|zh` 쿼리로 UI 언어 전환 후 캡처 (context 재생성)
+- `waitForLoadState('networkidle')` + 탭별 selector + `waitForResponse('/api/ai-providers/list')` + chip 개수 `waitForFunction` — zh/en 에서 `aiProviders` 가 스켈레톤 상태로 찍히던 문제 해결
+- `page.route('**/api/cost-timeline/summary', ...)` 로 Costs Timeline 모의 응답 주입 (14일 × 5 소스 × 147건 · 총 $12.38) — 실 API 호출 없이 의미있는 스택 차트 생성
+- overview 탭의 Claude 계정 온보딩 모달을 `Continue|계속|继续` 버튼 자동 클릭으로 통과
+- 워크플로우 시드 선택 fallback: `_wfOpen` → `_wfSelect` → 직접 `__wf.current` 할당
+
+**`dist/index.html` UI 브랜드 텍스트 정리**
+- `<title>` · 사이드바 브랜드 · 계정 온보딩 모달 헤더 등 4곳의 `Claude Control Center` → `LazyClaude` 치환 (리브랜딩 일관성)
+
+**README 3종 이미지 경로 분기**
+- `./docs/screenshots/*.png` → `./docs/screenshots/{ko,en,zh}/*.png` (각 README 자신의 언어로)
+
+**검증**
+- 36/36 캡처 성공
+- 각 언어에서 overview (최적화 점수 21 · 6171 세션 렌더) · aiProviders (8 프로바이더 카드) · costsTimeline (스택 차트 + 소스별 집계) · workflows ([Demo] Multi-AI Compare DAG) 시각 확인
+
+---
 ## [2.23.1] — 2026-04-23
 
 ### 🎨 Branding — 프로젝트 이름을 **LazyClaude** 로

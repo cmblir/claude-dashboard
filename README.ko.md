@@ -10,7 +10,7 @@ _50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.23.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.23.2-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-아키텍처)
 
 </div>
@@ -38,7 +38,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.23.1 🇰🇷│
+│  💤  LazyClaude                                     v2.23.2 🇰🇷│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 신기능│   🔀 워크플로우                                       │
 │ 🏠 메인 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -61,29 +61,29 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 | 개요 (최적화 점수 + 브리핑) | 워크플로우 DAG 에디터 (n8n 스타일) |
 |---|---|
-| ![Overview](./docs/screenshots/overview.png) | ![Workflows](./docs/screenshots/workflows.png) |
+| ![Overview](./docs/screenshots/ko/overview.png) | ![Workflows](./docs/screenshots/ko/workflows.png) |
 
 **멀티 AI + 통합 비용**
 
 | AI 프로바이더 (Claude/GPT/Gemini/Ollama/Codex) | 비용 타임라인 (플레이그라운드 + 워크플로우 통합) |
 |---|---|
-| ![AI Providers](./docs/screenshots/aiProviders.png) | ![Costs Timeline](./docs/screenshots/costsTimeline.png) |
+| ![AI Providers](./docs/screenshots/ko/aiProviders.png) | ![Costs Timeline](./docs/screenshots/ko/costsTimeline.png) |
 
 **Claude API 플레이그라운드**
 
 | 🧊 Prompt Cache Lab | 🧠 Extended Thinking Lab |
 |---|---|
-| ![Prompt Cache](./docs/screenshots/promptCache.png) | ![Thinking Lab](./docs/screenshots/thinkingLab.png) |
+| ![Prompt Cache](./docs/screenshots/ko/promptCache.png) | ![Thinking Lab](./docs/screenshots/ko/thinkingLab.png) |
 | 🛠️ Tool Use 플레이그라운드 | 🏁 모델 벤치마크 |
-| ![Tool Use](./docs/screenshots/toolUseLab.png) | ![Model Bench](./docs/screenshots/modelBench.png) |
+| ![Tool Use](./docs/screenshots/ko/toolUseLab.png) | ![Model Bench](./docs/screenshots/ko/modelBench.png) |
 
 **지식 · 재사용**
 
 | 📖 Claude Docs Hub | 📝 프롬프트 라이브러리 |
 |---|---|
-| ![Claude Docs](./docs/screenshots/claudeDocs.png) | ![Prompt Library](./docs/screenshots/promptLibrary.png) |
+| ![Claude Docs](./docs/screenshots/ko/claudeDocs.png) | ![Prompt Library](./docs/screenshots/ko/promptLibrary.png) |
 | 👥 프로젝트 서브에이전트 | 🔗 MCP 커넥터 |
-| ![Project Agents](./docs/screenshots/projectAgents.png) | ![MCP](./docs/screenshots/mcp.png) |
+| ![Project Agents](./docs/screenshots/ko/projectAgents.png) | ![MCP](./docs/screenshots/ko/mcp.png) |
 
 _모든 스크린샷은 `scripts/capture-screenshots.mjs` (Playwright · 1440×900 @2x) 로 자동 생성. UI 변경 후 재생성._
 
@@ -288,7 +288,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.23.1)
+## 🔢 통계 (v2.23.2)
 
 | 지표 | 값 |
 |---|---|
