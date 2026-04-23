@@ -119,6 +119,12 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "활성화하고 응답 블록(server_tool_use / *_tool_result / text)을 분류 시각화.",
         ["web_search", "웹 검색", "code_execution", "코드 실행",
          "hosted tool", "server tool", "공식 도구"]),
+    ("citationsLab",  "work",
+        "Citations 플레이그라운드 — 문서를 제공하고 citations.enabled 로 "
+        "정확한 인용 span 이 포함된 답변을 받아 원문 하이라이트로 시각화. "
+        "예시 2종 (회사 소개문 / 기술 아티클).",
+        ["citations", "인용", "citation", "document reference",
+         "cited_text", "span highlight"]),
     ("claudeDocs",    "new",
         "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
         "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "
@@ -213,6 +219,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                   "zh": "模型基准测试 — 提示集 × 模型交叉运行,汇总延迟/令牌/费用"},
     "serverTools": {"en": "Server-side Tools — web_search + code_execution hosted by Anthropic",
                    "zh": "服务端工具 — Anthropic 托管的 web_search + code_execution"},
+    "citationsLab": {"en": "Citations Lab — document + citations.enabled → span-highlighted answers",
+                    "zh": "引用实验室 — 文档 + citations.enabled → 片段高亮的答案"},
     "claudeDocs": {"en": "Claude Docs Hub — curated docs.anthropic.com index with cross-links to dashboard tabs",
                   "zh": "Claude 文档中心 — docs.anthropic.com 分类索引,关联仪表板标签页"},
     "hooks": {"en": "Event hooks", "zh": "事件钩子"},
