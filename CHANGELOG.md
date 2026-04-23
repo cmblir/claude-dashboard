@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.18.0] — 2026-04-23
+
+### 🎭 E2E 커버리지 확장 (v2.10.x UX 회귀 방지)
+
+**신규: `scripts/e2e-ui-elements.mjs`**
+
+워크플로우 탭의 중요 DOM/전역 함수 무결성을 자동 검증. Anthropic API 키 없이도 동작.
+
+**검증 항목**
+1. 핵심 컨테이너 7개 (`#wfRoot` · `#wfCanvasWrap` · `#wfToolbar` · `#wfCanvasHost` · `#wfCanvas` · `#wfViewport` · `#wfMinimap`)
+2. 빌트인 `bt-multi-ai-compare` 로 임시 워크플로우 생성 → `.wf-node` 6개 렌더 확인 → 자동 정리
+3. **v2.10.0 UX**: `.wf-node-ring` / `.wf-node-elapsed` 각 6개 존재 · `_wfRenderRunBanner` 전역 노출 · mock running run 으로 `#wfRunBanner.visible` 부착 검증
+4. **v2.10.1 UX**: `_wfToggleCat` 전역 노출
+5. **v2.10.2 UX**: `_wfShowNodeTooltip` 전역 노출
+6. `pageerror` / `console.error` 집계 → 하나라도 있으면 실패
+
+**package.json scripts 추가**
+- `test:e2e:ui` → `node scripts/e2e-ui-elements.mjs`
+- `test:e2e:all` → smoke + ui 연속 실행
+
+**검증 실행 결과 (v2.18.0)**
+- `npm run test:e2e:ui` — 18개 체크 전부 통과
+- `npm run test:e2e:smoke` — **51/51 탭 전수 통과**
+
 ## [2.17.0] — 2026-04-23
 
 ### 🚨 Batch 비용 가드 (batchJobs 확장)
