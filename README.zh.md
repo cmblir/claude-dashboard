@@ -12,7 +12,7 @@ _别死记 50+ CLI 命令，点一下就行。_
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.25.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.25.1-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-架构)
 
 </div>
@@ -40,7 +40,7 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.25.0 🇨🇳│
+│  💤  LazyClaude                                     v2.25.1 🇨🇳│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 新功能│   🔀 工作流                                          │
 │ 🏠 主要 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -86,6 +86,12 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 | ![Claude Docs](./docs/screenshots/zh/claudeDocs.png) | ![Prompt Library](./docs/screenshots/zh/promptLibrary.png) |
 | 👥 项目子代理 | 🔗 MCP 连接器 |
 | ![Project Agents](./docs/screenshots/zh/projectAgents.png) | ![MCP](./docs/screenshots/zh/mcp.png) |
+
+**Token 优化**
+
+| 🦀 RTK 优化器（安装 · 激活 · 统计） |
+|---|
+| ![RTK Optimizer](./docs/screenshots/zh/rtk.png) |
 
 _所有截图由 `scripts/capture-screenshots.mjs`（Playwright · 1440×900 @2x）自动生成。UI 变更后请重新生成。_
 
@@ -300,7 +306,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 统计（v2.25.0）
+## 🔢 统计（v2.25.1）
 
 | 指标 | 值 |
 |---|---|
