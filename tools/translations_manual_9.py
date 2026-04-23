@@ -1054,6 +1054,24 @@ NEW_EN = {
         "Watching for hook activation — tab will auto-refresh",
     "💡 -u/--ultra-compact 플래그로 ASCII 아이콘 사용 + 추가 절감.":
         "💡 Use -u / --ultra-compact for ASCII icons + extra savings.",
+
+    # v2.29.0 — Policy fallback + Event Forwarder
+    "policy_fallback_label": "Fallback provider on failure",
+    "policy_fallback_none": "(none)",
+    "policy_fallback_hint": "When a session node fails with its assignee, retry once with the selected provider. The node result records fallbackUsed.",
+    "fwd_subtitle": "Forward Claude Code hook events to an external HTTP endpoint — whitelisted hosts only, settings.json auto-backup.",
+    "fwd_add_heading": "Add new forwarder",
+    "fwd_matcher_placeholder": "matcher (e.g. Bash, *, empty = all)",
+    "fwd_add_btn": "Add forwarder",
+    "fwd_allowed_hosts": "Allowed hosts",
+    "fwd_list_heading": "Registered forwarders",
+    "fwd_matcher_col": "Matcher",
+    "fwd_action_col": "Action",
+    "fwd_hint": "Forwarders are written to settings.json hooks as curl commands. A backup is created on every change.",
+    "fwd_empty": "No forwarders registered",
+    "fwd_added": "Forwarder added",
+    "fwd_removed": "Removed",
+    "fwd_remove_confirm": "This removes the forwarder from settings.json. Continue?",
 }
 
 NEW_ZH = {
@@ -2103,4 +2121,22 @@ NEW_ZH = {
         "正在检测钩子激活 — 标签页将自动刷新",
     "💡 -u/--ultra-compact 플래그로 ASCII 아이콘 사용 + 추가 절감.":
         "💡 使用 -u / --ultra-compact 可启用 ASCII 图标并进一步节省。",
+
+    # v2.29.0 — Policy fallback + Event Forwarder
+    "policy_fallback_label": "失败时的回退供应商",
+    "policy_fallback_none": "(无)",
+    "policy_fallback_hint": "当 session 节点以其 assignee 失败时，使用所选供应商重试一次。节点结果会记录 fallbackUsed。",
+    "fwd_subtitle": "将 Claude Code hook 事件转发到外部 HTTP 端点 — 仅限白名单主机，settings.json 自动备份。",
+    "fwd_add_heading": "新增 Forwarder",
+    "fwd_matcher_placeholder": "matcher（如 Bash、*，留空 = 全部）",
+    "fwd_add_btn": "添加 Forwarder",
+    "fwd_allowed_hosts": "允许主机",
+    "fwd_list_heading": "已注册的 Forwarder",
+    "fwd_matcher_col": "匹配器",
+    "fwd_action_col": "操作",
+    "fwd_hint": "Forwarder 以 curl 命令写入 settings.json 的 hooks。每次变更都会创建备份。",
+    "fwd_empty": "暂无注册的 forwarder",
+    "fwd_added": "Forwarder 已添加",
+    "fwd_removed": "已移除",
+    "fwd_remove_confirm": "将从 settings.json 移除此 forwarder。继续吗？",
 }
