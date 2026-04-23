@@ -32,7 +32,7 @@ Claude Control Center 是一款**本地优先的仪表板**，统一管理你的
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  🧭  Claude Control Center                          v2.1.1 🇨🇳│
+│  🧭  Claude Control Center                          v2.21.1 🇨🇳│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 新功能│   🔀 工作流                                          │
 │ 🏠 主要 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -113,8 +113,6 @@ ANTHROPIC_API_KEY=sk-...             # 可选
 ```
 
 API 密钥也可以在 `🧠 AI 供应商` 标签页中保存 — 存储于 `~/.claude-dashboard-config.json`。
-
-🆕 **v2.3.0 — 提示缓存实验室**（`work` 组）：对 Anthropic Messages API 的 `cache_control` 在系统/工具/消息块中指定，实时测量 `cache_creation / cache_read` 令牌和 USD 成本节约。一键运行 3 种示例（系统/文档/工具缓存）+ 历史 20 条。→ [docs](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching)
 
 ---
 
