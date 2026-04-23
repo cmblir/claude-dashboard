@@ -180,6 +180,7 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
             "headers": d.get("headers") if isinstance(d.get("headers"), dict) else {},
             "body": _clamp_str(d.get("body"), 8000),
             "extractPath": _clamp_str(d.get("extractPath"), 200),
+            "allowInternal": bool(d.get("allowInternal")),  # v2.22.0 SSRF 옵트인
         }
     elif ntype == "transform":
         out["data"] = {
@@ -803,10 +804,66 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
                 "error": f"provider execution failed: {e}", "sessionId": ""}
 
 
+_HTTP_BLOCKED_SCHEMES = {"file", "ftp", "gopher", "data", "dict", "tftp"}
+_HTTP_BLOCKED_HOSTS = {
+    "127.0.0.1", "0.0.0.0", "::1", "::",
+    "localhost", "ip6-localhost", "ip6-loopback",
+    # 클라우드 메타데이터
+    "169.254.169.254", "metadata.google.internal", "metadata.goog",
+    "fd00:ec2::254",
+}
+_HTTP_PRIVATE_PREFIXES_V4 = (
+    "10.", "127.", "169.254.", "192.168.",
+    # 172.16.0.0/12
+    *(f"172.{i}." for i in range(16, 32)),
+)
+_HTTP_PRIVATE_PREFIXES_V6 = ("fc", "fd", "fe80:", "fe9", "fea", "feb")  # RFC 4193 ULA + link-local
+
+
+def _http_is_internal(host: str) -> bool:
+    """호스트가 내부/사설/메타데이터 대역인지 판정.
+
+    IPv4/IPv6 리터럴과 일반 이름 모두 처리. DNS 이름은 getaddrinfo 로
+    해석해 실제 IP 가 내부 대역이면 True (DNS rebinding 방어).
+    """
+    if not host:
+        return True
+    h = host.lower().strip("[]")
+    if h in _HTTP_BLOCKED_HOSTS:
+        return True
+    if h.endswith(".localhost"):
+        return True
+    if h.startswith(_HTTP_PRIVATE_PREFIXES_V4):
+        return True
+    if any(h.startswith(p) for p in _HTTP_PRIVATE_PREFIXES_V6):
+        return True
+    # DNS 이름 → IP 해석 후 다시 검사 (DNS rebinding 방어)
+    try:
+        import socket as _sock
+        for info in _sock.getaddrinfo(host, None):
+            ip = info[4][0]
+            if ip in _HTTP_BLOCKED_HOSTS:
+                return True
+            if ip.startswith(_HTTP_PRIVATE_PREFIXES_V4):
+                return True
+            if any(ip.startswith(p) for p in _HTTP_PRIVATE_PREFIXES_V6):
+                return True
+    except Exception:
+        # 해석 실패 시엔 차단으로 처리 (fail-closed)
+        return True
+    return False
+
+
 def _execute_http_node(data: dict, inputs: list[str], _elapsed) -> dict:
-    """HTTP 노드 실행 — 외부 API 호출."""
+    """HTTP 노드 실행 — 외부 API 호출.
+
+    보안: URL 의 scheme 을 http/https 로 제한하고, 호스트가 내부/사설/메타데이터
+    대역이면 기본 차단. 사용자가 의도적으로 내부 호출을 원하면 노드 data 에
+    `allowInternal: true` 플래그를 세팅해야 한다. (v2.22.0 SSRF 가드)
+    """
     import urllib.request
     import urllib.error
+    from urllib.parse import urlparse
 
     url = (data.get("url") or "").strip()
     if not url:
@@ -820,6 +877,19 @@ def _execute_http_node(data: dict, inputs: list[str], _elapsed) -> dict:
     input_text = inputs[0] if inputs else ""
     url = url.replace("{{input}}", input_text)
     body_template = body_template.replace("{{input}}", input_text)
+
+    # ── SSRF 가드 ──
+    parsed = urlparse(url)
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in ("http", "https"):
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"URL scheme '{scheme}' blocked (only http/https). "
+                         f"file://, ftp:// 등은 보안상 차단됨."}
+    allow_internal = bool(data.get("allowInternal"))
+    if not allow_internal and _http_is_internal(parsed.hostname or ""):
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": (f"내부/사설 호스트 '{parsed.hostname}' 차단 (SSRF 방지). "
+                          f"의도된 호출이면 노드 설정에서 'allowInternal: true' 체크.")}
 
     req_headers = {"Content-Type": "application/json"}
     if isinstance(headers_raw, dict):
