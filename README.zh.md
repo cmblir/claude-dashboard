@@ -12,7 +12,7 @@ _别死记 50+ CLI 命令，点一下就行。_
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.25.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.26.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-架构)
 
 </div>
@@ -40,7 +40,7 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.25.1 🇨🇳│
+│  💤  LazyClaude                                     v2.26.0 🇨🇳│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 新功能│   🔀 工作流                                          │
 │ 🏠 主要 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -306,7 +306,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 统计（v2.25.1）
+## 🔢 统计（v2.26.0）
 
 | 指标 | 值 |
 |---|---|

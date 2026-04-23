@@ -10,6 +10,45 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.26.0] — 2026-04-23
+
+### 🧭 사이드바 UX 개편 — 6 상위 카테고리 + hover flyout
+
+사용자 피드백: "카테고리가 너무 많아서 보기 어려운데, 상위 카테고리를 만들고 마우스가 가까이가면 바가 열리면서 상세 카테고리를 고를 수 있게 해줘. 형태나 양식이 비슷한 것들을 모아줘."
+
+**재분류 (6 → 6, 의미 재정비)**
+- `new` → **Learn** 🆕 — 신기능 · 온보딩 · Claude Docs · 가이드 (4)
+- `main` → **Main** 🏠 — 대시보드 · 프로젝트 · **plans(이동)** · 통계 · AI 평가 · 세션 (6)
+- `work` 분할 → **Build** 🔀 (워크플로우/에이전트/프롬프트 8) + **Playground** 🧪 (API 실험실 12)
+  - Build: workflows · promptLibrary · rtk · projectAgents · agents · skills · commands · agentSdkScaffold
+  - Playground: aiProviders · promptCache · thinkingLab · toolUseLab · batchJobs · apiFiles · visionLab · modelBench · serverTools · citationsLab · embeddingLab · sessionReplay
+- `advanced` 해체 → **Config** ⚙️ 로 흡수 (13). plans 만 Main 으로.
+- `system` → **Observe** 📊 — 비용/메트릭/세션 관측 (11)
+
+**UX**
+- `renderNav()` 전면 재작성: `nav-category` (상위 6) 만 사이드바에 표시, 각 `nav-category` 자식으로 `nav-flyout` (서브 탭 목록) 포함.
+- 호버/포커스/클릭 모두로 flyout 열기 — `hover: `, `:focus-within`, `.open` 트리거.
+- 현재 탭이 속한 카테고리에 `.has-active` + 주황 dot · drop-shadow 강조.
+- 탭 클릭 시 `go(id)` + flyout 자동 닫기.
+- ESC 로 모든 flyout 닫기. 사이드바 바깥 클릭으로도 닫힘.
+- 모바일(max-width: 900px) 에선 flyout 이 아코디언 (position static, hover 비활성, click 만).
+
+**CSS**
+- `.nav-category`, `.nav-cat-icon/meta/label/dot/desc/count/chevron`, `.nav-flyout`, `@keyframes navFlyoutIn` 신규.
+- `#nav` 의 `overflow-y-auto` → `overflow: visible` (flyout 이 오른쪽으로 튀어나올 수 있게).
+- 6 카테고리뿐이라 스크롤 불필요 (viewport 900 에서 footer 까지 여유).
+
+**서버 `nav_catalog.py`**
+- `TAB_GROUPS` 재정의 (6 상위).
+- `_new_group()` remap: 기존 `TAB_CATALOG` 엔트리의 legacy group 을 runtime 에 신규 group 으로 변환 — 챗봇 프롬프트(`render_tab_catalog_prompt`) 도 새 카테고리 기준.
+- `plans` 만 main 으로 수동 예외.
+
+**검증**
+- 54/54 탭 smoke 통과
+- Playwright 시각 체크: 6 카테고리 사이드바 + Playground hover 시 12 항목 flyout 펼쳐짐, 워크플로우 콘텐츠 정상 공존.
+- 챗봇 프롬프트 확인: Learn/Main/Build/Playground/Config/Observe 로 정렬됨.
+
+---
 ## [2.25.1] — 2026-04-23
 
 ### ⚡ 자율모드 빠른 개선 3건 (C1~C3)
