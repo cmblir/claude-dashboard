@@ -1096,6 +1096,12 @@ NEW_EN = {
     "sec_no_issues": "No issues detected — clean!",
     "sec_hint": "Targets: settings.json · CLAUDE.md · settings.hooks · ~/.claude/agents · mcp.json. Inspired by ECC AgentShield. Rotate any detected secrets and move them to env vars.",
     "다시 검사": "Re-scan",
+
+    # v2.32.0 — LazyClaude 자체 MCP 서버
+    "mcp_self_heading": "LazyClaude as MCP server (v2.32.0)",
+    "mcp_self_desc": "Register LazyClaude as a stdio MCP server so you can call dashboard features from inside a Claude Code session. Exposes 6 tools: tab catalog · cost summary · security scan · learner patterns · RTK status · workflow templates.",
+    "mcp_self_cmd": "Install command (Terminal):",
+    "mcp_self_tools_heading": "6 tools exposed",
 }
 
 NEW_ZH = {
@@ -2187,4 +2193,10 @@ NEW_ZH = {
     "sec_no_issues": "未检测到问题 — 干净！",
     "sec_hint": "目标：settings.json · CLAUDE.md · settings.hooks · ~/.claude/agents · mcp.json。受 ECC AgentShield 启发。检测到的密钥请立即轮换并迁移到环境变量。",
     "다시 검사": "重新扫描",
+
+    # v2.32.0 — LazyClaude 自身 MCP 服务器
+    "mcp_self_heading": "将 LazyClaude 注册为 MCP 服务器（v2.32.0）",
+    "mcp_self_desc": "将 LazyClaude 注册为 stdio MCP 服务器，以便在 Claude Code 会话中调用仪表板功能。暴露 6 个工具：标签目录、费用摘要、安全扫描、学习器模式、RTK 状态、工作流模板。",
+    "mcp_self_cmd": "安装命令 (Terminal)：",
+    "mcp_self_tools_heading": "暴露的 6 个工具",
 }
