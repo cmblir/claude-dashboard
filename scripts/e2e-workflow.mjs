@@ -24,8 +24,10 @@ page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.t
 page.on('pageerror', err => consoleErrors.push('[pageerror] ' + err.message));
 
 await page.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 });
-await page.evaluate(() => { window.state && (window.state.view = 'workflows'); window.renderView && window.renderView(); });
-await page.waitForSelector('#wfRoot', { timeout: 10000 });
+await page.waitForTimeout(500); // 초기화 안정화
+// hashchange 로 탭 전환 (go() 와 동일 경로)
+await page.evaluate(() => { location.hash = '#/workflows'; });
+await page.waitForSelector('#wfRoot', { timeout: 15000 });
 console.log('  ✓ 워크플로우 탭 로드됨');
 
 // 빌트인 템플릿 가져오기

@@ -1,7 +1,6 @@
 {
   "name": "claude-dashboard",
   "private": true,
-  "type": "module",
   "scripts": {
     "test:e2e:smoke": "node scripts/e2e-tabs-smoke.mjs",
     "test:e2e:workflow": "node scripts/e2e-workflow.mjs",

@@ -45,15 +45,33 @@ page.on('console', msg => {
 page.on('pageerror', err => consoleErrors.push('[pageerror] ' + err.message));
 
 await page.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 });
-await page.waitForSelector('nav[data-nav]', { timeout: 10000 }).catch(() => {});
+// nav 렌더 대기 (요소 id)
+await page.waitForSelector('#nav', { timeout: 10000 }).catch(() => {});
+// 앱 초기화 안정화 대기
+await page.waitForTimeout(500);
 
 for (const id of tabIds) {
   const errsBefore = consoleErrors.length;
   try {
-    await page.evaluate((tid) => { window.state && (window.state.view = tid); window.renderView && window.renderView(); }, id);
-    await page.waitForTimeout(350);
-    const bodyText = await page.evaluate(() => document.querySelector('main')?.innerText || '');
-    const renderFailed = bodyText.includes('뷰 렌더 실패') || bodyText.includes('View render failed');
+    // hashchange 이벤트로 네비게이션 — go() 와 동일 경로 (state.view + renderNav + renderView)
+    await page.evaluate((tid) => { location.hash = '#/' + tid; }, id);
+    await page.waitForTimeout(450);
+    // 실제 뷰 전환 확인
+    const confirmed = await page.evaluate((tid) =>
+      typeof state !== 'undefined' && state.view === tid
+    , id);
+    if (!confirmed) {
+      failures.push({ id, reason: 'view-not-switched', detail: 'state.view mismatch' });
+      console.log(`  ⚠️  ${id} — view did not switch`);
+      continue;
+    }
+    // 뷰 렌더 실패는 renderView() catch 블록이 생성하는 `<div class="card p-8 empty">` 로만 판정.
+    // 일반 본문 텍스트에 "뷰 렌더 실패" 라는 문자열이 포함돼 있어도 실제 에러가 아니면 무시 (ex. memory 탭의 메모리 노트 본문).
+    const renderFailed = await page.evaluate(() => {
+      const v = document.querySelector('#view');
+      if (!v) return false;
+      return !!v.querySelector('.card.p-8.empty');
+    });
     const newErrs = consoleErrors.slice(errsBefore);
     if (renderFailed) {
       failures.push({ id, reason: 'view-render-failed', detail: bodyText.split('\n').find(l => l.includes('실패') || l.includes('failed')) || '' });

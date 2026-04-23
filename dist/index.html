@@ -12641,10 +12641,11 @@ async function deleteTask(sessionId, id) {
 // TEAM / ORGANIZATION
 // ────────────────────────────────────────────────────────────────
 VIEWS.team = async () => {
-  const [t, auth] = await Promise.all([api('/api/team/info'), api('/api/auth/status')]);
+  // 주의: 전역 `t` (i18n) 를 섀도잉하지 않기 위해 로컬 변수는 `team` 사용.
+  const [team, auth] = await Promise.all([api('/api/team/info'), api('/api/auth/status')]);
   const row = (k, v) => `<tr><td class="text-[var(--text-mute)] text-xs w-[180px]">${k}</td><td class="mono text-xs break-all">${escapeHtml(String(v ?? '—'))}</td></tr>`;
 
-  if (!t.connected) {
+  if (!team.connected) {
     return `
       ${viewHeader('팀 / 조직', 'Claude Team / Enterprise 플랜의 워크스페이스 정보.', 'team')}
       <div class="card" style="max-width:500px;margin:2rem auto;padding:0;overflow:hidden;">
@@ -12682,20 +12683,20 @@ VIEWS.team = async () => {
     `;
   }
 
-  const hasOrg = t.organizationUuid || t.organizationName;
-  const planLabel = auth.planLabel || t.claimedPlan || '미지정';
+  const hasOrg = team.organizationUuid || team.organizationName;
+  const planLabel = auth.planLabel || team.claimedPlan || '미지정';
   return `
     ${viewHeader('팀 / 조직', 'Claude Team / Enterprise 플랜의 워크스페이스 정보.', 'team')}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="card p-5">
         <h3 class="font-semibold text-sm mb-3">👤 ${t('내 계정')}</h3>
         <table class="data"><tbody>
-          ${row('이름', t.displayName)}
-          ${row('이메일', t.email)}
-          ${row('계정 UUID', t.accountUuid)}
-          ${row('플랜', planLabel)}
-          ${row('billingType', t.billingType || '—')}
-          ${row('추가 사용 허용', t.hasExtraUsageEnabled ? '✅ ON' : 'OFF')}
+          ${row(t('이름'), team.displayName)}
+          ${row(t('이메일'), team.email)}
+          ${row(t('계정 UUID'), team.accountUuid)}
+          ${row(t('플랜'), planLabel)}
+          ${row('billingType', team.billingType || '—')}
+          ${row(t('추가 사용 허용'), team.hasExtraUsageEnabled ? '✅ ON' : 'OFF')}
         </tbody></table>
         <div class="flex gap-2 mt-3">
           <button class="btn text-xs" onclick="openCliStatusModal()">⚙️ ${t('플랜 설정')}</button>
@@ -12711,10 +12712,10 @@ VIEWS.team = async () => {
         <h3 class="font-semibold text-sm mb-3">🏢 ${t('조직')}</h3>
         ${hasOrg ? `
           <table class="data"><tbody>
-            ${row('조직 이름', t.organizationName || '(미지정)')}
-            ${row('조직 UUID', t.organizationUuid)}
-            ${row('조직 역할', t.organizationRole || '—')}
-            ${row('워크스페이스 역할', t.workspaceRole || '—')}
+            ${row(t('조직 이름'), team.organizationName || '(미지정)')}
+            ${row(t('조직 UUID'), team.organizationUuid)}
+            ${row(t('조직 역할'), team.organizationRole || '—')}
+            ${row(t('워크스페이스 역할'), team.workspaceRole || '—')}
           </tbody></table>
         ` : `
           <div class="text-sm text-[var(--text-mute)] text-center py-6">
@@ -12726,8 +12727,8 @@ VIEWS.team = async () => {
       </div>
     </div>
     <div class="card p-4 mt-4 text-xs text-[var(--text-mute)]">
-      <b>참고:</b> ${escapeHtml(t.note||'')}<br>
-      팀 멤버 목록·사용량·결제는 <a href="https://claude.ai/settings/organization" target="_blank" style="color:var(--accent); text-decoration:underline;">claude.ai/settings/organization</a> 에서 직접 관리합니다.
+      <b>${t('참고')}:</b> ${escapeHtml(team.note||'')}<br>
+      ${t('팀 멤버 목록·사용량·결제는')} <a href="https://claude.ai/settings/organization" target="_blank" style="color:var(--accent); text-decoration:underline;">claude.ai/settings/organization</a> ${t('에서 직접 관리합니다')}.
     </div>
   `;
 };
