@@ -934,6 +934,9 @@ const NAV = [
   { id: 'agentSdkScaffold', icon: '🧪', label: 'Agent SDK 스캐폴드', group: 'work',
     desc: 'claude-agent-sdk Python/TS 프로젝트 뼈대 생성',
     docUrl: 'https://docs.anthropic.com/en/docs/claude-code/sdk/sdk-overview' },
+  { id: 'embeddingLab', icon: '🧬', label: 'Embedding 비교', group: 'work',
+    desc: 'Voyage / OpenAI / Ollama 임베딩 cosine rank 매트릭스 비교',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/embeddings' },
   { id: 'hooks',       icon: '🪝', label: '훅',
     group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
   { id: 'permissions', icon: '🔐', label: '권한',
@@ -8279,6 +8282,225 @@ function mbDownload() {
   const a = document.createElement('a');
   a.href = url; a.download = `model-bench-${Date.now()}.json`; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ────────────────────────────────────────────────────────────────
+// EMBEDDING LAB (v2.15.0) — 여러 임베딩 프로바이더 cosine rank 비교
+// ────────────────────────────────────────────────────────────────
+VIEWS.embeddingLab = async () => {
+  const [provs, exData] = await Promise.all([
+    api('/api/embedding-lab/providers'),
+    api('/api/embedding-lab/examples'),
+  ]);
+  state.data.el = state.data.el || {
+    query: '',
+    docs: [''],
+    selections: (provs.providers || []).filter(p => p.available).map(p => ({
+      providerId: p.id, model: p.defaultModel,
+    })),
+    lastResult: null,
+  };
+  const el = state.data.el;
+  const providers = provs.providers || [];
+  const examples = exData.examples || [];
+
+  const providerCards = providers.map(p => {
+    const sel = el.selections.find(s => s.providerId === p.id);
+    const checked = !!sel;
+    return `<label class="card p-2 flex items-start gap-2 cursor-pointer text-[11px]" style="${checked?'border-color:rgba(217,119,87,0.5);background:rgba(217,119,87,0.06);':''} ${p.available?'':'opacity-60'}">
+      <input type="checkbox" ${checked?'checked':''} onchange="elToggleProvider('${p.id}')" style="margin-top:2px;">
+      <div style="flex:1;">
+        <div class="font-semibold">${p.icon} ${escapeHtml(p.label)}</div>
+        <div class="text-[10px] text-[var(--text-dim)] mt-0.5">${p.available ? (sel ? escapeHtml(sel.model) : escapeHtml(p.defaultModel)) : t('키 미설정')}</div>
+        ${checked ? `
+          <select class="input mt-1" style="font-size:10px;padding:2px 4px;" onchange="elSetModel('${p.id}', this.value); event.stopPropagation()">
+            ${p.modelOptions.map(m => `<option value="${m}" ${sel.model===m?'selected':''}>${m}</option>`).join('')}
+          </select>` : ''}
+      </div>
+    </label>`;
+  }).join('');
+
+  const exBtns = examples.map(e =>
+    `<button class="chip" onclick="elLoadExample('${e.id}')">${t(e.label)}</button>`
+  ).join('');
+
+  const docInputs = el.docs.map((d, i) => `
+    <div class="flex items-center gap-1 mb-1">
+      <span class="text-[10px] text-[var(--text-dim)] font-mono w-6 text-right">${i+1}</span>
+      <input class="input flex-1 text-[12px]" value="${escapeHtml(d||'')}" oninput="elSetDoc(${i}, this.value)" placeholder="${t('문서 텍스트')}">
+      <button class="btn btn-sm" onclick="elRemoveDoc(${i})" ${el.docs.length<=1?'disabled':''}>✕</button>
+    </div>
+  `).join('');
+
+  // 결과 매트릭스
+  const last = el.lastResult;
+  let resultCards = '';
+  if (last && last.ok) {
+    const docs = last.docs || [];
+    const ranksByProvider = (last.results || []).map(r => ({
+      id: r.providerId, ok: r.ok, model: r.model, dims: r.dimensions || 0,
+      sims: r.sims || [], ranks: r.ranks || [], error: r.error, duration: r.durationMs,
+    }));
+    // 각 문서의 rank 들이 얼마나 차이 나는지 — max rank - min rank
+    const rankSpans = docs.map((_, di) => {
+      const rs = ranksByProvider.filter(r => r.ok).map(r => r.ranks[di]);
+      if (rs.length < 2) return 0;
+      return Math.max(...rs) - Math.min(...rs);
+    });
+
+    resultCards = `
+      <div class="overflow-x-auto">
+        <table class="w-full text-[11px] border-collapse">
+          <thead>
+            <tr class="border-b border-[var(--border)]">
+              <th class="text-left py-1 px-2">#</th>
+              <th class="text-left py-1 px-2">${t('문서')}</th>
+              ${ranksByProvider.map(r => `<th class="text-center py-1 px-2 font-mono">${escapeHtml(r.id)}<br><span class="text-[9px] text-[var(--text-dim)]">${r.ok ? (r.dims+'d · '+r.duration+'ms') : '❌'}</span></th>`).join('')}
+              <th class="text-center py-1 px-2">${t('rank 차이')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${docs.map((d, di) => `
+              <tr class="border-b border-[var(--border)] ${rankSpans[di]>=2?'bg-[var(--bg-hover)]':''}">
+                <td class="py-1 px-2 font-mono text-[var(--text-dim)]">${di+1}</td>
+                <td class="py-1 px-2" style="max-width:320px;">${escapeHtml(d).slice(0,120)}${d.length>120?'…':''}</td>
+                ${ranksByProvider.map(r => r.ok ? `
+                  <td class="py-1 px-2 text-center font-mono ${r.ranks[di]===1?'text-[var(--ok)] font-bold':''}">
+                    <span class="text-[10px]">#${r.ranks[di]}</span>
+                    <span class="text-[9px] text-[var(--text-dim)] block">${(r.sims[di]||0).toFixed(3)}</span>
+                  </td>` : `<td class="py-1 px-2 text-center text-[var(--text-dim)]">-</td>`).join('')}
+                <td class="py-1 px-2 text-center font-mono ${rankSpans[di]>=2?'text-[var(--warn)] font-bold':'text-[var(--text-dim)]'}">±${rankSpans[di]}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="text-[10px] text-[var(--text-dim)] mt-2">${t('rank 차이 ≥ 2 인 문서는 하이라이트. 프로바이더간 의견이 크게 갈리는 항목.')}</div>
+      ${ranksByProvider.filter(r => !r.ok).map(r => `
+        <div class="text-[11px] text-[var(--danger)] mt-1">❌ ${escapeHtml(r.id)}: ${escapeHtml(r.error||'failed')}</div>
+      `).join('')}
+    `;
+  } else if (last && !last.ok) {
+    resultCards = `<div class="text-[11px] text-[var(--danger)]">${escapeHtml(last.error||'failed')}</div>`;
+  } else {
+    resultCards = `<div class="text-[11px] text-[var(--text-dim)]">${t('프로바이더 + 문서를 채우고 비교를 눌러주세요.')}</div>`;
+  }
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">🧬 ${t('Embedding 비교 실험실')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('같은 쿼리/문서를 여러 임베딩 프로바이더에 돌려 cosine similarity 와 rank 를 비교합니다. 프로바이더간 rank 차이가 큰 문서는 자동 하이라이트.')}
+      </p>
+    </div>
+
+    <div class="mb-3 flex items-center gap-2 flex-wrap">
+      <span class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('예시')}</span>
+      ${exBtns}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="space-y-3">
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('쿼리')}</label>
+          <input class="input" value="${escapeHtml(el.query||'')}" oninput="elSet('query', this.value)" placeholder="${t('쿼리 문장')}">
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('문서 리스트')} (${el.docs.length})</label>
+            <button class="btn btn-sm" onclick="elAddDoc()" ${el.docs.length>=10?'disabled':''}>+ ${t('추가')}</button>
+          </div>
+          ${docInputs}
+          <div class="text-[10px] text-[var(--text-dim)]">${t('최대 10개')}</div>
+        </div>
+        <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('프로바이더 선택')}</label>
+          <div class="space-y-2">${providerCards}</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary" onclick="elRun()">▶ ${t('비교 실행')}</button>
+          <button class="btn" onclick="elReset()">${t('초기화')}</button>
+          <span id="elStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="card p-3">
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('rank 매트릭스')}</div>
+          ${resultCards}
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+function elSet(k, v) { state.data.el = state.data.el || {}; state.data.el[k] = v; }
+function elSetDoc(i, v) {
+  state.data.el = state.data.el || { docs: [] };
+  state.data.el.docs[i] = v;
+}
+function elAddDoc() {
+  state.data.el = state.data.el || { docs: [] };
+  if (state.data.el.docs.length >= 10) return;
+  state.data.el.docs.push('');
+  renderView();
+}
+function elRemoveDoc(i) {
+  state.data.el.docs.splice(i, 1);
+  renderView();
+}
+function elToggleProvider(pid) {
+  state.data.el = state.data.el || { selections: [] };
+  const i = state.data.el.selections.findIndex(s => s.providerId === pid);
+  if (i >= 0) state.data.el.selections.splice(i, 1);
+  else {
+    // default model — fetch providers cache 는 간단히 무시, 기본은 선택 시 default 설정을 서버가 알림
+    state.data.el.selections.push({ providerId: pid, model: _elDefaultModel(pid) });
+  }
+  renderView();
+}
+function _elDefaultModel(pid) {
+  return ({ voyage: 'voyage-3-large', 'openai-api': 'text-embedding-3-large', 'ollama-api': 'bge-m3' }[pid]) || '';
+}
+function elSetModel(pid, model) {
+  const s = (state.data.el.selections || []).find(x => x.providerId === pid);
+  if (s) s.model = model;
+}
+function elReset() { state.data.el = null; renderView(); }
+async function elLoadExample(id) {
+  const r = await api('/api/embedding-lab/examples');
+  const e = (r.examples || []).find(x => x.id === id);
+  if (!e) return;
+  const provs = await api('/api/embedding-lab/providers');
+  state.data.el = {
+    query: e.query,
+    docs: e.docs.slice(),
+    selections: (provs.providers || []).filter(p => p.available).map(p => ({ providerId: p.id, model: p.defaultModel })),
+    lastResult: null,
+  };
+  renderView();
+}
+async function elRun() {
+  const el = state.data.el || {};
+  const docs = (el.docs || []).filter(d => (d||'').trim());
+  if (!(el.query||'').trim()) { toast(t('쿼리를 입력하세요'), 'err'); return; }
+  if (docs.length < 2) { toast(t('문서 2개 이상 필요'), 'err'); return; }
+  if (!(el.selections||[]).length) { toast(t('프로바이더 1개 이상 선택'), 'err'); return; }
+  const st = document.getElementById('elStatus');
+  if (st) st.textContent = t('호출 중…');
+  try {
+    const r = await fetch('/api/embedding-lab/compare', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ query: el.query, docs, selections: el.selections }),
+    }).then(x => x.json());
+    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (st) st.textContent=''; return; }
+    state.data.el.lastResult = r;
+    if (st) st.textContent = `${r.totalDurationMs||0}ms`;
+    renderView();
+  } catch (e) {
+    toast(t('네트워크 오류') + ': ' + e.message, 'err');
+    if (st) st.textContent = '';
+  }
 }
 
 // ────────────────────────────────────────────────────────────────

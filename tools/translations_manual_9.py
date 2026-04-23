@@ -596,6 +596,36 @@ NEW_EN = {
     "자동 설치하지 않습니다. 없으면 생성 단계에서 친절한 에러 메시지가 표시됩니다.":
         "Not installed automatically. A friendly error is shown if a tool is missing.",
     "이름을 입력하세요": "Enter a name",
+
+    # ── v2.15.0 embeddingLab ───────────────────────────────────
+    "Embedding 비교 실험실": "Embedding Lab",
+    "Embedding 비교": "Embedding compare",
+    "같은 쿼리/문서를 여러 임베딩 프로바이더에 돌려 cosine similarity 와 rank 를 비교합니다. 프로바이더간 rank 차이가 큰 문서는 자동 하이라이트.":
+        "Compare cosine similarity & rank across embedding providers for the same query/docs. Docs with big rank disagreement are highlighted.",
+    "Voyage / OpenAI / Ollama 임베딩 cosine rank 매트릭스 비교":
+        "Compare Voyage / OpenAI / Ollama embeddings via cosine rank matrix",
+    "쿼리": "Query",
+    "쿼리 문장": "Query sentence",
+    "문서 리스트": "Documents",
+    "문서 텍스트": "Document text",
+    "최대 10개": "Up to 10",
+    "프로바이더 선택": "Providers",
+    "키 미설정": "Key not set",
+    "비교 실행": "Run compare",
+    "rank 매트릭스": "Rank matrix",
+    "rank 차이": "rank Δ",
+    "rank 차이 ≥ 2 인 문서는 하이라이트. 프로바이더간 의견이 크게 갈리는 항목.":
+        "Docs with rank Δ ≥ 2 are highlighted — providers disagree strongly.",
+    "프로바이더 + 문서를 채우고 비교를 눌러주세요.": "Fill providers + docs then click Run compare.",
+    "FAQ 검색": "FAQ search",
+    "유사 문장 찾기": "Find similar sentences",
+    "질문 → 가장 관련 있는 FAQ 항목 랭킹.": "Question → most relevant FAQ ranking.",
+    "쿼리와 가장 유사한 문장 랭킹.": "Rank sentences by similarity to the query.",
+    "쿼리를 입력하세요": "Enter a query",
+    "문서 2개 이상 필요": "At least 2 documents required",
+    "프로바이더 1개 이상 선택": "Select at least one provider",
+    "문서": "Document",
+    "추가": "Add",
     "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
         "Provide a document and use citations.enabled to get answers with precise citation spans. Hover [N] in the answer to highlight the matching range in the source.",
     "문서 제목 (선택)": "Document title (optional)",
@@ -1345,6 +1375,36 @@ NEW_ZH = {
     "자동 설치하지 않습니다. 없으면 생성 단계에서 친절한 에러 메시지가 표시됩니다.":
         "不会自动安装。缺失时在创建阶段会显示友好错误。",
     "이름을 입력하세요": "请输入名称",
+
+    # ── v2.15.0 嵌入实验室 ────────────────────────────────────
+    "Embedding 비교 실험실": "嵌入比较实验室",
+    "Embedding 비교": "嵌入比较",
+    "같은 쿼리/문서를 여러 임베딩 프로바이더에 돌려 cosine similarity 와 rank 를 비교합니다. 프로바이더간 rank 차이가 큰 문서는 자동 하이라이트.":
+        "对同一查询/文档在多个嵌入供应商上比较余弦相似度和排名。供应商之间排名差异大的文档会高亮。",
+    "Voyage / OpenAI / Ollama 임베딩 cosine rank 매트릭스 비교":
+        "通过余弦相似度排名矩阵比较 Voyage / OpenAI / Ollama 嵌入",
+    "쿼리": "查询",
+    "쿼리 문장": "查询语句",
+    "문서 리스트": "文档列表",
+    "문서 텍스트": "文档文本",
+    "최대 10개": "最多 10 个",
+    "프로바이더 선택": "供应商选择",
+    "키 미설정": "未设置密钥",
+    "비교 실행": "运行比较",
+    "rank 매트릭스": "rank 矩阵",
+    "rank 차이": "rank 差",
+    "rank 차이 ≥ 2 인 문서는 하이라이트. 프로바이더간 의견이 크게 갈리는 항목.":
+        "rank 差 ≥ 2 的文档会高亮 — 供应商分歧较大。",
+    "프로바이더 + 문서를 채우고 비교를 눌러주세요.": "请填写供应商 + 文档后点击比较。",
+    "FAQ 검색": "FAQ 搜索",
+    "유사 문장 찾기": "查找相似句子",
+    "질문 → 가장 관련 있는 FAQ 항목 랭킹.": "问题 → 最相关的 FAQ 项排名。",
+    "쿼리와 가장 유사한 문장 랭킹.": "按与查询的相似度对句子排名。",
+    "쿼리를 입력하세요": "请输入查询",
+    "문서 2개 이상 필요": "至少需要 2 个文档",
+    "프로바이더 1개 이상 선택": "请至少选择 1 个供应商",
+    "문서": "文档",
+    "추가": "添加",
     "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
         "提供文档并启用 citations.enabled 以获得带精确引用片段的答案。将鼠标悬停在答案中的 [N] 上可高亮原文对应区间。",
     "문서 제목 (선택)": "文档标题（可选）",

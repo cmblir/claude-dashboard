@@ -10,6 +10,32 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.15.0] — 2026-04-23
+
+### 🧬 Embedding 비교 실험실 — 신규 탭 `embeddingLab`
+
+같은 쿼리/문서 집합을 **Voyage AI · OpenAI · Ollama** 세 프로바이더에 돌려 cosine similarity + rank 를 비교.
+
+**지원**
+- Voyage AI — `voyage-3-large` / `voyage-3` / `voyage-3-lite` (VOYAGE_API_KEY 필요)
+- OpenAI — `text-embedding-3-large` / `text-embedding-3-small`
+- Ollama — `bge-m3` / `nomic-embed-text` / `mxbai-embed-large` (로컬)
+
+**기능**
+- 쿼리 1 + 문서 2~10 → 각 프로바이더 병렬 호출 → cosine + rank
+- 프로바이더별 rank 나란히 + **rank Δ ≥ 2** 문서 자동 하이라이트
+- 예시 2종 (FAQ 검색 / 유사 문장)
+- 프로바이더별 모델 드롭다운 · 키 미설정 시 체크박스 비활성
+
+**Architecture**
+- `server/embedding_lab.py` 신설 — `api_embedding_{compare,providers,examples}`, `_cosine`, `_rank_desc`, `_voyage_embed` (stdlib HTTP)
+- `ai_providers.embed_with_provider` 재사용 (OpenAI/Ollama)
+- `ThreadPoolExecutor(max_workers=3)` 병렬 호출
+- `server/routes.py` 3 라우트 (GET providers/examples · POST compare)
+- `server/nav_catalog.py` `embeddingLab` 탭 + en/zh
+- `dist/index.html` NAV (icon 🧬) + `VIEWS.embeddingLab` — 체크박스 · 인라인 모델 select · rank 테이블 · Δ 하이라이트
+- `tools/translations_manual_9.py` 26 키 × ko/en/zh
+
 ## [2.14.1] — 2026-04-23
 
 ### Docs — README 3종 통계/탭 테이블 v2.14 기준 갱신

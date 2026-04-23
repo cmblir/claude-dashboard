@@ -68,6 +68,9 @@ from .citations_lab import (
     api_citations_examples, api_citations_history, api_citations_test,
 )
 from .agent_sdk_scaffold import api_scaffold_catalog, api_scaffold_create
+from .embedding_lab import (
+    api_embedding_compare, api_embedding_examples, api_embedding_providers,
+)
 from .version import api_version_info
 from .workflows import (
     api_workflow_clone, api_workflow_delete, api_workflow_export,
@@ -237,6 +240,8 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/citations-lab/examples": api_citations_examples,
     "/api/citations-lab/history": api_citations_history,
     "/api/scaffold/catalog": api_scaffold_catalog,
+    "/api/embedding-lab/providers": api_embedding_providers,
+    "/api/embedding-lab/examples": api_embedding_examples,
 }
 
 
@@ -336,6 +341,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/server-tools/run": api_server_tools_run,
     "/api/citations-lab/test": api_citations_test,
     "/api/scaffold/create": api_scaffold_create,
+    "/api/embedding-lab/compare": api_embedding_compare,
 }
 
 
