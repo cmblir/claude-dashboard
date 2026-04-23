@@ -674,6 +674,18 @@ NEW_EN = {
     "n예상 비용": "n expected cost",
     "n예상 토큰": "n expected tokens",
     "× 50% 배치 할인)": "× 50% batch discount)",
+
+    # ── v2.19.0 워크플로우 실행 이력 diff/rerun ─────────────────
+    "직전 run 과 비교": "Diff vs previous run",
+    "워크플로우 재실행": "Rerun workflow",
+    "재실행": "Rerun",
+    "재실행 시작": "Rerun started",
+    "재실행 실패": "Rerun failed",
+    "비교 실패": "Compare failed",
+    "실행 비교": "Run comparison",
+    "상태가 달라지거나 한쪽에만 있는 노드는 하이라이트.":
+        "Nodes with status change or present in only one run are highlighted.",
+
     "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
         "Provide a document and use citations.enabled to get answers with precise citation spans. Hover [N] in the answer to highlight the matching range in the source.",
     "문서 제목 (선택)": "Document title (optional)",
@@ -1495,12 +1507,24 @@ NEW_ZH = {
     "임계치 편집 버튼으로 한도를 올리거나 프롬프트 수를 줄이세요.":
         "通过编辑按钮提高限额或减少提示数量。",
     # extractor noise
-    "(입력": "(in",
-    "(정가": "(list",
-    "+ 출력": "+ out",
-    "n예상 비용": "n expected cost",
-    "n예상 토큰": "n expected tokens",
-    "× 50% 배치 할인)": "× 50% batch discount)",
+    "(입력": "(输入",
+    "(정가": "(定价",
+    "+ 출력": "+ 输出",
+    "n예상 비용": "n预计费用",
+    "n예상 토큰": "n预计 Token",
+    "× 50% 배치 할인)": "× 50% 批次折扣)",
+
+    # ── v2.19.0 工作流运行历史 diff/rerun ───────────────────────
+    "직전 run 과 비교": "与上一次 run 比较",
+    "워크플로우 재실행": "重新运行工作流",
+    "재실행": "重新运行",
+    "재실행 시작": "已启动重新运行",
+    "재실행 실패": "重新运行失败",
+    "비교 실패": "比较失败",
+    "실행 비교": "运行比较",
+    "상태가 달라지거나 한쪽에만 있는 노드는 하이라이트.":
+        "状态变化或只出现在一方的节点会高亮显示。",
+
     "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.":
         "提供文档并启用 citations.enabled 以获得带精确引用片段的答案。将鼠标悬停在答案中的 [N] 上可高亮原文对应区间。",
     "문서 제목 (선택)": "文档标题（可选）",

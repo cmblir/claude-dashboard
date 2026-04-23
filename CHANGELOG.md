@@ -10,6 +10,33 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.19.0] — 2026-04-23
+
+### 📜 워크플로우 실행 이력 diff / 재실행
+
+기존 `📜 이력` 모달을 확장. 각 run 카드에 **🔍 diff** + **🔄 재실행** 버튼.
+
+**🔍 diff**
+- 바로 직전 run 과 per-node 비교 테이블
+- 컬럼: 노드 id · A status · A duration · B status · B duration · Δ
+- 상태 변화 또는 한쪽에만 있는 노드는 하이라이트
+- 상단 요약: A/B 전체 status · duration · Δ
+
+**🔄 재실행**
+- 현재 선택된 워크플로우를 즉시 재실행 (기존 `api_workflow_run` 재사용)
+- SSE 폴링 자동 시작 → 배너 등장
+
+**Architecture**
+- `server/workflows.py` 신규 `api_workflow_run_diff(body: {a, b})` — 두 runId 의 `nodeResults` 비교 → node 별 status/duration Δ + onlyA/onlyB 플래그
+- `server/routes.py` 라우트 1 추가 (`POST /api/workflows/run-diff`)
+- `dist/index.html::_wfShowRuns` 확장: run 카드에 diff/rerun 액션
+- `_wfDiffRuns(aId, bId)` / `_wfRerunWorkflow()` 신규 함수
+- `tools/translations_manual_9.py` 10 키 × ko/en/zh
+
+**스모크**
+- `/api/workflows/run-diff` 신규 엔드포인트 정상
+- 워크플로우 탭 "📜 이력" 모달에서 각 run 카드에 diff/재실행 버튼 노출 확인
+
 ## [2.18.1] — 2026-04-23
 
 ### Docs — README 3종 통계 갱신 (세션 4 결과 반영)

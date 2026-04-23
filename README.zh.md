@@ -13,6 +13,8 @@ Claude Control Center 是一款**本地优先的仪表板**，统一管理你的
 
 **无云端上传。无遥测。无需安装任何依赖。** 只需 Python 标准库和一个 HTML 文件。
 
+🆕 **v2.19.0** — 工作流运行历史 diff/rerun：逐节点比较两次 run，一键重新运行当前工作流。
+
 🆕 **v2.3.0 ~ v2.9.0 (2026-04-23)** — `work` 组新增 Claude API 实验室 **7 个标签页**：
 - 🧊 [Prompt Cache Lab](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) (v2.3.0) — `cache_control` 实测 + USD 成本节省
 - 🧠 [Extended Thinking Lab](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking) (v2.4.0) — 思维块分离展示 + `budget_tokens` 滑块

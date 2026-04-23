@@ -13,6 +13,8 @@ Claude Control Center 는 **로컬 퍼스트 대시보드** 입니다. `~/.claud
 
 **클라우드 업로드 없음. 텔레메트리 없음. 설치할 의존성 없음.** 파이썬 표준 라이브러리와 HTML 한 파일이면 끝입니다.
 
+🆕 **v2.19.0** — 워크플로우 실행 이력 diff/rerun: 두 run 을 per-node 로 비교, 원클릭 재실행.
+
 🆕 **v2.3.0 ~ v2.9.0 (2026-04-23)** — `work` 그룹에 Claude API 플레이그라운드 **7개 탭** 신설:
 - 🧊 [Prompt Cache Lab](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) (v2.3.0) — `cache_control` 실측 + USD 절감 계산
 - 🧠 [Extended Thinking Lab](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking) (v2.4.0) — thinking block 분리 시각화 + `budget_tokens` 슬라이더

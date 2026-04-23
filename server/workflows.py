@@ -1996,6 +1996,53 @@ def api_workflow_import(body: dict) -> dict:
     return {"ok": True, "id": new_id, "name": wf_clean["name"]}
 
 
+def api_workflow_run_diff(body: dict) -> dict:
+    """POST /api/workflows/run-diff — 두 run 간 per-node 상태/지연 비교.
+
+    body: {a, b} — a (이전) / b (이후) runId.
+    반환: {ok, nodes: [{nodeId, aStatus, bStatus, aDurationMs, bDurationMs, durationDelta, statusChanged, onlyA, onlyB}]}
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "body must be object"}
+    a = body.get("a"); b = body.get("b")
+    if not (isinstance(a, str) and _RUN_ID_RE.match(a)):
+        return {"ok": False, "error": "invalid a"}
+    if not (isinstance(b, str) and _RUN_ID_RE.match(b)):
+        return {"ok": False, "error": "invalid b"}
+    store = _load_all()
+    runs = store.get("runs") or {}
+    ra = runs.get(a); rb = runs.get(b)
+    if not ra or not rb:
+        return {"ok": False, "error": "run(s) not found"}
+    nra = ra.get("nodeResults") or {}
+    nrb = rb.get("nodeResults") or {}
+    all_ids = sorted(set(list(nra.keys()) + list(nrb.keys())))
+    out = []
+    for nid in all_ids:
+        ax = nra.get(nid) or {}
+        bx = nrb.get(nid) or {}
+        ad = ax.get("durationMs") or 0
+        bd = bx.get("durationMs") or 0
+        out.append({
+            "nodeId": nid,
+            "aStatus": ax.get("status"),
+            "bStatus": bx.get("status"),
+            "aDurationMs": ad,
+            "bDurationMs": bd,
+            "durationDelta": bd - ad,
+            "statusChanged": ax.get("status") != bx.get("status"),
+            "onlyA": nid not in nrb,
+            "onlyB": nid not in nra,
+        })
+    # 요약 집계
+    summary = {
+        "a": {"status": ra.get("status"), "duration": max(0, (ra.get("finishedAt") or 0) - (ra.get("startedAt") or 0))},
+        "b": {"status": rb.get("status"), "duration": max(0, (rb.get("finishedAt") or 0) - (rb.get("startedAt") or 0))},
+    }
+    summary["durationDelta"] = summary["b"]["duration"] - summary["a"]["duration"]
+    return {"ok": True, "summary": summary, "nodes": out}
+
+
 def api_workflow_runs_list(query: dict) -> dict:
     """GET /api/workflows/runs?wfId=... — 해당 워크플로우의 runs 리스트 (최신순).
 
