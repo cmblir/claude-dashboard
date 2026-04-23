@@ -10,6 +10,32 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.10.2] — 2026-04-23
+
+### 💬 노드 hover 결과 tooltip
+
+실행 이력이 있는 노드에 마우스 hover 시 결과 미리보기 tooltip.
+
+**내용**
+- 상태 아이콘(✅/❌/⏳/⏭️) + 노드 제목 + 상태 라벨
+- 소요 시간 (running 노드는 startedAt 기반 실시간, ok/err 는 durationMs)
+- 제공자 · 모델 (있으면)
+- 입력/출력 토큰 (있으면)
+- 출력 미리보기 (앞 160자) 또는 에러 메시지 (앞 260자)
+
+**UX**
+- 280ms debounce → 손을 살짝 stop 시에만 노출, 지나갈 때는 안 뜸
+- 마우스 이동 시 위치 따라감 (화면 경계 감지)
+- 노드에서 벗어나면 즉시 숨김 (단 related target 이 다른 노드면 유지)
+- 실행 이력 없는 노드는 표시 안 함 (노이즈 최소화)
+- 상태별 left border 색 (ok 초록 / err 빨강 / running 보라 / skipped 회색)
+
+**Architecture**
+- `dist/index.html`:
+  * CSS: `#wfNodeTooltip` + 상태별 variant
+  * JS: `_wfShowNodeTooltip(nid, evt)` · `_wfHideNodeTooltip()` · delegation IIFE (mouseover/mousemove/mouseout)
+- `tools/translations_manual_9.py`: 3 키 × ko/en/zh (건너뜀 / 제공자 / 토큰)
+
 ## [2.10.1] — 2026-04-23
 
 ### 🪟 노드 편집 모달 — 카테고리 그리드 접기
