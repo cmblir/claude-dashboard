@@ -125,6 +125,12 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "예시 2종 (회사 소개문 / 기술 아티클).",
         ["citations", "인용", "citation", "document reference",
          "cited_text", "span highlight"]),
+    ("agentSdkScaffold", "work",
+        "Agent SDK 스캐폴드 — claude-agent-sdk Python(uv) / TypeScript(bun) "
+        "프로젝트 뼈대를 UI 로 생성. 템플릿 3종(basic/tool-use/memory) + "
+        "Terminal 새 창에서 초기화 명령 자동 붙여넣기.",
+        ["scaffold", "sdk", "agent sdk", "프로젝트 생성", "claude-agent-sdk",
+         "uv", "bun"]),
     ("claudeDocs",    "new",
         "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
         "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "
@@ -221,6 +227,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                    "zh": "服务端工具 — Anthropic 托管的 web_search + code_execution"},
     "citationsLab": {"en": "Citations Lab — document + citations.enabled → span-highlighted answers",
                     "zh": "引用实验室 — 文档 + citations.enabled → 片段高亮的答案"},
+    "agentSdkScaffold": {"en": "Agent SDK Scaffold — generate claude-agent-sdk Python/TS project skeletons",
+                        "zh": "Agent SDK 脚手架 — 生成 claude-agent-sdk Python/TS 项目骨架"},
     "claudeDocs": {"en": "Claude Docs Hub — curated docs.anthropic.com index with cross-links to dashboard tabs",
                   "zh": "Claude 文档中心 — docs.anthropic.com 分类索引,关联仪表板标签页"},
     "hooks": {"en": "Event hooks", "zh": "事件钩子"},

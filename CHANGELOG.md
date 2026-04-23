@@ -10,6 +10,43 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.14.0] — 2026-04-23
+
+### 🧪 Agent SDK 스캐폴드 — 신규 탭 `agentSdkScaffold`
+
+`claude-agent-sdk` 기반 Python / TypeScript 프로젝트 뼈대를 UI 에서 생성 + Terminal 새 창에 초기화 명령 자동 붙여넣기.
+
+**언어 · 도구**
+- **Python** — `uv` (대체 제안: `brew install uv`)
+- **TypeScript** — `bun` (대체 제안: `curl -fsSL https://bun.sh/install | bash`)
+
+**템플릿 3종**
+- `basic` — Messages API 1회 호출 + 응답 출력
+- `tool-use` — tool 정의 + `tool_use → tool_result` 라운드 트립 (가짜 weather)
+- `memory` — 대화 히스토리 JSON 저장
+
+**생성 결과**
+- `<path>/<name>/main.py` (py) 또는 `index.ts` (ts)
+- `pyproject.toml` / `package.json` — uv sync / bun install 시 실제 의존성 설치
+- `README.md` · `.gitignore`
+- AppleScript 로 Terminal 새 창 열림 + `cd <path>/<name> && uv sync` (또는 `bun install`) 명령 **붙여넣기** (Enter 는 사용자가 누름)
+
+**안전 장치**
+- `name` 은 `[a-zA-Z][a-zA-Z0-9_-]{1,63}` 만 (path traversal 방지)
+- `path` 는 `$HOME` 내부만
+- `<path>/<name>` 이 이미 있으면 거부
+- `uv`/`bun` 없으면 친절한 설치 힌트 포함 에러 (자동 설치 금지)
+
+**Architecture**
+- `server/agent_sdk_scaffold.py` 신설 — `api_scaffold_{catalog,create}` + 템플릿 본문 inline (python / ts × 3종)
+- `server/routes.py` 2 라우트 (GET catalog · POST create)
+- `server/nav_catalog.py` `agentSdkScaffold` 탭 (work 그룹) + en/zh
+- `dist/index.html` NAV (icon 🧪) + `VIEWS.agentSdkScaffold` + `scCreate/scSet/scReset/openFolderFromPath`
+- `tools/translations_manual_9.py` 25 키 × ko/en/zh
+
+**한계**
+- macOS 전용 (AppleScript Terminal). Linux/Windows 는 생성만 되고 Terminal 스폰은 실패 — 결과 카드에 `next command` 를 복사할 수 있도록 노출.
+
 ## [2.13.0] — 2026-04-23
 
 ### 📑 Citations 플레이그라운드 — 신규 탭 `citationsLab`
