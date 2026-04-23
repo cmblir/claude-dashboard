@@ -5365,18 +5365,24 @@ async function _wfShowRuns() {
     const h = Math.floor(m / 60);
     return h + 'h ' + (m%60) + 'm';
   }
-  const rows = runs.length ? runs.map(x => {
+  // v2.19.0 — 각 run 에 재실행 + 직전 run 과 diff 버튼 추가
+  const rows = runs.length ? runs.map((x, idx) => {
     const provTags = _runProviderSummary(x.nodeResults);
+    const prev = runs[idx + 1]; // 같은 workflow 의 바로 이전 run (리스트가 내림차순)
     return `
-    <div class="wf-list-item" onclick="_wfOpenRun('${x.id}')">
+    <div class="wf-list-item">
       <div class="flex items-center justify-between gap-2">
-        <div class="min-w-0 flex-1">
+        <div class="min-w-0 flex-1 cursor-pointer" onclick="_wfOpenRun('${x.id}')">
           <div class="text-sm">${statusIcon[x.status]||'•'} <span class="text-[10px] text-[var(--text-dim)]">${x.id}</span></div>
           <div class="text-[11px] text-[var(--text-dim)] mt-1">
             ${fmtRel(x.startedAt)} · ${x.nodeCount} ${t('노드')} · ${_fmtDurReadable(x.durationMs)}
           </div>
           ${provTags ? `<div class="flex flex-wrap gap-1 mt-1">${provTags}</div>` : ''}
           ${x.error ? `<div class="text-[11px] text-red-400 mt-1">⚠ ${escapeHtml(x.error)}</div>` : ''}
+        </div>
+        <div class="flex flex-col gap-1 flex-shrink-0" onclick="event.stopPropagation()">
+          ${prev ? `<button class="btn btn-sm" onclick="_wfDiffRuns('${prev.id}','${x.id}')" title="${t('직전 run 과 비교')}">🔍 ${t('diff')}</button>` : ''}
+          <button class="btn btn-sm" onclick="_wfRerunWorkflow()" title="${t('워크플로우 재실행')}">🔄 ${t('재실행')}</button>
         </div>
       </div>
     </div>`;
@@ -5397,6 +5403,88 @@ async function _wfOpenRun(runId) {
   const s = await api('/api/workflows/run-status?runId=' + encodeURIComponent(runId));
   if (!s.ok) { toast(errMsg(s), 'err'); return; }
   _wfShowRunResult(s.run || {});
+}
+
+// v2.19.0 — 두 run 비교
+async function _wfDiffRuns(aId, bId) {
+  const r = await fetch('/api/workflows/run-diff', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ a: aId, b: bId }),
+  }).then(x => x.json());
+  if (!r.ok) { toast(r.error || t('비교 실패'), 'err'); return; }
+  const iconFor = (s) => ({ok:'✅', err:'❌', running:'⏳', skipped:'⏭️'})[s] || '—';
+  const fmtDur = (ms) => ms < 1000 ? ms + 'ms' : (ms/1000).toFixed(1) + 's';
+  const fmtDelta = (d) => {
+    if (!d) return '<span class="text-[var(--text-dim)]">=</span>';
+    const sign = d > 0 ? '+' : '';
+    const color = d > 0 ? 'var(--warn)' : 'var(--ok)';
+    return `<span style="color:${color}">${sign}${fmtDur(Math.abs(d))}</span>`;
+  };
+  const rows = (r.nodes || []).map(n => {
+    const changed = n.statusChanged || n.onlyA || n.onlyB;
+    return `
+      <tr class="${changed?'bg-[var(--bg-hover)]':''}">
+        <td class="py-1 px-2 font-mono text-[10px]">${escapeHtml(n.nodeId)}</td>
+        <td class="py-1 px-2 text-center">${iconFor(n.aStatus)}</td>
+        <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtDur(n.aDurationMs||0)}</td>
+        <td class="py-1 px-2 text-center">${iconFor(n.bStatus)}</td>
+        <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtDur(n.bDurationMs||0)}</td>
+        <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtDelta(n.durationDelta)}</td>
+      </tr>
+    `;
+  }).join('');
+  const s = r.summary;
+  const summaryHtml = `
+    <div class="flex items-center gap-4 text-[11px] mb-3 pb-2 border-b border-[var(--border)]">
+      <div>A: ${iconFor(s.a.status)} <span class="font-mono">${fmtDur(s.a.duration)}</span></div>
+      <div>B: ${iconFor(s.b.status)} <span class="font-mono">${fmtDur(s.b.duration)}</span></div>
+      <div>Δ: ${fmtDelta(s.durationDelta)}</div>
+    </div>
+  `;
+  showModal(`
+    <div class="p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold">🔍 ${t('실행 비교')}</h3>
+        <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+      </div>
+      <div class="text-[11px] text-[var(--text-dim)] mb-2 font-mono">A: ${escapeHtml(aId)} → B: ${escapeHtml(bId)}</div>
+      ${summaryHtml}
+      <div class="max-h-[55vh] overflow-auto">
+        <table class="w-full text-[11px] border-collapse">
+          <thead class="sticky top-0" style="background:var(--card);">
+            <tr class="border-b border-[var(--border)]">
+              <th class="text-left py-1 px-2">${t('노드')}</th>
+              <th class="text-center py-1 px-2">A</th>
+              <th class="text-right py-1 px-2">A ${t('지연')}</th>
+              <th class="text-center py-1 px-2">B</th>
+              <th class="text-right py-1 px-2">B ${t('지연')}</th>
+              <th class="text-right py-1 px-2">Δ</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="text-[10px] text-[var(--text-dim)] mt-2">${t('상태가 달라지거나 한쪽에만 있는 노드는 하이라이트.')}</div>
+    </div>
+  `, { narrow: false });
+}
+
+// 현재 선택된 워크플로우 재실행
+async function _wfRerunWorkflow() {
+  if (!__wf.current) return;
+  const wfId = __wf.current.id;
+  closeModal();
+  const r = await fetch('/api/workflows/run', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id: wfId }),
+  }).then(x => x.json());
+  if (r.ok) {
+    __wf.runId = r.runId;
+    toast(t('재실행 시작'), 'ok');
+    _wfStartPolling();
+  } else {
+    toast(r.error || t('재실행 실패'), 'err');
+  }
 }
 
 // ────────────────────────────────────────────────────────────────
