@@ -433,6 +433,28 @@ tailwind.config = {
   #wfRunBanner .wfrb-focus:hover { background: rgba(167,139,250,0.35); }
   #wfRunBanner .wfrb-close { margin-left: auto; padding: 2px 6px; border-radius: 4px; cursor: pointer; color: var(--text-dim); font-size: 14px; line-height: 1; background: transparent; border: none; }
   #wfRunBanner .wfrb-close:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+  /* v2.10.2 — 노드 hover 결과 tooltip */
+  #wfNodeTooltip {
+    position: fixed; z-index: 9000;
+    max-width: 360px; min-width: 220px;
+    background: var(--card); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 11px; line-height: 1.5;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    pointer-events: none;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  #wfNodeTooltip.visible { opacity: 1; }
+  #wfNodeTooltip.state-ok    { border-left: 3px solid #4ade80; }
+  #wfNodeTooltip.state-err   { border-left: 3px solid #f87171; }
+  #wfNodeTooltip.state-running { border-left: 3px solid #a78bfa; }
+  #wfNodeTooltip.state-skipped { border-left: 3px solid rgba(255,255,255,0.3); }
+  #wfNodeTooltip .wfnt-head { display: flex; align-items: center; gap: 6px; font-weight: 600; margin-bottom: 4px; }
+  #wfNodeTooltip .wfnt-meta { color: var(--text-dim); font-family: ui-monospace, Menlo, monospace; font-size: 10px; }
+  #wfNodeTooltip .wfnt-row  { display: flex; justify-content: space-between; gap: 8px; }
+  #wfNodeTooltip .wfnt-out  { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); white-space: pre-wrap; color: var(--text-mute); max-height: 120px; overflow: auto; font-family: ui-monospace, Menlo, monospace; font-size: 10px; }
+  #wfNodeTooltip .wfnt-err  { color: #fca5a5; }
   .wf-node-title { fill: var(--text); font-size: 13px; font-weight: 600; pointer-events: none; }
   .wf-node-sub { fill: var(--text-dim); font-size: 10px; pointer-events: none; }
   .wf-node-icon { font-size: 18px; pointer-events: none; }
@@ -3991,6 +4013,100 @@ function _wfHideRunBanner() {
   const el = document.getElementById('wfRunBanner');
   if (el) el.classList.remove('visible');
 }
+
+// v2.10.2 — 노드 hover 결과 tooltip
+let _wfTooltipTimer = null;
+function _wfShowNodeTooltip(nid, evt) {
+  const results = __wf.lastRunResults || {};
+  const r = results[nid];
+  if (!r) return; // 실행 이력 없으면 표시 안 함
+  let el = document.getElementById('wfNodeTooltip');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'wfNodeTooltip';
+    document.body.appendChild(el);
+  }
+  const status = r.status || 'idle';
+  const icons = { ok: '✅', err: '❌', running: '⏳', skipped: '⏭️', idle: '•' };
+  const labels = { ok: t('완료'), err: t('실패'), running: t('실행 중'), skipped: t('건너뜀'), idle: t('대기 중') };
+  const wfNodes = (__wf.current && __wf.current.nodes) || [];
+  const node = wfNodes.find(n => n.id === nid);
+  const title = (node && ((node.data && node.data.subject) || node.title)) || nid;
+  const duration = r.durationMs != null
+    ? (status === 'running' && r.startedAt ? Math.max(0, Date.now() - r.startedAt) : r.durationMs)
+    : 0;
+  const dText = (duration / 1000).toFixed(1) + 's';
+  const usage = r.usage || {};
+  const tokens = (usage.input_tokens || r.inputTokens || 0) + ' / ' + (usage.output_tokens || r.outputTokens || 0);
+  const output = (r.output || '').slice(0, 160);
+  const more = (r.output || '').length > 160 ? '…' : '';
+
+  el.className = 'visible state-' + status;
+  el.innerHTML = `
+    <div class="wfnt-head">
+      <span>${icons[status] || '•'}</span>
+      <span>${escapeHtml(title)}</span>
+      <span class="wfnt-meta" style="margin-left:auto;">${labels[status] || status}</span>
+    </div>
+    <div class="wfnt-row wfnt-meta">
+      <span>⏱ ${t('소요 시간')}</span><span>${dText}</span>
+    </div>
+    ${r.provider ? `<div class="wfnt-row wfnt-meta"><span>${t('제공자')}</span><span>${escapeHtml(r.provider)}${r.model ? ' · ' + escapeHtml(r.model) : ''}</span></div>` : ''}
+    ${(usage.input_tokens || r.inputTokens || usage.output_tokens || r.outputTokens)
+      ? `<div class="wfnt-row wfnt-meta"><span>${t('토큰')}</span><span>${tokens}</span></div>` : ''}
+    ${status === 'err' && r.error
+      ? `<div class="wfnt-out wfnt-err">${escapeHtml(String(r.error).slice(0, 260))}</div>`
+      : (output ? `<div class="wfnt-out">${escapeHtml(output)}${more}</div>` : '')}
+  `;
+
+  // 위치: 마우스 근처 (화면 경계 고려)
+  const w = el.offsetWidth || 260;
+  const h = el.offsetHeight || 120;
+  let x = (evt.clientX || 0) + 14;
+  let y = (evt.clientY || 0) + 14;
+  if (x + w > window.innerWidth - 8) x = (evt.clientX || 0) - w - 14;
+  if (y + h > window.innerHeight - 8) y = (evt.clientY || 0) - h - 14;
+  el.style.left = Math.max(8, x) + 'px';
+  el.style.top = Math.max(8, y) + 'px';
+}
+function _wfHideNodeTooltip() {
+  const el = document.getElementById('wfNodeTooltip');
+  if (el) el.classList.remove('visible');
+}
+// delegation (canvas 가 한번만 붙이도록 IIFE)
+(function _wfNodeTooltipBindOnce() {
+  document.addEventListener('mouseover', (e) => {
+    const nodeEl = e.target.closest && e.target.closest('.wf-node');
+    if (!nodeEl) return;
+    if (!document.getElementById('wfRoot')) return;
+    const nid = nodeEl.getAttribute('data-node');
+    if (!nid) return;
+    if (_wfTooltipTimer) clearTimeout(_wfTooltipTimer);
+    _wfTooltipTimer = setTimeout(() => _wfShowNodeTooltip(nid, e), 280);
+  }, true);
+  document.addEventListener('mousemove', (e) => {
+    const el = document.getElementById('wfNodeTooltip');
+    if (!el || !el.classList.contains('visible')) return;
+    const nodeEl = e.target.closest && e.target.closest('.wf-node');
+    if (!nodeEl) return;
+    // 위치만 업데이트 (모양 유지)
+    const w = el.offsetWidth, h = el.offsetHeight;
+    let x = e.clientX + 14, y = e.clientY + 14;
+    if (x + w > window.innerWidth - 8) x = e.clientX - w - 14;
+    if (y + h > window.innerHeight - 8) y = e.clientY - h - 14;
+    el.style.left = Math.max(8, x) + 'px';
+    el.style.top = Math.max(8, y) + 'px';
+  }, true);
+  document.addEventListener('mouseout', (e) => {
+    const nodeEl = e.target.closest && e.target.closest('.wf-node');
+    if (!nodeEl) return;
+    if (_wfTooltipTimer) { clearTimeout(_wfTooltipTimer); _wfTooltipTimer = null; }
+    // related target 도 wf-node 내부면 유지
+    const rel = e.relatedTarget;
+    if (rel && rel.closest && rel.closest('.wf-node')) return;
+    _wfHideNodeTooltip();
+  }, true);
+})();
 
 // running 노드를 뷰포트 중앙으로 pan (zoom 유지)
 function _wfFocusNode(nid) {
