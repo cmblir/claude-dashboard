@@ -1089,6 +1089,13 @@ NEW_EN = {
     "learner_no_patterns": "Not enough repeated patterns yet.",
     "learner_prefilled": "Editor prefilled — review and save.",
     "learner_hint": "Analysis is fully local. No Claude API calls. Clicking a card opens the target tab so you can manually save.",
+
+    # v2.31.0 — Security Scan (ECC AgentShield 스타일)
+    "sec_subtitle": "Static scan of ~/.claude (settings · CLAUDE.md · hooks · agents · MCP) — secrets / risky hooks / over-privileged rules / untrusted MCP. No AI calls, 100% local.",
+    "sec_issues_heading": "Detected issues",
+    "sec_no_issues": "No issues detected — clean!",
+    "sec_hint": "Targets: settings.json · CLAUDE.md · settings.hooks · ~/.claude/agents · mcp.json. Inspired by ECC AgentShield. Rotate any detected secrets and move them to env vars.",
+    "다시 검사": "Re-scan",
 }
 
 NEW_ZH = {
@@ -2173,4 +2180,11 @@ NEW_ZH = {
     "learner_no_patterns": "尚未积累足够的重复模式。",
     "learner_prefilled": "编辑器已预填 — 请检查并保存。",
     "learner_hint": "分析完全在本地进行。无 Claude API 调用。点击卡片会打开目标标签页以便手动保存。",
+
+    # v2.31.0 — Security Scan
+    "sec_subtitle": "对 ~/.claude 全量进行静态扫描（settings · CLAUDE.md · hooks · agents · MCP）— 检测密钥泄露 / 风险钩子 / 过度权限 / 不受信 MCP。无 AI 调用，100% 本地。",
+    "sec_issues_heading": "检测到的问题",
+    "sec_no_issues": "未检测到问题 — 干净！",
+    "sec_hint": "目标：settings.json · CLAUDE.md · settings.hooks · ~/.claude/agents · mcp.json。受 ECC AgentShield 启发。检测到的密钥请立即轮换并迁移到环境变量。",
+    "다시 검사": "重新扫描",
 }

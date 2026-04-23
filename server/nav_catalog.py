@@ -171,6 +171,12 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "자동 추출 → Prompt Library / 워크플로우 템플릿 제안.",
         ["learner", "러너", "패턴", "pattern", "반복", "제안", "suggest",
          "tool sequence", "repeated prompt"]),
+    ("securityScan", "system",
+        "Security Scan — ~/.claude 전체(settings/CLAUDE.md/hooks/agents/mcp)를 "
+        "정적 검사해 시크릿 노출·위험 훅·과도한 권한·신뢰 불가 MCP 감지. "
+        "AI 호출 없음, 로컬 휴리스틱.",
+        ["security scan", "보안 스캔", "scan", "audit", "감사", "agentshield",
+         "secret detection", "permissions"]),
     ("claudeDocs",    "new",
         "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
         "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "
@@ -285,6 +291,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                        "zh": "事件转发器 — 将 Claude Code hook 事件（如 PostToolUse）转发到外部 HTTP 端点，采用主机白名单"},
     "learner": {"en": "Learner — automatically detect repeated tool sequences and prompts from recent sessions, with suggestions to save as Prompt Library / workflow templates",
                 "zh": "学习器 — 自动从最近会话中检测重复的工具序列和提示，建议保存为提示库 / 工作流模板"},
+    "securityScan": {"en": "Security Scan — static analysis of ~/.claude (settings, CLAUDE.md, hooks, agents, MCP) for secret leaks, risky hooks, over-privileged permissions, untrusted MCP servers. Local heuristics, no AI calls.",
+                     "zh": "安全扫描 — 对 ~/.claude 全量进行静态分析（settings、CLAUDE.md、钩子、代理、MCP），检测密钥泄露、风险钩子、过度权限、不受信 MCP 服务器。本地启发式，无 AI 调用。"},
     "promptLibrary": {"en": "Prompt Library — save/search/duplicate prompts, convert to workflow",
                      "zh": "提示库 — 保存/搜索/复制提示,转换为工作流"},
     "claudeDocs": {"en": "Claude Docs Hub — curated docs.anthropic.com index with cross-links to dashboard tabs",
