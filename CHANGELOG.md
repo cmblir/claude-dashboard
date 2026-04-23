@@ -10,6 +10,32 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.10.4] — 2026-04-23
+
+### Fixed — v2.10.3 스모크 테스트 실행으로 드러난 2건
+
+**1. `VIEWS.team` — `TypeError: t is not a function`**
+team 탭 진입 시 `VIEWS.team` 이 로컬 변수 `const [t, auth] = ...` 로 전역 `t(key)` i18n 함수를 **섀도잉** → 이후 `${t('내 계정')}` 같은 모든 i18n 호출이 TypeError 로 실패.
+
+- `VIEWS.team` 의 로컬 변수 `t` → **`team`** 으로 rename
+- 본문 11개 참조 지점 (`t.displayName`, `t.organizationUuid`, `t.note` 등) 모두 갱신
+- 주석으로 "전역 `t` 섀도잉 금지" 명기
+
+이 버그는 사용자가 team 탭을 열었다면 즉시 드러났을 텐데, 수동으로 접속할 일이 적어 회귀로 남아 있었음. **E2E smoke 가 없었다면 찾기 어려웠을 회귀.**
+
+**2. `scripts/e2e-tabs-smoke.mjs` — 오탐 가능 구조**
+`document.querySelector('main')?.innerText` 에 "뷰 렌더 실패" / "View render failed" 문자열이 있는지 단순 포함 검사 → `memory` 탭에 메모리 노트 내용(ex. `feedback_escape_html_helper.md`)의 문자열이 포함되어 **정상 렌더를 실패로 오탐**.
+
+- 검사 조건을 `#view .card.p-8.empty` element 존재 여부로 **엄격화**. `renderView()` catch 블록이 렌더하는 에러 카드만 검출 → 본문 텍스트 충돌 제거.
+- 네비게이션을 `window.state.view = ...` → `location.hash = '#/<tab>'` (go() 와 동일 경로) 로 변경. 이전엔 전역 `state` 변수가 `window` 에 노출 안 돼 **실제 뷰 전환이 안 된 채 45 탭이 전부 통과** 하는 false-positive 가 있었음 → 이번 smoke 로 최초 true positive 확인.
+
+**3. `package.json` — `"type": "module"` 제거**
+v2.10.3 에서 추가했던 `"type": "module"` 이 기존 CommonJS 스크립트 `scripts/verify-translations.js` (`require` 사용) 를 깨뜨림. `.mjs` 파일은 명시 확장자로 ESM 처리되므로 `"type"` 필드 없이도 충분. 제거.
+
+**결과**
+- `HEADLESS=1 npm run test:e2e:smoke` → 45/45 탭 **실제 전수 통과**
+- `npm run verify:i18n` → 3,096 키 × 3언어 · 0 누락
+
 ## [2.10.3] — 2026-04-23
 
 ### 🎭 Playwright E2E 스모크 스크립트
