@@ -6180,7 +6180,7 @@ VIEWS.overview = async () => {
     const rawHint = (v.rawValue !== undefined && v.rawValue !== v.value)
       ? `<span class="text-[10px] text-[var(--text-dim)] ml-1" title="단순 카운트 점수">(raw ${v.rawValue})</span>` : '';
     return `
-      <div class="p-3 card hover-lift cursor-pointer" onclick="${target ? `go('${target}')` : ''}" title="${escapeHtml((v.formula||'')+'\n'+(v.suggest||''))}">
+      <div class="p-3 card hover-lift cursor-pointer flex flex-col" style="min-height:140px" onclick="${target ? `go('${target}')` : ''}" title="${escapeHtml((v.formula||'')+'\n'+(v.suggest||''))}">
         <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <span class="text-sm font-medium">${label} <span class="text-[10px] text-[var(--text-dim)]">→</span></span>
           <div class="flex items-center gap-1">
@@ -6191,9 +6191,9 @@ VIEWS.overview = async () => {
         <div class="h-2 rounded-full bg-white/5 overflow-hidden">
           <div class="bar-fill" style="width:0%; background:${color}; height:100%; transition: width 0.8s cubic-bezier(0.16,1,0.3,1) 0.3s;" data-bar="${pct}"></div>
         </div>
-        <div class="text-xs text-[var(--text-dim)] mt-2">${escapeHtml(v.note)}</div>
+        <div class="text-xs text-[var(--text-dim)] mt-2 line-clamp-2">${escapeHtml(v.note)}</div>
         ${v.formula ? `<div class="text-[10px] mono text-[var(--text-dim)] mt-1 truncate" style="color:${color}cc;">${escapeHtml(v.formula)}</div>` : ''}
-        ${v.suggest ? `<div class="text-[10px] text-[var(--text-mute)] mt-1 line-clamp-2">💡 ${escapeHtml(v.suggest)}</div>` : ''}
+        ${v.suggest ? `<div class="text-[10px] text-[var(--text-mute)] mt-auto pt-1 line-clamp-2">💡 ${escapeHtml(v.suggest)}</div>` : ''}
       </div>`;
   }).join('');
 
@@ -6249,7 +6249,7 @@ VIEWS.overview = async () => {
       </div>
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4">
       ${statCard('인덱스된 세션', stats.totalSessions)}
       ${statCard('평균 세션 스코어', stats.avgScore, scoreColor(stats.avgScore))}
       ${statCard('총 도구 호출', stats.totalTools)}
