@@ -2016,7 +2016,10 @@ async function _eccInstallPlugin(btn, action) {
   try {
     const r = await api(url, { method: 'POST', body: { scope: 'user' } });
     if (r.ok) {
-      toast(action === 'install' ? t('플러그인 설치 완료') : t('플러그인 제거 완료'), 'ok');
+      // v2.33.5 — Plugins / Marketplaces 탭 캐시 무효화 → 이동 시 즉시 최신 표시
+      _apiCacheInvalidate('/api/plugins');
+      _apiCacheInvalidate('/api/marketplaces');
+      toast(action === 'install' ? t('플러그인 설치 완료') + ' — ' + t('플러그인 탭에서 확인') : t('플러그인 제거 완료'), 'ok');
       _refreshToolkitManage();
     } else {
       toast(r.error || t('실패'), 'err');
@@ -2029,7 +2032,12 @@ async function _eccUninstall(btn) {
   btn.disabled = true;
   try {
     const r = await api('/api/toolkit/ecc/uninstall', { method: 'POST', body: {} });
-    if (r.ok) { toast(t('ECC 마켓 제거 완료') + (r.note ? ' · ' + r.note : ''), 'ok'); _refreshToolkitManage(); }
+    if (r.ok) {
+      _apiCacheInvalidate('/api/plugins');
+      _apiCacheInvalidate('/api/marketplaces');
+      toast(t('ECC 마켓 제거 완료') + (r.note ? ' · ' + r.note : ''), 'ok');
+      _refreshToolkitManage();
+    }
     else { toast(r.error || t('제거 실패'), 'err'); btn.disabled = false; }
   } catch (e) { toast(String(e), 'err'); btn.disabled = false; }
 }
