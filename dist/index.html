@@ -13399,6 +13399,19 @@ async function _ollamaPull(modelName) {
 
     toast(t('모델 다운로드를 시작합니다') + ': ' + modelName, 'ok');
 
+    // v2.33.6 — ETA + 바이트 진행률 계산
+    const fmtBytes = (b) => {
+      if (!b) return '';
+      if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+      if (b < 1024*1024*1024) return (b/(1024*1024)).toFixed(1) + ' MB';
+      return (b/(1024*1024*1024)).toFixed(2) + ' GB';
+    };
+    const fmtEta = (sec) => {
+      if (!isFinite(sec) || sec <= 0) return '';
+      if (sec < 60) return Math.round(sec) + 's';
+      if (sec < 3600) return Math.floor(sec/60) + 'm ' + Math.round(sec%60) + 's';
+      return Math.floor(sec/3600) + 'h ' + Math.floor((sec%3600)/60) + 'm';
+    };
     // 2초 간격 폴링
     if (_ollamaPullTimers[pullId]) clearInterval(_ollamaPullTimers[pullId]);
     _ollamaPullTimers[pullId] = setInterval(async () => {
@@ -13406,10 +13419,22 @@ async function _ollamaPull(modelName) {
         const s = await api('/api/ollama/pull-status?pullId=' + encodeURIComponent(pullId));
         const pct = Math.min(100, Math.max(0, s.percent || s.progress || 0));
         const status = s.status || '';
+        // ETA 추정: (경과시간 / pct) * (100 - pct)
+        let extra = '';
+        if (s.bytesDownloaded && s.bytesTotal) {
+          extra = ` · ${fmtBytes(s.bytesDownloaded)} / ${fmtBytes(s.bytesTotal)}`;
+        }
+        if (s.startedAt && pct > 2 && pct < 100) {
+          const elapsed = Date.now()/1000 - s.startedAt;
+          const eta = (elapsed / pct) * (100 - pct);
+          const etaStr = fmtEta(eta);
+          if (etaStr) extra += ' · ETA ' + etaStr;
+        }
+        const lineHint = s.lastLine ? ` — ${s.lastLine.slice(0,80)}` : '';
 
         if (barEl) barEl.style.width = pct + '%';
-        if (percentEl) percentEl.textContent = Math.round(pct) + '%';
-        if (statusEl) statusEl.textContent = status || t('다운로드 중...');
+        if (percentEl) percentEl.textContent = Math.round(pct) + '%' + extra;
+        if (statusEl) statusEl.textContent = (status === 'pulling' ? t('다운로드 중...') : status) + lineHint;
 
         if (pct >= 100 || status === 'success' || status === 'complete' || s.done) {
           clearInterval(_ollamaPullTimers[pullId]);

@@ -184,7 +184,15 @@ def api_ollama_pull(body: dict) -> dict:
 
     # 백그라운드에서 pull 시작
     pull_id = f"pull-{int(time.time()*1000)}"
-    _PULL_STATUS[pull_id] = {"name": name, "status": "pulling", "progress": 0, "error": ""}
+    now = time.time()
+    _PULL_STATUS[pull_id] = {
+        "name": name, "status": "pulling", "progress": 0, "error": "",
+        "startedAt": now, "updatedAt": now, "lastLine": "",
+    }
+
+    # v2.33.6 — "pulling abc... 42% · 200 MB/500 MB" 같은 상세 패턴도 포착
+    _BYTE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(KB|MB|GB)\s*/\s*(\d+(?:\.\d+)?)\s*(KB|MB|GB)", re.IGNORECASE)
+    _UNIT_MULT = {"kb": 1024, "mb": 1024 ** 2, "gb": 1024 ** 3}
 
     def _run():
         try:
@@ -194,16 +202,32 @@ def api_ollama_pull(body: dict) -> dict:
             )
             for line in proc.stdout:
                 line = line.strip()
-                if "pulling" in line.lower() or "%" in line:
-                    # 진행률 파싱 시도
+                if not line:
+                    continue
+                changed = False
+                if "%" in line:
                     pct_match = re.search(r"(\d+)%", line)
                     if pct_match:
                         _PULL_STATUS[pull_id]["progress"] = int(pct_match.group(1))
-                    _PULL_STATUS[pull_id]["lastLine"] = line
+                        changed = True
+                bm = _BYTE_RE.search(line)
+                if bm:
+                    try:
+                        cur = float(bm.group(1)) * _UNIT_MULT[bm.group(2).lower()]
+                        tot = float(bm.group(3)) * _UNIT_MULT[bm.group(4).lower()]
+                        _PULL_STATUS[pull_id]["bytesDownloaded"] = int(cur)
+                        _PULL_STATUS[pull_id]["bytesTotal"] = int(tot)
+                        changed = True
+                    except Exception:
+                        pass
+                if "pulling" in line.lower() or changed:
+                    _PULL_STATUS[pull_id]["lastLine"] = line[:160]
+                    _PULL_STATUS[pull_id]["updatedAt"] = time.time()
             proc.wait()
             if proc.returncode == 0:
                 _PULL_STATUS[pull_id]["status"] = "ok"
                 _PULL_STATUS[pull_id]["progress"] = 100
+                _PULL_STATUS[pull_id]["updatedAt"] = time.time()
             else:
                 _PULL_STATUS[pull_id]["status"] = "err"
                 _PULL_STATUS[pull_id]["error"] = f"exit {proc.returncode}"
