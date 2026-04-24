@@ -10297,6 +10297,7 @@ VIEWS.hooks = async () => {
       </div>
       <div class="flex gap-2">
         <button class="btn text-xs" onclick="startFeatureRecommend('hooks')">🤖 AI 추천</button>
+        <button class="btn text-xs" onclick="_openHookPresets()">📚 ${t('프리셋')}</button>
         <button class="btn-primary btn" onclick="openHookEditor()">＋ 새 훅 추가</button>
         <a class="btn text-xs" href="${DOCS_BASE}hooks" target="_blank" rel="noopener">📖</a>
       </div>
@@ -10321,6 +10322,114 @@ VIEWS.hooks = async () => {
     }).join('') : `<div class="card empty">훅이 설정되지 않았습니다. 우측 상단 <b>＋ 새 훅 추가</b> 를 눌러 추가하세요.</div>`}
   `;
 };
+
+// v2.33.7 — 훅 프리셋 카탈로그 (선택 후 기본값 채워서 editor 열기)
+const _HOOK_PRESETS = [
+  {
+    id: 'session-start-summary',
+    icon: '🧠',
+    title: 'SessionStart — 이전 세션 요약 로드',
+    desc: 'SessionStart 훅이 최근 JSONL 에서 요약을 추출해 stdout 으로 주입. Claude 가 새 세션에 자동으로 맥락을 이어받는다.',
+    event: 'SessionStart',
+    matcher: '',
+    type: 'command',
+    command: "python3 -c \"import os, json, glob; d=os.path.expanduser('~/.claude/projects'); files=sorted(glob.glob(d+'/*/sessions/*.jsonl'), key=os.path.getmtime, reverse=True)[:1]; f=files[0] if files else None; print('최근 세션:', f or '(없음)')\"",
+    timeout: 8000,
+  },
+  {
+    id: 'pre-bash-rmrf',
+    icon: '🛡️',
+    title: 'PreToolUse Bash — rm -rf / 차단',
+    desc: 'Bash 도구 실행 전 매처 검사. rm -rf / 계열 명령이면 non-zero 로 종료해 Claude 에 거부 신호.',
+    event: 'PreToolUse',
+    matcher: 'Bash',
+    type: 'command',
+    command: "jq -e 'if .tool_input.command|test(\"\\\\brm\\\\s+-[rf]+\\\\s+/\") then error(\"blocked: rm -rf /\") else empty end' <<< \"$CLAUDE_TOOL_INPUT\"",
+    timeout: 2000,
+  },
+  {
+    id: 'pre-edit-secret',
+    icon: '🔑',
+    title: 'PreToolUse Edit — 시크릿 커밋 차단',
+    desc: 'Edit/Write 도구에 sk-…, ghp_…, AKIA… 패턴이 들어가면 거부.',
+    event: 'PreToolUse',
+    matcher: 'Edit|Write',
+    type: 'command',
+    command: "jq -e 'if (.tool_input.new_string // .tool_input.content // \"\") | test(\"(sk-ant-[A-Za-z0-9_-]{20}|sk-[A-Za-z0-9]{20}|ghp_[A-Za-z0-9]{20}|AKIA[A-Z0-9]{16})\") then error(\"blocked: secret-like token\") else empty end' <<< \"$CLAUDE_TOOL_INPUT\"",
+    timeout: 2000,
+  },
+  {
+    id: 'post-bash-log',
+    icon: '📝',
+    title: 'PostToolUse Bash — 명령 로깅',
+    desc: '실행된 Bash 명령을 ~/.claude/logs/bash-audit.log 에 append.',
+    event: 'PostToolUse',
+    matcher: 'Bash',
+    type: 'command',
+    command: "jq -r '[now|strftime(\"%Y-%m-%d %H:%M:%S\"), .tool_input.command // \"\"] | @tsv' <<< \"$CLAUDE_TOOL_INPUT\" >> ~/.claude/logs/bash-audit.log 2>/dev/null; true",
+    timeout: 1500,
+  },
+  {
+    id: 'session-end-save',
+    icon: '💾',
+    title: 'SessionEnd — 대시보드 재인덱스',
+    desc: '세션 종료 후 대시보드 인덱스 API 호출.',
+    event: 'SessionEnd',
+    matcher: '',
+    type: 'command',
+    command: "curl -s -X POST http://127.0.0.1:8080/api/sessions/reindex -d '{}' -H 'Content-Type: application/json' > /dev/null 2>&1; true",
+    timeout: 5000,
+  },
+];
+
+function _openHookPresets() {
+  const cards = _HOOK_PRESETS.map(p => `
+    <div class="card p-3 hover-lift">
+      <div class="flex items-start gap-2 mb-2">
+        <span class="text-2xl">${p.icon}</span>
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-sm">${escapeHtml(t(p.title))}</div>
+          <div class="text-[11px] text-[var(--text-mute)] mt-0.5">${escapeHtml(t(p.desc))}</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-1 flex-wrap mb-2">
+        <span class="chip text-[10px]">${escapeHtml(p.event)}</span>
+        ${p.matcher ? `<span class="chip text-[10px] mono">${escapeHtml(p.matcher)}</span>` : ''}
+        <span class="chip text-[10px]">${p.timeout}ms</span>
+      </div>
+      <pre class="code-terminal mono text-[10px] whitespace-pre-wrap overflow-x-auto max-h-24 overflow-y-auto">${escapeHtml(p.command)}</pre>
+      <div class="flex justify-end mt-2">
+        <button class="btn-primary btn text-[11px]" onclick='_applyHookPreset(${JSON.stringify(p.id)})'>${t('editor 에서 열기')}</button>
+      </div>
+    </div>
+  `).join('');
+  showModal(`
+    <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+      <div>
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${t('훅 프리셋')}</div>
+        <h2 class="text-lg font-bold">📚 ${t('훅 프리셋 라이브러리')}</h2>
+      </div>
+      <button class="btn-ghost btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-3" style="max-height:72vh;overflow-y:auto;">${cards}</div>
+  `);
+}
+function _applyHookPreset(id) {
+  const p = _HOOK_PRESETS.find(x => x.id === id);
+  if (!p) return;
+  closeModal();
+  openHookEditor();  // 새 훅 추가 모드
+  // 모달 DOM 이 붙은 뒤 값 pre-fill (편집 로직 건드리지 않음)
+  setTimeout(() => {
+    const ev = document.getElementById('hookEvent'); if (ev) ev.value = p.event;
+    const mt = document.getElementById('hookMatcher'); if (mt) mt.value = p.matcher || '';
+    const tp = document.getElementById('hookType'); if (tp) tp.value = p.type || 'command';
+    const cm = document.getElementById('hookCommand'); if (cm) cm.value = p.command || '';
+    const tm = document.getElementById('hookTimeout'); if (tm) tm.value = p.timeout || 5000;
+  }, 60);
+}
+window._openHookPresets = _openHookPresets;
+window._applyHookPreset = _applyHookPreset;
 
 function openHookEditor(existing) {
   const isEdit = !!existing;
