@@ -432,15 +432,25 @@ def api_ollama_settings_save(body: dict) -> dict:
 # ───────── API 엔드포인트 핸들러 ─────────
 
 def api_providers_list() -> dict:
-    """전체 프로바이더 목록 + 상태."""
+    """전체 프로바이더 목록 + 상태.
+
+    v2.33.5 — is_available + list_models 를 ThreadPoolExecutor 로 병렬 프로빙.
+    8 빌트인 + custom 에서 CLI subprocess 체크가 누적되면 직렬은 5-6초.
+    병렬이면 가장 느린 프로브 하나의 시간 (~1초) 으로 수렴.
+    """
+    from concurrent.futures import ThreadPoolExecutor
     from .ai_providers import get_registry
     reg = get_registry()
 
-    providers = []
-    for p in reg.all_providers():
-        available = p.is_available()
-        models = p.list_models() if available else []
-        providers.append({
+    all_p = list(reg.all_providers())
+
+    def _probe(p):
+        try:
+            available = p.is_available()
+            models = p.list_models() if available else []
+        except Exception:  # noqa: BLE001
+            available, models = False, []
+        return {
             "id": p.provider_id,
             "name": p.provider_name,
             "type": p.provider_type,
@@ -450,7 +460,11 @@ def api_providers_list() -> dict:
             "capabilities": getattr(p, "capabilities", ["chat"]),
             "modelCount": len(models),
             "models": [m.to_dict() for m in models],
-        })
+        }
+
+    max_workers = min(16, max(4, len(all_p)))
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        providers = list(ex.map(_probe, all_p))
 
     cfg = _load_config()
     # API 키 마스킹

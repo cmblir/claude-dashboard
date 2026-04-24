@@ -111,11 +111,12 @@ CLI_CATALOG: dict[str, dict] = {
 
 
 def _cli_version(bin_path: str, args: list[str]) -> str:
+    """v2.33.5 — timeout 5s → 2s (병렬 프로빙에서 한 도구가 5s 걸리면 전체 느림)."""
     if not bin_path:
         return ""
     try:
         out = subprocess.check_output(
-            [bin_path, *args], text=True, timeout=5,
+            [bin_path, *args], text=True, timeout=2,
             env={**os.environ, "PATH": os.environ.get("PATH", "") + os.pathsep
                  + os.pathsep.join(_CLI_SEARCH_PATHS)},
         )
@@ -133,13 +134,19 @@ def _npm_present() -> bool:
 
 
 def api_cli_status(query: dict | None = None) -> dict:
-    """4종 CLI 의 설치 여부 · 버전 · 경로 + 설치 도구(brew/npm) 가용성."""
-    out = {}
-    for tool_id, meta in CLI_CATALOG.items():
+    """4종 CLI 의 설치 여부 · 버전 · 경로 + 설치 도구(brew/npm) 가용성.
+
+    v2.33.5 — 도구별 프로브 + brew/npm 존재 확인을 ThreadPoolExecutor 로 병렬.
+    `--version` subprocess 가 4-5 개 직렬이면 1-2초, 병렬이면 ~300ms.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _probe(item):
+        tool_id, meta = item
         bin_path = _which(meta["command"])
         installed = bool(bin_path)
         version = _cli_version(bin_path, meta["versionArgs"]) if installed else ""
-        out[tool_id] = {
+        return tool_id, {
             "id": tool_id,
             "label": meta["label"],
             "command": meta["command"],
@@ -152,10 +159,21 @@ def api_cli_status(query: dict | None = None) -> dict:
             "loginCmd": meta["loginCmd"],
             "logoutCmd": meta["logoutCmd"],
         }
+
+    max_workers = max(4, len(CLI_CATALOG) + 2)
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        # 도구별 프로브 + 설치자 prescence 체크 모두 병렬
+        tool_futs = [ex.submit(_probe, it) for it in CLI_CATALOG.items()]
+        brew_fut = ex.submit(_brew_present)
+        npm_fut = ex.submit(_npm_present)
+        out = dict(f.result() for f in tool_futs)
+        brew_ok = brew_fut.result()
+        npm_ok = npm_fut.result()
+
     return {
         "tools": out,
-        "brewAvailable": _brew_present(),
-        "npmAvailable": _npm_present(),
+        "brewAvailable": brew_ok,
+        "npmAvailable": npm_ok,
         "platform": platform.system(),
     }
 
