@@ -31,22 +31,37 @@ MCP_JSON = CLAUDE_HOME / "mcp.json"
 
 # 위험 패턴
 _SECRET_PATTERNS = [
-    (re.compile(r"sk-[A-Za-z0-9]{20,}"), "openai api key"),
-    (re.compile(r"AIza[0-9A-Za-z_\-]{35}"), "google api key"),
+    # Anthropic 먼저 매칭 — `sk-ant-` 는 `sk-` 접두사 포함이므로 순서 중요.
     (re.compile(r"sk-ant-[A-Za-z0-9_\-]{50,}"), "anthropic api key"),
+    # OpenAI — classic sk-…, project-scoped sk-proj-…, admin sk-admin-…
+    (re.compile(r"sk-(?:proj|admin)-[A-Za-z0-9_\-]{20,}"), "openai scoped api key"),
+    (re.compile(r"(?<![A-Za-z0-9])sk-[A-Za-z0-9]{20,}"), "openai api key"),
+    (re.compile(r"AIza[0-9A-Za-z_\-]{35}"), "google api key"),
     (re.compile(r"ghp_[A-Za-z0-9]{20,}"), "github personal access token"),
     (re.compile(r"github_pat_[A-Za-z0-9_]{20,}"), "github fine-grained pat"),
+    (re.compile(r"gho_[A-Za-z0-9]{30,}"), "github oauth token"),
+    (re.compile(r"ghs_[A-Za-z0-9]{30,}"), "github app server token"),
     (re.compile(r"AKIA[A-Z0-9]{16}"), "aws access key"),
+    (re.compile(r"ASIA[A-Z0-9]{16}"), "aws session token"),
     (re.compile(r"xox[baprs]-[A-Za-z0-9\-]{20,}"), "slack token"),
+    (re.compile(r"hf_[A-Za-z0-9]{30,}"), "huggingface token"),
+    (re.compile(r"glpat-[A-Za-z0-9_\-]{20,}"), "gitlab personal access token"),
     (re.compile(r"-----BEGIN [A-Z ]+PRIVATE KEY-----"), "private key"),
 ]
+# v2.33.6 — 예제 / 플레이스홀더 패턴. 매칭되면 secret 경고 억제.
+_SECRET_PLACEHOLDER_RE = re.compile(
+    r"(?:YOUR[_-]?|EXAMPLE|PLACEHOLDER|XXXXXX|1234567890|REPLACE[_-]ME|\.\.\.\.|MASKED)",
+    re.IGNORECASE,
+)
 _DANGEROUS_HOOK_PATTERNS = [
     (re.compile(r"\bsudo\b"), "sudo in hook"),
     (re.compile(r"\brm\s+-rf\s+/"), "rm -rf / in hook"),
-    (re.compile(r"\bcurl\s+[^|]*\|\s*sh\b"), "curl | sh (remote code execution)"),
-    (re.compile(r"\bwget\s+[^|]*\|\s*sh\b"), "wget | sh"),
+    (re.compile(r"\bcurl\s+[^|]*\|\s*(?:sh|bash|zsh|ksh)\b"), "curl | shell (remote code execution)"),
+    (re.compile(r"\bwget\s+[^|]*\|\s*(?:sh|bash|zsh|ksh)\b"), "wget | shell"),
     (re.compile(r"eval\s*\$\("), "eval of command substitution"),
     (re.compile(r"chmod\s+777"), "chmod 777 (world-writable)"),
+    (re.compile(r"\bnc\s+-l\b"), "netcat listener in hook"),
+    (re.compile(r"/dev/tcp/"), "bash /dev/tcp reverse shell"),
 ]
 _DANGEROUS_PERMS = {
     "Bash(sudo *)": "unrestricted sudo",
@@ -67,8 +82,25 @@ def _add(issues: list, severity: str, category: str, title: str, detail: str = "
 
 
 def _scan_secrets_in_text(text: str, where: str, issues: list):
+    # v2.33.6 — .env.example / *.sample 류는 플레이스홀더로 가정하고 스킵.
+    lower_where = where.lower()
+    if (
+        lower_where.endswith(".example")
+        or ".example." in lower_where
+        or lower_where.endswith(".sample")
+        or ".sample." in lower_where
+        or lower_where.endswith(".template")
+        or "/fixtures/" in lower_where
+        or "/tests/" in lower_where
+        or "/test/" in lower_where
+    ):
+        return
     for pat, label in _SECRET_PATTERNS:
         for m in pat.finditer(text):
+            sample = m.group(0)
+            # 플레이스홀더 (YOUR_…, EXAMPLE, MASKED, ….) 는 false positive
+            if _SECRET_PLACEHOLDER_RE.search(sample):
+                continue
             _add(issues, "critical", "secrets",
                  f"{label} detected",
                  f"Literal secret found in {where} — rotate and store via env var.",
