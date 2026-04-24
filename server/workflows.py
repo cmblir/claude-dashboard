@@ -1874,6 +1874,80 @@ def _notify_run_completion(wfId: str, runId: str, status: str, summary: str = ""
         log.warning("notify dispatch failed: %s", e)
 
 
+def api_workflow_dry_run(body: dict) -> dict:
+    """v2.33.7 — 실제 LLM/HTTP 호출 없이 DAG 검증 + 실행 순서 + 변수 해석 스텁.
+
+    반환:
+      - ok: bool
+      - error: 사이클 / 미존재 시
+      - levels: [[nodeId, ...], ...] — 같은 level 은 병렬 실행 대상
+      - plan: [{id, kind, label, assignee, willRun, notes}, ...] 토폴로지 순
+      - unresolved: [{nodeId, key}] — {{var}} 인데 어디서도 정의 안 된 항목
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    wfId = body.get("id")
+    if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
+        return {"ok": False, "error": "invalid id"}
+    with _LOCK:
+        store = _load_all()
+        wf = store["workflows"].get(wfId)
+    if not wf:
+        return {"ok": False, "error": "not found"}
+    nodes = wf.get("nodes", []) or []
+    edges = wf.get("edges", []) or []
+    cyc = _check_dag(nodes, edges)
+    if cyc:
+        return {"ok": False, "error": cyc[0]}
+    levels = _topological_levels(nodes, edges)
+    order = [nid for lv in levels for nid in lv]
+    by_id = {n["id"]: n for n in nodes}
+    # 변수 스코프 수집 (전역 + variable 노드 output)
+    defined: set = set()
+    var_pat = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*\}\}")
+    wf_vars = wf.get("variables") or {}
+    if isinstance(wf_vars, dict):
+        defined.update(wf_vars.keys())
+    # variable 노드도 해당 키를 출력에 추가한다고 가정
+    for n in nodes:
+        if n.get("kind") == "variable":
+            k = (n.get("data") or {}).get("key") or n.get("label") or ""
+            if k:
+                defined.add(k)
+    plan = []
+    unresolved = []
+    for nid in order:
+        n = by_id[nid]
+        data = n.get("data") or {}
+        text_pieces = []
+        for k in ("prompt", "input", "body", "command", "url", "code"):
+            v = data.get(k)
+            if isinstance(v, str) and v:
+                text_pieces.append(v)
+        joined = "\n".join(text_pieces)
+        for m in var_pat.finditer(joined):
+            key = m.group(1)
+            if key.split(".")[0] not in defined and key not in defined:
+                unresolved.append({"nodeId": nid, "key": key})
+        plan.append({
+            "id": nid,
+            "kind": n.get("kind"),
+            "label": n.get("label") or n.get("kind"),
+            "assignee": n.get("assignee") or data.get("provider") or "",
+            "willRun": n.get("kind") not in ("variable",),  # variable 은 노드 단위 실행 안 함
+            "notes": f"kind={n.get('kind')}",
+        })
+    return {
+        "ok": True,
+        "workflowId": wfId,
+        "levels": levels,
+        "plan": plan,
+        "unresolved": unresolved,
+        "nodeCount": len(nodes),
+        "edgeCount": len(edges),
+    }
+
+
 def api_workflow_run(body: dict) -> dict:
     """워크플로우를 백그라운드 스레드로 실행 시작. runId 를 즉시 반환."""
     if not isinstance(body, dict):

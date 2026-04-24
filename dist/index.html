@@ -2374,6 +2374,7 @@ VIEWS.workflows = async () => {
           <button class="btn text-xs" onclick="_wfShowRuns()" title="${t('실행 이력')}">📜 ${t('이력')}</button>
           <button id="wfUndoBtn" class="btn text-xs" onclick="_wfUndo()" title="${t('실행 취소')} (⌘Z)" aria-label="${t('실행 취소')}" disabled>↶ <span id="wfUndoCount">0</span></button>
           <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn" aria-label="${t('워크플로우 저장')}">💾 ${t('저장')}</button>
+          <button class="btn text-xs" onclick="_wfDryRun()" id="wfDryRunBtn" title="${t('실제 호출 없이 실행 계획만 확인')}" aria-label="${t('드라이런')}">🧪 ${t('드라이런')}</button>
           <button class="btn-primary btn text-xs" onclick="_wfRun()" id="wfRunBtn" aria-label="${t('워크플로우 실행')}">▶ ${t('실행')}</button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
           <button class="btn text-xs" onclick="_wfExport()" title="${t('JSON 파일로 내보내기')}" aria-label="${t('내보내기')}">📦 ${t('내보내기')}</button>
@@ -4571,6 +4572,56 @@ async function _wfImport(event) {
     _wfUpdateToolbar();
   } catch (e) { toast(t('JSON 파싱 실패'), 'err'); }
 }
+
+// v2.33.7 — 실제 LLM/HTTP 호출 없이 DAG 검증 + 실행 순서 + 미해결 변수만 계산
+async function _wfDryRun() {
+  if (!__wf.current) { toast(t('워크플로우를 선택하세요'), 'warn'); return; }
+  if (__wf.dirty) await _wfSave();
+  const r = await api('/api/workflows/dry-run', {
+    method: 'POST', headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({ id: __wf.current.id }),
+  });
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
+  const levels = (r.levels || []).map((lv, i) => `<div class="text-[11px]"><span class="chip text-[9px]">L${i}</span> ${lv.map(id=>`<span class="chip text-[10px] mono">${escapeHtml(id)}</span>`).join(' ')}</div>`).join('');
+  const planRows = (r.plan || []).map(p => `
+    <tr>
+      <td class="mono text-[11px]">${escapeHtml(p.id)}</td>
+      <td class="text-[11px]">${escapeHtml(p.kind)}</td>
+      <td class="text-[11px]">${escapeHtml(p.label)}</td>
+      <td class="text-[11px] mono">${escapeHtml(p.assignee||'')}</td>
+      <td class="text-[11px]">${p.willRun ? '<span class="chip chip-ok text-[9px]">run</span>' : '<span class="chip text-[9px]">skip</span>'}</td>
+    </tr>`).join('');
+  const unresolvedRows = (r.unresolved || []).map(u => `<li class="text-[11px]"><span class="chip chip-warn text-[9px]">${t('미해결')}</span> <code class="mono">${escapeHtml(u.nodeId)}</code> → <code class="mono">{{${escapeHtml(u.key)}}}</code></li>`).join('');
+  showModal(`
+    <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+      <div>
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${t('드라이런')}</div>
+        <h2 class="text-lg font-bold">🧪 ${t('워크플로우 실행 계획')}</h2>
+        <div class="text-[11px] text-[var(--text-mute)] mt-1">${r.nodeCount} ${t('노드')} · ${r.edgeCount} ${t('엣지')} · ${(r.levels||[]).length} ${t('병렬 레벨')}</div>
+      </div>
+      <button class="btn-ghost btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="p-5" style="max-height:72vh;overflow-y:auto;">
+      <div class="mb-4">
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('병렬 레벨')}</div>
+        ${levels || '<div class="text-[11px] text-[var(--text-dim)]">—</div>'}
+      </div>
+      ${unresolvedRows ? `
+        <div class="mb-4">
+          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">⚠️ ${t('미해결 변수')} (${(r.unresolved||[]).length})</div>
+          <ul class="list-disc pl-5 space-y-1">${unresolvedRows}</ul>
+        </div>` : `<div class="chip chip-ok text-[10px] mb-4">${t('변수 전부 해결됨')}</div>`}
+      <div class="mb-2">
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('실행 순서')}</div>
+        <table class="data text-xs">
+          <thead><tr><th>id</th><th>kind</th><th>label</th><th>assignee</th><th>—</th></tr></thead>
+          <tbody>${planRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `);
+}
+window._wfDryRun = _wfDryRun;
 
 async function _wfRun() {
   if (!__wf.current) return;
