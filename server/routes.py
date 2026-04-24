@@ -138,7 +138,7 @@ def _ai_providers_by_cap(query: dict) -> dict:
     return {"capability": cap, "providers": list_providers_by_capability(cap)}
 from .logger import log
 from .mcp import (
-    api_mcp_catalog, api_mcp_install, api_mcp_install_prepare,
+    api_mcp_catalog, api_mcp_health, api_mcp_install, api_mcp_install_prepare,
     api_mcp_project_remove, api_mcp_remove, list_connectors,
 )
 from .plugins import (
@@ -206,6 +206,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/project/tool-breakdown": api_project_tool_breakdown,
     "/api/project/timeline": api_project_timeline,
     "/api/mcp/catalog": lambda q: api_mcp_catalog(),
+    "/api/mcp/health": api_mcp_health,
     "/api/plugins/browse": lambda q: api_plugins_browse(),
     "/api/project-agents/roles": lambda q: api_agent_roles(),
     "/api/project-agents/list": api_project_agents_list,

@@ -628,3 +628,52 @@ def list_connectors() -> dict:
     project_list = _scan_project_mcp()
     return {"platform": platform_list, "local": local, "plugin": plugin_list,
             "desktop": desktop_list, "project": project_list}
+
+
+# v2.33.7 — MCP health probe
+#
+# Non-intrusive: stdio 서버는 command 바이너리 존재 여부만 확인 (spawn 하지 않음).
+# HTTP / SSE 서버는 짧은 GET 으로 status 확인. 결과는 { id: { status, note } }.
+def api_mcp_health(_q: dict | None = None) -> dict:
+    from concurrent.futures import ThreadPoolExecutor
+    import urllib.request
+    import urllib.error
+
+    out: dict = {}
+    conns = list_connectors()
+    items: list = []
+    for group in ("local", "desktop", "project", "plugin"):
+        for c in conns.get(group, []):
+            items.append(c)
+
+    def _probe(c):
+        cid = c.get("id") or c.get("name") or ""
+        ctype = (c.get("type") or "").lower()
+        if ctype in ("http", "sse"):
+            # URL 기반 probe
+            url = c.get("url") or c.get("endpoint") or ""
+            if not url or not url.startswith(("http://", "https://")):
+                return cid, {"status": "unknown", "note": "no url"}
+            try:
+                req = urllib.request.Request(url, method="GET")
+                with urllib.request.urlopen(req, timeout=3) as r:
+                    return cid, {"status": "ok", "note": f"HTTP {r.status}"}
+            except urllib.error.HTTPError as e:
+                # 4xx 가 와도 서버는 살아있음 (auth 등)
+                return cid, {"status": "ok" if 400 <= e.code < 500 else "offline",
+                             "note": f"HTTP {e.code}"}
+            except Exception as e:  # noqa: BLE001
+                return cid, {"status": "offline", "note": str(e)[:80]}
+        # stdio — command 바이너리 존재만 확인
+        cmd = c.get("command") or ""
+        if not cmd:
+            return cid, {"status": "unknown", "note": "no command"}
+        exists = shutil.which(cmd) or (os.path.exists(cmd) and os.access(cmd, os.X_OK))
+        if exists:
+            return cid, {"status": "ok", "note": "binary present"}
+        return cid, {"status": "offline", "note": "command not found"}
+
+    with ThreadPoolExecutor(max_workers=min(16, max(4, len(items)))) as ex:
+        for cid, res in ex.map(_probe, items):
+            out[cid] = res
+    return {"ok": True, "health": out, "ts": int(time.time() * 1000)}

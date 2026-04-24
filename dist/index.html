@@ -10890,6 +10890,22 @@ async function removeProjectMcp(cwd, name) {
   else toast(errMsg(r), 'err');
 }
 
+AFTER.mcp = () => {
+  // v2.33.7 — 커넥터 health probe (비동기)
+  api('/api/mcp/health').then(r => {
+    if (!r || !r.ok) return;
+    const h = r.health || {};
+    document.querySelectorAll('.mcp-health-chip').forEach(el => {
+      const id = el.dataset.mcpId;
+      const row = h[id];
+      if (!row) return;
+      const { status, note } = row;
+      const cls = status === 'ok' ? 'chip-ok' : status === 'offline' ? 'chip-err' : '';
+      const label = status === 'ok' ? t('probe ok') : status === 'offline' ? t('probe 실패') : t('probe 미상');
+      el.innerHTML = `<span class="chip ${cls} text-[9px]" title="${escapeHtml(note || '')}">${label}</span>`;
+    });
+  }).catch(() => {});
+};
 function renderConnectorGroup(title, list, allowRemove) {
   const statusBadge = (m) => {
     if (m.connected === true) return '<span class="chip chip-ok text-[9px]" style="white-space:nowrap;">✓ 연결됨</span>';
@@ -10910,6 +10926,7 @@ function renderConnectorGroup(title, list, allowRemove) {
               </div>
               <div class="flex items-center gap-1 flex-shrink-0">
                 ${statusBadge(m)}
+                <span class="mcp-health-chip" data-mcp-id="${escapeHtml(m.id || m.name)}"></span>
                 ${m.scope === 'project' && m.projectCwd
                   ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick="removeProjectMcp(JSON.parse(this.dataset.cwd), JSON.parse(this.dataset.name))" data-cwd="${jsonAttr(m.projectCwd)}" data-name="${jsonAttr(m.name)}">제거</button>`
                   : (allowRemove ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick="removeMcp(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr(m.name)}">제거</button>` : '')}
