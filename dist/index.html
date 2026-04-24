@@ -2372,6 +2372,7 @@ VIEWS.workflows = async () => {
           <button class="btn-primary btn text-xs" onclick="_wfOpenNodeEditor(null)" title="${t('새 노드 추가')}">＋ ${t('노드 추가')}</button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
           <button class="btn text-xs" onclick="_wfShowRuns()" title="${t('실행 이력')}">📜 ${t('이력')}</button>
+          <button id="wfUndoBtn" class="btn text-xs" onclick="_wfUndo()" title="${t('실행 취소')} (⌘Z)" aria-label="${t('실행 취소')}" disabled>↶ <span id="wfUndoCount">0</span></button>
           <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn" aria-label="${t('워크플로우 저장')}">💾 ${t('저장')}</button>
           <button class="btn-primary btn text-xs" onclick="_wfRun()" id="wfRunBtn" aria-label="${t('워크플로우 실행')}">▶ ${t('실행')}</button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
@@ -2598,12 +2599,21 @@ function _wfUpdateToolbar() {
   if (!__wf.current) {
     nameEl.textContent = t('워크플로우를 선택하거나 생성하세요');
     dirtyEl.innerHTML = '';
-    return;
+  } else {
+    nameEl.textContent = __wf.current.name || 'Untitled';
+    dirtyEl.innerHTML = __wf.dirty
+      ? `<span class="wf-dirty-dot"></span>${t('변경사항 있음')}`
+      : `<span class="wf-ok-dot"></span>${t('저장됨')}`;
   }
-  nameEl.textContent = __wf.current.name || 'Untitled';
-  dirtyEl.innerHTML = __wf.dirty
-    ? `<span class="wf-dirty-dot"></span>${t('변경사항 있음')}`
-    : `<span class="wf-ok-dot"></span>${t('저장됨')}`;
+  // v2.33.6 — undo 스택 깊이 표시
+  const undoBtn = document.getElementById('wfUndoBtn');
+  const undoCnt = document.getElementById('wfUndoCount');
+  if (undoBtn && undoCnt) {
+    const depth = (__wf._undoStack || []).length;
+    undoCnt.textContent = depth;
+    undoBtn.disabled = depth === 0;
+    undoBtn.style.opacity = depth === 0 ? 0.45 : 1;
+  }
 }
 
 // ─── 캔버스 렌더링 ─────────────────────────────────────────────
@@ -3034,6 +3044,7 @@ function _wfPushUndo() {
   };
   __wf._undoStack.push(snap);
   if (__wf._undoStack.length > 30) __wf._undoStack.shift();
+  _wfUpdateToolbar();
 }
 
 function _wfUndo() {
