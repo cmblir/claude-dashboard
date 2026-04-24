@@ -1459,12 +1459,38 @@ document.addEventListener('click', (e) => {
   sb.classList.remove('open');
   document.body.classList.remove('sidebar-open');
 });
+// v2.33.4 — 탭 히스토리 (Alt+←/→) · 최근 20개 유지
+const _tabHistory = [];
+let _tabHistoryIdx = -1;
+let _tabNavigating = false;
+
 function go(id) {
   if (state.view === 'rtk' && id !== 'rtk' && typeof _rtkStopPolling === 'function') _rtkStopPolling();
+  // 히스토리에 기록 — 알트 ±로 이동 중일 때는 append 안 함
+  if (!_tabNavigating && id !== _tabHistory[_tabHistoryIdx]) {
+    _tabHistory.splice(_tabHistoryIdx + 1);
+    _tabHistory.push(id);
+    if (_tabHistory.length > 20) _tabHistory.shift();
+    _tabHistoryIdx = _tabHistory.length - 1;
+  }
   state.view = id;
   location.hash = '#/' + id;
   renderNav();
   renderView();
+}
+function _tabHistoryBack() {
+  if (_tabHistoryIdx <= 0) return;
+  _tabHistoryIdx--;
+  _tabNavigating = true;
+  go(_tabHistory[_tabHistoryIdx]);
+  _tabNavigating = false;
+}
+function _tabHistoryForward() {
+  if (_tabHistoryIdx >= _tabHistory.length - 1) return;
+  _tabHistoryIdx++;
+  _tabNavigating = true;
+  go(_tabHistory[_tabHistoryIdx]);
+  _tabNavigating = false;
 }
 window.addEventListener('hashchange', () => {
   const h = location.hash.replace(/^#\//, '') || 'overview';
@@ -1472,6 +1498,14 @@ window.addEventListener('hashchange', () => {
     if (state.view === 'rtk' && h !== 'rtk' && typeof _rtkStopPolling === 'function') _rtkStopPolling();
     state.view = h; renderNav(); renderView();
   }
+});
+// 글로벌 Alt+←/→ 핸들러
+document.addEventListener('keydown', (e) => {
+  if (!e.altKey || e.ctrlKey || e.metaKey) return;
+  const inInput = ['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName);
+  if (inInput) return;
+  if (e.key === 'ArrowLeft') { e.preventDefault(); _tabHistoryBack(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); _tabHistoryForward(); }
 });
 
 // ────────────────────────────────────────────────────────────────
