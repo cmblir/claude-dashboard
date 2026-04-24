@@ -722,7 +722,16 @@ tailwind.config = {
 
   /* ─── 모바일 반응형 ─── */
   @media (max-width: 900px) {
-    #sidebar { position: fixed; left: 0; top: 0; height: 100vh; z-index: 40; transform: translateX(-100%); transition: transform 0.2s; width: min(300px, 85vw) !important; }
+    /* v2.33.10 — 긴 카테고리 리스트가 뷰포트보다 길면 사이드바 내부 스크롤
+       (기존에는 overflow 가 지정되지 않아 마지막 카테고리가 잘렸음) */
+    #sidebar {
+      position: fixed; left: 0; top: 0; height: 100vh; z-index: 40;
+      transform: translateX(-100%); transition: transform 0.2s;
+      width: min(300px, 85vw) !important;
+      overflow-y: auto; overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
     #sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,0.6); }
     #content { margin-left: 0 !important; }
     /* 사이드바 열렸을 때 배경 오버레이 */
