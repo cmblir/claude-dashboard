@@ -132,21 +132,41 @@ def api_prompt_library_save(body: dict) -> dict:
 def find_keyword_triggers(input_text: str) -> list[dict]:
     """입력 텍스트에 키워드가 포함된 prompt library 항목 리스트 반환.
 
-    대소문자 무시 부분 문자열 매칭. 여러 항목이 매칭되면 순서대로 반환.
-    워크플로우 session 노드에서 자동 주입 여부 결정에 사용.
+    v2.33.8 — 토큰 경계 매칭 (word boundary) 으로 정확도 개선:
+    - 영문/숫자 키워드는 `\\b` 로 단어 경계 요구 (예: 'test' 가 'testing' 에 매칭되지 않음)
+    - 한글/특수문자 포함 키워드는 기존처럼 부분 문자열 매칭 (Unicode word boundary 를
+      기대할 수 없으므로)
+
+    반환 시 `_matchedKeyword` 필드로 어떤 키워드가 매칭됐는지 기록해 run 로그에 표시 가능.
     """
     if not isinstance(input_text, str) or not input_text:
         return []
+    import re
     text_lower = input_text.lower()
     out = []
     for it in _load().get("items") or []:
         kws = it.get("keywords") or []
         if not isinstance(kws, list):
             continue
+        matched_kw = None
         for kw in kws:
-            if isinstance(kw, str) and kw and kw.lower() in text_lower:
-                out.append(it)
-                break
+            if not (isinstance(kw, str) and kw):
+                continue
+            kw_lower = kw.lower()
+            # ASCII 전용 키워드는 단어 경계 요구
+            if all(ord(ch) < 128 for ch in kw_lower) and re.fullmatch(r"[a-z0-9][a-z0-9_\-]*", kw_lower):
+                pat = r"\b" + re.escape(kw_lower) + r"\b"
+                if re.search(pat, text_lower):
+                    matched_kw = kw
+                    break
+            else:
+                # 한글/공백/특수문자 포함 — 부분 문자열
+                if kw_lower in text_lower:
+                    matched_kw = kw
+                    break
+        if matched_kw is not None:
+            # mutation 방지 위해 얕은 복사 후 _matchedKeyword 주입
+            out.append({**it, "_matchedKeyword": matched_kw})
     return out
 
 
