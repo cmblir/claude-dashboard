@@ -15198,16 +15198,50 @@ AFTER.usage = () => {
 // ────────────────────────────────────────────────────────────────
 // MEMORY
 // ────────────────────────────────────────────────────────────────
+// v2.33.6 — 메모리 탭 클라이언트 측 필터 state
+state.data.memoryFilter = state.data.memoryFilter || { q: '', type: '' };
 VIEWS.memory = async () => {
   const d = await api('/api/memory/list');
   const list = d.projects || [];
+  // 모든 type 수집 (type chips 용)
+  const typeSet = new Set();
+  for (const p of list) for (const it of (p.items || [])) if (it.type) typeSet.add(it.type);
+  const allTypes = Array.from(typeSet).sort();
+
+  // 필터 적용
+  const { q, type } = state.data.memoryFilter;
+  const qLow = (q || '').toLowerCase();
+  let totalAll = 0, totalShown = 0;
+  const filtered = list.map(p => {
+    totalAll += (p.items || []).length;
+    const items = (p.items || []).filter(it => {
+      if (type && it.type !== type) return false;
+      if (!qLow) return true;
+      const hay = (it.name + ' ' + (it.description || '') + ' ' + (it.content || '')).toLowerCase();
+      return hay.includes(qLow);
+    });
+    totalShown += items.length;
+    return { ...p, items, count: items.length };
+  }).filter(p => p.items.length > 0 || (!qLow && !type));
+
   return `
     ${viewHeader('프로젝트 메모리', 'Claude Code 가 프로젝트마다 자동 기록하는 기억들. ~/.claude/projects/&lt;slug&gt;/memory/*.md', 'memory')}
-    ${list.length ? list.map(p => `
+
+    <div class="card p-3 mb-4 flex flex-wrap items-center gap-2">
+      <input id="memQ" class="input max-w-[320px] text-xs" placeholder="${t('메모/내용 검색…')}" value="${escapeHtml(q)}"
+             oninput="state.data.memoryFilter.q = this.value; clearTimeout(window._memDb); window._memDb = setTimeout(renderView, 180);" />
+      <button class="chip ${!type?'chip-accent':''}" onclick="state.data.memoryFilter.type=''; renderView();">${t('전체')} ${totalAll}</button>
+      ${allTypes.map(tp => `
+        <button class="chip ${tp===type?'chip-accent':''}" onclick="state.data.memoryFilter.type='${escapeHtml(tp)}'; renderView();">${escapeHtml(tp)}</button>
+      `).join('')}
+      ${(q || type) ? `<span class="text-[11px] text-[var(--text-dim)] ml-auto">${totalShown} / ${totalAll}</span>` : ''}
+    </div>
+
+    ${filtered.length ? filtered.map(p => `
       <div class="card p-4 mb-3">
         <div class="flex items-center justify-between mb-2">
           <div class="font-semibold text-sm">${escapeHtml(p.projectName)}</div>
-          <span class="chip">${p.count}개 메모</span>
+          <span class="chip">${p.count}${t('개 메모')}</span>
         </div>
         <div class="text-[10px] mono text-[var(--text-dim)] mb-2">${escapeHtml(p.memoryDir)}</div>
         <div class="space-y-2">
@@ -15221,7 +15255,7 @@ VIEWS.memory = async () => {
               <pre class="mono text-[10px] whitespace-pre-wrap text-[var(--text-mute)] line-clamp-6">${escapeHtml(it.content||'')}</pre>
             </div>`).join('') || '<div class="text-xs text-[var(--text-dim)]">MEMORY.md 인덱스만 존재 (개별 파일 없음)</div>'}
         </div>
-      </div>`).join('') : `<div class="card empty">아직 저장된 메모리가 없습니다.<br><span class="text-xs">Claude 가 "Saved to memory" 라고 말하면 여기에 자동으로 나타납니다.</span></div>`}
+      </div>`).join('') : `<div class="card empty">${(q || type) ? t('일치하는 메모리 없음') : '아직 저장된 메모리가 없습니다.<br><span class="text-xs">Claude 가 \"Saved to memory\" 라고 말하면 여기에 자동으로 나타납니다.</span>'}</div>`}
   `;
 };
 
