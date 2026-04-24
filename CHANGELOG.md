@@ -10,6 +10,33 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.33.3] — 2026-04-24
+
+### 🎨 Light theme WCAG AA contrast audit
+
+Playwright 기반 contrast sweep 스크립트(`scripts/e2e-light-contrast.mjs`) 신규 — 58 탭을 light 테마로 순회하며 text/bg pair 를 relative luminance 로 측정, WCAG AA 4.5:1 미달 요소를 path · fg · bg · fontSize 와 함께 수집.
+
+**초기 측정**
+- `rgb(136,136,146) #888892` (light --text-dim) 414 건, ratio 2.85-3.51
+- `rgb(217,119,87)` accent orange 10 건, ratio 3.12
+- `rgb(167,139,250)` / `rgb(251,191,36)` 등 pastel 색상 30+ 건
+
+**수정**
+1. light 테마 CSS 변수 강화: `--text-dim #888892 → #5a5a62` · `--text-mute → #3f3f46` · `--accent → #9e4422`.
+2. Tailwind arbitrary color (`text-[#c4b5fd]` 등) 클래스 셀렉터로 9 색 배치 override.
+3. inline `style="color:#XXX"` 패턴을 attribute selector (`[style*="color:#fbbf24"]`) 로 추가 오버라이드 9 색.
+4. `.pulse-dot` 녹색을 `#15803d` 로 강화.
+
+**결과**
+- Strict AA (4.5:1): 819 → 87 건 (89% 감소). 남은 대부분 `rgb(21,128,61)` on `chip-ok` 배경 — ratio 정확히 4.50 (AA 경계, 읽기 문제 없음).
+- 실질적 4.0:1 기준: 9 탭 17 건 (98% 개선).
+- Overview / guideHub / workflows 스크린샷에서 카드 제목·숫자·사이드바 메타 모두 뚜렷하게 가독.
+
+**파일**
+- `dist/index.html`: light theme CSS 변수 + 20 줄 추가 override.
+- `scripts/e2e-light-contrast.mjs`: 신규 audit 스크립트.
+
+---
 ## [2.33.2] — 2026-04-24
 
 ### 🔌 ECC Plugin full auto-install

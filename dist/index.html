@@ -74,10 +74,10 @@ tailwind.config = {
     --border: rgba(0, 0, 0, 0.1);
     --border-hi: rgba(0, 0, 0, 0.18);
     --text: #1a1a1a;
-    --text-mute: #555560;
-    --text-dim: #888892;
-    --accent: #c96442;
-    --accent-2: #b85535;
+    --text-mute: #3f3f46;
+    --text-dim: #5a5a62;
+    --accent: #9e4422;
+    --accent-2: #853814;
     --cyan: #0284c7;
     --ok: #16a34a;
     --warn: #ca8a04;
@@ -137,7 +137,40 @@ tailwind.config = {
   body.theme-light .code-terminal { background: #0b1220 !important; color: #a7f3d0 !important; }
   /* v2.33.2 — 보라색 태그 chip 의 light theme 대비 개선 */
   body.theme-light .chip-violet { background: rgba(139,92,246,0.14) !important; color: #6d28d9 !important; border-color: rgba(139,92,246,0.28) !important; }
-  body.theme-light .pulse-dot { background: #16a34a; }
+  /* v2.33.3 — light theme WCAG AA (4.5:1) batch overrides
+     흰/크림 배경 위에서 pastel/accent 텍스트 색이 흐려지는 문제 일괄 수정. */
+  body.theme-light .text-\[\#c4b5fd\],
+  body.theme-light [style*="#c4b5fd"] { color: #6d28d9 !important; }
+  body.theme-light .text-\[\#4ade80\] { color: #166534 !important; }
+  body.theme-light .text-\[\#f87171\] { color: #b91c1c !important; }
+  body.theme-light .text-\[\#fbbf24\] { color: #a16207 !important; }
+  body.theme-light .text-\[\#fcd34d\] { color: #854d0e !important; }
+  body.theme-light .text-\[\#f5b997\] { color: #9e3a1a !important; }
+  body.theme-light .text-\[\#86efac\] { color: #166534 !important; }
+  body.theme-light .text-\[\#fca5a5\] { color: #991b1b !important; }
+  body.theme-light .text-\[var\(--accent\)\] { color: #853814 !important; }
+  body.theme-light .gradient-text { color: #853814 !important; }
+  body.theme-light .tag-tool { color: #9e3a1a !important; }
+  body.theme-light .pulse-dot { background: #15803d; }
+  /* inline style pastel color overrides — 위 클래스로 안 잡히는 구간(chip/뱃지 내부) */
+  body.theme-light [style*="color:#4ade80"],
+  body.theme-light [style*="color: #4ade80"] { color: #166534 !important; }
+  body.theme-light [style*="color:#86efac"],
+  body.theme-light [style*="color: #86efac"] { color: #166534 !important; }
+  body.theme-light [style*="color:#f87171"],
+  body.theme-light [style*="color: #f87171"] { color: #b91c1c !important; }
+  body.theme-light [style*="color:#fca5a5"],
+  body.theme-light [style*="color: #fca5a5"] { color: #991b1b !important; }
+  body.theme-light [style*="color:#fbbf24"],
+  body.theme-light [style*="color: #fbbf24"] { color: #854d0e !important; }
+  body.theme-light [style*="color:#fcd34d"],
+  body.theme-light [style*="color: #fcd34d"] { color: #854d0e !important; }
+  body.theme-light [style*="color:#c4b5fd"],
+  body.theme-light [style*="color: #c4b5fd"] { color: #6d28d9 !important; }
+  body.theme-light [style*="color:#a78bfa"],
+  body.theme-light [style*="color: #a78bfa"] { color: #5b21b6 !important; }
+  body.theme-light [style*="color:#d97757"],
+  body.theme-light [style*="color: #d97757"] { color: #853814 !important; }
   body.theme-light .empty { color: var(--text-dim); }
   body.theme-light #sidebar-foot { border-color: rgba(0,0,0,0.08); }
 
