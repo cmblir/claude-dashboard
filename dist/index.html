@@ -849,6 +849,9 @@ tailwind.config = {
         </button>
         <div id="settingsDropdown" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:220px;background:var(--bg-soft);border:1px solid var(--border-hi);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.4);overflow:hidden;z-index:45;">
           <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);" data-i18n="settings.theme">테마</div>
+          <button class="settings-item" onclick="setTheme('auto')" id="themeOptAuto">
+            <span>🖥️</span><span data-i18n="settings.auto">자동 (OS)</span><span class="settings-check theme-check" data-theme="auto" id="checkAuto" style="display:none;">✓</span>
+          </button>
           <button class="settings-item" onclick="setTheme('dark')" id="themeOptDark">
             <span>🌙</span><span data-i18n="settings.dark">다크</span><span class="settings-check theme-check" data-theme="dark" id="checkDark">✓</span>
           </button>
@@ -15949,34 +15952,58 @@ document.addEventListener('click', (e) => {
 
 // ── 테마 ──
 const _ALL_THEMES = ['dark','light','midnight','forest','sunset'];
+// v2.33.4 — 'auto' 는 prefers-color-scheme 따라가기 (dark ↔ light)
+function _resolveAutoTheme() {
+  try {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  } catch { return 'dark'; }
+}
+function _applyTheme(th) {
+  // 실제 DOM 적용 로직 — auto 일 때는 resolvedTheme 사용
+  const resolved = th === 'auto' ? _resolveAutoTheme() : th;
+  _ALL_THEMES.forEach(t => document.body.classList.remove('theme-' + t));
+  document.body.classList.add('theme-' + resolved);
+  const isLight = resolved === 'light';
+  if (window.Chart) {
+    Chart.defaults.color = isLight ? '#555' : '#a0a0a8';
+    Chart.defaults.borderColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)';
+  }
+  document.documentElement.style.colorScheme = isLight ? 'light' : 'dark';
+}
 function setTheme(th) {
-  // 전환 애니메이션
   document.body.classList.add('theme-switching');
-  setTimeout(() => {
-    _ALL_THEMES.forEach(t => document.body.classList.remove('theme-' + t));
-    document.body.classList.add('theme-' + th);
-    // Chart.js 차트가 있으면 텍스트 색상 업데이트
-    const isLight = th === 'light';
-    if (window.Chart) {
-      Chart.defaults.color = isLight ? '#555' : '#a0a0a8';
-      Chart.defaults.borderColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)';
-    }
-    // color-scheme for scrollbars/inputs
-    document.documentElement.style.colorScheme = isLight ? 'light' : 'dark';
-  }, 50);
-  setTimeout(() => {
-    document.body.classList.remove('theme-switching');
-    renderView(); // 차트 등 재렌더링
-  }, 550);
-  // 테마 체크 표시 동기화
+  setTimeout(() => _applyTheme(th), 50);
+  setTimeout(() => { document.body.classList.remove('theme-switching'); renderView(); }, 550);
+  // 체크마크 — 'auto' 도 독립 항목으로 취급
   document.querySelectorAll('.theme-check').forEach(el => {
     el.style.display = el.getAttribute('data-theme') === th ? '' : 'none';
   });
   try { localStorage.setItem('cc-theme', th); } catch {}
+  // auto 모드에서만 OS 변경 구독
+  try {
+    if (window._themeMql) { window._themeMql.onchange = null; window._themeMql = null; }
+    if (th === 'auto' && window.matchMedia) {
+      const mql = window.matchMedia('(prefers-color-scheme: light)');
+      mql.onchange = () => _applyTheme('auto');
+      window._themeMql = mql;
+    }
+  } catch {}
 }
 (function _initTheme() {
   try {
     const saved = localStorage.getItem('cc-theme');
+    if (saved === 'auto') {
+      _applyTheme('auto');
+      document.querySelectorAll('.theme-check').forEach(el => {
+        el.style.display = el.getAttribute('data-theme') === 'auto' ? '' : 'none';
+      });
+      if (window.matchMedia) {
+        const mql = window.matchMedia('(prefers-color-scheme: light)');
+        mql.onchange = () => _applyTheme('auto');
+        window._themeMql = mql;
+      }
+      return;
+    }
     if (saved && saved !== 'dark' && _ALL_THEMES.includes(saved)) {
       _ALL_THEMES.forEach(t => document.body.classList.remove('theme-' + t));
       document.body.classList.add('theme-' + saved);
