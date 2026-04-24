@@ -1479,13 +1479,64 @@ const AFTER = {};
 
 let __renderLock = false;
 let __renderQueued = false;
+// v2.33.4 — 탭별 skeleton 매핑 (이름/아이콘 즉시 노출 → 사용자가 "열고 있는 탭" 확실히 인지)
+const _SKELETONS = {
+  aiProviders: () => `
+    <div class="shimmer h-10 mb-4" style="width:40%"></div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      ${Array.from({length:6}).map(()=>'<div class="shimmer h-44"></div>').join('')}
+    </div>`,
+  commands: () => `
+    <div class="shimmer h-10 mb-4" style="width:30%"></div>
+    <div class="space-y-2">
+      ${Array.from({length:10}).map(()=>'<div class="shimmer h-14"></div>').join('')}
+    </div>`,
+  workflows: () => `
+    <div class="shimmer h-10 mb-4" style="width:40%"></div>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div class="shimmer h-96"></div>
+      <div class="shimmer h-96 md:col-span-2"></div>
+      <div class="shimmer h-96"></div>
+    </div>`,
+  overview: () => `
+    <div class="shimmer h-12 mb-4" style="width:50%"></div>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+      ${Array.from({length:4}).map(()=>'<div class="shimmer h-28"></div>').join('')}
+    </div>
+    <div class="shimmer h-64"></div>`,
+  sessions: () => `
+    <div class="shimmer h-10 mb-4" style="width:35%"></div>
+    <div class="shimmer h-8 mb-3" style="width:60%"></div>
+    ${Array.from({length:8}).map(()=>'<div class="shimmer h-12 mb-2"></div>').join('')}`,
+  projects: () => `
+    <div class="shimmer h-10 mb-4" style="width:35%"></div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      ${Array.from({length:6}).map(()=>'<div class="shimmer h-40"></div>').join('')}
+    </div>`,
+  analytics: () => `
+    <div class="shimmer h-10 mb-4" style="width:40%"></div>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+      ${Array.from({length:4}).map(()=>'<div class="shimmer h-24"></div>').join('')}
+    </div>
+    <div class="shimmer h-80"></div>`,
+};
+function _skeletonFor(tabId) {
+  if (_SKELETONS[tabId]) return _SKELETONS[tabId]();
+  // 기본 — header + 카드 grid
+  return `
+    <div class="shimmer h-10 mb-4" style="width:35%"></div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+      ${Array.from({length:4}).map(()=>'<div class="shimmer h-28"></div>').join('')}
+    </div>
+    <div class="shimmer h-48"></div>`;
+}
 async function renderView() {
   // 동시 렌더 방지 — 이전 렌더 완료 전 호출 시 큐잉
   if (__renderLock) { __renderQueued = true; return; }
   __renderLock = true;
   __renderQueued = false;
   const v = document.getElementById('view');
-  v.innerHTML = `<div class="tab-enter"><div class="shimmer h-32 mb-4"></div><div class="shimmer h-64"></div></div>`;
+  v.innerHTML = `<div class="tab-enter">${_skeletonFor(state.view)}</div>`;
   try {
     const fn = VIEWS[state.view] || VIEWS.overview;
     const html = await fn();
