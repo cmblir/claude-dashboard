@@ -14173,23 +14173,71 @@ AFTER.bashHistory = () => {
 // ────────────────────────────────────────────────────────────────
 // TELEMETRY
 // ────────────────────────────────────────────────────────────────
+// v2.33.8 — telemetry 탭 auto-refresh (30s) + 오류 급등 감지 시 browser notification
+state.data._telLive = state.data._telLive || { enabled: false, lastTotal: 0, lastErrors: 0, timer: null, lastUpdate: 0 };
+function _telToggleLive() {
+  const s = state.data._telLive;
+  s.enabled = !s.enabled;
+  if (s.timer) { clearInterval(s.timer); s.timer = null; }
+  if (s.enabled) {
+    s.timer = setInterval(() => {
+      if (state.view !== 'telemetry') { clearInterval(s.timer); s.timer = null; s.enabled = false; renderView(); return; }
+      renderView();
+    }, 30000);
+    // 알림 권한 요청 (1회)
+    if ('Notification' in window && Notification.permission === 'default') {
+      try { Notification.requestPermission(); } catch {}
+    }
+  }
+  renderView();
+}
+window._telToggleLive = _telToggleLive;
+
 VIEWS.telemetry = async () => {
-  const t = await api('/api/telemetry/summary');
-  if (!t.exists) return `${viewHeader('텔레메트리', null, 'telemetry')}<div class="card empty">telemetry/ 없음</div>`;
+  const tel = await api('/api/telemetry/summary');
+  if (!tel.exists) return `${viewHeader('텔레메트리', null, 'telemetry')}<div class="card empty">telemetry/ 없음</div>`;
+  const live = state.data._telLive;
+  // 오류 급등 감지 (이전 대비 5+ 증가) — 알림
+  if (live.enabled && live.lastTotal > 0) {
+    const delta = tel.totalLines - live.lastTotal;
+    const errEvents = (tel.topEvents||[]).filter(e => /error|err|fail/i.test(e.event));
+    const errTotal = errEvents.reduce((a,b)=>a+b.n, 0);
+    const errDelta = errTotal - live.lastErrors;
+    if (errDelta >= 5 && 'Notification' in window && Notification.permission === 'granted') {
+      try { new Notification('Telemetry 오류 급등', { body: `+${errDelta} errors since last refresh (total ${errTotal})` }); } catch {}
+    }
+    live.lastErrors = errTotal;
+  } else {
+    const errEvents = (tel.topEvents||[]).filter(e => /error|err|fail/i.test(e.event));
+    live.lastErrors = errEvents.reduce((a,b)=>a+b.n, 0);
+  }
+  live.lastTotal = tel.totalLines;
+  live.lastUpdate = Date.now();
   return `
-    ${viewHeader('텔레메트리', `파일 ${t.fileCount}개 · 이벤트 ${t.totalLines.toLocaleString()}건 · 파싱 오류 ${t.parseErrors}`, 'telemetry')}
+    ${viewHeader('텔레메트리', `파일 ${tel.fileCount}개 · 이벤트 ${tel.totalLines.toLocaleString()}건 · 파싱 오류 ${tel.parseErrors}`, 'telemetry')}
+    <div class="card p-3 mb-4 flex items-center justify-between flex-wrap gap-2">
+      <div class="text-[11px] text-[var(--text-mute)]">
+        ${t('마지막 갱신')}: ${new Date(live.lastUpdate).toLocaleTimeString()}
+        ${live.enabled ? ` · <span class="chip chip-ok text-[10px]">${t('자동 갱신 ON (30s)')}</span>` : ''}
+      </div>
+      <div class="flex gap-2">
+        <button class="btn text-xs" onclick="renderView()">🔄 ${t('지금 갱신')}</button>
+        <button class="btn text-xs ${live.enabled?'btn-primary':''}" onclick="_telToggleLive()">${live.enabled ? '⏸ ' + t('자동 갱신 중지') : '▶ ' + t('자동 갱신 시작')}</button>
+      </div>
+    </div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
       <div class="card p-5">
         <h3 class="font-semibold text-sm mb-3">📊 상위 이벤트 타입</h3>
         <div class="space-y-1 max-h-[480px] overflow-y-auto">
-          ${(t.topEvents||[]).map(e => {
-            const top = t.topEvents[0].n; const pct = Math.round((e.n/top)*100);
+          ${(tel.topEvents||[]).map(e => {
+            const top = tel.topEvents[0].n; const pct = Math.round((e.n/top)*100);
+            const isErr = /error|err|fail/i.test(e.event);
             return `<div class="py-1.5">
               <div class="flex justify-between text-xs">
-                <span class="mono truncate pr-2">${escapeHtml(e.event)}</span>
+                <span class="mono truncate pr-2" ${isErr?'style="color:#f87171"':''}>${escapeHtml(e.event)}</span>
                 <span class="mono">${e.n}</span>
               </div>
-              <div class="h-1 bg-white/5 rounded"><div style="width:${pct}%; height:100%; background:var(--grad);"></div></div>
+              <div class="h-1 bg-white/5 rounded"><div style="width:${pct}%; height:100%; background:${isErr?'#f87171':'var(--grad)'};"></div></div>
             </div>`;
           }).join('')}
         </div>
@@ -14197,7 +14245,7 @@ VIEWS.telemetry = async () => {
       <div class="card p-5">
         <h3 class="font-semibold text-sm mb-3">📁 최근 텔레메트리 파일</h3>
         <table class="data"><tbody>
-          ${(t.files||[]).map(f => `<tr>
+          ${(tel.files||[]).map(f => `<tr>
             <td class="mono text-[10px] truncate" style="max-width:280px;">${escapeHtml(f.name)}</td>
             <td class="text-right text-xs">${formatBytes(f.size)}</td>
             <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(f.mtime)}</td>
