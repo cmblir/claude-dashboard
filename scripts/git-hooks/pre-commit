@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# pre-commit — runs scripts/translate-refresh.sh if any i18n-relevant file is staged.
+# Installed via: git config core.hooksPath scripts/git-hooks
+#
+# Skip hook: git commit --no-verify   (discouraged; CI enforces the same check.)
+
+set -euo pipefail
+
+# Only run from repo root
+cd "$(git rev-parse --show-toplevel)"
+
+STAGED=$(git diff --cached --name-only)
+
+needs_refresh=0
+while IFS= read -r f; do
+  case "$f" in
+    dist/index.html|dist/locales/*.json|tools/translations_manual*.py|tools/extract_ko_strings.py|tools/build_locales.py)
+      needs_refresh=1
+      break
+      ;;
+  esac
+done <<< "$STAGED"
+
+if [ "$needs_refresh" -eq 0 ]; then
+  exit 0
+fi
+
+echo "▶ pre-commit: i18n-relevant file staged — running scripts/translate-refresh.sh"
+if ! bash scripts/translate-refresh.sh > /tmp/translate-refresh.log 2>&1; then
+  echo "❌ translate-refresh.sh failed. Log:" >&2
+  tail -40 /tmp/translate-refresh.log >&2
+  exit 1
+fi
+
+# Re-stage any files the refresh may have regenerated.
+CHANGED=$(git status --porcelain -- 'dist/locales/*.json' 'translation-audit.json' 2>/dev/null || true)
+if [ -n "$CHANGED" ]; then
+  echo "▶ pre-commit: re-staging regenerated locale / audit files"
+  git add dist/locales/*.json translation-audit.json 2>/dev/null || true
+fi
+
+echo "✅ pre-commit: translation pipeline OK"
+exit 0

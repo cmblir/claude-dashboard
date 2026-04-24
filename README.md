@@ -380,6 +380,12 @@ LazyClaude is a solo-maintained personal project, but issues and PRs are welcome
 
 Small fixes (typos, i18n gaps, obvious bugs) can go straight to a PR. For larger features or refactors, please open an issue first so we can avoid duplicate work.
 
+Install the repo pre-commit hook once so i18n drift can't land:
+
+```bash
+git config core.hooksPath scripts/git-hooks
+```
+
 ### Adding a new tab (7 steps)
 
 1. Add entry to `dist/index.html::NAV`
