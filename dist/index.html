@@ -16961,6 +16961,8 @@ function openSpotlight() {
   const inp = document.getElementById('spotlightInput');
   setTimeout(() => inp.focus(), 50);
   _renderSpotlightResults('');
+  // v2.33.4 — 프로젝트/세션/프롬프트/워크플로우 비동기 prefetch
+  _ensureSpotlightCache();
   inp.oninput = () => { _spotlightIdx = 0; _renderSpotlightResults(inp.value); };
   inp.onkeydown = _spotlightKeydown;
 }
@@ -17002,6 +17004,31 @@ const _NAV_KEYWORDS = {
   statusline: ['상태라인','statusline','키바인딩','keybinding','단축키','shortcut'],
   mcp: ['mcp','커넥터','connector','외부 도구','slack','github','database'],
 };
+
+// v2.33.4 — spotlight 보조 데이터 lazy cache (프로젝트/세션/프롬프트/워크플로우)
+const _spotlightCache = { projects: null, sessions: null, prompts: null, workflows: null, loadedAt: 0 };
+async function _ensureSpotlightCache() {
+  const now = Date.now();
+  if (_spotlightCache.loadedAt && now - _spotlightCache.loadedAt < 60000) return;
+  try {
+    const [projects, sessions, prompts, workflows] = await Promise.all([
+      api('/api/projects').catch(() => ({ projects: [] })),
+      api('/api/sessions/list?limit=30').catch(() => ({ sessions: [] })),
+      api('/api/prompt-library/list').catch(() => ({ items: [] })),
+      api('/api/workflows/list').catch(() => ({ workflows: [] })),
+    ]);
+    _spotlightCache.projects = projects.projects || [];
+    _spotlightCache.sessions = sessions.sessions || [];
+    _spotlightCache.prompts = prompts.items || prompts.prompts || [];
+    _spotlightCache.workflows = workflows.workflows || workflows.items || [];
+    _spotlightCache.loadedAt = now;
+    // 열려있는 경우 재렌더
+    if (_spotlightOpen) {
+      const inp = document.getElementById('spotlightInput');
+      _renderSpotlightResults(inp ? inp.value : '');
+    }
+  } catch {}
+}
 
 function _getSpotlightItems(query) {
   const q = (query || '').toLowerCase().trim();
@@ -17049,6 +17076,7 @@ function _getSpotlightItems(query) {
     { id: 'act-chat', icon: '💬', label: '챗봇 열기', desc: '대시보드 도우미와 대화', fn: "toggleChat()" },
     { id: 'act-cli', icon: '⚙️', label: 'CLI 상태 확인', desc: '로그인 상태 / 플랜 확인', fn: "openCliStatusModal()" },
     { id: 'act-refresh', icon: '↻', label: '새로고침', desc: '현재 뷰 다시 로드', fn: "renderView()" },
+    { id: 'act-shortcuts', icon: '⌨️', label: '단축키 도움말', desc: '전체 키보드 단축키 보기', fn: "_openShortcutHelp()" },
   ];
   for (const a of actions) {
     const text = `${a.label} ${a.desc}`;
@@ -17056,9 +17084,61 @@ function _getSpotlightItems(query) {
     if (s > 0) scored.push({ item: { type: 'action', ...a }, score: s });
   }
 
-  // 점수 내림차순 정렬, 최대 15개
+  // 4) 프로젝트 — q 있을 때만 노출 (빈 쿼리 시 탭/액션만 보이도록)
+  if (q && _spotlightCache.projects) {
+    for (const p of _spotlightCache.projects) {
+      const name = p.name || p.slug || p.cwd || '';
+      const text = `${name} ${p.cwd || ''}`;
+      const s = _score(text, q);
+      if (s > 0) scored.push({
+        item: { type: 'project', id: p.slug || name, icon: '📂', label: name, desc: p.cwd || '', cwd: p.cwd || '' },
+        score: s - 2,
+      });
+    }
+  }
+
+  // 5) 세션 — 최근 30개, q 있을 때만
+  if (q && _spotlightCache.sessions) {
+    for (const s of _spotlightCache.sessions.slice(0, 30)) {
+      const name = (s.summary || s.first_user_message || s.id || '').slice(0, 80);
+      const text = `${name} ${s.cwd || ''}`;
+      const sc = _score(text, q);
+      if (sc > 0) scored.push({
+        item: { type: 'session', id: s.id, icon: '💬', label: name || s.id, desc: s.cwd || '', sessionId: s.id },
+        score: sc - 3,
+      });
+    }
+  }
+
+  // 6) Prompt Library — q 있을 때만
+  if (q && _spotlightCache.prompts) {
+    for (const p of _spotlightCache.prompts) {
+      const name = p.title || p.name || p.id || '';
+      const text = `${name} ${(p.tags||[]).join(' ')} ${(p.body||'').slice(0,100)}`;
+      const s = _score(text, q);
+      if (s > 0) scored.push({
+        item: { type: 'prompt', id: p.id, icon: '📝', label: name, desc: (p.body||'').slice(0, 60) },
+        score: s - 2,
+      });
+    }
+  }
+
+  // 7) 워크플로우 — q 있을 때만
+  if (q && _spotlightCache.workflows) {
+    for (const w of _spotlightCache.workflows) {
+      const name = w.name || w.id || '';
+      const text = `${name} ${w.description || ''}`;
+      const s = _score(text, q);
+      if (s > 0) scored.push({
+        item: { type: 'workflow', id: w.id, icon: '🔀', label: name, desc: w.description || `${(w.nodes||[]).length} nodes` },
+        score: s - 2,
+      });
+    }
+  }
+
+  // 점수 내림차순 정렬, 최대 20개
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, 15).map(s => s.item);
+  return scored.slice(0, 20).map(s => s.item);
 }
 
 function _renderSpotlightResults(query) {
@@ -17076,7 +17156,15 @@ function _renderSpotlightResults(query) {
         <div class="sl-label">${escapeHtml(it.label)}</div>
         ${it.desc ? `<div class="sl-desc">${escapeHtml(it.desc)}</div>` : ''}
       </div>
-      ${it.type==='nav'?`<span class="sl-kbd">${t('이동')}</span>`:it.type==='feature'?`<span class="sl-kbd">${t('신기능')}</span>`:`<span class="sl-kbd">${t('실행')}</span>`}
+      ${
+        it.type==='nav'     ? `<span class="sl-kbd">${t('이동')}</span>` :
+        it.type==='feature' ? `<span class="sl-kbd">${t('신기능')}</span>` :
+        it.type==='project' ? `<span class="sl-kbd">${t('프로젝트')}</span>` :
+        it.type==='session' ? `<span class="sl-kbd">${t('세션')}</span>` :
+        it.type==='prompt'  ? `<span class="sl-kbd">${t('프롬프트')}</span>` :
+        it.type==='workflow'? `<span class="sl-kbd">${t('워크플로우')}</span>` :
+        `<span class="sl-kbd">${t('실행')}</span>`
+      }
     </div>
   `).join('');
 }
@@ -17098,6 +17186,17 @@ function _spotlightSelect(idx) {
   } else if (item.type === 'feature' && item.feat) {
     go('features');
     setTimeout(() => { try { openFeatureWindow(item.feat); } catch {} }, 300);
+  } else if (item.type === 'project' && item.cwd) {
+    go('projects');
+    setTimeout(() => { try { openProjectDetail(item.cwd); } catch {} }, 300);
+  } else if (item.type === 'session' && item.sessionId) {
+    go('sessions');
+    setTimeout(() => { try { openSessionDetail(item.sessionId); } catch {} }, 300);
+  } else if (item.type === 'prompt') {
+    go('promptLibrary');
+  } else if (item.type === 'workflow' && item.id) {
+    location.hash = '#/workflows';
+    setTimeout(() => { try { location.hash = '#/workflows?id=' + encodeURIComponent(item.id); } catch {} }, 300);
   } else if (item.fn) {
     try { eval(item.fn); } catch {}
   }
