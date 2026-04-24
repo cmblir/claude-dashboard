@@ -12,7 +12,7 @@ _50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.33.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.33.2-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-아키텍처)
 
 </div>
@@ -27,6 +27,12 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 | 버전 | 요점 |
 |---|---|
+| **v2.33.2** | 🔌 ECC 플러그인 **완전 자동 설치** — 가이드 & 툴 탭에서 원클릭, Claude Code 명령어 입력 불필요 |
+| **v2.33.1** | 🧰 가이드 툴킷 관리자 (ECC / CCB 설치·제거) · flyout viewport 수정 · 로그인 게이트 첫 방문만 |
+| **v2.33.0** | 🎨 Artifacts Viewer — 4중 보안 미리보기 (sandbox + CSP + postMessage + 정적 필터) |
+| **v2.32.0** | 🤝 MCP 서버 모드 — Claude Code 세션에서 LazyClaude 직접 호출 |
+| **v2.31.0** | 🛡 Security Scan 탭 — 시크릿 / 위험 훅 / 과도 권한 정적 휴리스틱 검사 |
+| **v2.30.0** | 🎓 Learner — 최근 세션 JSONL 에서 반복 툴 시퀀스 자동 추출 |
 | **v2.23.0** | 🛡 Webhook `X-Webhook-Secret` 인증 + 출력 경로 화이트리스트 (`~/Downloads` · `~/Documents` · `~/Desktop`) |
 | **v2.22.1** | 📸 실 UI 스크린샷 12장 자동 생성 (Playwright) |
 | **v2.22.0** | 🛡 HTTP 노드 SSRF 가드 (scheme/host/prefix + DNS rebinding 방어) |
@@ -40,7 +46,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.33.1 🇰🇷│
+│  💤  LazyClaude                                     v2.33.2 🇰🇷│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 신기능│   🔀 워크플로우                                       │
 │ 🏠 메인 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -306,7 +312,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.33.1)
+## 🔢 통계 (v2.33.2)
 
 | 지표 | 값 |
 |---|---|

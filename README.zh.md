@@ -12,7 +12,7 @@ _别死记 50+ CLI 命令，点一下就行。_
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.33.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.33.2-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-架构)
 
 </div>
@@ -27,6 +27,12 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 | 版本 | 重点 |
 |---|---|
+| **v2.33.2** | 🔌 ECC 插件 **全自动安装** — 在"指南与工具"标签页一键完成，无需输入 Claude Code 命令 |
+| **v2.33.1** | 🧰 指南工具包管理（ECC / CCB 安装·移除）· flyout 视口修复 · 登录门首次访问仅一次 |
+| **v2.33.0** | 🎨 Artifacts Viewer —— 4 层安全预览（sandbox + CSP + postMessage + 静态过滤） |
+| **v2.32.0** | 🤝 MCP 服务器模式 —— 在 Claude Code 会话中直接调用 LazyClaude |
+| **v2.31.0** | 🛡 Security Scan 标签 —— 静态启发式检测密钥 / 危险钩子 / 过度权限 |
+| **v2.30.0** | 🎓 Learner —— 从最近会话 JSONL 自动提取重复工具序列 |
 | **v2.23.0** | 🛡 Webhook `X-Webhook-Secret` 鉴权 + 输出路径白名单 (`~/Downloads` · `~/Documents` · `~/Desktop`) |
 | **v2.22.1** | 📸 Playwright 自动生成 12 张真实 UI 截图 |
 | **v2.22.0** | 🛡 HTTP 节点 SSRF 防护 (scheme/host/prefix + DNS rebinding 防御) |
@@ -40,7 +46,7 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.33.1 🇨🇳│
+│  💤  LazyClaude                                     v2.33.2 🇨🇳│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 新功能│   🔀 工作流                                          │
 │ 🏠 主要 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -306,7 +312,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 统计（v2.33.1）
+## 🔢 统计（v2.33.2）
 
 | 指标 | 值 |
 |---|---|
