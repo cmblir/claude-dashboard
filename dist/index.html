@@ -1247,11 +1247,17 @@ function errMsg(r) {
 function toast(msg, kind='info') {
   const div = document.createElement('div');
   div.className = `card px-4 py-3 text-sm flex items-center gap-2`;
-  div.innerHTML = `<span>${({info:'ℹ️', ok:'✅', err:'❌', warn:'⚠️'})[kind]||'ℹ️'}</span><span>${escapeHtml(msg)}</span>`;
+  // v2.33.5 — err/warn 토스트는 📋 복사 버튼 + 긴 표시 시간 (디버깅 편의)
+  const isFailure = kind === 'err' || kind === 'warn';
+  const copyBtn = isFailure
+    ? `<button class="btn-ghost btn text-[11px] px-2 py-0.5 ml-2" onclick="(function(b){try{navigator.clipboard.writeText(${JSON.stringify(String(msg))});b.textContent='✓';setTimeout(()=>b.textContent='📋',1200);}catch{}})(this)" title="${t('복사')}" aria-label="${t('복사')}">📋</button>`
+    : '';
+  div.innerHTML = `<span>${({info:'ℹ️', ok:'✅', err:'❌', warn:'⚠️'})[kind]||'ℹ️'}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(msg)}</span>${copyBtn}`;
   _translateDOM(div);
   document.getElementById('toast').appendChild(div);
-  setTimeout(() => div.style.opacity='0', 2600);
-  setTimeout(() => div.remove(), 3200);
+  const holdMs = isFailure ? 6000 : 2600;
+  setTimeout(() => div.style.opacity='0', holdMs);
+  setTimeout(() => div.remove(), holdMs + 600);
 }
 
 function escapeHtml(s) {
