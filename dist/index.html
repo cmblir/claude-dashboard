@@ -1843,10 +1843,11 @@ function _renderEccManage(r) {
     <div class="flex items-center gap-2 flex-wrap">
       ${cloned
         ? `<button class="btn text-[12px]" onclick="_eccInstall(this)" ${!r.gitAvailable?'disabled':''}>🔄 ${t('업데이트')}</button>
-           <button class="btn-danger btn text-[12px]" onclick="_eccUninstall(this)">🗑 ${t('마켓 제거')}</button>`
+           ${nInstalled > 0
+             ? `<button class="btn-danger btn text-[12px]" onclick="_eccInstallPlugin(this, 'uninstall')">🗑 ${t('플러그인 제거')}</button>`
+             : `<button class="btn-primary btn text-[12px]" onclick="_eccInstallPlugin(this, 'install')">🔌 ${t('플러그인 설치')}</button>`}
+           <button class="btn-danger btn text-[12px]" onclick="_eccUninstall(this)">${t('마켓 제거')}</button>`
         : `<button class="btn-primary btn text-[12px]" onclick="_eccInstall(this)" ${!r.gitAvailable?'disabled':''}>⬇︎ ${t('마켓플레이스 추가')}</button>`}
-      ${cloned ? `<code class="code-terminal text-[11px] px-2 py-1 rounded">${escapeHtml(e.installCommand)}</code>
-                  <button class="btn text-[11px]" onclick="_copyToClipboard(this, ${JSON.stringify(e.installCommand).replace(/"/g,'&quot;')})">📋 ${t('복사')}</button>` : ''}
     </div>
     ${cloned ? `<div class="text-[11px] text-[var(--text-dim)] mt-1.5">📂 ${escapeHtml(e.installDir || '')}</div>` : ''}`;
 }
@@ -1876,6 +1877,21 @@ async function _eccInstall(btn) {
     const r = await api('/api/toolkit/ecc/install', { method: 'POST', body: {} });
     if (r.ok) { toast(r.updated ? t('ECC 마켓 업데이트 완료') : t('ECC 마켓 추가 완료'), 'ok'); _refreshToolkitManage(); }
     else { toast(r.error || t('설치 실패'), 'err'); btn.disabled = false; btn.textContent = orig; }
+  } catch (e) { toast(String(e), 'err'); btn.disabled = false; btn.textContent = orig; }
+}
+async function _eccInstallPlugin(btn, action) {
+  const url = action === 'install' ? '/api/toolkit/ecc/install-plugin' : '/api/toolkit/ecc/uninstall-plugin';
+  const waitText = action === 'install' ? t('플러그인 설치 중...') : t('플러그인 제거 중...');
+  btn.disabled = true; const orig = btn.textContent; btn.textContent = '⏳ ' + waitText;
+  try {
+    const r = await api(url, { method: 'POST', body: { scope: 'user' } });
+    if (r.ok) {
+      toast(action === 'install' ? t('플러그인 설치 완료') : t('플러그인 제거 완료'), 'ok');
+      _refreshToolkitManage();
+    } else {
+      toast(r.error || t('실패'), 'err');
+      btn.disabled = false; btn.textContent = orig;
+    }
   } catch (e) { toast(String(e), 'err'); btn.disabled = false; btn.textContent = orig; }
 }
 async function _eccUninstall(btn) {

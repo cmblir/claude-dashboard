@@ -34,6 +34,31 @@ from .utils import _safe_write
 from .cli_tools import _which
 
 
+def _run_claude_plugin(args: list[str], timeout: int = 90) -> dict[str, Any]:
+    """`claude plugin ...` subcommand — non-interactive.
+
+    Used for full auto-install/uninstall/enable/disable of plugins without a CC session.
+    """
+    claude = _which("claude")
+    if not claude:
+        return {"ok": False, "error": "claude CLI not found", "error_key": "err_no_claude_cli"}
+    try:
+        proc = subprocess.run(
+            [claude, "plugin", *args],
+            capture_output=True, timeout=timeout, check=False,
+        )
+        return {
+            "ok": proc.returncode == 0,
+            "returncode": proc.returncode,
+            "stdout": proc.stdout.decode("utf-8", "replace").strip(),
+            "stderr": proc.stderr.decode("utf-8", "replace").strip(),
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": f"timeout after {timeout}s"}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e)}
+
+
 # 고정 카탈로그 — guide.py 의 _TOOLKIT_SOURCES 와 정합성 유지
 _ECC_ID = "everything-claude-code"
 _ECC_REPO = "https://github.com/affaan-m/everything-claude-code.git"
@@ -205,6 +230,41 @@ def api_toolkit_ecc_install(_body: dict | None = None) -> dict[str, Any]:
         "path": str(target),
         "nextStep": f"Claude Code 에서 `/plugin install {_ECC_ID}@{_ECC_ID}` 실행",
     }
+
+
+def api_toolkit_ecc_install_plugin(body: dict | None = None) -> dict[str, Any]:
+    """Run `claude plugin install everything-claude-code@everything-claude-code -s <scope>`.
+
+    Non-interactive; finishes in a few seconds. Requires the marketplace to be
+    registered first (run api_toolkit_ecc_install beforehand).
+    """
+    body = body or {}
+    scope = (body.get("scope") or "user").lower()
+    if scope not in ("user", "project", "local"):
+        return {"ok": False, "error": "invalid scope"}
+    # marketplace 가 없으면 먼저 시도
+    if not _ecc_install_dir().exists():
+        pre = api_toolkit_ecc_install()
+        if not pre.get("ok"):
+            return {"ok": False, "error": f"marketplace prep failed: {pre.get('error')}"}
+    target = f"{_ECC_ID}@{_ECC_ID}"
+    r = _run_claude_plugin(["install", target, "-s", scope])
+    if not r.get("ok"):
+        return {"ok": False, "error": r.get("stderr") or r.get("error") or "install failed"}
+    return {"ok": True, "installed": True, "scope": scope, "plugin": target, "stdout": r.get("stdout", "")}
+
+
+def api_toolkit_ecc_uninstall_plugin(body: dict | None = None) -> dict[str, Any]:
+    """Run `claude plugin uninstall everything-claude-code@everything-claude-code`."""
+    body = body or {}
+    scope = (body.get("scope") or "user").lower()
+    if scope not in ("user", "project", "local"):
+        return {"ok": False, "error": "invalid scope"}
+    target = f"{_ECC_ID}@{_ECC_ID}"
+    r = _run_claude_plugin(["uninstall", target, "-s", scope])
+    if not r.get("ok"):
+        return {"ok": False, "error": r.get("stderr") or r.get("error") or "uninstall failed"}
+    return {"ok": True, "uninstalled": True, "scope": scope, "plugin": target, "stdout": r.get("stdout", "")}
 
 
 def api_toolkit_ecc_uninstall(_body: dict | None = None) -> dict[str, Any]:

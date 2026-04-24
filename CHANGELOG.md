@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.33.2] — 2026-04-24
+
+### 🔌 ECC Plugin full auto-install
+
+기존 v2.33.1 의 ECC 자동화는 marketplace 클론까지만 자동이고 실제 플러그인 설치는 사용자가 Claude Code 에서 `/plugin install` 을 직접 실행해야 했다. `claude plugin install` 서브커맨드가 비대화형으로 동작하는 것을 확인 후 두 신규 엔드포인트 추가:
+
+- `POST /api/toolkit/ecc/install-plugin` — marketplace 미클론이면 선행 클론 후 `claude plugin install everything-claude-code@everything-claude-code -s user` 실행
+- `POST /api/toolkit/ecc/uninstall-plugin` — `claude plugin uninstall ...` 실행
+
+GuideHub 카드 UI 가 설치 상태에 따라 "🔌 플러그인 설치" / "🗑 플러그인 제거" 버튼으로 자동 토글.
+
+**검증**
+- Playwright end-to-end: "플러그인 설치" 클릭 → 30초 내 "1 개 플러그인 설치됨" 으로 전환 확인
+- `claude plugin list` 에 `everything-claude-code@everything-claude-code` v1.10.0 등록 확인
+
+**파일**
+- `server/toolkits.py`: `_run_claude_plugin` + 2 신규 API
+- `server/routes.py`: 2 라우트 등록
+- `dist/index.html`: `_renderEccManage` 에 플러그인 토글 버튼 + `_eccInstallPlugin` 핸들러
+- `dist/locales/{ko,en,zh}.json`: +7 keys
+
+---
 ## [2.33.1] — 2026-04-24
 
 ### 🪟 사이드바 UX 3종 픽스

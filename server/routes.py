@@ -86,6 +86,7 @@ from .rtk_lab import (
 from .toolkits import (
     api_toolkit_status,
     api_toolkit_ecc_install, api_toolkit_ecc_uninstall,
+    api_toolkit_ecc_install_plugin, api_toolkit_ecc_uninstall_plugin,
     api_toolkit_ccb_install, api_toolkit_ccb_uninstall, api_toolkit_ccb_open,
 )
 from .notify import api_notify_test
@@ -365,6 +366,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/rtk/uninstall-hook": api_rtk_uninstall_hook,
     "/api/toolkit/ecc/install": api_toolkit_ecc_install,
     "/api/toolkit/ecc/uninstall": api_toolkit_ecc_uninstall,
+    "/api/toolkit/ecc/install-plugin": api_toolkit_ecc_install_plugin,
+    "/api/toolkit/ecc/uninstall-plugin": api_toolkit_ecc_uninstall_plugin,
     "/api/toolkit/ccb/install": api_toolkit_ccb_install,
     "/api/toolkit/ccb/uninstall": api_toolkit_ccb_uninstall,
     "/api/toolkit/ccb/open": api_toolkit_ccb_open,
