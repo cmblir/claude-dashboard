@@ -10,6 +10,141 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.33.1] — 2026-04-24
+
+### 🪟 사이드바 UX 3종 픽스
+
+**문제**
+1. **복구 불가** — 햄버거 버튼으로 사이드바를 접으면, 다시 펼칠 버튼이 사라져 재시작 전까지 좁은 아이콘 모드에 갇힘.
+2. **flyout hover 끊김** — 카테고리에서 오른쪽 flyout 으로 마우스를 이동하는 도중 `8px` gap 구간에서 hover 가 빠져 flyout 이 닫힘.
+3. **아이콘 의미 불명** — 접힌 사이드바에서 🆕 🏠 🔀 🧪 ⚙️ 📊 아이콘만 보여 어떤 기능인지 즉시 인지 불가.
+
+**원인**
+1. `_initMobileNav` IIFE 가 원본 `_syncNavToggleVisibility` 를 래핑하면서 `collapsed` 상태를 무시하고 `#navToggle` 을 항상 `display:none` 으로 덮어씀 → 접힌 상태에서 유일한 재펼치기 버튼이 숨겨짐.
+2. `.nav-flyout { left: calc(100% + 8px) }` 의 8px gap 에서 마우스가 공백 위에 놓이면 `.nav-category:hover` 가 풀림.
+3. `.nav-category` 에 `title` 속성 없음 + collapsed 상태에서 `.nav-cat-meta` 가 58px sidebar 내에 사실상 클리핑됨.
+
+**수정**
+1. `_initMobileNav` 의 래퍼 제거 — 원본 `_syncNavToggleVisibility` 가 이미 `(모바일 OR collapsed) ? 표시 : 숨김` 을 정확히 처리.
+2. `.nav-category::after` 로 category 오른쪽에 14px 투명 pseudo-element 를 두어 hover 브리지. pseudo-element 는 category 의 자식이므로 마우스가 그 위에 있어도 `:hover` 유지.
+3. collapsed 사이드바 너비 `58px → 78px` 로 확대. 아이콘 아래 **짧은 라벨**(Learn / Main / Build / Lab / Config / Watch) 9.5px 폰트로 세로 정렬. 추가로 `.nav-category` 에 `title` 네이티브 툴팁 부여 → 전체 설명도 hover 로 확인 가능.
+
+**검증**
+- `scripts/e2e-sidebar-ux.mjs` 신규 E2E — collapsed 후 `#navToggle` 가시성, flyout gap 중간 hover 유지, 바깥 이동 시 정상 종료, short 라벨 `display:inline-block` + full 라벨 `display:none` 확인.
+- 기존 `e2e-ui-elements.mjs` 전 테스트 통과 (회귀 없음).
+
+**파일**
+- `dist/index.html`: nav-category CSS/마크업, GROUPS 에 `short` 필드 추가, `_initMobileNav` 단순화.
+- `scripts/e2e-sidebar-ux.mjs`: 신규 회귀 테스트.
+
+### 🌐 i18n — 사이드바 카테고리 & 부분 번역 누수 해소
+
+**문제**
+1. 사이드바 상위 카테고리 6종(Learn/Main/Build/Playground/Config/Observe)과 short 라벨(Lab/Watch 포함) 이 사전에 없어 en/zh 전환 시 영어 그대로 노출.
+2. 서브탭 4개(`learner`/`artifacts`/`eventForwarder`/`securityScan`) 의 한국어 desc 가 en/zh 사전에 없어 원문 한국어가 노출됨.
+3. 백엔드 추천 문구(`features.py::overallScore` recommendations 6종) 가 사전에 없어 `_translateDOM` 단어 레벨 치환으로 **부분 번역**(예: "자주 쓰는 Command Allow", "Permissions 프롬프트를 줄이려면 … allowAdd to.") 발생.
+
+**원인**
+- GROUPS 의 `label`/`short` 가 영어 리터럴이라 `t()` → ko 분기에서 `!_KO_RE.test(key)` 로 fallback 경로 타고 원문 리턴.
+- 4 서브탭 desc 추가 시 locale 파일 업데이트 누락 (v2.30~v2.33 도입 탭).
+- `_translateDOM` 의 pattern-based 치환이 긴 Korean 키 일치 없이 부분 단어만 치환하여 어색한 혼합문장 생성.
+
+**수정**
+- `GROUPS` label/short 을 Korean 으로 전환 (`학습`/`메인`/`빌드`/`플레이그라운드`/`구성`/`관측` + short `실험실`) — 기존 `t()` dict 경로로 자연 번역.
+- `dist/locales/{ko,en,zh}.json` 에 22 개 키 추가:
+  - 카테고리 6종 + short 변형
+  - 4 서브탭 desc (Learner/Artifacts Viewer/Event Forwarder/Security Scan)
+  - 백엔드 추천 6쌍(제목 + 상세) 완전 문장 (훅 설정/거부 규칙/자주 쓰는 명령/세션 스코어/플러그인 활성화/MCP 커넥터)
+
+**검증**
+- `scripts/e2e-find-missing-i18n.mjs` 신규 — ko/en/zh 3 언어 전환 후 텍스트 노드 + 속성에서 한국어 누수 수집. UI 텍스트 누수 0건 (남은 4건은 사용자 세션 prompt 내용으로 번역 대상 아님).
+- `node scripts/verify-translations.js` 4 단계 검증 통과 (3486 keys × 3 lang).
+- 스크린샷 확인: KO "학습/메인/빌드/플레이그라운드/구성/관측" · EN "Learn/Main/Build/Playground/Config/Observe" · ZH "学习/主要/构建/实验场/配置/观测".
+
+**파일**
+- `dist/index.html`: GROUPS label/short Korean 전환.
+- `dist/locales/{ko,en,zh}.json`: +22 keys each.
+- `scripts/e2e-find-missing-i18n.mjs`: 신규.
+
+### 📏 flyout viewport-aware 위치 계산
+
+**문제**
+하단 카테고리(Observe/Config 14 items, Playground 12 items 등) 의 flyout 이 category top 기준 `top:0` 으로 아래로만 뻗어 viewport 아래로 삐져나감. `max-height:80vh + overflow-y:auto` 가 걸려있지만 스크롤 영역 자체가 viewport 밖이라 하단 아이템 접근 불가.
+
+**원인**
+`.nav-flyout { top: 0; max-height: 80vh }` CSS 만으로는 category 가 viewport 하단 쪽에 있을 때 flyout bottom 이 viewport 를 초과함. 측정 결과: 1440×900 viewport 에서 Observe flyout top=373, bottom=1093 (193px 초과 · 12 items 중 마지막 2개 클리핑).
+
+**수정**
+`_positionNavFlyout(cat)` 도입 — category 위치/자연 높이 측정 후 동적으로 `top` 음수 offset + `max-height` clamp. `mouseenter` · `focusin` · 클릭 open 시에 실행. resize 시 열려있는 flyout 자동 재계산.
+- flyout 이 아래 공간에 들어가면 top:0 유지
+- 아래로 넘치면 위로 shift 해서 flyout bottom ≤ viewport - 12px
+- shift 해도 viewport 상단을 넘으면 top = 12px 에서 clamp (이때만 내부 스크롤 필수)
+
+**결과** (1440×900)
+| 카테고리 | 아이템 | 이전 flyout bottom | 이후 flyout bottom | fits? |
+|---|---|---|---|---|
+| learn | 4 | 368 | 368 | ✓ |
+| main | 6 | 482 | 482 | ✓ |
+| build | 10 | 819 | 819 | ✓ |
+| playground | 12 | 1108 | 888 | ✓ (shift -220) |
+| config | 14 | 1187 | 888 | ✓ (shift -299) |
+| observe | 12 | 1093 | 888 | ✓ (shift -231) |
+
+**파일**
+- `dist/index.html`: `_positionNavFlyout` 함수 + nav-category mouseenter/focusin/click 바인딩.
+
+### 🧰 가이드 툴킷 자동 설치/제거 — ECC · CCB
+
+**문제**
+1. **가독성** — guideHub 툴킷 카드의 설치 코드박스가 `rgba(0,0,0,0.3)` 반투명 배경 + `#a7f3d0` 민트 글씨라 light 테마에서 중간 회색 위에 밝은 글씨가 거의 안 보임. 카테고리 태그(Agents/Skills/Commands/Hooks) 도 `#c4b5fd` 연보라 글씨라 light 에선 대비 부족.
+2. **관리 기능 부재** — Everything Claude Code(ECC) · Claude Code Best Practice(CCB) 가 카탈로그엔 있지만 설치/제거 버튼이 없어 사용자가 직접 터미널/CC 에서 수행해야 했음 (RTK 는 이미 자동화되어 있음).
+
+**수정**
+- **CSS `.code-terminal`** — 모든 테마에서 항상 `#0b1220` 진한 배경 + 선명한 민트 글씨로 통일. 툴킷 install 코드박스 전부 이 클래스 사용.
+- **CSS `.chip-violet`** — light 테마에서 `#6d28d9` 진한 보라색으로 오버라이드. 카테고리 태그 전부 이 클래스 추가.
+- **신규 `server/toolkits.py`** — `/api/toolkit/{status,ecc/install,ecc/uninstall,ccb/install,ccb/uninstall,ccb/open}` 6 라우트:
+  - **ECC**: `git clone --depth 1 affaan-m/everything-claude-code` → `~/.claude/plugins/marketplaces/everything-claude-code/` + `known_marketplaces.json` 엔트리 등록. 이후 Claude Code 에서 `/plugin install ...` 만 실행하면 됨(명령 복사 버튼 제공). 제거 시 디렉터리 + 레지스트리 entry 모두 삭제.
+  - **CCB**: `git clone --depth 1 shanraisshan/claude-code-best-practice` → 기본 `~/claude-code-best-practice/`. 제거 시 디렉터리 삭제(.git 존재 확인). macOS `open` 으로 폴더 열기 지원.
+  - 보안: `_under_home` realpath 검증 · 쓰기 경로 화이트리스트 · `.git` 존재 확인 후 제거.
+- **guideHub 카드 UI** — `AFTER.guideHub` → `_refreshToolkitManage()` 가 상태 가져와 각 카드 상단에 상태 chip + 버튼 렌더:
+  - ECC: 미설치/마켓추가됨/플러그인 설치 필요, "마켓플레이스 추가"/"업데이트"/"마켓 제거" + `/plugin install` 명령 복사
+  - CCB: 미설치/설치됨(commit hash), "내려받기"/"업데이트"/"폴더 열기"/"제거"
+
+**검증**
+- `curl -X POST /api/toolkit/ecc/install` → `{"ok":true,"installed":true}` · `~/.claude/plugins/marketplaces/everything-claude-code/` clone 완료 · `known_marketplaces.json` 에 entry 추가 확인.
+- UI 재렌더 후 ECC 상태가 "✓ 마켓플레이스 추가됨 · 4e66b28 · 플러그인 설치 필요" 로 자동 업데이트.
+- Light 테마 스크린샷에서 코드박스·태그 가독성 확연히 개선.
+
+**파일**
+- `server/toolkits.py`: 신규 (237줄).
+- `server/routes.py`: 6 라우트 등록.
+- `dist/index.html`: `.code-terminal` · `.chip-violet` CSS + `_renderGuideToolkits` 클래스 전환 + `AFTER.guideHub` + 5 API 호출 헬퍼.
+
+### 🔑 로그인 게이트 — 매번 새로고침 → 첫 방문만
+
+**문제**
+`boot()` 에서 auth 상태와 무관하게 **항상** `showLoginGate` 를 호출해 새로고침마다 "Continue" 버튼을 한 번씩 눌러야 했음.
+
+**수정**
+- `localStorage` `dashboard-entered` 플래그 도입. 첫 `enterDashboard()` 호출 시 설정, `doLogoutOnly()` 에서 제거.
+- `boot()` 로직: 플래그가 있고 `auth.connected` 면 → 게이트 스킵 후 바로 `enterDashboard()`. 첫 방문 OR 연결 끊김 OR 서버 실패 시에만 게이트 표시.
+- 좌측 하단 `#cliStatus` 카드에 로그아웃 버튼 추가:
+  - 연결됨: "🔄 전환" + "🚪 로그아웃" 2 버튼 (기존 "계정 전환" 단독 → 2 버튼)
+  - 미연결: "🚀 로그인" 버튼
+- i18n 22 키 추가 (`전환`, `로그아웃`, 기타 토글 + 토스트 메시지).
+
+**검증**
+- 첫 방문: 게이트 표시 · flag null
+- Continue 클릭 후 flag="1"
+- 새로고침: 게이트 스킵 · sidebar 즉시 표시 · nav 6 카테고리 렌더
+- 로그아웃 버튼 → flag 제거 → 다음 로드 시 게이트 재표시
+- verify-translations 4단계 통과 (3508 keys × 3 lang)
+
+**파일**
+- `dist/index.html`: `enterDashboard` localStorage 저장 · `boot()` 플래그 분기 · `doLogoutOnly` 플래그 클리어 · `#cliStatus` 카드 버튼 확장.
+- `dist/locales/{ko,en,zh}.json`: +22 keys.
+
+---
 ## [2.33.0] — 2026-04-24
 
 ### 🎨 Artifacts 로컬 뷰어 — 4중 보안 워크플로우 출력 미리보기 (build 그룹)

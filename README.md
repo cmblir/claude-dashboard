@@ -12,7 +12,7 @@ _Don't memorize 50+ CLI commands. Just click._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.33.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.33.1-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-architecture)
 
 </div>
@@ -40,7 +40,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.33.0 🇺🇸│
+│  💤  LazyClaude                                     v2.33.1 🇺🇸│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 New │   🔀 Workflows                                         │
 │ 🏠 Main│   ┌──────┐      ┌──────┐      ┌──────┐                │
@@ -306,7 +306,7 @@ Atomic writes via `server/utils.py::_safe_write` (`.tmp → rename`), threading 
 
 ---
 
-## 🔢 Stats (v2.33.0)
+## 🔢 Stats (v2.33.1)
 
 | Metric | Value |
 |---|---|

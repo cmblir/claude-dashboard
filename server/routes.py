@@ -83,6 +83,11 @@ from .rtk_lab import (
     api_rtk_config, api_rtk_gain, api_rtk_session,
     api_rtk_uninstall_hook,
 )
+from .toolkits import (
+    api_toolkit_status,
+    api_toolkit_ecc_install, api_toolkit_ecc_uninstall,
+    api_toolkit_ccb_install, api_toolkit_ccb_uninstall, api_toolkit_ccb_open,
+)
 from .notify import api_notify_test
 from .session_replay import api_session_replay_list, api_session_replay_load
 from .event_forwarder import (
@@ -273,6 +278,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/rtk/config": api_rtk_config,
     "/api/rtk/gain": api_rtk_gain,
     "/api/rtk/session": api_rtk_session,
+    "/api/toolkit/status": api_toolkit_status,
     "/api/session-replay/list": api_session_replay_list,
     "/api/session-replay/load": api_session_replay_load,
     "/api/event-forwarder/list": api_event_forwarder_list,
@@ -357,6 +363,11 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/rtk/install": api_rtk_install,
     "/api/rtk/init": api_rtk_init,
     "/api/rtk/uninstall-hook": api_rtk_uninstall_hook,
+    "/api/toolkit/ecc/install": api_toolkit_ecc_install,
+    "/api/toolkit/ecc/uninstall": api_toolkit_ecc_uninstall,
+    "/api/toolkit/ccb/install": api_toolkit_ccb_install,
+    "/api/toolkit/ccb/uninstall": api_toolkit_ccb_uninstall,
+    "/api/toolkit/ccb/open": api_toolkit_ccb_open,
     "/api/notify/test": api_notify_test,
     "/api/event-forwarder/add": api_event_forwarder_add,
     "/api/event-forwarder/remove": api_event_forwarder_remove,

@@ -132,6 +132,11 @@ tailwind.config = {
   body.theme-light .spotlight-item:hover, body.theme-light .spotlight-item.active { background: rgba(0,0,0,0.05); }
   body.theme-light .prose-claude code { background: rgba(0,0,0,0.06); }
   body.theme-light .prose-claude pre { background: #f0f0ea; border-color: rgba(0,0,0,0.08); }
+  /* v2.33.2 — 모든 테마에서 선명하게 보이는 공용 코드 박스 (guide 탭, 등) */
+  .code-terminal { background: #0b1220 !important; color: #7ee2b8 !important; border: 1px solid rgba(126,226,184,0.18); }
+  body.theme-light .code-terminal { background: #0b1220 !important; color: #a7f3d0 !important; }
+  /* v2.33.2 — 보라색 태그 chip 의 light theme 대비 개선 */
+  body.theme-light .chip-violet { background: rgba(139,92,246,0.14) !important; color: #6d28d9 !important; border-color: rgba(139,92,246,0.28) !important; }
   body.theme-light .pulse-dot { background: #16a34a; }
   body.theme-light .empty { color: var(--text-dim); }
   body.theme-light #sidebar-foot { border-color: rgba(0,0,0,0.08); }
@@ -331,6 +336,17 @@ tailwind.config = {
     z-index: 1200;
     animation: navFlyoutIn 0.14s ease-out;
   }
+  /* v2.33.1 — hover bridge: 카테고리 오른쪽에 투명 pseudo-element 를 두어
+     gap(8px) 을 건너는 동안 :hover 상태를 유지. category 의 자식이므로
+     마우스가 bridge 위에 있어도 .nav-category:hover 가 참. */
+  .nav-category::after {
+    content: ''; position: absolute; left: 100%; top: 0;
+    width: 14px; height: 100%; background: transparent; z-index: 1201;
+    pointer-events: none;
+  }
+  .nav-category:hover::after,
+  .nav-category:focus-within::after,
+  .nav-category.open::after { pointer-events: auto; }
   @keyframes navFlyoutIn {
     from { opacity: 0; transform: translateX(-6px); }
     to { opacity: 1; transform: translateX(0); }
@@ -568,7 +584,7 @@ tailwind.config = {
   .line-clamp-6 { display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden; }
   /* 햄버거 토글 중복 방지: sb-collapsed 상태면 sbToggle 숨기고 navToggle 만, 평상시엔 반대 */
   body.sb-collapsed #sbToggle { display: none; }
-  body.sb-collapsed #sidebar { width: 58px; }
+  body.sb-collapsed #sidebar { width: 78px; }
 
   /* 🪟 macOS 스타일 플로팅 창 (신기능 전용) */
   .feat-win {
@@ -624,7 +640,29 @@ tailwind.config = {
   body.sb-collapsed #sidebar .group-label,
   body.sb-collapsed #sidebar .cli-body { display: none; }
   body.sb-collapsed #sidebar .nav-item { justify-content: center; padding: 0.55rem 0.4rem; }
-  body.sb-collapsed #content { margin-left: 58px; }
+  /* v2.33.1 — collapsed 카테고리: 아이콘 + 짧은 라벨 세로 배치로 "뭐가 뭔지" 즉시 인지 가능 */
+  body.sb-collapsed #sidebar .nav-category {
+    flex-direction: column; gap: 2px; padding: 0.5rem 0.2rem; text-align: center;
+  }
+  body.sb-collapsed #sidebar .nav-cat-desc,
+  body.sb-collapsed #sidebar .nav-cat-count,
+  body.sb-collapsed #sidebar .nav-cat-chevron,
+  body.sb-collapsed #sidebar .nav-cat-dot { display: none; }
+  body.sb-collapsed #sidebar .nav-cat-meta { flex: none; width: 100%; overflow: visible; }
+  body.sb-collapsed #sidebar .nav-cat-label {
+    font-size: 9.5px; font-weight: 600; line-height: 1.1; color: var(--text-mute);
+    white-space: nowrap; overflow: hidden; text-overflow: clip;
+    letter-spacing: 0.02em; max-width: 72px;
+    justify-content: center;
+  }
+  /* 기본(expanded): full 라벨만, short 숨김 */
+  .nav-cat-label-short { display: none; }
+  /* collapsed: short 만, full 숨김. `> span` 셀렉터보다 특이도를 높이기 위해 속성 셀렉터 이용 */
+  body.sb-collapsed #sidebar .nav-cat-label span.nav-cat-label-full { display: none; }
+  body.sb-collapsed #sidebar .nav-cat-label span.nav-cat-label-short { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  body.sb-collapsed #sidebar .nav-category.has-active .nav-cat-label { color: var(--text); }
+  body.sb-collapsed #sidebar .nav-cat-icon { font-size: 1.25rem; width: auto; }
+  body.sb-collapsed #content { margin-left: 78px; }
   body.sb-collapsed #sidebar-foot { padding: 0.4rem; gap: 0.3rem; }
   body.sb-collapsed #sidebar-foot .btn { display: none; }  /* 접힌 상태에서 버튼 숨김 */
   body.sb-collapsed #sidebar-foot #cliStatus > .card { padding: 0.35rem !important; }
@@ -1066,12 +1104,12 @@ const NAV = [
     docUrl: DOCS_BASE+'security' },
 ];
 const GROUPS = [
-  { id: 'learn',      icon: '🆕', label: 'Learn',      desc: '신기능 · 온보딩 · 공식 문서 · 가이드' },
-  { id: 'main',       icon: '🏠', label: 'Main',       desc: '대시보드 · 프로젝트 · 플랜 · 세션' },
-  { id: 'build',      icon: '🔀', label: 'Build',      desc: '워크플로우 · 에이전트 · 프롬프트' },
-  { id: 'playground', icon: '🧪', label: 'Playground', desc: 'Claude API 실험 12종 + 프로바이더' },
-  { id: 'config',     icon: '⚙️', label: 'Config',     desc: '훅 · 권한 · MCP · 플러그인 · 설정' },
-  { id: 'observe',    icon: '📊', label: 'Observe',    desc: '비용 · 메트릭 · 시스템 관측' },
+  { id: 'learn',      icon: '🆕', label: '학습',         short: '학습',   desc: '신기능 · 온보딩 · 공식 문서 · 가이드' },
+  { id: 'main',       icon: '🏠', label: '메인',         short: '메인',   desc: '대시보드 · 프로젝트 · 플랜 · 세션' },
+  { id: 'build',      icon: '🔀', label: '빌드',         short: '빌드',   desc: '워크플로우 · 에이전트 · 프롬프트' },
+  { id: 'playground', icon: '🧪', label: '플레이그라운드', short: '실험실', desc: 'Claude API 실험 12종 + 프로바이더' },
+  { id: 'config',     icon: '⚙️', label: '구성',         short: '구성',   desc: '훅 · 권한 · MCP · 플러그인 · 설정' },
+  { id: 'observe',    icon: '📊', label: '관측',         short: '관측',   desc: '비용 · 메트릭 · 시스템 관측' },
 ];
 
 function viewHeader(title, subtitle, viewId) {
@@ -1234,6 +1272,8 @@ function renderNav() {
     cat.setAttribute('aria-haspopup', 'true');
     cat.setAttribute('aria-expanded', 'false');
     cat.setAttribute('aria-label', g.label + ' — ' + (g.desc || ''));
+    // v2.33.1 — collapsed 상태에서 아이콘만 남을 때도 의미 전달. title 은 네이티브 툴팁용.
+    cat.setAttribute('title', t(g.label) + (g.desc ? ' — ' + t(g.desc) : ''));
     cat.dataset.cat = g.id;
     const activeMark = activeHere
       ? '<span class="nav-cat-dot" aria-hidden="true"></span>'
@@ -1242,7 +1282,7 @@ function renderNav() {
       <span class="nav-cat-icon" aria-hidden="true">${g.icon}</span>
       <div class="nav-cat-meta flex-1 min-w-0">
         <div class="nav-cat-label flex items-center gap-1">
-          ${activeMark}<span>${escapeHtml(t(g.label))}</span>
+          ${activeMark}<span class="nav-cat-label-full">${escapeHtml(t(g.label))}</span><span class="nav-cat-label-short">${escapeHtml(t(g.short || g.label))}</span>
         </div>
         <div class="nav-cat-desc text-[10px] text-[var(--text-dim)] truncate">${escapeHtml(t(g.desc || ''))}</div>
       </div>
@@ -1290,6 +1330,10 @@ function renderNav() {
       flyout.appendChild(el);
     });
     cat.appendChild(flyout);
+    // v2.33.2 — flyout 이 viewport 에 들어가도록 mouseenter/focusin 시 top/max-height 재계산
+    const reposition = () => _positionNavFlyout(cat);
+    cat.addEventListener('mouseenter', reposition);
+    cat.addEventListener('focusin', reposition);
     // 카테고리 자체 클릭: open 토글 (다른 카테고리는 닫기)
     cat.onclick = (e) => {
       if (e.target.closest('.nav-item')) return;
@@ -1298,6 +1342,7 @@ function renderNav() {
       if (!isOpen) {
         cat.classList.add('open');
         cat.setAttribute('aria-expanded', 'true');
+        _positionNavFlyout(cat);
       } else {
         cat.setAttribute('aria-expanded', 'false');
       }
@@ -1314,6 +1359,50 @@ function renderNav() {
   });
   _translateDOM(nav);
 }
+
+// v2.33.2 — flyout 이 viewport 안에 들어가도록 top/max-height 를 동적 계산
+// 이유: `.nav-flyout { top: 0; max-height: 80vh }` 만으로는 하단 카테고리(Observe)의
+// flyout 이 category 최상단에서 시작 → viewport 아래로 삐져나가 뒤쪽 아이템이 잘림.
+// 내부 overflow 는 있지만 스크롤바가 뷰포트 밖이라 사용자가 접근 불가.
+function _positionNavFlyout(cat) {
+  const fl = cat && cat.querySelector('.nav-flyout');
+  if (!fl) return;
+  const margin = 12;
+  const vh = window.innerHeight;
+  const cr = cat.getBoundingClientRect();
+  // 자연 높이 측정 — display:none 상태면 임시로 block 처리 후 복원
+  const priorDisplay = fl.style.display;
+  const priorVisibility = fl.style.visibility;
+  fl.style.maxHeight = '';
+  fl.style.top = '0';
+  if (getComputedStyle(fl).display === 'none') {
+    fl.style.visibility = 'hidden';
+    fl.style.display = 'block';
+  }
+  const naturalH = fl.scrollHeight;
+  // 측정 후 원복 (CSS :hover 가 곧 display:block 을 적용)
+  fl.style.display = priorDisplay;
+  fl.style.visibility = priorVisibility;
+  const maxAllowed = vh - 2 * margin;
+  const wantH = Math.min(naturalH, maxAllowed);
+  let topOffset = 0;
+  if (cr.top + wantH + margin > vh) {
+    topOffset = vh - cr.top - wantH - margin;
+    if (cr.top + topOffset < margin) topOffset = margin - cr.top;
+  }
+  fl.style.top = `${topOffset}px`;
+  fl.style.maxHeight = `${wantH}px`;
+}
+window._positionNavFlyout = _positionNavFlyout;
+
+// viewport 변화 시 열려있는 flyout 재계산
+window.addEventListener('resize', () => {
+  document.querySelectorAll('.nav-category').forEach(cat => {
+    if (cat.matches(':hover') || cat.classList.contains('open') || cat.contains(document.activeElement)) {
+      _positionNavFlyout(cat);
+    }
+  });
+});
 
 // 사이드바 바깥 클릭 시 flyout 닫기
 document.addEventListener('click', (e) => {
@@ -1721,6 +1810,106 @@ VIEWS.guideHub = async () => {
     ${sub === 'cheatsheet'     ? _renderGuideCheatsheet(r.cheatsheet || {}) : ''}
   `;
 };
+AFTER.guideHub = () => {
+  if ((state.data.guideSub || 'toolkits') !== 'toolkits') return;
+  _refreshToolkitManage();
+};
+async function _refreshToolkitManage() {
+  const eccSlot = document.getElementById('tkManage-everything-claude-code');
+  const ccbSlot = document.getElementById('tkManage-claude-code-best-practice');
+  if (!eccSlot && !ccbSlot) return;
+  try {
+    const r = await api('/api/toolkit/status');
+    if (!r || !r.ok) return;
+    if (eccSlot) eccSlot.innerHTML = _renderEccManage(r);
+    if (ccbSlot) ccbSlot.innerHTML = _renderCcbManage(r);
+  } catch {}
+}
+function _renderEccManage(r) {
+  const e = r.ecc || {};
+  const cloned = !!e.marketplaceCloned;
+  const nInstalled = (e.installedPlugins || []).length;
+  const stateChip = cloned
+    ? `<span class="chip chip-ok text-[10px]">✓ ${t('마켓플레이스 추가됨')}${e.commit ? ' · ' + escapeHtml(e.commit) : ''}</span>`
+    : `<span class="chip text-[10px]">${t('미설치')}</span>`;
+  const pluginChip = nInstalled > 0
+    ? `<span class="chip chip-ok text-[10px]">🔌 ${nInstalled} ${t('개 플러그인 설치됨')}</span>`
+    : cloned ? `<span class="chip chip-warn text-[10px]">${t('플러그인 설치 필요')}</span>` : '';
+  return `
+    <div class="flex items-center gap-2 flex-wrap mb-2">
+      <div class="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider flex-1">${t('대시보드에서 관리')}</div>
+      ${stateChip} ${pluginChip}
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      ${cloned
+        ? `<button class="btn text-[12px]" onclick="_eccInstall(this)" ${!r.gitAvailable?'disabled':''}>🔄 ${t('업데이트')}</button>
+           <button class="btn-danger btn text-[12px]" onclick="_eccUninstall(this)">🗑 ${t('마켓 제거')}</button>`
+        : `<button class="btn-primary btn text-[12px]" onclick="_eccInstall(this)" ${!r.gitAvailable?'disabled':''}>⬇︎ ${t('마켓플레이스 추가')}</button>`}
+      ${cloned ? `<code class="code-terminal text-[11px] px-2 py-1 rounded">${escapeHtml(e.installCommand)}</code>
+                  <button class="btn text-[11px]" onclick="_copyToClipboard(this, ${JSON.stringify(e.installCommand).replace(/"/g,'&quot;')})">📋 ${t('복사')}</button>` : ''}
+    </div>
+    ${cloned ? `<div class="text-[11px] text-[var(--text-dim)] mt-1.5">📂 ${escapeHtml(e.installDir || '')}</div>` : ''}`;
+}
+function _renderCcbManage(r) {
+  const c = r.ccb || {};
+  const cloned = !!c.cloned;
+  const stateChip = cloned
+    ? `<span class="chip chip-ok text-[10px]">✓ ${t('설치됨')}${c.commit ? ' · ' + escapeHtml(c.commit) : ''}</span>`
+    : `<span class="chip text-[10px]">${t('미설치')}</span>`;
+  return `
+    <div class="flex items-center gap-2 flex-wrap mb-2">
+      <div class="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider flex-1">${t('대시보드에서 관리')}</div>
+      ${stateChip}
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      ${cloned
+        ? `<button class="btn text-[12px]" onclick="_ccbInstall(this)" ${!r.gitAvailable?'disabled':''}>🔄 ${t('업데이트')}</button>
+           <button class="btn text-[12px]" onclick="_ccbOpen(this)">📂 ${t('폴더 열기')}</button>
+           <button class="btn-danger btn text-[12px]" onclick="_ccbUninstall(this)">🗑 ${t('제거')}</button>`
+        : `<button class="btn-primary btn text-[12px]" onclick="_ccbInstall(this)" ${!r.gitAvailable?'disabled':''}>⬇︎ ${t('레포 내려받기')}</button>`}
+    </div>
+    <div class="text-[11px] text-[var(--text-dim)] mt-1.5">📂 ${escapeHtml(c.defaultDir || '')}</div>`;
+}
+async function _eccInstall(btn) {
+  btn.disabled = true; const orig = btn.textContent; btn.textContent = '⏳ ' + t('설치 중...');
+  try {
+    const r = await api('/api/toolkit/ecc/install', { method: 'POST', body: {} });
+    if (r.ok) { toast(r.updated ? t('ECC 마켓 업데이트 완료') : t('ECC 마켓 추가 완료'), 'ok'); _refreshToolkitManage(); }
+    else { toast(r.error || t('설치 실패'), 'err'); btn.disabled = false; btn.textContent = orig; }
+  } catch (e) { toast(String(e), 'err'); btn.disabled = false; btn.textContent = orig; }
+}
+async function _eccUninstall(btn) {
+  if (!confirm(t('ECC 마켓플레이스 디렉터리와 레지스트리 entry 를 제거합니다. 계속할까요?'))) return;
+  btn.disabled = true;
+  try {
+    const r = await api('/api/toolkit/ecc/uninstall', { method: 'POST', body: {} });
+    if (r.ok) { toast(t('ECC 마켓 제거 완료') + (r.note ? ' · ' + r.note : ''), 'ok'); _refreshToolkitManage(); }
+    else { toast(r.error || t('제거 실패'), 'err'); btn.disabled = false; }
+  } catch (e) { toast(String(e), 'err'); btn.disabled = false; }
+}
+async function _ccbInstall(btn) {
+  btn.disabled = true; const orig = btn.textContent; btn.textContent = '⏳ ' + t('내려받는 중...');
+  try {
+    const r = await api('/api/toolkit/ccb/install', { method: 'POST', body: {} });
+    if (r.ok) { toast(r.updated ? t('CCB 업데이트 완료') : t('CCB 내려받기 완료'), 'ok'); _refreshToolkitManage(); }
+    else { toast(r.error || t('설치 실패'), 'err'); btn.disabled = false; btn.textContent = orig; }
+  } catch (e) { toast(String(e), 'err'); btn.disabled = false; btn.textContent = orig; }
+}
+async function _ccbUninstall(btn) {
+  if (!confirm(t('CCB 디렉터리를 완전히 제거합니다. 계속할까요?'))) return;
+  btn.disabled = true;
+  try {
+    const r = await api('/api/toolkit/ccb/uninstall', { method: 'POST', body: {} });
+    if (r.ok) { toast(t('CCB 제거 완료'), 'ok'); _refreshToolkitManage(); }
+    else { toast(r.error || t('제거 실패'), 'err'); btn.disabled = false; }
+  } catch (e) { toast(String(e), 'err'); btn.disabled = false; }
+}
+async function _ccbOpen() {
+  try {
+    const r = await api('/api/toolkit/ccb/open', { method: 'POST', body: {} });
+    if (!r.ok) toast(r.error || t('폴더 열기 실패'), 'err');
+  } catch (e) { toast(String(e), 'err'); }
+}
 
 function _renderGuideToolkits(list) {
   if (!list.length) return `<div class="card p-8 empty">${t('데이터 없음')}</div>`;
@@ -1749,6 +1938,8 @@ function _renderGuideToolkits(list) {
               </ul>
             </div>` : ''}
 
+          <div id="tkManage-${escapeHtml(tk.id)}" class="mb-3"></div>
+
           ${tk.install?.length ? `
             <div class="mb-3">
               <div class="text-xs font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">${t('설치 & 사용')}</div>
@@ -1757,8 +1948,8 @@ function _renderGuideToolkits(list) {
                   <div>
                     <div class="text-[11px] text-[var(--text-dim)] mb-0.5">${escapeHtml(inst.label)}</div>
                     <div class="flex items-center gap-2">
-                      <code class="flex-1 min-w-0 px-2 py-1.5 rounded text-xs font-mono"
-                            style="background:rgba(0,0,0,0.3); color:#a7f3d0; word-break:break-all;">${escapeHtml(inst.code)}</code>
+                      <code class="code-terminal flex-1 min-w-0 px-2 py-1.5 rounded text-xs font-mono"
+                            style="word-break:break-all;">${escapeHtml(inst.code)}</code>
                       <button class="btn text-[11px]" onclick="_copyToClipboard(this, ${JSON.stringify(inst.code).replace(/"/g,'&quot;')})">📋 ${t('복사')}</button>
                     </div>
                   </div>`).join('')}
@@ -1771,7 +1962,7 @@ function _renderGuideToolkits(list) {
                 <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; padding:10px 12px;">
                   <div class="text-xs font-semibold mb-1.5">${escapeHtml(c.name)}</div>
                   <div class="flex flex-wrap gap-1">
-                    ${(c.items||[]).map(it => `<span class="chip text-[10px]" style="background:rgba(167,139,250,0.12); color:#c4b5fd;">${escapeHtml(it)}</span>`).join('')}
+                    ${(c.items||[]).map(it => `<span class="chip chip-violet text-[10px]" style="background:rgba(167,139,250,0.12); color:#c4b5fd;">${escapeHtml(it)}</span>`).join('')}
                   </div>
                 </div>`).join('')}
             </div>` : ''}
@@ -15384,8 +15575,10 @@ async function loadCliFoot() {
         </div>
         ${connOk ? `<div class="cli-body text-[10px] text-[var(--text-dim)] mt-1 truncate">${escapeHtml(auth.planLabel||'')} · ${escapeHtml(auth.email||'')}</div>` : ''}
         <div class="flex gap-1 mt-1.5">
-          ${connOk ? `<button class="btn text-[9px] px-1.5 py-0.5 flex-1" onclick="event.stopPropagation();switchAccount()">🔄 계정 전환</button>`
-                   : `<button class="btn-primary btn text-[9px] px-1.5 py-0.5 flex-1" onclick="event.stopPropagation();triggerLogin()">🚀 로그인</button>`}
+          ${connOk
+            ? `<button class="btn text-[9px] px-1.5 py-0.5 flex-1" onclick="event.stopPropagation();switchAccount()" title="${t('다른 Claude 계정으로 전환')}">🔄 ${t('전환')}</button>
+               <button class="btn text-[9px] px-1.5 py-0.5 flex-1" onclick="event.stopPropagation();doLogoutOnly()" title="${t('현재 계정 로그아웃')}">🚪 ${t('로그아웃')}</button>`
+            : `<button class="btn-primary btn text-[9px] px-1.5 py-0.5 flex-1" onclick="event.stopPropagation();triggerLogin()">🚀 ${t('로그인')}</button>`}
         </div>
       </div>
     `;
@@ -15493,6 +15686,8 @@ async function doLogoutOnly() {
     if (r.ok) {
       toast('로그아웃 되었습니다', 'ok');
       closeModal();
+      // v2.33.2 — 다음 새로고침에 로그인 게이트가 다시 뜨도록 플래그 클리어
+      try { localStorage.removeItem('dashboard-entered'); } catch {}
       await loadCliFoot();
     } else toast(errMsg(r), 'err');
   } catch (e) { toast(e.message, 'err'); }
@@ -16045,6 +16240,8 @@ function enterDashboard() {
   contentEl.style.marginLeft = '';
   const headerEl = contentEl.querySelector('header');
   if (headerEl) headerEl.style.display = '';
+  // v2.33.2 — 한 번 진입했음을 기록해 다음 새로고침 시 게이트 스킵
+  try { localStorage.setItem('dashboard-entered', '1'); } catch {}
   // 챗 창 드래그 + 마스코트 초기화 (1회)
   if (!_chatDragInit) {
     try { _makeDraggable(document.getElementById('chatWin')); } catch {}
@@ -17181,26 +17378,12 @@ async function _wfDiffVersions() {
 // Task 1: 모바일 반응형 — 768px 이하 사이드바 기본 접힘 + 햄버거
 // ────────────────────────────────────────────────────────────────
 (function _initMobileNav() {
-  function syncNavToggle() {
-    const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    const toggle = document.getElementById('navToggle');
-    if (toggle) toggle.style.display = isMobile ? '' : 'none';
-    if (isMobile) {
-      const sb = document.getElementById('sidebar');
-      if (sb && !sb.classList.contains('open')) {
-        // 모바일에서 기본 접힘 상태 보장
-      }
-    }
-  }
-  // _syncNavToggleVisibility 가 이미 있으면 덮어쓰지 않고 기존 것을 호출
+  // v2.33.1 — 원본 _syncNavToggleVisibility 가 (모바일 OR collapsed) 조건을
+  // 이미 올바르게 처리한다. 래핑하지 않고 원본 그대로 사용.
   if (typeof _syncNavToggleVisibility === 'function') {
-    const orig = _syncNavToggleVisibility;
-    window._syncNavToggleVisibility = function() { orig(); syncNavToggle(); };
-  } else {
-    window._syncNavToggleVisibility = syncNavToggle;
+    window.addEventListener('resize', _syncNavToggleVisibility);
+    _syncNavToggleVisibility();
   }
-  window.addEventListener('resize', syncNavToggle);
-  syncNavToggle();
 })();
 
 (async function boot() {
@@ -17209,11 +17392,19 @@ async function _wfDiffVersions() {
   state.view = (location.hash.replace(/^#\//, '') || 'overview');
   if (!NAV.find(n => n.id === state.view)) state.view = 'overview';
   renderNav();
-  // 항상 로그인 게이트를 먼저 표시 — 연결 확인 후 진입
+  // v2.33.2 — 이미 한 번 진입했고 연결돼 있으면 게이트 스킵하고 바로 대시보드로.
+  // 첫 방문 OR 연결 끊김 OR 서버 실패 시에만 로그인 게이트 표시.
+  let alreadyEntered = false;
+  try { alreadyEntered = localStorage.getItem('dashboard-entered') === '1'; } catch {}
   try {
     const auth = await api('/api/auth/status');
-    showLoginGate(auth);
+    if (alreadyEntered && auth.connected) {
+      enterDashboard();
+    } else {
+      showLoginGate(auth);
+    }
   } catch(e) {
+    // 서버 접근 실패 — 플래그와 무관하게 게이트로 안내
     showLoginGate({ connected: false, cliInstalled: false, reason: '서버 연결 실패: ' + e.message });
   }
 })();
