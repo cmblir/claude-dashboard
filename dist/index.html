@@ -824,7 +824,10 @@ tailwind.config = {
     <button id="btn-latest-features" class="btn w-full justify-center text-[12px]" title="Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가" aria-label="최신 정보 로딩">
       <span>📡</span><span>최신 정보 로딩</span>
     </button>
-    <div id="appVersion" class="text-center text-[10px] text-[var(--text-dim)] cursor-pointer hover:text-[var(--text-mute)]" onclick="_showVersionModal()" title="버전 정보 / 변경 이력"></div>
+    <div class="flex items-center justify-center gap-1 mt-1">
+      <div id="appVersion" class="text-center text-[10px] text-[var(--text-dim)] cursor-pointer hover:text-[var(--text-mute)]" onclick="_showVersionModal()" title="버전 정보 / 변경 이력"></div>
+      <button class="btn-ghost btn text-[9px] px-1.5 py-0.5" onclick="_openShortcutHelp()" title="키보드 단축키 (?)" aria-label="키보드 단축키">⌨️</button>
+    </div>
   </div>
 </aside>
 
@@ -17230,7 +17233,75 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && _spotlightOpen) {
     closeSpotlight();
   }
+  // v2.33.4 — 글로벌 단축키 도움말 (? 키, input/textarea 포커스 아닐 때만)
+  if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const inInput = ['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName);
+    if (!inInput && !document.querySelector('#shortcutHelpModal')) {
+      // 워크플로우 탭에서는 _wfShowShortcutHelp 가 우선권 — let it handle
+      if (state.view !== 'workflows') {
+        e.preventDefault();
+        _openShortcutHelp();
+      }
+    }
+  }
 });
+
+// v2.33.4 — 글로벌 단축키 도움말 모달
+function _openShortcutHelp() {
+  const existing = document.getElementById('shortcutHelpModal');
+  if (existing) { existing.remove(); return; }
+  const mac = /Mac/i.test(navigator.platform);
+  const MOD = mac ? '⌘' : 'Ctrl';
+  const groups = [
+    { title: t('내비게이션'), items: [
+      { k: [MOD, 'K'], d: t('모든 탭·프로젝트·세션 검색') },
+      { k: ['Alt', '←'], d: t('이전 탭') },
+      { k: ['Alt', '→'], d: t('다음 탭') },
+      { k: ['Esc'], d: t('모달 / 플라이아웃 닫기') },
+      { k: ['?'], d: t('이 도움말 열기') },
+    ]},
+    { title: t('워크플로우 캔버스'), items: [
+      { k: [MOD, 'Z'], d: t('실행 취소') },
+      { k: [MOD, 'C'], d: t('노드 복사') },
+      { k: [MOD, 'V'], d: t('노드 붙여넣기') },
+      { k: ['Alt', 'C'], d: t('편집기 카테고리 접기/펴기') },
+      { k: ['Shift', t('클릭')], d: t('노드 다중 선택') },
+      { k: ['?'], d: t('워크플로우 전용 단축키') },
+    ]},
+    { title: t('사이드바'), items: [
+      { k: [t('햄버거')], d: t('사이드바 접기/펼치기') },
+      { k: [t('hover')], d: t('카테고리 → 서브탭 flyout') },
+      { k: [t('클릭')], d: t('카테고리 고정 open') },
+    ]},
+    { title: t('기타'), items: [
+      { k: [t('⌘K')], d: t('빠른 액션: 재인덱스·챗봇·CLI 상태') },
+      { k: ['Enter', 'Space'], d: t('포커스된 항목 실행') },
+    ]},
+  ];
+  const kbd = (keys) => keys.map(k => `<kbd style="display:inline-block;min-width:24px;text-align:center;padding:2px 7px;border-radius:5px;background:var(--card-hi);border:1px solid var(--border);font-size:0.78rem;font-family:'JetBrains Mono',monospace;">${escapeHtml(k)}</kbd>`).join(' + ');
+  const rowsHtml = groups.map(g => `
+    <div class="mb-4">
+      <div class="text-[11px] uppercase tracking-widest font-semibold mb-2" style="color:var(--text-dim)">${escapeHtml(g.title)}</div>
+      <div class="space-y-1.5">
+        ${g.items.map(it => `
+          <div class="flex items-center justify-between gap-4 text-sm">
+            <span style="color:var(--text-mute)">${escapeHtml(it.d)}</span>
+            <span>${kbd(it.k)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+  const body = `
+    <div id="shortcutHelpModal" class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+      <div>
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${t('키보드 단축키')}</div>
+        <h2 class="text-lg font-bold">${t('⌨️ 전체 단축키')}</h2>
+      </div>
+      <button class="btn-ghost btn" onclick="closeModal()" aria-label="${t('닫기')}">✕</button>
+    </div>
+    <div class="p-5" style="max-height:70vh;overflow-y:auto;">${rowsHtml}</div>`;
+  showModal(body, { narrow: true });
+}
+window._openShortcutHelp = _openShortcutHelp;
 
 // ────────────────────────────────────────────────────────────────
 // Task 2: 포커스 트랩 — 모달 내 Tab 키 순환
