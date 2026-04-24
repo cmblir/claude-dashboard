@@ -391,16 +391,31 @@ tailwind.config = {
   /* flyout 내부는 hover 유지를 위해 pointer-events 자연스럽게 */
   .nav-flyout .nav-item { margin-bottom: 2px; }
 
-  /* 모바일: flyout 을 아코디언으로 (좌측에서 오른쪽으로 띄우면 영역 부족) */
+  /* 모바일: flyout 을 아코디언으로 (좌측에서 오른쪽으로 띄우면 영역 부족).
+     v2.33.9 — nav-category 를 flex-wrap 하여 flyout 이 새 row 로 내려가며 100% 너비 차지.
+     또한 데스크톱에서 _positionNavFlyout 이 박은 inline top/max-height 를 !important 로 덮어씀. */
   @media (max-width: 900px) {
+    .nav-category {
+      flex-wrap: wrap;
+    }
     .nav-flyout {
-      position: static; left: auto; top: auto;
-      min-width: 0; max-width: none; margin-top: 6px;
-      box-shadow: none; background: rgba(255,255,255,0.03);
+      position: static !important;
+      left: auto !important;
+      top: auto !important;
+      min-width: 0;
+      max-width: none;
+      max-height: none !important;   /* inline style 에서 px 로 박힌 값 무효화 */
+      width: 100%;
+      flex-basis: 100%;
+      margin-top: 6px;
+      box-shadow: none;
+      background: rgba(255,255,255,0.03);
       animation: none;
     }
     .nav-category:hover > .nav-flyout { display: none; }
     .nav-category.open > .nav-flyout { display: block; }
+    /* 브리지 pseudo-element 비활성 (좌→우 hover 이동 없음) */
+    .nav-category::after { display: none; }
   }
   .badge-n { display: inline-block; min-width: 20px; height: 20px; line-height: 20px; text-align: center; padding: 0 6px; border-radius: 10px; font-size: 0.7rem; background: rgba(255,255,255,0.08); color: var(--text-mute); }
   .gradient-text { color: #d97757; }
@@ -1412,6 +1427,13 @@ function renderNav() {
 function _positionNavFlyout(cat) {
   const fl = cat && cat.querySelector('.nav-flyout');
   if (!fl) return;
+  // v2.33.9 — 모바일(≤900px) 은 아코디언 모드라 position 계산 불필요.
+  // inline style 을 찌끼로 남기면 @media 규칙과 충돌하므로 반드시 초기화.
+  if (window.matchMedia && window.matchMedia('(max-width: 900px)').matches) {
+    fl.style.top = '';
+    fl.style.maxHeight = '';
+    return;
+  }
   const margin = 12;
   const vh = window.innerHeight;
   const cr = cat.getBoundingClientRect();
