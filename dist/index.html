@@ -9843,18 +9843,42 @@ async function ciRun() {
 // ────────────────────────────────────────────────────────────────
 // CLAUDE DOCS HUB (v2.12.0) — docs.anthropic.com 색인 + 검색
 // ────────────────────────────────────────────────────────────────
+// v2.33.7 — claudeDocs 북마크 (localStorage 저장)
+function _cdLoadBookmarks() {
+  try { return new Set(JSON.parse(localStorage.getItem('cd-bookmarks') || '[]')); }
+  catch { return new Set(); }
+}
+function _cdSaveBookmarks(set) {
+  try { localStorage.setItem('cd-bookmarks', JSON.stringify([...set])); } catch {}
+}
+function cdToggleBookmark(url) {
+  const set = _cdLoadBookmarks();
+  if (set.has(url)) set.delete(url); else set.add(url);
+  _cdSaveBookmarks(set);
+  renderView();
+}
+window.cdToggleBookmark = cdToggleBookmark;
+
 VIEWS.claudeDocs = async () => {
-  state.data.cd = state.data.cd || { q: '' };
+  state.data.cd = state.data.cd || { q: '', onlyBookmarks: false };
   const cd = state.data.cd;
   const url = cd.q ? `/api/claude-docs/search?q=${encodeURIComponent(cd.q)}` : '/api/claude-docs/list';
   const data = await api(url);
-  const cats = data.categories || [];
+  const bookmarks = _cdLoadBookmarks();
+  let cats = data.categories || [];
+  if (cd.onlyBookmarks) {
+    cats = cats.map(c => ({ ...c, items: (c.items || []).filter(it => bookmarks.has(it.url)) }))
+               .filter(c => c.items.length > 0);
+  }
   const total = cats.reduce((a, c) => a + (c.items||[]).length, 0);
 
-  const renderCard = (it) => `
-    <div class="card p-3 flex flex-col gap-1" style="border-left:3px solid var(--accent);">
+  const renderCard = (it) => {
+    const starred = bookmarks.has(it.url);
+    return `
+    <div class="card p-3 flex flex-col gap-1" style="border-left:3px solid ${starred?'#fbbf24':'var(--accent)'};">
       <div class="flex items-start justify-between gap-2">
         <div class="font-semibold text-[13px]" style="color:var(--text);">${escapeHtml(it.title)}</div>
+        <button class="btn-ghost btn text-[13px] px-1.5 py-0" onclick="cdToggleBookmark(${JSON.stringify(it.url).replace(/"/g,'&quot;')})" title="${starred?t('북마크 해제'):t('북마크 추가')}" aria-label="${starred?t('북마크 해제'):t('북마크 추가')}">${starred?'★':'☆'}</button>
       </div>
       <div class="text-[11px] text-[var(--text-mute)] flex-1">${escapeHtml(it.summary)}</div>
       <div class="flex items-center gap-2 mt-1">
@@ -9862,8 +9886,8 @@ VIEWS.claudeDocs = async () => {
         ${it.relatedTab ? `<button class="btn btn-sm" onclick="go('${it.relatedTab}')">→ ${t('관련 탭')}</button>` : ''}
       </div>
       <div class="text-[9px] text-[var(--text-dim)] font-mono truncate">${escapeHtml(it.url)}</div>
-    </div>
-  `;
+    </div>`;
+  };
 
   const sections = cats.map(cat => `
     <div class="mb-6">
@@ -9872,7 +9896,7 @@ VIEWS.claudeDocs = async () => {
         ${(cat.items||[]).map(renderCard).join('')}
       </div>
     </div>
-  `).join('') || `<div class="card p-6 text-center text-[11px] text-[var(--text-dim)]">${t('검색 결과 없음')}</div>`;
+  `).join('') || `<div class="card p-6 text-center text-[11px] text-[var(--text-dim)]">${cd.onlyBookmarks ? t('북마크한 문서 없음') : t('검색 결과 없음')}</div>`;
 
   return `
     <div class="mb-4">
@@ -9882,10 +9906,11 @@ VIEWS.claudeDocs = async () => {
       </p>
     </div>
 
-    <div class="flex items-center gap-2 mb-4">
+    <div class="flex items-center gap-2 mb-4 flex-wrap">
       <input class="input flex-1" placeholder="${t('키워드로 검색 (제목/요약/URL)')}"
              value="${escapeHtml(cd.q || '')}"
              oninput="cdSet('q', this.value); cdRender()">
+      <button class="chip ${cd.onlyBookmarks?'chip-accent':''}" onclick="cdSet('onlyBookmarks', !state.data.cd.onlyBookmarks); renderView()">★ ${t('북마크')} ${bookmarks.size}</button>
       <span class="text-[11px] text-[var(--text-dim)]">${total}${t('건')}</span>
       ${cd.q ? `<button class="btn btn-sm" onclick="cdSet('q',''); renderView()">✕ ${t('지우기')}</button>` : ''}
     </div>

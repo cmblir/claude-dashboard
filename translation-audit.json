@@ -1,6 +1,6 @@
 {
   "source": "dist/index.html",
-  "total": 2245,
+  "total": 2249,
   "items": [
     {
       "text": "'{name}' 가 {mcp_file} 에 없음",
@@ -12,7 +12,7 @@
       "text": "(DB 기반)",
       "count": 1,
       "sample_lines": [
-        13339
+        13364
       ],
       "in_existing_en_dict": false
     },
@@ -20,7 +20,7 @@
       "text": "(cwd 미확인)",
       "count": 1,
       "sample_lines": [
-        11253
+        11278
       ],
       "in_existing_en_dict": false
     },
@@ -28,7 +28,7 @@
       "text": "(모든 권한 차단) + CSP default-src:none + 정적 필터 (script/iframe/on*/javascript: 제거).",
       "count": 1,
       "sample_lines": [
-        13512
+        13537
       ],
       "in_existing_en_dict": false
     },
@@ -36,7 +36,7 @@
       "text": "(미지정)",
       "count": 1,
       "sample_lines": [
-        14735
+        14760
       ],
       "in_existing_en_dict": false
     },
@@ -61,7 +61,7 @@
       "count": 2,
       "sample_lines": [
         6834,
-        9456
+        9481
       ],
       "in_existing_en_dict": false
     },
@@ -96,7 +96,7 @@
         5460,
         6164,
         6261,
-        14405
+        14430
       ],
       "in_existing_en_dict": false
     },
@@ -168,7 +168,7 @@
       "text": ") 하위",
       "count": 1,
       "sample_lines": [
-        11253
+        11278
       ],
       "in_existing_en_dict": false
     },
@@ -184,7 +184,7 @@
       "text": "* 좌(현재) / 우(제안) 2-컬럼 diff + 각 컬럼 에디터 + 적용/건너뛰기 / 병합 저장 UX.",
       "count": 1,
       "sample_lines": [
-        10773
+        10798
       ],
       "in_existing_en_dict": false
     },
@@ -200,7 +200,7 @@
       "text": "+ 추가",
       "count": 1,
       "sample_lines": [
-        10919
+        10944
       ],
       "in_existing_en_dict": false
     },
@@ -216,7 +216,7 @@
       "text": "+ 커스텀 프로바이더 추가",
       "count": 1,
       "sample_lines": [
-        11622
+        11647
       ],
       "in_existing_en_dict": false
     },
@@ -230,7 +230,7 @@
       "text": ". 설치 후 여기에 나타납니다. 활성화 토글은",
       "count": 1,
       "sample_lines": [
-        10050
+        10075
       ],
       "in_existing_en_dict": false
     },
@@ -238,7 +238,7 @@
       "text": ". 정확한 표시를 원하면 여기서 직접 지정하세요.",
       "count": 1,
       "sample_lines": [
-        15208
+        15233
       ],
       "in_existing_en_dict": false
     },
@@ -246,7 +246,7 @@
       "text": ". 중간에 쓰려면",
       "count": 1,
       "sample_lines": [
-        9694
+        9719
       ],
       "in_existing_en_dict": false
     },
@@ -254,7 +254,7 @@
       "text": ".claude 없음",
       "count": 1,
       "sample_lines": [
-        10529
+        10554
       ],
       "in_existing_en_dict": false
     },
@@ -262,7 +262,7 @@
       "text": ".claude 존재",
       "count": 1,
       "sample_lines": [
-        10529
+        10554
       ],
       "in_existing_en_dict": false
     },
@@ -276,7 +276,7 @@
       "text": ".claude/agents 비어있음",
       "count": 1,
       "sample_lines": [
-        10473
+        10498
       ],
       "in_existing_en_dict": false
     },
@@ -284,7 +284,7 @@
       "text": ".claude/settings.local.json 없음",
       "count": 1,
       "sample_lines": [
-        10487
+        10512
       ],
       "in_existing_en_dict": false
     },
@@ -298,7 +298,7 @@
       "text": "/ — 세션 중 파일 편집 이력",
       "count": 1,
       "sample_lines": [
-        13465
+        13490
       ],
       "in_existing_en_dict": false
     },
@@ -306,7 +306,7 @@
       "text": "/ 스킵",
       "count": 1,
       "sample_lines": [
-        14962
+        14987
       ],
       "in_existing_en_dict": false
     },
@@ -314,7 +314,7 @@
       "text": "/ 전체",
       "count": 1,
       "sample_lines": [
-        13447
+        13472
       ],
       "in_existing_en_dict": false
     },
@@ -322,7 +322,7 @@
       "text": "/ 프로젝트 명령어",
       "count": 1,
       "sample_lines": [
-        10547
+        10572
       ],
       "in_existing_en_dict": false
     },
@@ -338,7 +338,7 @@
       "text": "/* 비용 API 미지원 시 조용히 무시 */",
       "count": 1,
       "sample_lines": [
-        12834
+        12859
       ],
       "in_existing_en_dict": false
     },
@@ -346,7 +346,7 @@
       "text": "0회",
       "count": 1,
       "sample_lines": [
-        10420
+        10445
       ],
       "in_existing_en_dict": false
     },
@@ -354,8 +354,8 @@
       "text": "1. 계정 연결",
       "count": 2,
       "sample_lines": [
-        10186,
-        10195
+        10211,
+        10220
       ],
       "in_existing_en_dict": false
     },
@@ -435,7 +435,7 @@
       "text": "2. 변경 미리보기",
       "count": 1,
       "sample_lines": [
-        10209
+        10234
       ],
       "in_existing_en_dict": false
     },
@@ -459,7 +459,7 @@
       "text": "2025 공식 요금표 기준 추정",
       "count": 1,
       "sample_lines": [
-        13360
+        13385
       ],
       "in_existing_en_dict": false
     },
@@ -467,7 +467,7 @@
       "text": "2개 이상의 노드를 선택하세요",
       "count": 1,
       "sample_lines": [
-        16821
+        16846
       ],
       "in_existing_en_dict": false
     },
@@ -507,7 +507,7 @@
       "text": "3. 적용",
       "count": 1,
       "sample_lines": [
-        10230
+        10255
       ],
       "in_existing_en_dict": false
     },
@@ -553,7 +553,7 @@
       "text": "6 tool 노출: 탭 카탈로그 · 비용 요약 · 보안 스캔 · 러너 패턴 · RTK 상태 · 워크플로우 템플릿.",
       "count": 1,
       "sample_lines": [
-        9774
+        9799
       ],
       "in_existing_en_dict": false
     },
@@ -613,7 +613,7 @@
       "text": "AI 에게 추천 받기",
       "count": 1,
       "sample_lines": [
-        10292
+        10317
       ],
       "in_existing_en_dict": false
     },
@@ -647,7 +647,7 @@
       "text": "AI 추천 등 claude CLI 가 필요한 기능은 위의 상태 두 개가 모두 초록일 때만 동작합니다.",
       "count": 1,
       "sample_lines": [
-        15216
+        15241
       ],
       "in_existing_en_dict": false
     },
@@ -656,7 +656,7 @@
       "count": 2,
       "sample_lines": [
         262,
-        11497
+        11522
       ],
       "in_existing_en_dict": false
     },
@@ -673,7 +673,7 @@
       "text": "AI 프로바이더 설정 위자드",
       "count": 1,
       "sample_lines": [
-        11504
+        11529
       ],
       "in_existing_en_dict": false
     },
@@ -713,8 +713,8 @@
       "text": "API 키",
       "count": 2,
       "sample_lines": [
-        12036,
-        12048
+        12061,
+        12073
       ],
       "in_existing_en_dict": false
     },
@@ -722,7 +722,7 @@
       "text": "API 키 삭제 완료",
       "count": 1,
       "sample_lines": [
-        12228
+        12253
       ],
       "in_existing_en_dict": false
     },
@@ -736,8 +736,8 @@
       "text": "API 키 저장",
       "count": 2,
       "sample_lines": [
-        12038,
-        12050
+        12063,
+        12075
       ],
       "in_existing_en_dict": false
     },
@@ -745,8 +745,8 @@
       "text": "API 키 저장 완료",
       "count": 2,
       "sample_lines": [
-        12084,
-        12220
+        12109,
+        12245
       ],
       "in_existing_en_dict": false
     },
@@ -754,7 +754,7 @@
       "text": "API 키를 설정하면 워크플로우에서 사용 가능합니다.",
       "count": 1,
       "sample_lines": [
-        11586
+        11611
       ],
       "in_existing_en_dict": false
     },
@@ -762,8 +762,8 @@
       "text": "API 키를 입력하세요",
       "count": 2,
       "sample_lines": [
-        12079,
-        12218
+        12104,
+        12243
       ],
       "in_existing_en_dict": false
     },
@@ -810,7 +810,7 @@
       "text": "Anthropic 공식 문서 주요 페이지를 카테고리별로 색인. 검색어로 필터링하고 관련 대시보드 탭으로 바로 이동할 수 있습니다.",
       "count": 1,
       "sample_lines": [
-        9097
+        9121
       ],
       "in_existing_en_dict": false
     },
@@ -818,7 +818,7 @@
       "text": "Anthropic 서버가 직접 실행하는 hosted tool (web_search / code_execution) 을 활성화하고 응답 블록을 분류 시각화합니다.",
       "count": 1,
       "sample_lines": [
-        9177
+        9202
       ],
       "in_existing_en_dict": false
     },
@@ -960,8 +960,8 @@
       "text": "CLAUDE.md 갱신됨",
       "count": 2,
       "sample_lines": [
-        10841,
-        11336
+        10866,
+        11361
       ],
       "in_existing_en_dict": false
     },
@@ -969,7 +969,7 @@
       "text": "CLI 명령 보기",
       "count": 1,
       "sample_lines": [
-        9816
+        9841
       ],
       "in_existing_en_dict": false
     },
@@ -977,7 +977,7 @@
       "text": "CLI 명령어",
       "count": 1,
       "sample_lines": [
-        12251
+        12276
       ],
       "in_existing_en_dict": false
     },
@@ -985,7 +985,7 @@
       "text": "CLI 미설치",
       "count": 1,
       "sample_lines": [
-        15022
+        15047
       ],
       "in_existing_en_dict": false
     },
@@ -993,7 +993,7 @@
       "text": "CLI 바이너리",
       "count": 1,
       "sample_lines": [
-        15185
+        15210
       ],
       "in_existing_en_dict": false
     },
@@ -1001,7 +1001,7 @@
       "text": "CLI 상태 확인",
       "count": 1,
       "sample_lines": [
-        16425
+        16450
       ],
       "in_existing_en_dict": false
     },
@@ -1009,7 +1009,7 @@
       "text": "CLI 설치",
       "count": 1,
       "sample_lines": [
-        12132
+        12157
       ],
       "in_existing_en_dict": false
     },
@@ -1017,7 +1017,7 @@
       "text": "CLI가 설치되어 있지 않습니다. 먼저 설치하세요",
       "count": 1,
       "sample_lines": [
-        15640
+        15665
       ],
       "in_existing_en_dict": false
     },
@@ -1041,7 +1041,7 @@
       "text": "Claude API 플레이그라운드 + 워크플로우 실행의 모든 비용을 통합 조회. 로컬 히스토리 JSON 파일들에서 자동 수집.",
       "count": 1,
       "sample_lines": [
-        14208
+        14233
       ],
       "in_existing_en_dict": false
     },
@@ -1049,7 +1049,7 @@
       "text": "Claude CLI 미설치",
       "count": 1,
       "sample_lines": [
-        15635
+        15660
       ],
       "in_existing_en_dict": false
     },
@@ -1057,7 +1057,7 @@
       "text": "Claude CLI 설치됨",
       "count": 1,
       "sample_lines": [
-        15635
+        15660
       ],
       "in_existing_en_dict": false
     },
@@ -1071,7 +1071,7 @@
       "text": "Claude CLI 연결 상태",
       "count": 1,
       "sample_lines": [
-        15178
+        15203
       ],
       "in_existing_en_dict": false
     },
@@ -1079,7 +1079,7 @@
       "text": "Claude CLI 연결됨",
       "count": 1,
       "sample_lines": [
-        15018
+        15043
       ],
       "in_existing_en_dict": false
     },
@@ -1093,7 +1093,7 @@
       "text": "Claude CLI 점검",
       "count": 1,
       "sample_lines": [
-        15018
+        15043
       ],
       "in_existing_en_dict": false
     },
@@ -1117,7 +1117,7 @@
       "text": "Claude Code hooks 이벤트를 외부 HTTP endpoint 로 포워딩 — 화이트리스트 호스트만 허용, settings.json 자동 백업.",
       "count": 1,
       "sample_lines": [
-        9321
+        9346
       ],
       "in_existing_en_dict": false
     },
@@ -1125,7 +1125,7 @@
       "text": "Claude Code settings.json 에서 rtk 훅 항목만 제거 (바이너리는 유지)",
       "count": 1,
       "sample_lines": [
-        13912
+        13937
       ],
       "in_existing_en_dict": false
     },
@@ -1133,7 +1133,7 @@
       "text": "Claude Code settings.json 에서 rtk 훅 항목만 제거합니다 (백업 자동 생성). rtk 바이너리는 유지됩니다. 계속할까요?",
       "count": 1,
       "sample_lines": [
-        14030
+        14055
       ],
       "in_existing_en_dict": false
     },
@@ -1141,7 +1141,7 @@
       "text": "Claude Code 가 읽는 환경변수들. settings.json.env 값과 현재 프로세스 실제 값 비교",
       "count": 1,
       "sample_lines": [
-        12907
+        12932
       ],
       "in_existing_en_dict": false
     },
@@ -1149,7 +1149,7 @@
       "text": "Claude Code 가 자동 생성하는 복구/롤백 데이터",
       "count": 1,
       "sample_lines": [
-        13463
+        13488
       ],
       "in_existing_en_dict": false
     },
@@ -1157,7 +1157,7 @@
       "text": "Claude Code 가 프로젝트마다 자동 기록하는 기억들. ~/.claude/projects/&lt;slug&gt;/memory/*.md",
       "count": 1,
       "sample_lines": [
-        14489
+        14514
       ],
       "in_existing_en_dict": false
     },
@@ -1173,7 +1173,7 @@
       "text": "Claude Code 내부 추적기 ·",
       "count": 1,
       "sample_lines": [
-        13153
+        13178
       ],
       "in_existing_en_dict": false
     },
@@ -1189,7 +1189,7 @@
       "text": "Claude Code 는 로컬에",
       "count": 1,
       "sample_lines": [
-        15208
+        15233
       ],
       "in_existing_en_dict": false
     },
@@ -1209,7 +1209,7 @@
       "text": "Claude Code 세션 로그(JSONL)를 시간순으로 재생 · 툴 호출 강조 · 누적 토큰 차트",
       "count": 1,
       "sample_lines": [
-        13771
+        13796
       ],
       "in_existing_en_dict": false
     },
@@ -1217,7 +1217,7 @@
       "text": "Claude Code 세션 안에서 대시보드 기능을 호출할 수 있게 LazyClaude 를 stdio MCP 서버로 등록합니다",
       "count": 1,
       "sample_lines": [
-        9774
+        9799
       ],
       "in_existing_en_dict": false
     },
@@ -1225,8 +1225,8 @@
       "text": "Claude Code 에서",
       "count": 2,
       "sample_lines": [
-        13018,
-        13210
+        13043,
+        13235
       ],
       "in_existing_en_dict": false
     },
@@ -1234,7 +1234,7 @@
       "text": "Claude Code 와 연결된 터미널/IDE 상태",
       "count": 1,
       "sample_lines": [
-        12972
+        12997
       ],
       "in_existing_en_dict": false
     },
@@ -1242,7 +1242,7 @@
       "text": "Claude Code 터미널 UI 커스터마이즈",
       "count": 1,
       "sample_lines": [
-        13273
+        13298
       ],
       "in_existing_en_dict": false
     },
@@ -1258,7 +1258,7 @@
       "text": "Claude Code 하단에 표시되는 상태라인 스크립트 설정.",
       "count": 1,
       "sample_lines": [
-        13283
+        13308
       ],
       "in_existing_en_dict": false
     },
@@ -1274,7 +1274,7 @@
       "text": "Claude Code 훅",
       "count": 1,
       "sample_lines": [
-        13902
+        13927
       ],
       "in_existing_en_dict": false
     },
@@ -1290,8 +1290,8 @@
       "text": "Claude Team / Enterprise 플랜의 워크스페이스 정보.",
       "count": 2,
       "sample_lines": [
-        14670,
-        14709
+        14695,
+        14734
       ],
       "in_existing_en_dict": false
     },
@@ -1299,7 +1299,7 @@
       "text": "Claude · GPT · Gemini · Ollama · Codex 등 멀티 AI 프로바이더 관리",
       "count": 1,
       "sample_lines": [
-        11497
+        11522
       ],
       "in_existing_en_dict": false
     },
@@ -1307,7 +1307,7 @@
       "text": "Claude 가",
       "count": 1,
       "sample_lines": [
-        14519
+        14544
       ],
       "in_existing_en_dict": false
     },
@@ -1315,7 +1315,7 @@
       "text": "Claude 가 답할 때 쓰는 톤·포맷. 예",
       "count": 1,
       "sample_lines": [
-        13194
+        13219
       ],
       "in_existing_en_dict": false
     },
@@ -1323,7 +1323,7 @@
       "text": "Claude 가 열심히 일하는 중!",
       "count": 1,
       "sample_lines": [
-        15947
+        15972
       ],
       "in_existing_en_dict": false
     },
@@ -1370,7 +1370,7 @@
       "text": "Claude 계정 연결 확인 중…",
       "count": 1,
       "sample_lines": [
-        10166
+        10191
       ],
       "in_existing_en_dict": false
     },
@@ -1378,7 +1378,7 @@
       "text": "Claude 계정에 로그인되지 않았습니다.",
       "count": 1,
       "sample_lines": [
-        15648
+        15673
       ],
       "in_existing_en_dict": false
     },
@@ -1386,7 +1386,7 @@
       "text": "Claude 공식 내장 Tools",
       "count": 1,
       "sample_lines": [
-        9175
+        9200
       ],
       "in_existing_en_dict": false
     },
@@ -1410,7 +1410,7 @@
       "text": "Claude 에게 조사 중… (~1분)",
       "count": 1,
       "sample_lines": [
-        15238
+        15263
       ],
       "in_existing_en_dict": false
     },
@@ -1426,7 +1426,7 @@
       "text": "Claude 에게 초안 요청 중 (30~90초)…",
       "count": 1,
       "sample_lines": [
-        10307
+        10332
       ],
       "in_existing_en_dict": false
     },
@@ -1467,7 +1467,7 @@
       "text": "Claude 토큰 60-90% 절감 Rust CLI 프록시 (rtk-ai/rtk) — 설치·활성화·통계를 한 탭에서.",
       "count": 1,
       "sample_lines": [
-        13862
+        13887
       ],
       "in_existing_en_dict": false
     },
@@ -1483,7 +1483,7 @@
       "text": "Claude에 로그인되지 않음",
       "count": 1,
       "sample_lines": [
-        10197
+        10222
       ],
       "in_existing_en_dict": false
     },
@@ -1491,7 +1491,7 @@
       "text": "Code 로컬",
       "count": 1,
       "sample_lines": [
-        9760
+        9785
       ],
       "in_existing_en_dict": false
     },
@@ -1539,7 +1539,7 @@
       "text": "DB 세션 토큰 +",
       "count": 1,
       "sample_lines": [
-        14307
+        14332
       ],
       "in_existing_en_dict": false
     },
@@ -1567,7 +1567,7 @@
       "text": "ECC AgentShield 방식에서 영감",
       "count": 1,
       "sample_lines": [
-        13617
+        13642
       ],
       "in_existing_en_dict": false
     },
@@ -1665,7 +1665,7 @@
       "text": "Forwarder 추가",
       "count": 1,
       "sample_lines": [
-        9333
+        9358
       ],
       "in_existing_en_dict": false
     },
@@ -1673,7 +1673,7 @@
       "text": "Forwarder 추가됨",
       "count": 1,
       "sample_lines": [
-        9367
+        9392
       ],
       "in_existing_en_dict": false
     },
@@ -1681,7 +1681,7 @@
       "text": "GPT API 연결",
       "count": 1,
       "sample_lines": [
-        12033
+        12058
       ],
       "in_existing_en_dict": false
     },
@@ -1695,7 +1695,7 @@
       "text": "Google AI 연결",
       "count": 1,
       "sample_lines": [
-        12045
+        12070
       ],
       "in_existing_en_dict": false
     },
@@ -1749,7 +1749,7 @@
       "text": "Homebrew 미설치 — curl/cargo 경로로 진행 가능.",
       "count": 1,
       "sample_lines": [
-        13898
+        13923
       ],
       "in_existing_en_dict": false
     },
@@ -1757,7 +1757,7 @@
       "text": "Homunculus 프로젝트 추적",
       "count": 1,
       "sample_lines": [
-        13153
+        13178
       ],
       "in_existing_en_dict": false
     },
@@ -1765,7 +1765,7 @@
       "text": "ID (영문 소문자)",
       "count": 1,
       "sample_lines": [
-        12249
+        12274
       ],
       "in_existing_en_dict": false
     },
@@ -1774,7 +1774,7 @@
       "count": 2,
       "sample_lines": [
         330,
-        12972
+        12997
       ],
       "in_existing_en_dict": false
     },
@@ -1782,7 +1782,7 @@
       "text": "ID를 입력하세요",
       "count": 1,
       "sample_lines": [
-        12273
+        12298
       ],
       "in_existing_en_dict": false
     },
@@ -1840,7 +1840,7 @@
       "text": "JSON 오류",
       "count": 1,
       "sample_lines": [
-        10133
+        10158
       ],
       "in_existing_en_dict": false
     },
@@ -1894,7 +1894,7 @@
       "text": "LazyClaude 자체를 MCP 서버로 (v2.32.0)",
       "count": 1,
       "sample_lines": [
-        9772
+        9797
       ],
       "in_existing_en_dict": false
     },
@@ -1916,7 +1916,7 @@
       "text": "MCP 서버 제거",
       "count": 1,
       "sample_lines": [
-        9919
+        9944
       ],
       "in_existing_en_dict": false
     },
@@ -1924,7 +1924,7 @@
       "text": "MCP 설정이 궁금하면 저를 눌러보세요",
       "count": 1,
       "sample_lines": [
-        15742
+        15767
       ],
       "in_existing_en_dict": false
     },
@@ -1949,7 +1949,7 @@
       "count": 2,
       "sample_lines": [
         312,
-        9759
+        9784
       ],
       "in_existing_en_dict": false
     },
@@ -1957,7 +1957,7 @@
       "text": "MEMORY.md 인덱스만 존재 (개별 파일 없음)",
       "count": 1,
       "sample_lines": [
-        14517
+        14542
       ],
       "in_existing_en_dict": false
     },
@@ -1981,7 +1981,7 @@
       "text": "Modelfile 내용",
       "count": 1,
       "sample_lines": [
-        16704
+        16729
       ],
       "in_existing_en_dict": false
     },
@@ -1989,7 +1989,7 @@
       "text": "Modelfile 내용을 입력하세요",
       "count": 1,
       "sample_lines": [
-        16724
+        16749
       ],
       "in_existing_en_dict": false
     },
@@ -2009,7 +2009,7 @@
       "text": "Ollama Modelfile 형식으로 커스텀 모델을 정의합니다.",
       "count": 1,
       "sample_lines": [
-        16701
+        16726
       ],
       "in_existing_en_dict": false
     },
@@ -2017,7 +2017,7 @@
       "text": "Ollama 모델 생성 완료",
       "count": 1,
       "sample_lines": [
-        16735
+        16760
       ],
       "in_existing_en_dict": false
     },
@@ -2025,7 +2025,7 @@
       "text": "Ollama 모델 허브",
       "count": 1,
       "sample_lines": [
-        11676
+        11701
       ],
       "in_existing_en_dict": false
     },
@@ -2033,7 +2033,7 @@
       "text": "Ollama 모델 허브로 이동",
       "count": 1,
       "sample_lines": [
-        12069
+        12094
       ],
       "in_existing_en_dict": false
     },
@@ -2041,7 +2041,7 @@
       "text": "Ollama 시작",
       "count": 1,
       "sample_lines": [
-        11637
+        11662
       ],
       "in_existing_en_dict": false
     },
@@ -2049,7 +2049,7 @@
       "text": "Ollama 시작됨",
       "count": 1,
       "sample_lines": [
-        12356
+        12381
       ],
       "in_existing_en_dict": false
     },
@@ -2057,7 +2057,7 @@
       "text": "Ollama 엔진 설정",
       "count": 1,
       "sample_lines": [
-        11648
+        11673
       ],
       "in_existing_en_dict": false
     },
@@ -2065,7 +2065,7 @@
       "text": "Ollama 엔진 설정이 저장되었습니다",
       "count": 1,
       "sample_lines": [
-        12424
+        12449
       ],
       "in_existing_en_dict": false
     },
@@ -2073,7 +2073,7 @@
       "text": "Ollama 정지됨",
       "count": 1,
       "sample_lines": [
-        12374
+        12399
       ],
       "in_existing_en_dict": false
     },
@@ -2081,7 +2081,7 @@
       "text": "Ollama 카탈로그를 불러올 수 없습니다.",
       "count": 1,
       "sample_lines": [
-        12461
+        12486
       ],
       "in_existing_en_dict": false
     },
@@ -2089,7 +2089,7 @@
       "text": "Ollama를 정지하시겠습니까?",
       "count": 1,
       "sample_lines": [
-        12370
+        12395
       ],
       "in_existing_en_dict": false
     },
@@ -2143,7 +2143,7 @@
       "text": "Plan Mode 로 작성된 계획 ·",
       "count": 1,
       "sample_lines": [
-        13302
+        13327
       ],
       "in_existing_en_dict": false
     },
@@ -2157,7 +2157,7 @@
       "text": "Prompt Library 로 저장",
       "count": 1,
       "sample_lines": [
-        13661
+        13686
       ],
       "in_existing_en_dict": false
     },
@@ -2216,9 +2216,9 @@
       "count": 4,
       "sample_lines": [
         318,
-        10087,
-        12927,
-        14783
+        10112,
+        12952,
+        14808
       ],
       "in_existing_en_dict": false
     },
@@ -2226,7 +2226,7 @@
       "text": "Settings 편집에서 수정 →",
       "count": 1,
       "sample_lines": [
-        13285
+        13310
       ],
       "in_existing_en_dict": false
     },
@@ -2234,7 +2234,7 @@
       "text": "Settings 편집으로 이동 →",
       "count": 1,
       "sample_lines": [
-        12945
+        12970
       ],
       "in_existing_en_dict": false
     },
@@ -2262,7 +2262,7 @@
       "text": "TODO 를 삭제할까요?",
       "count": 1,
       "sample_lines": [
-        14651
+        14676
       ],
       "in_existing_en_dict": false
     },
@@ -2270,7 +2270,7 @@
       "text": "TODO 삭제",
       "count": 1,
       "sample_lines": [
-        14651
+        14676
       ],
       "in_existing_en_dict": false
     },
@@ -2278,7 +2278,7 @@
       "text": "TODO 수정",
       "count": 1,
       "sample_lines": [
-        14592
+        14617
       ],
       "in_existing_en_dict": false
     },
@@ -2300,7 +2300,7 @@
       "text": "Terminal 창을 열고",
       "count": 1,
       "sample_lines": [
-        14000
+        14025
       ],
       "in_existing_en_dict": false
     },
@@ -2308,7 +2308,7 @@
       "text": "Terminal 창이 열렸습니다 — 설치 완료 후 이 탭을 새로고침하세요",
       "count": 1,
       "sample_lines": [
-        14009
+        14034
       ],
       "in_existing_en_dict": false
     },
@@ -2325,7 +2325,7 @@
       "text": "Tool 시퀀스",
       "count": 1,
       "sample_lines": [
-        13668
+        13693
       ],
       "in_existing_en_dict": false
     },
@@ -2339,8 +2339,8 @@
       "text": "URL 을 먼저 입력하세요",
       "count": 2,
       "sample_lines": [
-        9360,
-        14018
+        9385,
+        14043
       ],
       "in_existing_en_dict": false
     },
@@ -2430,7 +2430,7 @@
       "text": "bash-commands.log 없음",
       "count": 1,
       "sample_lines": [
-        13078
+        13103
       ],
       "in_existing_en_dict": false
     },
@@ -2446,7 +2446,7 @@
       "text": "billingType (로컬)",
       "count": 1,
       "sample_lines": [
-        15198
+        15223
       ],
       "in_existing_en_dict": false
     },
@@ -2516,7 +2516,7 @@
       "text": "command (쉘 명령 실행)",
       "count": 1,
       "sample_lines": [
-        9510
+        9535
       ],
       "in_existing_en_dict": false
     },
@@ -2524,7 +2524,7 @@
       "text": "command 를 입력하세요",
       "count": 1,
       "sample_lines": [
-        9535
+        9560
       ],
       "in_existing_en_dict": false
     },
@@ -2532,7 +2532,7 @@
       "text": "cost-tracker.log 없음",
       "count": 1,
       "sample_lines": [
-        14307
+        14332
       ],
       "in_existing_en_dict": false
     },
@@ -2598,7 +2598,7 @@
       "text": "forwarder 는 settings.json 의 hooks 섹션에 curl 명령으로 등록됩니다. 매 변경 시 자동 백업 생성.",
       "count": 1,
       "sample_lines": [
-        9350
+        9375
       ],
       "in_existing_en_dict": false
     },
@@ -2606,7 +2606,7 @@
       "text": "git URL (예: https://github.com/user/repo.git)",
       "count": 1,
       "sample_lines": [
-        13033
+        13058
       ],
       "in_existing_en_dict": false
     },
@@ -2646,7 +2646,7 @@
       "text": "matcher (선택 — PreToolUse/PostToolUse 에서 도구 이름 패턴)",
       "count": 1,
       "sample_lines": [
-        9504
+        9529
       ],
       "in_existing_en_dict": false
     },
@@ -2654,7 +2654,7 @@
       "text": "matcher (예: Bash, *, 비워두면 all)",
       "count": 1,
       "sample_lines": [
-        9329
+        9354
       ],
       "in_existing_en_dict": false
     },
@@ -2694,7 +2694,7 @@
       "text": "n## 톤",
       "count": 1,
       "sample_lines": [
-        13216
+        13241
       ],
       "in_existing_en_dict": false
     },
@@ -2702,7 +2702,7 @@
       "text": "n## 포맷",
       "count": 1,
       "sample_lines": [
-        13216
+        13241
       ],
       "in_existing_en_dict": false
     },
@@ -2710,7 +2710,7 @@
       "text": "n- 긴 답변은 섹션 헤더 사용.",
       "count": 1,
       "sample_lines": [
-        13216
+        13241
       ],
       "in_existing_en_dict": false
     },
@@ -2718,7 +2718,7 @@
       "text": "n- 불필요한 감탄사 생략.",
       "count": 1,
       "sample_lines": [
-        13216
+        13241
       ],
       "in_existing_en_dict": false
     },
@@ -2726,7 +2726,7 @@
       "text": "n- 항상 한국어로 답한다.",
       "count": 1,
       "sample_lines": [
-        13216
+        13241
       ],
       "in_existing_en_dict": false
     },
@@ -2734,7 +2734,7 @@
       "text": "ndescription: 한 줄 설명",
       "count": 1,
       "sample_lines": [
-        13216
+        13241
       ],
       "in_existing_en_dict": false
     },
@@ -2766,7 +2766,7 @@
       "text": "ollama serve 가 실행 중인지 확인하세요.",
       "count": 1,
       "sample_lines": [
-        12062
+        12087
       ],
       "in_existing_en_dict": false
     },
@@ -2829,7 +2829,7 @@
       "text": "rtk init -g --auto-patch 실행 — settings.json 자동 패치",
       "count": 1,
       "sample_lines": [
-        14051
+        14076
       ],
       "in_existing_en_dict": false
     },
@@ -2837,7 +2837,7 @@
       "text": "rtk init -g 를 실행하면 Claude Code settings.json 이 수정됩니다. 계속할까요?",
       "count": 1,
       "sample_lines": [
-        14044
+        14069
       ],
       "in_existing_en_dict": false
     },
@@ -2845,7 +2845,7 @@
       "text": "rtk init -g 를 실행하면 Claude Code 의 Bash 명령(예: git status)이 자동으로 rtk 로 감싸져 토큰 사용량이 줄어듭니다.",
       "count": 1,
       "sample_lines": [
-        13904
+        13929
       ],
       "in_existing_en_dict": false
     },
@@ -2853,7 +2853,7 @@
       "text": "rtk init -g 실행",
       "count": 1,
       "sample_lines": [
-        13908
+        13933
       ],
       "in_existing_en_dict": false
     },
@@ -2861,7 +2861,7 @@
       "text": "rtk 는 자주 쓰는 dev 명령에 대한 출력 압축 프록시입니다. 예: git status → rtk git status.",
       "count": 1,
       "sample_lines": [
-        13942
+        13967
       ],
       "in_existing_en_dict": false
     },
@@ -2869,7 +2869,7 @@
       "text": "rtk 설치 감지 — 탭 새로고침",
       "count": 1,
       "sample_lines": [
-        13990
+        14015
       ],
       "in_existing_en_dict": false
     },
@@ -2877,7 +2877,7 @@
       "text": "rtk 훅",
       "count": 1,
       "sample_lines": [
-        14038
+        14063
       ],
       "in_existing_en_dict": false
     },
@@ -2893,7 +2893,7 @@
       "text": "sandbox 속성 =",
       "count": 1,
       "sample_lines": [
-        13512
+        13537
       ],
       "in_existing_en_dict": false
     },
@@ -2917,7 +2917,7 @@
       "text": "settings.json 에 statusLine 키 추가",
       "count": 1,
       "sample_lines": [
-        13284
+        13309
       ],
       "in_existing_en_dict": false
     },
@@ -2945,7 +2945,7 @@
       "text": "settings.json 의 모델 / 인증 / 자동업데이트 옵션",
       "count": 1,
       "sample_lines": [
-        12938
+        12963
       ],
       "in_existing_en_dict": false
     },
@@ -2995,7 +2995,7 @@
       "text": "telemetry/ 없음",
       "count": 1,
       "sample_lines": [
-        13110
+        13135
       ],
       "in_existing_en_dict": false
     },
@@ -3003,7 +3003,7 @@
       "text": "timeout (ms, 선택)",
       "count": 1,
       "sample_lines": [
-        9518
+        9543
       ],
       "in_existing_en_dict": false
     },
@@ -3096,7 +3096,7 @@
       "text": "~/.claude 전체(설정·훅·에이전트·MCP)를 정적 검사 — 시크릿 · 위험 훅 · 과도한 권한 · 신뢰 불가 MCP. AI 호출 없음, 100% 로컬.",
       "count": 1,
       "sample_lines": [
-        13607
+        13632
       ],
       "in_existing_en_dict": false
     },
@@ -3124,7 +3124,7 @@
       "text": "~/.claude/CLAUDE.md — 글로벌 지침. 모든 세션에 로드됩니다.",
       "count": 1,
       "sample_lines": [
-        10281
+        10306
       ],
       "in_existing_en_dict": false
     },
@@ -3132,7 +3132,7 @@
       "text": "~/.claude/backups/ — 세션 자동 백업",
       "count": 1,
       "sample_lines": [
-        13464
+        13489
       ],
       "in_existing_en_dict": false
     },
@@ -3166,7 +3166,7 @@
       "text": "~/.claude/scheduled-tasks/ 에 정의된 cron 스킬",
       "count": 1,
       "sample_lines": [
-        13007
+        13032
       ],
       "in_existing_en_dict": false
     },
@@ -3182,7 +3182,7 @@
       "text": "~/.claude/settings.json — 편집 후",
       "count": 1,
       "sample_lines": [
-        10088
+        10113
       ],
       "in_existing_en_dict": false
     },
@@ -3198,7 +3198,7 @@
       "text": "~/.claude/shell-snapshots/ — Claude Code 가 덮어쓴 쉘 환경 스냅샷",
       "count": 1,
       "sample_lines": [
-        13466
+        13491
       ],
       "in_existing_en_dict": false
     },
@@ -3220,7 +3220,7 @@
       "text": "· Desktop 앱",
       "count": 1,
       "sample_lines": [
-        9760
+        9785
       ],
       "in_existing_en_dict": false
     },
@@ -3252,7 +3252,7 @@
       "text": "· 다른 앱에 영향 없음",
       "count": 1,
       "sample_lines": [
-        15214
+        15239
       ],
       "in_existing_en_dict": false
     },
@@ -3284,7 +3284,7 @@
       "text": "· 세션",
       "count": 1,
       "sample_lines": [
-        13340
+        13365
       ],
       "in_existing_en_dict": false
     },
@@ -3292,7 +3292,7 @@
       "text": "· 예상",
       "count": 1,
       "sample_lines": [
-        11287
+        11312
       ],
       "in_existing_en_dict": false
     },
@@ -3308,7 +3308,7 @@
       "text": "· 원본",
       "count": 1,
       "sample_lines": [
-        9863
+        9888
       ],
       "in_existing_en_dict": false
     },
@@ -3324,7 +3324,7 @@
       "text": "· 조직 역할",
       "count": 1,
       "sample_lines": [
-        10188
+        10213
       ],
       "in_existing_en_dict": false
     },
@@ -3340,7 +3340,7 @@
       "text": "· 최근",
       "count": 1,
       "sample_lines": [
-        10368
+        10393
       ],
       "in_existing_en_dict": false
     },
@@ -3348,7 +3348,7 @@
       "text": "· 카탈로그",
       "count": 1,
       "sample_lines": [
-        9760
+        9785
       ],
       "in_existing_en_dict": false
     },
@@ -3364,7 +3364,7 @@
       "text": "· 프로젝트",
       "count": 1,
       "sample_lines": [
-        9760
+        9785
       ],
       "in_existing_en_dict": false
     },
@@ -3372,7 +3372,7 @@
       "text": "· 플랫폼",
       "count": 1,
       "sample_lines": [
-        9760
+        9785
       ],
       "in_existing_en_dict": false
     },
@@ -3380,8 +3380,8 @@
       "text": "· 플러그인",
       "count": 2,
       "sample_lines": [
-        9473,
-        9760
+        9498,
+        9785
       ],
       "in_existing_en_dict": false
     },
@@ -3391,7 +3391,7 @@
       "sample_lines": [
         6483,
         6834,
-        9456
+        9481
       ],
       "in_existing_en_dict": false
     },
@@ -3423,7 +3423,7 @@
       "text": "— 선택 안 함 —",
       "count": 1,
       "sample_lines": [
-        15172
+        15197
       ],
       "in_existing_en_dict": false
     },
@@ -3431,7 +3431,7 @@
       "text": "— 스크립트·폼·쿠키·탐색·플러그인 전부 차단. CSP default-src:none, img-src:data 만 허용.",
       "count": 1,
       "sample_lines": [
-        13550
+        13575
       ],
       "in_existing_en_dict": false
     },
@@ -3455,7 +3455,7 @@
       "text": "→ 올바른 예",
       "count": 1,
       "sample_lines": [
-        9694
+        9719
       ],
       "in_existing_en_dict": false
     },
@@ -3463,7 +3463,7 @@
       "text": "→ 적용하기",
       "count": 1,
       "sample_lines": [
-        10108
+        10133
       ],
       "in_existing_en_dict": false
     },
@@ -3479,7 +3479,7 @@
       "text": "⌘K로 빠른 검색도 돼요!",
       "count": 1,
       "sample_lines": [
-        15745
+        15770
       ],
       "in_existing_en_dict": false
     },
@@ -3487,7 +3487,7 @@
       "text": "⌨️ 전체 단축키",
       "count": 1,
       "sample_lines": [
-        16642
+        16667
       ],
       "in_existing_en_dict": false
     },
@@ -3511,7 +3511,7 @@
       "text": "⌨️ 키바인딩 (~/.claude/keybindings.json)",
       "count": 1,
       "sample_lines": [
-        13288
+        13313
       ],
       "in_existing_en_dict": false
     },
@@ -3519,7 +3519,7 @@
       "text": "⏰ 시간 초과 — 페이지를 새로고침 하세요.",
       "count": 1,
       "sample_lines": [
-        15703
+        15728
       ],
       "in_existing_en_dict": false
     },
@@ -3535,7 +3535,7 @@
       "text": "⏳ 대기",
       "count": 1,
       "sample_lines": [
-        14611
+        14636
       ],
       "in_existing_en_dict": false
     },
@@ -3543,8 +3543,8 @@
       "text": "⏳ 로그아웃 중…",
       "count": 2,
       "sample_lines": [
-        15102,
-        15603
+        15127,
+        15628
       ],
       "in_existing_en_dict": false
     },
@@ -3552,8 +3552,8 @@
       "text": "⏳ 새 로그인 창 여는 중…",
       "count": 2,
       "sample_lines": [
-        15108,
-        15606
+        15133,
+        15631
       ],
       "in_existing_en_dict": false
     },
@@ -3561,7 +3561,7 @@
       "text": "⏳ 터미널에서 로그인 중…",
       "count": 1,
       "sample_lines": [
-        14690
+        14715
       ],
       "in_existing_en_dict": false
     },
@@ -3569,7 +3569,7 @@
       "text": "⏳ 터미널에서 로그인 창 여는 중…",
       "count": 1,
       "sample_lines": [
-        15666
+        15691
       ],
       "in_existing_en_dict": false
     },
@@ -3585,7 +3585,7 @@
       "text": "◀ 좌측(현재값) 유지",
       "count": 1,
       "sample_lines": [
-        10791
+        10816
       ],
       "in_existing_en_dict": false
     },
@@ -3593,7 +3593,7 @@
       "text": "☁️ API 프로바이더",
       "count": 1,
       "sample_lines": [
-        11585
+        11610
       ],
       "in_existing_en_dict": false
     },
@@ -3601,7 +3601,7 @@
       "text": "★ 평균",
       "count": 1,
       "sample_lines": [
-        10523
+        10548
       ],
       "in_existing_en_dict": false
     },
@@ -3609,7 +3609,7 @@
       "text": "☕ 한 잔의 여유",
       "count": 1,
       "sample_lines": [
-        15949
+        15974
       ],
       "in_existing_en_dict": false
     },
@@ -3617,7 +3617,7 @@
       "text": "⚙️ 커스텀 CLI 프로바이더",
       "count": 1,
       "sample_lines": [
-        11619
+        11644
       ],
       "in_existing_en_dict": false
     },
@@ -3625,7 +3625,7 @@
       "text": "⚠️ Claude Code doctor 가 거부하는 패턴",
       "count": 1,
       "sample_lines": [
-        9658
+        9683
       ],
       "in_existing_en_dict": false
     },
@@ -3641,7 +3641,7 @@
       "text": "⚠️ 설정 필요",
       "count": 1,
       "sample_lines": [
-        15179
+        15204
       ],
       "in_existing_en_dict": false
     },
@@ -3657,7 +3657,7 @@
       "text": "⚠️ 유효한 JSON 이어야 저장됩니다.",
       "count": 1,
       "sample_lines": [
-        10099
+        10124
       ],
       "in_existing_en_dict": false
     },
@@ -3681,7 +3681,7 @@
       "text": "⚠️ 잘못된 권한 규칙",
       "count": 1,
       "sample_lines": [
-        9679
+        9704
       ],
       "in_existing_en_dict": false
     },
@@ -3689,7 +3689,7 @@
       "text": "⚠️ 플러그인의 hooks.json 을 직접 수정합니다. 플러그인 업데이트 시 변경이 덮어써질 수 있습니다.",
       "count": 1,
       "sample_lines": [
-        9496
+        9521
       ],
       "in_existing_en_dict": false
     },
@@ -3697,7 +3697,7 @@
       "text": "⚠️ 필수 값",
       "count": 1,
       "sample_lines": [
-        9882
+        9907
       ],
       "in_existing_en_dict": false
     },
@@ -3705,7 +3705,7 @@
       "text": "⚠️ 환경변수 누락",
       "count": 1,
       "sample_lines": [
-        9972
+        9997
       ],
       "in_existing_en_dict": false
     },
@@ -3713,7 +3713,7 @@
       "text": "⚡ 거의 다 왔어요!",
       "count": 1,
       "sample_lines": [
-        16129
+        16154
       ],
       "in_existing_en_dict": false
     },
@@ -3737,7 +3737,7 @@
       "text": "⚡ 처리 중…",
       "count": 1,
       "sample_lines": [
-        15949
+        15974
       ],
       "in_existing_en_dict": false
     },
@@ -3745,7 +3745,7 @@
       "text": "⚡ 활성 세션 (",
       "count": 1,
       "sample_lines": [
-        14788
+        14813
       ],
       "in_existing_en_dict": false
     },
@@ -3761,7 +3761,7 @@
       "text": "✅ 연결됨",
       "count": 1,
       "sample_lines": [
-        15179
+        15204
       ],
       "in_existing_en_dict": false
     },
@@ -3769,7 +3769,7 @@
       "text": "✅ 완료",
       "count": 1,
       "sample_lines": [
-        14613
+        14638
       ],
       "in_existing_en_dict": false
     },
@@ -3777,7 +3777,7 @@
       "text": "✅ 추가될 허용 (",
       "count": 1,
       "sample_lines": [
-        10212
+        10237
       ],
       "in_existing_en_dict": false
     },
@@ -3785,8 +3785,8 @@
       "text": "✅ 터미널에서 브라우저 인증을 완료하세요.",
       "count": 2,
       "sample_lines": [
-        15609,
-        15671
+        15634,
+        15696
       ],
       "in_existing_en_dict": false
     },
@@ -3794,7 +3794,7 @@
       "text": "✅ 터미널에서 브라우저 인증을 완료하세요. 자동 감지됩니다.",
       "count": 1,
       "sample_lines": [
-        15114
+        15139
       ],
       "in_existing_en_dict": false
     },
@@ -3802,7 +3802,7 @@
       "text": "✅ 허용 (allow)",
       "count": 1,
       "sample_lines": [
-        9689
+        9714
       ],
       "in_existing_en_dict": false
     },
@@ -3818,7 +3818,7 @@
       "sample_lines": [
         6429,
         6814,
-        9413
+        9438
       ],
       "in_existing_en_dict": false
     },
@@ -3826,7 +3826,7 @@
       "text": "✓ 성공 (",
       "count": 1,
       "sample_lines": [
-        12188
+        12213
       ],
       "in_existing_en_dict": false
     },
@@ -3834,7 +3834,7 @@
       "text": "✓ 연결됨",
       "count": 1,
       "sample_lines": [
-        9946
+        9971
       ],
       "in_existing_en_dict": false
     },
@@ -3850,7 +3850,7 @@
       "text": "✗ 실패",
       "count": 1,
       "sample_lines": [
-        9948
+        9973
       ],
       "in_existing_en_dict": false
     },
@@ -3865,7 +3865,7 @@
       "count": 2,
       "sample_lines": [
         909,
-        15245
+        15270
       ],
       "in_existing_en_dict": false
     },
@@ -3873,7 +3873,7 @@
       "text": "✨ 프로젝트 스킬",
       "count": 1,
       "sample_lines": [
-        10546
+        10571
       ],
       "in_existing_en_dict": false
     },
@@ -3881,7 +3881,7 @@
       "text": "❌ (brew install 필요)",
       "count": 1,
       "sample_lines": [
-        15187
+        15212
       ],
       "in_existing_en_dict": false
     },
@@ -3889,7 +3889,7 @@
       "text": "❌ AI 추천 실패",
       "count": 1,
       "sample_lines": [
-        10660
+        10685
       ],
       "in_existing_en_dict": false
     },
@@ -3897,8 +3897,8 @@
       "text": "➕ CLAUDE.md 에 추가",
       "count": 2,
       "sample_lines": [
-        10720,
-        11191
+        10745,
+        11216
       ],
       "in_existing_en_dict": false
     },
@@ -3930,7 +3930,7 @@
       "text": "가입일",
       "count": 1,
       "sample_lines": [
-        15200
+        15225
       ],
       "in_existing_en_dict": false
     },
@@ -3976,7 +3976,7 @@
       "text": "각 추천은 프로젝트 루트(",
       "count": 1,
       "sample_lines": [
-        11253
+        11278
       ],
       "in_existing_en_dict": false
     },
@@ -3984,7 +3984,7 @@
       "text": "감지 시간 초과 — 직접 새로고침해 주세요",
       "count": 1,
       "sample_lines": [
-        13979
+        14004
       ],
       "in_existing_en_dict": false
     },
@@ -3992,7 +3992,7 @@
       "text": "감지된 이슈",
       "count": 1,
       "sample_lines": [
-        13611
+        13636
       ],
       "in_existing_en_dict": false
     },
@@ -4000,7 +4000,7 @@
       "text": "감지된 이슈 없음 — 깨끗합니다!",
       "count": 1,
       "sample_lines": [
-        13604
+        13629
       ],
       "in_existing_en_dict": false
     },
@@ -4008,7 +4008,7 @@
       "text": "감지된 터미널 없음",
       "count": 1,
       "sample_lines": [
-        12995
+        13020
       ],
       "in_existing_en_dict": false
     },
@@ -4052,7 +4052,7 @@
       "text": "개 · 이벤트",
       "count": 1,
       "sample_lines": [
-        13112
+        13137
       ],
       "in_existing_en_dict": false
     },
@@ -4060,7 +4060,7 @@
       "text": "개 · 차단",
       "count": 1,
       "sample_lines": [
-        9668
+        9693
       ],
       "in_existing_en_dict": false
     },
@@ -4068,7 +4068,7 @@
       "text": "개 — 여기서 직접 추가/삭제 가능",
       "count": 1,
       "sample_lines": [
-        9668
+        9693
       ],
       "in_existing_en_dict": false
     },
@@ -4076,7 +4076,7 @@
       "text": "개 규칙 자동 교정됨",
       "count": 1,
       "sample_lines": [
-        9705
+        9730
       ],
       "in_existing_en_dict": false
     },
@@ -4084,7 +4084,7 @@
       "text": "개 마켓플레이스 ·",
       "count": 1,
       "sample_lines": [
-        10004
+        10029
       ],
       "in_existing_en_dict": false
     },
@@ -4092,7 +4092,7 @@
       "text": "개 마켓플레이스 · git URL 로 추가",
       "count": 1,
       "sample_lines": [
-        13028
+        13053
       ],
       "in_existing_en_dict": false
     },
@@ -4100,7 +4100,7 @@
       "text": "개 메모",
       "count": 1,
       "sample_lines": [
-        14505
+        14530
       ],
       "in_existing_en_dict": false
     },
@@ -4116,7 +4116,7 @@
       "text": "개 모델",
       "count": 1,
       "sample_lines": [
-        11433
+        11458
       ],
       "in_existing_en_dict": false
     },
@@ -4132,7 +4132,7 @@
       "text": "개 발견! 좌측",
       "count": 1,
       "sample_lines": [
-        15245
+        15270
       ],
       "in_existing_en_dict": false
     },
@@ -4148,7 +4148,7 @@
       "text": "개 서브에이전트 활용",
       "count": 1,
       "sample_lines": [
-        10611
+        10636
       ],
       "in_existing_en_dict": false
     },
@@ -4164,7 +4164,7 @@
       "text": "개 세션에서",
       "count": 1,
       "sample_lines": [
-        10587
+        10612
       ],
       "in_existing_en_dict": false
     },
@@ -4172,7 +4172,7 @@
       "text": "개 세션의 5축 평균 · 각 세션은 max 100",
       "count": 1,
       "sample_lines": [
-        11227
+        11252
       ],
       "in_existing_en_dict": false
     },
@@ -4196,7 +4196,7 @@
       "text": "개 이벤트",
       "count": 1,
       "sample_lines": [
-        9456
+        9481
       ],
       "in_existing_en_dict": false
     },
@@ -4204,7 +4204,7 @@
       "text": "개 이벤트 (",
       "count": 1,
       "sample_lines": [
-        14307
+        14332
       ],
       "in_existing_en_dict": false
     },
@@ -4212,7 +4212,7 @@
       "text": "개 인덱스 프로젝트. 카드를 클릭하면 실제 설정 스냅샷이 열립니다.",
       "count": 1,
       "sample_lines": [
-        10350
+        10375
       ],
       "in_existing_en_dict": false
     },
@@ -4220,7 +4220,7 @@
       "text": "개 입력",
       "count": 1,
       "sample_lines": [
-        9882
+        9907
       ],
       "in_existing_en_dict": false
     },
@@ -4228,7 +4228,7 @@
       "text": "개 전체 ·",
       "count": 1,
       "sample_lines": [
-        10004
+        10029
       ],
       "in_existing_en_dict": false
     },
@@ -4236,7 +4236,7 @@
       "text": "개 제거됨 (백업 보존)",
       "count": 1,
       "sample_lines": [
-        14038
+        14063
       ],
       "in_existing_en_dict": false
     },
@@ -4260,7 +4260,7 @@
       "text": "개 프로젝트",
       "count": 1,
       "sample_lines": [
-        13153
+        13178
       ],
       "in_existing_en_dict": false
     },
@@ -4276,7 +4276,7 @@
       "text": "개 활성 ·",
       "count": 1,
       "sample_lines": [
-        10004
+        10029
       ],
       "in_existing_en_dict": false
     },
@@ -4284,7 +4284,7 @@
       "text": "개가 있지만 세션에서 한 번도 위임되지 않았습니다. AI 추천으로 활용 시나리오를 받아보세요.",
       "count": 1,
       "sample_lines": [
-        10422
+        10447
       ],
       "in_existing_en_dict": false
     },
@@ -4322,7 +4322,7 @@
       "text": "개인 플랜을 사용 중이거나 조직에 초대되지 않았습니다.",
       "count": 1,
       "sample_lines": [
-        14744
+        14769
       ],
       "in_existing_en_dict": false
     },
@@ -4338,7 +4338,7 @@
       "text": "거의 다 됐어요!",
       "count": 1,
       "sample_lines": [
-        15947
+        15972
       ],
       "in_existing_en_dict": false
     },
@@ -4347,8 +4347,8 @@
       "count": 3,
       "sample_lines": [
         7673,
-        9105,
-        10694
+        9130,
+        10719
       ],
       "in_existing_en_dict": false
     },
@@ -4364,7 +4364,7 @@
       "text": "건 · 파싱 오류",
       "count": 1,
       "sample_lines": [
-        13112
+        13137
       ],
       "in_existing_en_dict": false
     },
@@ -4372,7 +4372,7 @@
       "text": "건 — Claude Code 가 무시합니다",
       "count": 1,
       "sample_lines": [
-        9679
+        9704
       ],
       "in_existing_en_dict": false
     },
@@ -4380,7 +4380,7 @@
       "text": "건너뛰기",
       "count": 1,
       "sample_lines": [
-        10790
+        10815
       ],
       "in_existing_en_dict": false
     },
@@ -4404,7 +4404,7 @@
       "text": "검사 대상: settings.json · CLAUDE.md · settings.hooks · ~/.claude/agents · mcp.json",
       "count": 1,
       "sample_lines": [
-        13617
+        13642
       ],
       "in_existing_en_dict": false
     },
@@ -4412,7 +4412,7 @@
       "text": "검색 결과 없음",
       "count": 1,
       "sample_lines": [
-        9091
+        9115
       ],
       "in_existing_en_dict": false
     },
@@ -4436,7 +4436,7 @@
       "text": "검색: context7, github, search...",
       "count": 1,
       "sample_lines": [
-        9802
+        9827
       ],
       "in_existing_en_dict": false
     },
@@ -4444,7 +4444,7 @@
       "text": "검색: kotlin, security, django...",
       "count": 1,
       "sample_lines": [
-        10014
+        10039
       ],
       "in_existing_en_dict": false
     },
@@ -4498,8 +4498,8 @@
       "count": 3,
       "sample_lines": [
         4145,
-        13091,
-        16496
+        13116,
+        16521
       ],
       "in_existing_en_dict": false
     },
@@ -4539,7 +4539,7 @@
       "text": "경과",
       "count": 1,
       "sample_lines": [
-        10648
+        10673
       ],
       "in_existing_en_dict": false
     },
@@ -4549,8 +4549,8 @@
       "sample_lines": [
         6062,
         8813,
-        14791,
-        15188
+        14816,
+        15213
       ],
       "in_existing_en_dict": false
     },
@@ -4558,7 +4558,7 @@
       "text": "경로 미확인",
       "count": 1,
       "sample_lines": [
-        10362
+        10387
       ],
       "in_existing_en_dict": false
     },
@@ -4566,7 +4566,7 @@
       "text": "계정 / 구독",
       "count": 1,
       "sample_lines": [
-        15194
+        15219
       ],
       "in_existing_en_dict": false
     },
@@ -4574,7 +4574,7 @@
       "text": "계정 UUID",
       "count": 1,
       "sample_lines": [
-        14716
+        14741
       ],
       "in_existing_en_dict": false
     },
@@ -4582,8 +4582,8 @@
       "text": "계정 미연결",
       "count": 2,
       "sample_lines": [
-        14685,
-        15646
+        14710,
+        15671
       ],
       "in_existing_en_dict": false
     },
@@ -4591,7 +4591,7 @@
       "text": "계정 연결이 필요합니다",
       "count": 1,
       "sample_lines": [
-        14674
+        14699
       ],
       "in_existing_en_dict": false
     },
@@ -4599,7 +4599,7 @@
       "text": "계정 전환",
       "count": 1,
       "sample_lines": [
-        15057
+        15082
       ],
       "in_existing_en_dict": false
     },
@@ -4616,7 +4616,7 @@
       "text": "곧 결과가 나와요!",
       "count": 1,
       "sample_lines": [
-        15948
+        15973
       ],
       "in_existing_en_dict": false
     },
@@ -4624,7 +4624,7 @@
       "text": "공식 가이드",
       "count": 1,
       "sample_lines": [
-        13881
+        13906
       ],
       "in_existing_en_dict": false
     },
@@ -4656,7 +4656,7 @@
       "text": "관련 탭",
       "count": 1,
       "sample_lines": [
-        9078
+        9102
       ],
       "in_existing_en_dict": false
     },
@@ -4672,7 +4672,7 @@
       "text": "교정할 항목 없음",
       "count": 1,
       "sample_lines": [
-        9705
+        9730
       ],
       "in_existing_en_dict": false
     },
@@ -4680,7 +4680,7 @@
       "text": "구독 세부 플랜(Pro·Max·Team)을 저장하지 않습니다",
       "count": 1,
       "sample_lines": [
-        15208
+        15233
       ],
       "in_existing_en_dict": false
     },
@@ -4688,7 +4688,7 @@
       "text": "구독 시작",
       "count": 1,
       "sample_lines": [
-        15201
+        15226
       ],
       "in_existing_en_dict": false
     },
@@ -4696,7 +4696,7 @@
       "text": "구독 인증",
       "count": 1,
       "sample_lines": [
-        15023
+        15048
       ],
       "in_existing_en_dict": false
     },
@@ -4734,7 +4734,7 @@
       "text": "궁금한 거 물어봐주세요! 🤔",
       "count": 1,
       "sample_lines": [
-        15739
+        15764
       ],
       "in_existing_en_dict": false
     },
@@ -4746,7 +4746,7 @@
         5431,
         5918,
         5932,
-        14783
+        14808
       ],
       "in_existing_en_dict": false
     },
@@ -4754,7 +4754,7 @@
       "text": "권한 (Permissions)",
       "count": 1,
       "sample_lines": [
-        9667
+        9692
       ],
       "in_existing_en_dict": false
     },
@@ -4778,7 +4778,7 @@
       "text": "규칙을 입력하세요",
       "count": 1,
       "sample_lines": [
-        9712
+        9737
       ],
       "in_existing_en_dict": false
     },
@@ -4786,7 +4786,7 @@
       "text": "규칙을 입력하세요 (예: Bash(git status:*))",
       "count": 1,
       "sample_lines": [
-        9719
+        9744
       ],
       "in_existing_en_dict": false
     },
@@ -4815,7 +4815,7 @@
       "count": 2,
       "sample_lines": [
         1598,
-        16823
+        16848
       ],
       "in_existing_en_dict": false
     },
@@ -4831,7 +4831,7 @@
       "text": "그룹이 생성되었습니다",
       "count": 1,
       "sample_lines": [
-        16828
+        16853
       ],
       "in_existing_en_dict": false
     },
@@ -4839,7 +4839,7 @@
       "text": "근거",
       "count": 1,
       "sample_lines": [
-        10787
+        10812
       ],
       "in_existing_en_dict": false
     },
@@ -4863,7 +4863,7 @@
       "text": "글로벌 CLAUDE.md 초안",
       "count": 1,
       "sample_lines": [
-        10315
+        10340
       ],
       "in_existing_en_dict": false
     },
@@ -4879,7 +4879,7 @@
       "text": "기능 (쉼표 구분: chat, embed, code, vision)",
       "count": 1,
       "sample_lines": [
-        12254
+        12279
       ],
       "in_existing_en_dict": false
     },
@@ -4909,7 +4909,7 @@
       "text": "기본 모델",
       "count": 1,
       "sample_lines": [
-        11407
+        11432
       ],
       "in_existing_en_dict": false
     },
@@ -4923,7 +4923,7 @@
       "text": "기본 모델 저장 실패",
       "count": 1,
       "sample_lines": [
-        12298
+        12323
       ],
       "in_existing_en_dict": false
     },
@@ -4931,7 +4931,7 @@
       "text": "기본 모델 저장 완료",
       "count": 1,
       "sample_lines": [
-        12295
+        12320
       ],
       "in_existing_en_dict": false
     },
@@ -4939,7 +4939,7 @@
       "text": "기본 임베딩 모델",
       "count": 1,
       "sample_lines": [
-        11658
+        11683
       ],
       "in_existing_en_dict": false
     },
@@ -4947,7 +4947,7 @@
       "text": "기본 채팅 모델 (LLM)",
       "count": 1,
       "sample_lines": [
-        11652
+        11677
       ],
       "in_existing_en_dict": false
     },
@@ -5015,7 +5015,7 @@
       "text": "기술 문서형",
       "count": 1,
       "sample_lines": [
-        13194
+        13219
       ],
       "in_existing_en_dict": false
     },
@@ -5023,7 +5023,7 @@
       "text": "기타",
       "count": 1,
       "sample_lines": [
-        16621
+        16646
       ],
       "in_existing_en_dict": false
     },
@@ -5055,7 +5055,7 @@
       "text": "내 계정",
       "count": 1,
       "sample_lines": [
-        14712
+        14737
       ],
       "in_existing_en_dict": false
     },
@@ -5071,7 +5071,7 @@
       "text": "내 플랜",
       "count": 1,
       "sample_lines": [
-        15206
+        15231
       ],
       "in_existing_en_dict": false
     },
@@ -5130,7 +5130,7 @@
       "text": "내비게이션",
       "count": 1,
       "sample_lines": [
-        16601
+        16626
       ],
       "in_existing_en_dict": false
     },
@@ -5138,7 +5138,7 @@
       "text": "내용 보기",
       "count": 1,
       "sample_lines": [
-        13875
+        13900
       ],
       "in_existing_en_dict": false
     },
@@ -5146,7 +5146,7 @@
       "text": "내장",
       "count": 1,
       "sample_lines": [
-        13045
+        13070
       ],
       "in_existing_en_dict": false
     },
@@ -5250,7 +5250,7 @@
       "text": "노드 다중 선택",
       "count": 1,
       "sample_lines": [
-        16613
+        16638
       ],
       "in_existing_en_dict": false
     },
@@ -5258,7 +5258,7 @@
       "text": "노드 복사",
       "count": 1,
       "sample_lines": [
-        16610
+        16635
       ],
       "in_existing_en_dict": false
     },
@@ -5275,7 +5275,7 @@
       "count": 2,
       "sample_lines": [
         2291,
-        16611
+        16636
       ],
       "in_existing_en_dict": false
     },
@@ -5300,7 +5300,7 @@
       "text": "노드 수 차이",
       "count": 1,
       "sample_lines": [
-        16980
+        17005
       ],
       "in_existing_en_dict": false
     },
@@ -5332,7 +5332,7 @@
       "text": "노드 클릭 → 편집",
       "count": 1,
       "sample_lines": [
-        10947
+        10972
       ],
       "in_existing_en_dict": false
     },
@@ -5381,7 +5381,7 @@
       "text": "노출되는 6 tool",
       "count": 1,
       "sample_lines": [
-        9787
+        9812
       ],
       "in_existing_en_dict": false
     },
@@ -5397,7 +5397,7 @@
       "text": "누적 토큰",
       "count": 1,
       "sample_lines": [
-        13696
+        13721
       ],
       "in_existing_en_dict": false
     },
@@ -5405,7 +5405,7 @@
       "text": "누적 토큰 절감 (rtk gain)",
       "count": 1,
       "sample_lines": [
-        13925
+        13950
       ],
       "in_existing_en_dict": false
     },
@@ -5413,7 +5413,7 @@
       "text": "는 Claude Code 가 자동으로 발견한 모든 프로젝트 루트를 기록합니다. 우리가",
       "count": 1,
       "sample_lines": [
-        13155
+        13180
       ],
       "in_existing_en_dict": false
     },
@@ -5421,7 +5421,7 @@
       "text": "다른 Claude 계정으로 연결",
       "count": 1,
       "sample_lines": [
-        15058
+        15083
       ],
       "in_existing_en_dict": false
     },
@@ -5429,7 +5429,7 @@
       "text": "다른 Claude 계정으로 전환",
       "count": 1,
       "sample_lines": [
-        15028
+        15053
       ],
       "in_existing_en_dict": false
     },
@@ -5437,7 +5437,7 @@
       "text": "다른 계정으로 로그인",
       "count": 1,
       "sample_lines": [
-        15076
+        15101
       ],
       "in_existing_en_dict": false
     },
@@ -5469,7 +5469,7 @@
       "text": "다른 변경 키",
       "count": 1,
       "sample_lines": [
-        10220
+        10245
       ],
       "in_existing_en_dict": false
     },
@@ -5485,7 +5485,7 @@
       "text": "다시 검사",
       "count": 1,
       "sample_lines": [
-        13612
+        13637
       ],
       "in_existing_en_dict": false
     },
@@ -5493,7 +5493,7 @@
       "text": "다시 보지 않기",
       "count": 1,
       "sample_lines": [
-        11557
+        11582
       ],
       "in_existing_en_dict": false
     },
@@ -5501,7 +5501,7 @@
       "text": "다시 시도",
       "count": 1,
       "sample_lines": [
-        10663
+        10688
       ],
       "in_existing_en_dict": false
     },
@@ -5509,7 +5509,7 @@
       "text": "다운로드",
       "count": 1,
       "sample_lines": [
-        12544
+        12569
       ],
       "in_existing_en_dict": false
     },
@@ -5517,7 +5517,7 @@
       "text": "다운로드 시작...",
       "count": 1,
       "sample_lines": [
-        12614
+        12639
       ],
       "in_existing_en_dict": false
     },
@@ -5525,7 +5525,7 @@
       "text": "다운로드 중...",
       "count": 1,
       "sample_lines": [
-        12653
+        12678
       ],
       "in_existing_en_dict": false
     },
@@ -5533,7 +5533,7 @@
       "text": "다운로드 진행",
       "count": 1,
       "sample_lines": [
-        11734
+        11759
       ],
       "in_existing_en_dict": false
     },
@@ -5549,7 +5549,7 @@
       "text": "다음 탭",
       "count": 1,
       "sample_lines": [
-        16604
+        16629
       ],
       "in_existing_en_dict": false
     },
@@ -5587,7 +5587,7 @@
       "text": "단축키 도움말",
       "count": 1,
       "sample_lines": [
-        16427
+        16452
       ],
       "in_existing_en_dict": false
     },
@@ -5697,7 +5697,7 @@
       "text": "대시보드 도우미와 대화",
       "count": 1,
       "sample_lines": [
-        16424
+        16449
       ],
       "in_existing_en_dict": false
     },
@@ -5705,7 +5705,7 @@
       "text": "대시보드 서버를 재시작하면 최신 기능이 적용됩니다",
       "count": 1,
       "sample_lines": [
-        12116
+        12141
       ],
       "in_existing_en_dict": false
     },
@@ -5722,7 +5722,7 @@
       "text": "대시보드에서 직접 만든 태스크는 ~/.claude/tasks/dashboard-manual/ 로 저장",
       "count": 1,
       "sample_lines": [
-        14561
+        14586
       ],
       "in_existing_en_dict": false
     },
@@ -5773,7 +5773,7 @@
       "text": "데이터 없음 (세션 재인덱스 필요할 수 있음)",
       "count": 1,
       "sample_lines": [
-        14340
+        14365
       ],
       "in_existing_en_dict": false
     },
@@ -5781,11 +5781,11 @@
       "text": "데이터를 불러오지 못했습니다",
       "count": 7,
       "sample_lines": [
-        9304,
-        13481,
-        13571,
-        13627,
-        13751
+        9329,
+        13506,
+        13596,
+        13652,
+        13776
       ],
       "in_existing_en_dict": false
     },
@@ -5801,8 +5801,8 @@
       "sample_lines": [
         6148,
         6635,
-        10500,
-        14418
+        10525,
+        14443
       ],
       "in_existing_en_dict": false
     },
@@ -5818,7 +5818,7 @@
       "text": "도구 사용 기록 없음",
       "count": 1,
       "sample_lines": [
-        10592
+        10617
       ],
       "in_existing_en_dict": false
     },
@@ -5826,7 +5826,7 @@
       "text": "도구 사용 내역 로딩…",
       "count": 1,
       "sample_lines": [
-        10566
+        10591
       ],
       "in_existing_en_dict": false
     },
@@ -5834,8 +5834,8 @@
       "text": "도구 사용 드릴다운",
       "count": 2,
       "sample_lines": [
-        10525,
-        10585
+        10550,
+        10610
       ],
       "in_existing_en_dict": false
     },
@@ -5867,7 +5867,7 @@
       "text": "도구 호출 (전체)",
       "count": 1,
       "sample_lines": [
-        14331
+        14356
       ],
       "in_existing_en_dict": false
     },
@@ -5883,7 +5883,7 @@
       "text": "도구로 추가 가능",
       "count": 1,
       "sample_lines": [
-        13018
+        13043
       ],
       "in_existing_en_dict": false
     },
@@ -5891,7 +5891,7 @@
       "text": "도구를 1개 이상 활성화하세요",
       "count": 1,
       "sample_lines": [
-        9272
+        9297
       ],
       "in_existing_en_dict": false
     },
@@ -5899,7 +5899,7 @@
       "text": "도구를 활용할 질문",
       "count": 1,
       "sample_lines": [
-        9204
+        9229
       ],
       "in_existing_en_dict": false
     },
@@ -5907,7 +5907,7 @@
       "text": "도움이 필요하면 불러주세요 ✨",
       "count": 1,
       "sample_lines": [
-        15746
+        15771
       ],
       "in_existing_en_dict": false
     },
@@ -5923,7 +5923,7 @@
       "text": "동일",
       "count": 1,
       "sample_lines": [
-        16981
+        17006
       ],
       "in_existing_en_dict": false
     },
@@ -5931,7 +5931,7 @@
       "text": "동일한 프롬프트를 여러 AI 프로바이더에 동시에 보내 결과를 비교합니다.",
       "count": 1,
       "sample_lines": [
-        11808
+        11833
       ],
       "in_existing_en_dict": false
     },
@@ -5947,7 +5947,7 @@
       "text": "됩니다. 직접 쓰거나, 위의",
       "count": 1,
       "sample_lines": [
-        10292
+        10317
       ],
       "in_existing_en_dict": false
     },
@@ -5963,7 +5963,7 @@
       "text": "두 버전이 동일합니다",
       "count": 1,
       "sample_lines": [
-        16964
+        16989
       ],
       "in_existing_en_dict": false
     },
@@ -5971,7 +5971,7 @@
       "text": "등록 완료",
       "count": 1,
       "sample_lines": [
-        12276
+        12301
       ],
       "in_existing_en_dict": false
     },
@@ -5979,7 +5979,7 @@
       "text": "등록된 Forwarder",
       "count": 1,
       "sample_lines": [
-        9339
+        9364
       ],
       "in_existing_en_dict": false
     },
@@ -5993,7 +5993,7 @@
       "text": "등록된 forwarder 가 없습니다",
       "count": 1,
       "sample_lines": [
-        9318
+        9343
       ],
       "in_existing_en_dict": false
     },
@@ -6001,7 +6001,7 @@
       "text": "등록된 커스텀 프로바이더가 없습니다.",
       "count": 1,
       "sample_lines": [
-        11621
+        11646
       ],
       "in_existing_en_dict": false
     },
@@ -6009,7 +6009,7 @@
       "text": "등록할 이름",
       "count": 1,
       "sample_lines": [
-        9877
+        9902
       ],
       "in_existing_en_dict": false
     },
@@ -6017,7 +6017,7 @@
       "text": "디렉토리 없음",
       "count": 1,
       "sample_lines": [
-        13460
+        13485
       ],
       "in_existing_en_dict": false
     },
@@ -6025,7 +6025,7 @@
       "text": "디바이스 & 활성 세션 · 권한 요약",
       "count": 1,
       "sample_lines": [
-        14763
+        14788
       ],
       "in_existing_en_dict": false
     },
@@ -6066,9 +6066,9 @@
       "text": "또는",
       "count": 3,
       "sample_lines": [
-        11253,
-        13141,
-        14783
+        11278,
+        13166,
+        14808
       ],
       "in_existing_en_dict": false
     },
@@ -6076,7 +6076,7 @@
       "text": "또는 Claude Code 재시작으로 동기화.",
       "count": 1,
       "sample_lines": [
-        13037
+        13062
       ],
       "in_existing_en_dict": false
     },
@@ -6092,7 +6092,7 @@
       "text": "또는 터미널에서",
       "count": 1,
       "sample_lines": [
-        14699
+        14724
       ],
       "in_existing_en_dict": false
     },
@@ -6100,7 +6100,7 @@
       "text": "또는 터미널에서 직접 실행",
       "count": 1,
       "sample_lines": [
-        15656
+        15681
       ],
       "in_existing_en_dict": false
     },
@@ -6108,7 +6108,7 @@
       "text": "라고 말하면 여기에 자동으로 나타납니다.",
       "count": 1,
       "sample_lines": [
-        14519
+        14544
       ],
       "in_existing_en_dict": false
     },
@@ -6149,7 +6149,7 @@
       "text": "로 변경",
       "count": 1,
       "sample_lines": [
-        11098
+        11123
       ],
       "in_existing_en_dict": false
     },
@@ -6157,7 +6157,7 @@
       "text": "로 보는 세션 데이터와는 다르게, git remote 추적 + 마지막 작업 시간을 함께 저장.",
       "count": 1,
       "sample_lines": [
-        13155
+        13180
       ],
       "in_existing_en_dict": false
     },
@@ -6165,7 +6165,7 @@
       "text": "로 설치합니다. 계속할까요?",
       "count": 1,
       "sample_lines": [
-        14000
+        14025
       ],
       "in_existing_en_dict": false
     },
@@ -6181,7 +6181,7 @@
       "text": "로 임시 전환.",
       "count": 1,
       "sample_lines": [
-        12962
+        12987
       ],
       "in_existing_en_dict": false
     },
@@ -6189,7 +6189,7 @@
       "text": "로 저장되는 서브 에이전트를 관리. 역할 프리셋으로 즉시 추가.",
       "count": 1,
       "sample_lines": [
-        10930
+        10955
       ],
       "in_existing_en_dict": false
     },
@@ -6197,7 +6197,7 @@
       "text": "로 적용",
       "count": 1,
       "sample_lines": [
-        13210
+        13235
       ],
       "in_existing_en_dict": false
     },
@@ -6213,7 +6213,7 @@
       "text": "로 첫 스타일 추가",
       "count": 1,
       "sample_lines": [
-        13209
+        13234
       ],
       "in_existing_en_dict": false
     },
@@ -6229,7 +6229,7 @@
       "text": "로 현재 작업 패턴 기반 초안을 받아보세요.",
       "count": 1,
       "sample_lines": [
-        10292
+        10317
       ],
       "in_existing_en_dict": false
     },
@@ -6237,10 +6237,10 @@
       "text": "로그아웃",
       "count": 6,
       "sample_lines": [
-        14724,
-        14728,
-        15029,
-        15130
+        14749,
+        14753,
+        15054,
+        15155
       ],
       "in_existing_en_dict": false
     },
@@ -6248,8 +6248,8 @@
       "text": "로그아웃 되었습니다",
       "count": 2,
       "sample_lines": [
-        14726,
-        15136
+        14751,
+        15161
       ],
       "in_existing_en_dict": false
     },
@@ -6257,8 +6257,8 @@
       "text": "로그인",
       "count": 2,
       "sample_lines": [
-        11387,
-        15030
+        11412,
+        15055
       ],
       "in_existing_en_dict": false
     },
@@ -6266,7 +6266,7 @@
       "text": "로그인 상태 / 플랜 확인",
       "count": 1,
       "sample_lines": [
-        16425
+        16450
       ],
       "in_existing_en_dict": false
     },
@@ -6274,8 +6274,8 @@
       "text": "로그인 성공!",
       "count": 2,
       "sample_lines": [
-        14692,
-        15153
+        14717,
+        15178
       ],
       "in_existing_en_dict": false
     },
@@ -6283,7 +6283,7 @@
       "text": "로그인 실패",
       "count": 1,
       "sample_lines": [
-        12176
+        12201
       ],
       "in_existing_en_dict": false
     },
@@ -6291,7 +6291,7 @@
       "text": "로그인이 필요합니다",
       "count": 1,
       "sample_lines": [
-        15629
+        15654
       ],
       "in_existing_en_dict": false
     },
@@ -6302,8 +6302,8 @@
         2755,
         2817,
         4537,
-        11574,
-        11705
+        11599,
+        11730
       ],
       "in_existing_en_dict": false
     },
@@ -6327,8 +6327,8 @@
       "text": "로컬 LLM",
       "count": 2,
       "sample_lines": [
-        11534,
-        12057
+        11559,
+        12082
       ],
       "in_existing_en_dict": false
     },
@@ -6336,7 +6336,7 @@
       "text": "로컬 LLM 모델을 탐색하고 관리합니다.",
       "count": 1,
       "sample_lines": [
-        11677
+        11702
       ],
       "in_existing_en_dict": false
     },
@@ -6358,7 +6358,7 @@
       "text": "로컬에 설치된 CLI 도구를 자동 감지합니다. 워크플로우 노드에서 선택 가능.",
       "count": 1,
       "sample_lines": [
-        11581
+        11606
       ],
       "in_existing_en_dict": false
     },
@@ -6366,7 +6366,7 @@
       "text": "루트 경로",
       "count": 1,
       "sample_lines": [
-        13159
+        13184
       ],
       "in_existing_en_dict": false
     },
@@ -6390,7 +6390,7 @@
       "text": "를 눌러 추가하세요.",
       "count": 1,
       "sample_lines": [
-        9481
+        9506
       ],
       "in_existing_en_dict": false
     },
@@ -6531,7 +6531,7 @@
       "text": "마지막 활동",
       "count": 1,
       "sample_lines": [
-        13159
+        13184
       ],
       "in_existing_en_dict": false
     },
@@ -6555,7 +6555,7 @@
       "text": "마켓플레이스 제거",
       "count": 1,
       "sample_lines": [
-        13063
+        13088
       ],
       "in_existing_en_dict": false
     },
@@ -6587,7 +6587,7 @@
       "text": "마켓플레이스를 제거할까요?",
       "count": 1,
       "sample_lines": [
-        13064
+        13089
       ],
       "in_existing_en_dict": false
     },
@@ -6603,7 +6603,7 @@
       "text": "만 편집 가능 (안전장치).",
       "count": 1,
       "sample_lines": [
-        11253
+        11278
       ],
       "in_existing_en_dict": false
     },
@@ -6643,7 +6643,7 @@
       "text": "매처",
       "count": 1,
       "sample_lines": [
-        9343
+        9368
       ],
       "in_existing_en_dict": false
     },
@@ -6675,7 +6675,7 @@
       "text": "맨 끝",
       "count": 1,
       "sample_lines": [
-        9694
+        9719
       ],
       "in_existing_en_dict": false
     },
@@ -6697,7 +6697,7 @@
       "text": "멀티 AI 비교",
       "count": 1,
       "sample_lines": [
-        11807
+        11832
       ],
       "in_existing_en_dict": false
     },
@@ -6705,7 +6705,7 @@
       "text": "메모/내용 검색…",
       "count": 1,
       "sample_lines": [
-        14492
+        14517
       ],
       "in_existing_en_dict": false
     },
@@ -6800,7 +6800,7 @@
       "text": "명령",
       "count": 1,
       "sample_lines": [
-        11232
+        11257
       ],
       "in_existing_en_dict": false
     },
@@ -6808,7 +6808,7 @@
       "text": "명령 검색 (예: git, npm, curl)",
       "count": 1,
       "sample_lines": [
-        13082
+        13107
       ],
       "in_existing_en_dict": false
     },
@@ -6816,7 +6816,7 @@
       "text": "명령 레퍼런스",
       "count": 1,
       "sample_lines": [
-        13941
+        13966
       ],
       "in_existing_en_dict": false
     },
@@ -6846,7 +6846,7 @@
       "text": "모달 / 플라이아웃 닫기",
       "count": 1,
       "sample_lines": [
-        16605
+        16630
       ],
       "in_existing_en_dict": false
     },
@@ -6866,7 +6866,7 @@
       "text": "모델 검색...",
       "count": 1,
       "sample_lines": [
-        11702
+        11727
       ],
       "in_existing_en_dict": false
     },
@@ -6874,7 +6874,7 @@
       "text": "모델 다운로드 실패",
       "count": 1,
       "sample_lines": [
-        12670
+        12695
       ],
       "in_existing_en_dict": false
     },
@@ -6882,7 +6882,7 @@
       "text": "모델 다운로드 완료",
       "count": 1,
       "sample_lines": [
-        12661
+        12686
       ],
       "in_existing_en_dict": false
     },
@@ -6890,7 +6890,7 @@
       "text": "모델 다운로드 요청 실패",
       "count": 1,
       "sample_lines": [
-        12679
+        12704
       ],
       "in_existing_en_dict": false
     },
@@ -6898,7 +6898,7 @@
       "text": "모델 다운로드를 시작합니다",
       "count": 1,
       "sample_lines": [
-        12616
+        12641
       ],
       "in_existing_en_dict": false
     },
@@ -6906,7 +6906,7 @@
       "text": "모델 목록 (쉼표 구분)",
       "count": 1,
       "sample_lines": [
-        12253
+        12278
       ],
       "in_existing_en_dict": false
     },
@@ -6931,7 +6931,7 @@
       "text": "모델 삭제",
       "count": 1,
       "sample_lines": [
-        12686
+        12711
       ],
       "in_existing_en_dict": false
     },
@@ -6939,7 +6939,7 @@
       "text": "모델 삭제 실패",
       "count": 1,
       "sample_lines": [
-        12700
+        12725
       ],
       "in_existing_en_dict": false
     },
@@ -6947,7 +6947,7 @@
       "text": "모델 삭제 완료",
       "count": 1,
       "sample_lines": [
-        12697
+        12722
       ],
       "in_existing_en_dict": false
     },
@@ -6955,7 +6955,7 @@
       "text": "모델 생성",
       "count": 2,
       "sample_lines": [
-        16714
+        16739
       ],
       "in_existing_en_dict": false
     },
@@ -6963,8 +6963,8 @@
       "text": "모델 생성 실패",
       "count": 2,
       "sample_lines": [
-        16738,
-        16741
+        16763,
+        16766
       ],
       "in_existing_en_dict": false
     },
@@ -6972,7 +6972,7 @@
       "text": "모델 생성 중...",
       "count": 1,
       "sample_lines": [
-        16727
+        16752
       ],
       "in_existing_en_dict": false
     },
@@ -6989,7 +6989,7 @@
       "count": 2,
       "sample_lines": [
         324,
-        12938
+        12963
       ],
       "in_existing_en_dict": false
     },
@@ -7005,8 +7005,8 @@
       "text": "모델 이름",
       "count": 2,
       "sample_lines": [
-        11715,
-        16702
+        11740,
+        16727
       ],
       "in_existing_en_dict": false
     },
@@ -7014,7 +7014,7 @@
       "text": "모델 이름을 입력하세요",
       "count": 1,
       "sample_lines": [
-        16723
+        16748
       ],
       "in_existing_en_dict": false
     },
@@ -7022,7 +7022,7 @@
       "text": "모델 정보를 불러오는 중...",
       "count": 1,
       "sample_lines": [
-        12706
+        12731
       ],
       "in_existing_en_dict": false
     },
@@ -7030,7 +7030,7 @@
       "text": "모델 정보를 불러올 수 없습니다",
       "count": 1,
       "sample_lines": [
-        12736
+        12761
       ],
       "in_existing_en_dict": false
     },
@@ -7066,7 +7066,7 @@
       "text": "모델별 집계 (Top 20)",
       "count": 1,
       "sample_lines": [
-        14262
+        14287
       ],
       "in_existing_en_dict": false
     },
@@ -7074,7 +7074,7 @@
       "text": "모델을",
       "count": 1,
       "sample_lines": [
-        11098
+        11123
       ],
       "in_existing_en_dict": false
     },
@@ -7104,7 +7104,7 @@
       "text": "모든 세션 시작 시 자동 로드",
       "count": 1,
       "sample_lines": [
-        10292
+        10317
       ],
       "in_existing_en_dict": false
     },
@@ -7120,7 +7120,7 @@
       "text": "모든 탭·프로젝트·세션 검색",
       "count": 1,
       "sample_lines": [
-        16602
+        16627
       ],
       "in_existing_en_dict": false
     },
@@ -7254,7 +7254,7 @@
       "text": "미로그인",
       "count": 1,
       "sample_lines": [
-        15023
+        15048
       ],
       "in_existing_en_dict": false
     },
@@ -7262,7 +7262,7 @@
       "text": "미리보기",
       "count": 1,
       "sample_lines": [
-        10300
+        10325
       ],
       "in_existing_en_dict": false
     },
@@ -7294,7 +7294,7 @@
       "text": "미사용",
       "count": 1,
       "sample_lines": [
-        10410
+        10435
       ],
       "in_existing_en_dict": false
     },
@@ -7304,9 +7304,9 @@
       "sample_lines": [
         1180,
         1205,
-        12541,
-        13849,
-        14681
+        12566,
+        13874,
+        14706
       ],
       "in_existing_en_dict": false
     },
@@ -7314,7 +7314,7 @@
       "text": "미설치 (CLI)",
       "count": 1,
       "sample_lines": [
-        10044
+        10069
       ],
       "in_existing_en_dict": false
     },
@@ -7322,7 +7322,7 @@
       "text": "미설치/미설정",
       "count": 1,
       "sample_lines": [
-        11368
+        11393
       ],
       "in_existing_en_dict": false
     },
@@ -7330,7 +7330,7 @@
       "text": "미실행",
       "count": 1,
       "sample_lines": [
-        12329
+        12354
       ],
       "in_existing_en_dict": false
     },
@@ -7338,7 +7338,7 @@
       "text": "미지정",
       "count": 1,
       "sample_lines": [
-        14707
+        14732
       ],
       "in_existing_en_dict": false
     },
@@ -7397,7 +7397,7 @@
       "text": "반복 프롬프트",
       "count": 1,
       "sample_lines": [
-        13655
+        13680
       ],
       "in_existing_en_dict": false
     },
@@ -7405,7 +7405,7 @@
       "text": "발견된 시크릿은 rotate 후 env var 로 옮기세요.",
       "count": 1,
       "sample_lines": [
-        13617
+        13642
       ],
       "in_existing_en_dict": false
     },
@@ -7487,7 +7487,7 @@
       "count": 2,
       "sample_lines": [
         346,
-        13463
+        13488
       ],
       "in_existing_en_dict": false
     },
@@ -7536,9 +7536,9 @@
       "text": "버전",
       "count": 3,
       "sample_lines": [
-        12976,
-        14791,
-        15189
+        13001,
+        14816,
+        15214
       ],
       "in_existing_en_dict": false
     },
@@ -7554,8 +7554,8 @@
       "text": "버전 비교",
       "count": 2,
       "sample_lines": [
-        16951,
-        16971
+        16976,
+        16996
       ],
       "in_existing_en_dict": false
     },
@@ -7563,7 +7563,7 @@
       "text": "버전 비교 중...",
       "count": 1,
       "sample_lines": [
-        16921
+        16946
       ],
       "in_existing_en_dict": false
     },
@@ -7571,7 +7571,7 @@
       "text": "버전 정보",
       "count": 1,
       "sample_lines": [
-        14987
+        15012
       ],
       "in_existing_en_dict": false
     },
@@ -7648,7 +7648,7 @@
       "text": "베이스 모델",
       "count": 1,
       "sample_lines": [
-        16710
+        16735
       ],
       "in_existing_en_dict": false
     },
@@ -7680,7 +7680,7 @@
       "text": "변경 없음",
       "count": 1,
       "sample_lines": [
-        16963
+        16988
       ],
       "in_existing_en_dict": false
     },
@@ -7688,7 +7688,7 @@
       "text": "변경된 노드",
       "count": 1,
       "sample_lines": [
-        16962
+        16987
       ],
       "in_existing_en_dict": false
     },
@@ -7711,7 +7711,7 @@
       "count": 2,
       "sample_lines": [
         1485,
-        12911
+        12936
       ],
       "in_existing_en_dict": false
     },
@@ -7782,8 +7782,8 @@
         1439,
         2751,
         3002,
-        9784,
-        10128
+        9809,
+        10153
       ],
       "in_existing_en_dict": false
     },
@@ -7885,6 +7885,38 @@
       "in_existing_en_dict": false
     },
     {
+      "text": "북마크",
+      "count": 1,
+      "sample_lines": [
+        9129
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "북마크 추가",
+      "count": 2,
+      "sample_lines": [
+        9097
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "북마크 해제",
+      "count": 2,
+      "sample_lines": [
+        9097
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "북마크한 문서 없음",
+      "count": 1,
+      "sample_lines": [
+        9115
+      ],
+      "in_existing_en_dict": false
+    },
+    {
       "text": "분 전",
       "count": 2,
       "sample_lines": [
@@ -7925,7 +7957,7 @@
       "text": "분석은 완전히 로컬에서 수행됩니다. Claude API 호출 없음. 제안 카드는 클릭 시 해당 탭으로 이동하여 수동 저장할 수 있습니다.",
       "count": 1,
       "sample_lines": [
-        13726
+        13751
       ],
       "in_existing_en_dict": false
     },
@@ -7933,7 +7965,7 @@
       "text": "분포",
       "count": 1,
       "sample_lines": [
-        14418
+        14443
       ],
       "in_existing_en_dict": false
     },
@@ -7949,7 +7981,7 @@
       "text": "불러오기 실패",
       "count": 1,
       "sample_lines": [
-        10178
+        10203
       ],
       "in_existing_en_dict": false
     },
@@ -7957,7 +7989,7 @@
       "text": "불러오는 중…",
       "count": 1,
       "sample_lines": [
-        15064
+        15089
       ],
       "in_existing_en_dict": false
     },
@@ -8014,7 +8046,7 @@
       "count": 2,
       "sample_lines": [
         8655,
-        11824
+        11849
       ],
       "in_existing_en_dict": false
     },
@@ -8022,7 +8054,7 @@
       "text": "비교 실행 중...",
       "count": 1,
       "sample_lines": [
-        12847
+        12872
       ],
       "in_existing_en_dict": false
     },
@@ -8031,7 +8063,7 @@
       "count": 2,
       "sample_lines": [
         4547,
-        16914
+        16939
       ],
       "in_existing_en_dict": false
     },
@@ -8039,7 +8071,7 @@
       "text": "비교할 프로바이더 선택",
       "count": 1,
       "sample_lines": [
-        11814
+        11839
       ],
       "in_existing_en_dict": false
     },
@@ -8047,7 +8079,7 @@
       "text": "비교할 프롬프트를 입력하세요...",
       "count": 1,
       "sample_lines": [
-        11811
+        11836
       ],
       "in_existing_en_dict": false
     },
@@ -8055,9 +8087,9 @@
       "text": "비어있음",
       "count": 3,
       "sample_lines": [
-        9661,
-        10799,
-        14581
+        9686,
+        10824,
+        14606
       ],
       "in_existing_en_dict": false
     },
@@ -8093,9 +8125,9 @@
       "text": "비용 (",
       "count": 3,
       "sample_lines": [
-        13382,
-        13414,
-        13422
+        13407,
+        13439,
+        13447
       ],
       "in_existing_en_dict": false
     },
@@ -8103,7 +8135,7 @@
       "text": "비용 (USD)",
       "count": 1,
       "sample_lines": [
-        12785
+        12810
       ],
       "in_existing_en_dict": false
     },
@@ -8151,7 +8183,7 @@
       "text": "비용 분석",
       "count": 1,
       "sample_lines": [
-        11749
+        11774
       ],
       "in_existing_en_dict": false
     },
@@ -8168,7 +8200,7 @@
       "count": 2,
       "sample_lines": [
         336,
-        14206
+        14231
       ],
       "in_existing_en_dict": false
     },
@@ -8176,7 +8208,7 @@
       "text": "비용 한도",
       "count": 1,
       "sample_lines": [
-        11980
+        12005
       ],
       "in_existing_en_dict": false
     },
@@ -8184,8 +8216,8 @@
       "text": "비용 한도 초과",
       "count": 2,
       "sample_lines": [
-        11959,
-        11972
+        11984,
+        11997
       ],
       "in_existing_en_dict": false
     },
@@ -8202,7 +8234,7 @@
       "count": 2,
       "sample_lines": [
         6486,
-        10032
+        10057
       ],
       "in_existing_en_dict": false
     },
@@ -8212,7 +8244,7 @@
       "sample_lines": [
         6434,
         6813,
-        9428
+        9453
       ],
       "in_existing_en_dict": false
     },
@@ -8229,7 +8261,7 @@
       "count": 2,
       "sample_lines": [
         6684,
-        10070
+        10095
       ],
       "in_existing_en_dict": false
     },
@@ -8259,7 +8291,7 @@
       "text": "빠른 액션: 재인덱스·챗봇·CLI 상태",
       "count": 1,
       "sample_lines": [
-        16622
+        16647
       ],
       "in_existing_en_dict": false
     },
@@ -8267,7 +8299,7 @@
       "text": "사용 가능",
       "count": 1,
       "sample_lines": [
-        11367
+        11392
       ],
       "in_existing_en_dict": false
     },
@@ -8283,7 +8315,7 @@
       "text": "사용. 잘못된 예",
       "count": 1,
       "sample_lines": [
-        9694
+        9719
       ],
       "in_existing_en_dict": false
     },
@@ -8299,7 +8331,7 @@
       "text": "사용량 / 비용 (토큰 중심)",
       "count": 1,
       "sample_lines": [
-        14305
+        14330
       ],
       "in_existing_en_dict": false
     },
@@ -8307,7 +8339,7 @@
       "text": "사용량 알림",
       "count": 1,
       "sample_lines": [
-        11961
+        11986
       ],
       "in_existing_en_dict": false
     },
@@ -8315,7 +8347,7 @@
       "text": "사용량 알림 발생",
       "count": 1,
       "sample_lines": [
-        11968
+        11993
       ],
       "in_existing_en_dict": false
     },
@@ -8323,7 +8355,7 @@
       "text": "사용량 알림 설정",
       "count": 1,
       "sample_lines": [
-        11789
+        11814
       ],
       "in_existing_en_dict": false
     },
@@ -8331,7 +8363,7 @@
       "text": "사용량 알림 설정이 저장되었습니다",
       "count": 1,
       "sample_lines": [
-        11939
+        11964
       ],
       "in_existing_en_dict": false
     },
@@ -8339,7 +8371,7 @@
       "text": "사용량 알림 저장 실패",
       "count": 1,
       "sample_lines": [
-        11942
+        11967
       ],
       "in_existing_en_dict": false
     },
@@ -8364,7 +8396,7 @@
       "text": "사용자",
       "count": 1,
       "sample_lines": [
-        15089
+        15114
       ],
       "in_existing_en_dict": false
     },
@@ -8408,7 +8440,7 @@
       "text": "사용할 AI 프로바이더를 선택하고 연결을 설정합니다.",
       "count": 1,
       "sample_lines": [
-        11510
+        11535
       ],
       "in_existing_en_dict": false
     },
@@ -8416,7 +8448,7 @@
       "text": "사이드바",
       "count": 1,
       "sample_lines": [
-        16616
+        16641
       ],
       "in_existing_en_dict": false
     },
@@ -8433,7 +8465,7 @@
       "count": 3,
       "sample_lines": [
         63,
-        16617
+        16642
       ],
       "in_existing_en_dict": false
     },
@@ -8480,7 +8512,7 @@
       "sample_lines": [
         7959,
         8486,
-        12235
+        12260
       ],
       "in_existing_en_dict": false
     },
@@ -8489,8 +8521,8 @@
       "count": 3,
       "sample_lines": [
         1712,
-        12225,
-        12232
+        12250,
+        12257
       ],
       "in_existing_en_dict": false
     },
@@ -8498,7 +8530,7 @@
       "text": "삭제된 노드",
       "count": 1,
       "sample_lines": [
-        16961
+        16986
       ],
       "in_existing_en_dict": false
     },
@@ -8510,7 +8542,7 @@
         3614,
         4527,
         6700,
-        9633
+        9658
       ],
       "in_existing_en_dict": false
     },
@@ -8534,7 +8566,7 @@
       "text": "상세",
       "count": 1,
       "sample_lines": [
-        12587
+        12612
       ],
       "in_existing_en_dict": false
     },
@@ -8542,7 +8574,7 @@
       "text": "상세 버전 데이터를 가져올 수 없어 기본 비교를 수행합니다.",
       "count": 1,
       "sample_lines": [
-        16972
+        16997
       ],
       "in_existing_en_dict": false
     },
@@ -8565,8 +8597,8 @@
       "text": "상태",
       "count": 2,
       "sample_lines": [
-        13866,
-        14609
+        13891,
+        14634
       ],
       "in_existing_en_dict": false
     },
@@ -8574,7 +8606,7 @@
       "text": "상태 토글",
       "count": 1,
       "sample_lines": [
-        14541
+        14566
       ],
       "in_existing_en_dict": false
     },
@@ -8582,9 +8614,9 @@
       "text": "상태 확인 실패",
       "count": 3,
       "sample_lines": [
-        12344,
-        12675,
-        15035
+        12369,
+        12700,
+        15060
       ],
       "in_existing_en_dict": false
     },
@@ -8611,7 +8643,7 @@
       "count": 2,
       "sample_lines": [
         328,
-        13272
+        13297
       ],
       "in_existing_en_dict": false
     },
@@ -8628,7 +8660,7 @@
       "text": "새 Forwarder 추가",
       "count": 1,
       "sample_lines": [
-        9324
+        9349
       ],
       "in_existing_en_dict": false
     },
@@ -8636,7 +8668,7 @@
       "text": "새 TODO 추가",
       "count": 1,
       "sample_lines": [
-        14592
+        14617
       ],
       "in_existing_en_dict": false
     },
@@ -8693,7 +8725,7 @@
       "text": "새 출력 스타일",
       "count": 1,
       "sample_lines": [
-        13220
+        13245
       ],
       "in_existing_en_dict": false
     },
@@ -8710,7 +8742,7 @@
       "text": "새 훅 추가",
       "count": 1,
       "sample_lines": [
-        9489
+        9514
       ],
       "in_existing_en_dict": false
     },
@@ -8721,8 +8753,8 @@
         1092,
         7720,
         7934,
-        11570,
-        16426
+        11595,
+        16451
       ],
       "in_existing_en_dict": false
     },
@@ -8731,7 +8763,7 @@
       "count": 2,
       "sample_lines": [
         909,
-        15245
+        15270
       ],
       "in_existing_en_dict": false
     },
@@ -8739,7 +8771,7 @@
       "text": "새로운 기능을 확인해 보세요 🆕",
       "count": 1,
       "sample_lines": [
-        15743
+        15768
       ],
       "in_existing_en_dict": false
     },
@@ -8792,7 +8824,7 @@
       "text": "서버 연결 실패",
       "count": 1,
       "sample_lines": [
-        17023
+        17048
       ],
       "in_existing_en_dict": false
     },
@@ -8866,7 +8898,7 @@
       "text": "선택 안 함",
       "count": 1,
       "sample_lines": [
-        11409
+        11434
       ],
       "in_existing_en_dict": false
     },
@@ -8915,7 +8947,7 @@
       "count": 2,
       "sample_lines": [
         2743,
-        12911
+        12936
       ],
       "in_existing_en_dict": false
     },
@@ -8925,7 +8957,7 @@
       "sample_lines": [
         3289,
         3623,
-        11034
+        11059
       ],
       "in_existing_en_dict": false
     },
@@ -8933,7 +8965,7 @@
       "text": "설명 (optional)",
       "count": 1,
       "sample_lines": [
-        14601
+        14626
       ],
       "in_existing_en_dict": false
     },
@@ -8957,7 +8989,7 @@
       "text": "설정 저장",
       "count": 1,
       "sample_lines": [
-        11665
+        11690
       ],
       "in_existing_en_dict": false
     },
@@ -8965,7 +8997,7 @@
       "text": "설정 저장됨",
       "count": 1,
       "sample_lines": [
-        12423
+        12448
       ],
       "in_existing_en_dict": false
     },
@@ -8973,8 +9005,8 @@
       "text": "설정 파일",
       "count": 2,
       "sample_lines": [
-        13872,
-        14082
+        13897,
+        14107
       ],
       "in_existing_en_dict": false
     },
@@ -8982,7 +9014,7 @@
       "text": "설정된 모델 관련 키 없음 — 기본값 사용 중",
       "count": 1,
       "sample_lines": [
-        12944
+        12969
       ],
       "in_existing_en_dict": false
     },
@@ -8990,9 +9022,9 @@
       "text": "설치",
       "count": 3,
       "sample_lines": [
-        9892,
-        11397,
-        13888
+        9917,
+        11422,
+        13913
       ],
       "in_existing_en_dict": false
     },
@@ -9008,7 +9040,7 @@
       "text": "설치 명령 (Terminal)",
       "count": 1,
       "sample_lines": [
-        9779
+        9804
       ],
       "in_existing_en_dict": false
     },
@@ -9016,7 +9048,7 @@
       "text": "설치 스크립트",
       "count": 1,
       "sample_lines": [
-        11395
+        11420
       ],
       "in_existing_en_dict": false
     },
@@ -9024,7 +9056,7 @@
       "text": "설치 시 터미널 창이 열립니다",
       "count": 1,
       "sample_lines": [
-        11398
+        11423
       ],
       "in_existing_en_dict": false
     },
@@ -9032,7 +9064,7 @@
       "text": "설치 시작",
       "count": 1,
       "sample_lines": [
-        12134
+        12159
       ],
       "in_existing_en_dict": false
     },
@@ -9042,7 +9074,7 @@
       "sample_lines": [
         1225,
         1265,
-        12161
+        12186
       ],
       "in_existing_en_dict": false
     },
@@ -9050,7 +9082,7 @@
       "text": "설치 여부",
       "count": 1,
       "sample_lines": [
-        15187
+        15212
       ],
       "in_existing_en_dict": false
     },
@@ -9058,7 +9090,7 @@
       "text": "설치 완료",
       "count": 1,
       "sample_lines": [
-        11390
+        11415
       ],
       "in_existing_en_dict": false
     },
@@ -9066,7 +9098,7 @@
       "text": "설치 완료 감지 중 — 완료되면 자동 새로고침",
       "count": 1,
       "sample_lines": [
-        13973
+        13998
       ],
       "in_existing_en_dict": false
     },
@@ -9074,7 +9106,7 @@
       "text": "설치 위치",
       "count": 1,
       "sample_lines": [
-        11030
+        11055
       ],
       "in_existing_en_dict": false
     },
@@ -9096,7 +9128,7 @@
       "text": "설치 확인",
       "count": 1,
       "sample_lines": [
-        12024
+        12049
       ],
       "in_existing_en_dict": false
     },
@@ -9104,7 +9136,7 @@
       "text": "설치: 터미널에서",
       "count": 1,
       "sample_lines": [
-        15191
+        15216
       ],
       "in_existing_en_dict": false
     },
@@ -9112,7 +9144,7 @@
       "text": "설치가 감지되었습니다 — 새로고침합니다",
       "count": 1,
       "sample_lines": [
-        12153
+        12178
       ],
       "in_existing_en_dict": false
     },
@@ -9120,7 +9152,7 @@
       "text": "설치된 Ollama 모델이 없습니다.",
       "count": 1,
       "sample_lines": [
-        12566
+        12591
       ],
       "in_existing_en_dict": false
     },
@@ -9128,7 +9160,7 @@
       "text": "설치된 모델",
       "count": 1,
       "sample_lines": [
-        11685
+        11710
       ],
       "in_existing_en_dict": false
     },
@@ -9136,7 +9168,7 @@
       "text": "설치된 임베딩 모델 없음 — bge-m3 권장",
       "count": 1,
       "sample_lines": [
-        12406
+        12431
       ],
       "in_existing_en_dict": false
     },
@@ -9144,7 +9176,7 @@
       "text": "설치된 채팅 모델 없음 — 모델 허브에서 다운로드",
       "count": 1,
       "sample_lines": [
-        12403
+        12428
       ],
       "in_existing_en_dict": false
     },
@@ -9152,7 +9184,7 @@
       "text": "설치된 훅은 🪝 훅 탭에서 확인할 수 있습니다.",
       "count": 1,
       "sample_lines": [
-        13918
+        13943
       ],
       "in_existing_en_dict": false
     },
@@ -9161,10 +9193,10 @@
       "count": 8,
       "sample_lines": [
         1204,
-        9810,
-        9909,
-        10919,
-        11056
+        9835,
+        9934,
+        10944,
+        11081
       ],
       "in_existing_en_dict": false
     },
@@ -9173,8 +9205,8 @@
       "count": 3,
       "sample_lines": [
         8246,
-        12107,
-        12879
+        12132,
+        12904
       ],
       "in_existing_en_dict": false
     },
@@ -9207,8 +9239,8 @@
         1471,
         5436,
         6062,
-        10367,
-        13377
+        10392,
+        13402
       ],
       "in_existing_en_dict": false
     },
@@ -9216,7 +9248,7 @@
       "text": "세션 DB 새로고침",
       "count": 1,
       "sample_lines": [
-        16423
+        16448
       ],
       "in_existing_en_dict": false
     },
@@ -9224,7 +9256,7 @@
       "text": "세션 ID",
       "count": 1,
       "sample_lines": [
-        12976
+        13001
       ],
       "in_existing_en_dict": false
     },
@@ -9232,7 +9264,7 @@
       "text": "세션 JSONL 이 없습니다. Claude Code 를 최소 한 번 사용해 주세요.",
       "count": 1,
       "sample_lines": [
-        13768
+        13793
       ],
       "in_existing_en_dict": false
     },
@@ -9246,7 +9278,7 @@
       "text": "세션 길이 분포",
       "count": 1,
       "sample_lines": [
-        13700
+        13725
       ],
       "in_existing_en_dict": false
     },
@@ -9278,7 +9310,7 @@
       "text": "세션 리스트로 스크롤",
       "count": 1,
       "sample_lines": [
-        10524
+        10549
       ],
       "in_existing_en_dict": false
     },
@@ -9294,7 +9326,7 @@
       "text": "세션 수",
       "count": 1,
       "sample_lines": [
-        13361
+        13386
       ],
       "in_existing_en_dict": false
     },
@@ -9304,7 +9336,7 @@
       "sample_lines": [
         70,
         71,
-        16423
+        16448
       ],
       "in_existing_en_dict": false
     },
@@ -9338,7 +9370,7 @@
       "sample_lines": [
         241,
         6125,
-        10561
+        10586
       ],
       "in_existing_en_dict": false
     },
@@ -9346,7 +9378,7 @@
       "text": "세션)",
       "count": 1,
       "sample_lines": [
-        14330
+        14355
       ],
       "in_existing_en_dict": false
     },
@@ -9362,7 +9394,7 @@
       "text": "세션별 TaskCreate 저장소. 수동 태스크는 dashboard-manual 세션에 누적.",
       "count": 1,
       "sample_lines": [
-        14556
+        14581
       ],
       "in_existing_en_dict": false
     },
@@ -9370,7 +9402,7 @@
       "text": "세션에서 Agent 도구로 위임된 총 횟수 (통계 탭 참고)",
       "count": 1,
       "sample_lines": [
-        10527
+        10552
       ],
       "in_existing_en_dict": false
     },
@@ -9401,8 +9433,8 @@
       "count": 3,
       "sample_lines": [
         348,
-        13078,
-        13080
+        13103,
+        13105
       ],
       "in_existing_en_dict": false
     },
@@ -9410,7 +9442,7 @@
       "text": "소속된 조직이 없습니다",
       "count": 1,
       "sample_lines": [
-        14743
+        14768
       ],
       "in_existing_en_dict": false
     },
@@ -9418,9 +9450,9 @@
       "text": "소스",
       "count": 3,
       "sample_lines": [
-        10296,
-        14253,
-        14280
+        10321,
+        14278,
+        14305
       ],
       "in_existing_en_dict": false
     },
@@ -9428,7 +9460,7 @@
       "text": "소스가 비어있습니다",
       "count": 1,
       "sample_lines": [
-        10301
+        10326
       ],
       "in_existing_en_dict": false
     },
@@ -9436,7 +9468,7 @@
       "text": "소스별 집계",
       "count": 1,
       "sample_lines": [
-        14250
+        14275
       ],
       "in_existing_en_dict": false
     },
@@ -9453,7 +9485,7 @@
       "text": "수동",
       "count": 1,
       "sample_lines": [
-        14573
+        14598
       ],
       "in_existing_en_dict": false
     },
@@ -9470,8 +9502,8 @@
         5628,
         8367,
         8394,
-        9420,
-        9446
+        9445,
+        9471
       ],
       "in_existing_en_dict": false
     },
@@ -9479,7 +9511,7 @@
       "text": "수정일",
       "count": 1,
       "sample_lines": [
-        11720
+        11745
       ],
       "in_existing_en_dict": false
     },
@@ -9503,7 +9535,7 @@
       "text": "스캔한 세션",
       "count": 1,
       "sample_lines": [
-        13691
+        13716
       ],
       "in_existing_en_dict": false
     },
@@ -9635,7 +9667,7 @@
       "text": "스타일 본문 (frontmatter + 지침)",
       "count": 1,
       "sample_lines": [
-        13229
+        13254
       ],
       "in_existing_en_dict": false
     },
@@ -9660,7 +9692,7 @@
       "text": "시각",
       "count": 1,
       "sample_lines": [
-        14279
+        14304
       ],
       "in_existing_en_dict": false
     },
@@ -9676,7 +9708,7 @@
       "text": "시간 초과 — 페이지를 새로고침 해주세요.",
       "count": 1,
       "sample_lines": [
-        15161
+        15186
       ],
       "in_existing_en_dict": false
     },
@@ -9685,7 +9717,7 @@
       "count": 2,
       "sample_lines": [
         356,
-        14763
+        14788
       ],
       "in_existing_en_dict": false
     },
@@ -9693,7 +9725,7 @@
       "text": "시스템 프롬프트",
       "count": 1,
       "sample_lines": [
-        16710
+        16735
       ],
       "in_existing_en_dict": false
     },
@@ -9745,7 +9777,7 @@
       "text": "시작 중...",
       "count": 1,
       "sample_lines": [
-        12350
+        12375
       ],
       "in_existing_en_dict": false
     },
@@ -9762,7 +9794,7 @@
       "count": 2,
       "sample_lines": [
         226,
-        11505
+        11530
       ],
       "in_existing_en_dict": false
     },
@@ -9779,7 +9811,7 @@
       "count": 2,
       "sample_lines": [
         224,
-        16509
+        16534
       ],
       "in_existing_en_dict": false
     },
@@ -9801,7 +9833,7 @@
       "text": "실제 경로 확인 불가 — 재인덱스 해보세요",
       "count": 1,
       "sample_lines": [
-        10358
+        10383
       ],
       "in_existing_en_dict": false
     },
@@ -9959,7 +9991,7 @@
       "sample_lines": [
         3871,
         3918,
-        12323
+        12348
       ],
       "in_existing_en_dict": false
     },
@@ -9987,7 +10019,7 @@
       "sample_lines": [
         1591,
         2292,
-        16609
+        16634
       ],
       "in_existing_en_dict": false
     },
@@ -9995,7 +10027,7 @@
       "text": "실행 프로세스 값",
       "count": 1,
       "sample_lines": [
-        12911
+        12936
       ],
       "in_existing_en_dict": false
     },
@@ -10003,7 +10035,7 @@
       "text": "실행 후 다시 시도하세요.",
       "count": 1,
       "sample_lines": [
-        10198
+        10223
       ],
       "in_existing_en_dict": false
     },
@@ -10011,7 +10043,7 @@
       "text": "실행 후 새로고침.",
       "count": 1,
       "sample_lines": [
-        15203
+        15228
       ],
       "in_existing_en_dict": false
     },
@@ -10043,7 +10075,7 @@
       "text": "아래 방법 중 하나를 선택하면 Terminal 창이 열리고 실제 설치가 진행됩니다.",
       "count": 1,
       "sample_lines": [
-        13889
+        13914
       ],
       "in_existing_en_dict": false
     },
@@ -10082,7 +10114,7 @@
       "text": "아직 글로벌 CLAUDE.md 가 없습니다",
       "count": 1,
       "sample_lines": [
-        10291
+        10316
       ],
       "in_existing_en_dict": false
     },
@@ -10090,7 +10122,7 @@
       "text": "아직 데이터가 없습니다",
       "count": 1,
       "sample_lines": [
-        14184
+        14209
       ],
       "in_existing_en_dict": false
     },
@@ -10098,7 +10130,7 @@
       "text": "아직 데이터가 없습니다. 플레이그라운드 탭을 사용하면 자동으로 축적됩니다.",
       "count": 1,
       "sample_lines": [
-        14171
+        14196
       ],
       "in_existing_en_dict": false
     },
@@ -10118,7 +10150,7 @@
       "text": "아직 없음 — 위",
       "count": 1,
       "sample_lines": [
-        13209
+        13234
       ],
       "in_existing_en_dict": false
     },
@@ -10126,7 +10158,7 @@
       "text": "아직 이 프로젝트에 에이전트가 없습니다. 아래 역할 프리셋에서 하나를 선택해 추가하세요.",
       "count": 1,
       "sample_lines": [
-        10908
+        10933
       ],
       "in_existing_en_dict": false
     },
@@ -10134,7 +10166,7 @@
       "text": "아직 저장된 메모리가 없습니다.",
       "count": 1,
       "sample_lines": [
-        14519
+        14544
       ],
       "in_existing_en_dict": false
     },
@@ -10142,7 +10174,7 @@
       "text": "아직 저장된 플랜 없음 — Claude Code 에서",
       "count": 1,
       "sample_lines": [
-        13309
+        13334
       ],
       "in_existing_en_dict": false
     },
@@ -10150,7 +10182,7 @@
       "text": "아직 제안할 패턴이 충분히 누적되지 않았습니다.",
       "count": 1,
       "sample_lines": [
-        13681
+        13706
       ],
       "in_existing_en_dict": false
     },
@@ -10186,8 +10218,8 @@
       "text": "알 수 없음",
       "count": 2,
       "sample_lines": [
-        10257,
-        11311
+        10282,
+        11336
       ],
       "in_existing_en_dict": false
     },
@@ -10195,7 +10227,7 @@
       "text": "알려진",
       "count": 1,
       "sample_lines": [
-        13028
+        13053
       ],
       "in_existing_en_dict": false
     },
@@ -10209,7 +10241,7 @@
       "text": "알려진 마켓플레이스 없음",
       "count": 1,
       "sample_lines": [
-        13050
+        13075
       ],
       "in_existing_en_dict": false
     },
@@ -10217,7 +10249,7 @@
       "text": "알림 설정 저장",
       "count": 1,
       "sample_lines": [
-        11802
+        11827
       ],
       "in_existing_en_dict": false
     },
@@ -10233,7 +10265,7 @@
       "text": "알림 활성",
       "count": 1,
       "sample_lines": [
-        11980
+        12005
       ],
       "in_existing_en_dict": false
     },
@@ -10241,7 +10273,7 @@
       "text": "양자화",
       "count": 1,
       "sample_lines": [
-        11719
+        11744
       ],
       "in_existing_en_dict": false
     },
@@ -10249,7 +10281,7 @@
       "text": "양쪽 값을 자유롭게 편집한 뒤 어느 쪽을 저장할지 고르세요. ·",
       "count": 1,
       "sample_lines": [
-        10813
+        10838
       ],
       "in_existing_en_dict": false
     },
@@ -10257,7 +10289,7 @@
       "text": "어떤 AI를 사용하시겠습니까?",
       "count": 1,
       "sample_lines": [
-        11514
+        11539
       ],
       "in_existing_en_dict": false
     },
@@ -10340,10 +10372,10 @@
       "count": 5,
       "sample_lines": [
         3369,
-        9976,
-        10205,
-        13167,
-        13458
+        10001,
+        10230,
+        13192,
+        13483
       ],
       "in_existing_en_dict": false
     },
@@ -10359,7 +10391,7 @@
       "text": "에 즉시 반영됩니다.",
       "count": 1,
       "sample_lines": [
-        10050
+        10075
       ],
       "in_existing_en_dict": false
     },
@@ -10367,7 +10399,7 @@
       "text": "에디터에 미리 채워졌습니다 — 검토 후 저장하세요",
       "count": 1,
       "sample_lines": [
-        13742
+        13767
       ],
       "in_existing_en_dict": false
     },
@@ -10423,7 +10455,7 @@
       "text": "에서 claude CLI 실행",
       "count": 1,
       "sample_lines": [
-        10638
+        10663
       ],
       "in_existing_en_dict": false
     },
@@ -10431,7 +10463,7 @@
       "text": "에서 삭제됩니다.",
       "count": 1,
       "sample_lines": [
-        9932
+        9957
       ],
       "in_existing_en_dict": false
     },
@@ -10439,7 +10471,7 @@
       "text": "에서 설정하면 모든 세션에 적용. 프로세스 값은 이 대시보드 서버가 실행 중인 쉘의 현재 값.",
       "count": 1,
       "sample_lines": [
-        12923
+        12948
       ],
       "in_existing_en_dict": false
     },
@@ -10447,7 +10479,7 @@
       "text": "에서 제거됩니다.",
       "count": 1,
       "sample_lines": [
-        9920
+        9945
       ],
       "in_existing_en_dict": false
     },
@@ -10455,7 +10487,7 @@
       "text": "에서 직접 관리합니다",
       "count": 1,
       "sample_lines": [
-        14751
+        14776
       ],
       "in_existing_en_dict": false
     },
@@ -10467,7 +10499,7 @@
         5434,
         6149,
         7015,
-        10500
+        10525
       ],
       "in_existing_en_dict": false
     },
@@ -10499,7 +10531,7 @@
       "text": "에이전트 그래프가 멋있어요 🤝",
       "count": 1,
       "sample_lines": [
-        15744
+        15769
       ],
       "in_existing_en_dict": false
     },
@@ -10507,7 +10539,7 @@
       "text": "에이전트 본문 (미리보기)",
       "count": 1,
       "sample_lines": [
-        11038
+        11063
       ],
       "in_existing_en_dict": false
     },
@@ -10515,7 +10547,7 @@
       "text": "에이전트 삭제",
       "count": 1,
       "sample_lines": [
-        11077
+        11102
       ],
       "in_existing_en_dict": false
     },
@@ -10533,7 +10565,7 @@
       "count": 2,
       "sample_lines": [
         5483,
-        14332
+        14357
       ],
       "in_existing_en_dict": false
     },
@@ -10542,7 +10574,7 @@
       "count": 2,
       "sample_lines": [
         6052,
-        14376
+        14401
       ],
       "in_existing_en_dict": false
     },
@@ -10550,7 +10582,7 @@
       "text": "에이전트 위임 내역",
       "count": 1,
       "sample_lines": [
-        10609
+        10634
       ],
       "in_existing_en_dict": false
     },
@@ -10558,7 +10590,7 @@
       "text": "에이전트 위임 내역 로딩…",
       "count": 1,
       "sample_lines": [
-        10601
+        10626
       ],
       "in_existing_en_dict": false
     },
@@ -10582,7 +10614,7 @@
       "text": "여기에 적은 지침(기억·규칙·선호)은",
       "count": 1,
       "sample_lines": [
-        10292
+        10317
       ],
       "in_existing_en_dict": false
     },
@@ -10606,7 +10638,7 @@
       "text": "역할 프리셋",
       "count": 1,
       "sample_lines": [
-        11021
+        11046
       ],
       "in_existing_en_dict": false
     },
@@ -10631,7 +10663,7 @@
       "text": "연결 오류",
       "count": 1,
       "sample_lines": [
-        16285
+        16310
       ],
       "in_existing_en_dict": false
     },
@@ -10639,10 +10671,10 @@
       "text": "연결 테스트",
       "count": 4,
       "sample_lines": [
-        11376,
-        11485,
-        11547,
-        11549
+        11401,
+        11510,
+        11572,
+        11574
       ],
       "in_existing_en_dict": false
     },
@@ -10650,7 +10682,7 @@
       "text": "연결되지 않음",
       "count": 1,
       "sample_lines": [
-        10196
+        10221
       ],
       "in_existing_en_dict": false
     },
@@ -10658,7 +10690,7 @@
       "text": "연결된 계정 없음",
       "count": 1,
       "sample_lines": [
-        15094
+        15119
       ],
       "in_existing_en_dict": false
     },
@@ -10675,9 +10707,9 @@
       "count": 4,
       "sample_lines": [
         94,
-        10190,
-        14963,
-        15581
+        10215,
+        14988,
+        15606
       ],
       "in_existing_en_dict": false
     },
@@ -10693,7 +10725,7 @@
       "text": "예: 5000",
       "count": 1,
       "sample_lines": [
-        9519
+        9544
       ],
       "in_existing_en_dict": false
     },
@@ -10701,7 +10733,7 @@
       "text": "예: Bash",
       "count": 1,
       "sample_lines": [
-        9505
+        9530
       ],
       "in_existing_en_dict": false
     },
@@ -10709,7 +10741,7 @@
       "text": "예: Bash(git status:*)",
       "count": 1,
       "sample_lines": [
-        9650
+        9675
       ],
       "in_existing_en_dict": false
     },
@@ -10733,7 +10765,7 @@
       "text": "예: README 작성 중",
       "count": 1,
       "sample_lines": [
-        14606
+        14631
       ],
       "in_existing_en_dict": false
     },
@@ -10757,7 +10789,7 @@
       "text": "예: terse-korean",
       "count": 1,
       "sample_lines": [
-        13226
+        13251
       ],
       "in_existing_en_dict": false
     },
@@ -10789,7 +10821,7 @@
       "text": "예: 프로젝트 README 작성",
       "count": 1,
       "sample_lines": [
-        14598
+        14623
       ],
       "in_existing_en_dict": false
     },
@@ -10818,7 +10850,7 @@
       "count": 2,
       "sample_lines": [
         332,
-        13007
+        13032
       ],
       "in_existing_en_dict": false
     },
@@ -10826,7 +10858,7 @@
       "text": "예약된 작업 없음",
       "count": 1,
       "sample_lines": [
-        13018
+        13043
       ],
       "in_existing_en_dict": false
     },
@@ -10842,7 +10874,7 @@
       "text": "오늘 세션 스코어는 어떤가요?",
       "count": 1,
       "sample_lines": [
-        15740
+        15765
       ],
       "in_existing_en_dict": false
     },
@@ -10865,7 +10897,7 @@
         1112,
         3872,
         3918,
-        12660
+        12685
       ],
       "in_existing_en_dict": false
     },
@@ -10873,7 +10905,7 @@
       "text": "완료 ·",
       "count": 1,
       "sample_lines": [
-        14577
+        14602
       ],
       "in_existing_en_dict": false
     },
@@ -10913,7 +10945,7 @@
       "text": "왜 필요한가",
       "count": 1,
       "sample_lines": [
-        11295
+        11320
       ],
       "in_existing_en_dict": false
     },
@@ -10945,7 +10977,7 @@
       "text": "외부 열기",
       "count": 1,
       "sample_lines": [
-        9077
+        9101
       ],
       "in_existing_en_dict": false
     },
@@ -10953,7 +10985,7 @@
       "text": "왼쪽에서 run 을 선택하세요.",
       "count": 1,
       "sample_lines": [
-        13511
+        13536
       ],
       "in_existing_en_dict": false
     },
@@ -10961,7 +10993,7 @@
       "text": "왼쪽에서 세션을 선택하세요.",
       "count": 1,
       "sample_lines": [
-        13778
+        13803
       ],
       "in_existing_en_dict": false
     },
@@ -11007,7 +11039,7 @@
       "text": "요청 실패",
       "count": 1,
       "sample_lines": [
-        12876
+        12901
       ],
       "in_existing_en_dict": false
     },
@@ -11015,7 +11047,7 @@
       "text": "요청 전송 중…",
       "count": 1,
       "sample_lines": [
-        10639
+        10664
       ],
       "in_existing_en_dict": false
     },
@@ -11047,7 +11079,7 @@
       "text": "우측(제안) 적용 ▶",
       "count": 1,
       "sample_lines": [
-        10792
+        10817
       ],
       "in_existing_en_dict": false
     },
@@ -11063,7 +11095,7 @@
       "text": "워크스페이스 역할",
       "count": 1,
       "sample_lines": [
-        14738
+        14763
       ],
       "in_existing_en_dict": false
     },
@@ -11074,7 +11106,7 @@
         244,
         3830,
         3833,
-        16513
+        16538
       ],
       "in_existing_en_dict": false
     },
@@ -11106,7 +11138,7 @@
       "text": "워크플로우 노드가 실패하면 순서대로 다음 프로바이더를 시도합니다. 드래그하거나 체크박스로 편집하세요.",
       "count": 1,
       "sample_lines": [
-        11599
+        11624
       ],
       "in_existing_en_dict": false
     },
@@ -11188,7 +11220,7 @@
       "text": "워크플로우 전용 단축키",
       "count": 1,
       "sample_lines": [
-        16614
+        16639
       ],
       "in_existing_en_dict": false
     },
@@ -11204,7 +11236,7 @@
       "text": "워크플로우 출력물을 sandbox iframe + CSP + 정적 필터 4중 보안으로 안전하게 미리보기 — 스크립트 실행·외부 네트워크·쿠키 모두 차단.",
       "count": 1,
       "sample_lines": [
-        13502
+        13527
       ],
       "in_existing_en_dict": false
     },
@@ -11212,7 +11244,7 @@
       "text": "워크플로우 캔버스",
       "count": 1,
       "sample_lines": [
-        16608
+        16633
       ],
       "in_existing_en_dict": false
     },
@@ -11220,7 +11252,7 @@
       "text": "워크플로우 탭으로 이동",
       "count": 1,
       "sample_lines": [
-        13676
+        13701
       ],
       "in_existing_en_dict": false
     },
@@ -11305,7 +11337,7 @@
       "text": "원본 응답 보기",
       "count": 1,
       "sample_lines": [
-        10662
+        10687
       ],
       "in_existing_en_dict": false
     },
@@ -11321,7 +11353,7 @@
       "text": "월",
       "count": 1,
       "sample_lines": [
-        14237
+        14262
       ],
       "in_existing_en_dict": false
     },
@@ -11329,7 +11361,7 @@
       "text": "월별 비용 (소스별 스택)",
       "count": 1,
       "sample_lines": [
-        14230
+        14255
       ],
       "in_existing_en_dict": false
     },
@@ -11378,7 +11410,7 @@
       "text": "위자드 닫기",
       "count": 1,
       "sample_lines": [
-        11559
+        11584
       ],
       "in_existing_en_dict": false
     },
@@ -11410,7 +11442,7 @@
       "text": "으로 기본 모델 변경. 세션 내에서는",
       "count": 1,
       "sample_lines": [
-        12962
+        12987
       ],
       "in_existing_en_dict": false
     },
@@ -11426,7 +11458,7 @@
       "text": "으로 플랜 모드 진입 후 저장",
       "count": 1,
       "sample_lines": [
-        13309
+        13334
       ],
       "in_existing_en_dict": false
     },
@@ -11442,7 +11474,7 @@
       "text": "을 누르면 현재 계정이 로그아웃되고 터미널에서 새 로그인 창이 열립니다.",
       "count": 1,
       "sample_lines": [
-        15076
+        15101
       ],
       "in_existing_en_dict": false
     },
@@ -11459,7 +11491,7 @@
       "text": "응답 없음",
       "count": 1,
       "sample_lines": [
-        12862
+        12887
       ],
       "in_existing_en_dict": false
     },
@@ -11475,8 +11507,8 @@
       "text": "의",
       "count": 2,
       "sample_lines": [
-        10050,
-        12962
+        10075,
+        12987
       ],
       "in_existing_en_dict": false
     },
@@ -11484,7 +11516,7 @@
       "text": "이 API 키를 삭제하시겠습니까?",
       "count": 1,
       "sample_lines": [
-        12225
+        12250
       ],
       "in_existing_en_dict": false
     },
@@ -11492,7 +11524,7 @@
       "text": "이 forwarder 를 settings.json 에서 제거합니다. 계속할까요?",
       "count": 1,
       "sample_lines": [
-        9373
+        9398
       ],
       "in_existing_en_dict": false
     },
@@ -11516,7 +11548,7 @@
       "text": "이 도구는 로그인이 필요하지 않습니다",
       "count": 1,
       "sample_lines": [
-        12171
+        12196
       ],
       "in_existing_en_dict": false
     },
@@ -11524,7 +11556,7 @@
       "text": "이 도움말 열기",
       "count": 1,
       "sample_lines": [
-        16606
+        16631
       ],
       "in_existing_en_dict": false
     },
@@ -11532,7 +11564,7 @@
       "text": "이 모델을 삭제하시겠습니까?",
       "count": 1,
       "sample_lines": [
-        12687
+        12712
       ],
       "in_existing_en_dict": false
     },
@@ -11581,7 +11613,7 @@
       "text": "이 축 점수 올리는 방법",
       "count": 1,
       "sample_lines": [
-        11156
+        11181
       ],
       "in_existing_en_dict": false
     },
@@ -11597,7 +11629,7 @@
       "text": "이 커스텀 프로바이더를 삭제하시겠습니까?",
       "count": 1,
       "sample_lines": [
-        12232
+        12257
       ],
       "in_existing_en_dict": false
     },
@@ -11638,7 +11670,7 @@
       "text": "이 프로젝트 세션들에서는 서브에이전트 위임이 없었습니다. 위의 🤖 AI 추천으로 프로젝트 전용 에이전트를 만들면 delegation 점수가 오릅니다.",
       "count": 1,
       "sample_lines": [
-        10422
+        10447
       ],
       "in_existing_en_dict": false
     },
@@ -11646,7 +11678,7 @@
       "text": "이 프로젝트 컨텍스트로 실제 claude CLI 호출",
       "count": 1,
       "sample_lines": [
-        10535
+        10560
       ],
       "in_existing_en_dict": false
     },
@@ -11654,7 +11686,7 @@
       "text": "이 프로젝트에서 서브에이전트 위임 없음 — 🤖 AI 추천으로 프로젝트 에이전트를 만들어보세요",
       "count": 1,
       "sample_lines": [
-        10621
+        10646
       ],
       "in_existing_en_dict": false
     },
@@ -11662,7 +11694,7 @@
       "text": "이 프로젝트에서 실행된 세션 없음",
       "count": 1,
       "sample_lines": [
-        10513
+        10538
       ],
       "in_existing_en_dict": false
     },
@@ -11678,7 +11710,7 @@
       "text": "이 훅을 삭제할까요?",
       "count": 1,
       "sample_lines": [
-        9620
+        9645
       ],
       "in_existing_en_dict": false
     },
@@ -11686,7 +11718,7 @@
       "text": "이동",
       "count": 1,
       "sample_lines": [
-        16508
+        16533
       ],
       "in_existing_en_dict": false
     },
@@ -11705,7 +11737,7 @@
         7132,
         7296,
         8957,
-        9171
+        9196
       ],
       "in_existing_en_dict": false
     },
@@ -11714,10 +11746,10 @@
       "count": 6,
       "sample_lines": [
         2741,
-        12250,
-        13159,
-        13451,
-        14714
+        12275,
+        13184,
+        13476,
+        14739
       ],
       "in_existing_en_dict": false
     },
@@ -11725,7 +11757,7 @@
       "text": "이름 (예: my-marketplace)",
       "count": 1,
       "sample_lines": [
-        13032
+        13057
       ],
       "in_existing_en_dict": false
     },
@@ -11734,7 +11766,7 @@
       "count": 2,
       "sample_lines": [
         6712,
-        13225
+        13250
       ],
       "in_existing_en_dict": false
     },
@@ -11751,7 +11783,7 @@
       "text": "이름 입력",
       "count": 1,
       "sample_lines": [
-        13241
+        13266
       ],
       "in_existing_en_dict": false
     },
@@ -11767,7 +11799,7 @@
       "text": "이름/URL 모두 입력",
       "count": 1,
       "sample_lines": [
-        13057
+        13082
       ],
       "in_existing_en_dict": false
     },
@@ -11784,8 +11816,8 @@
       "text": "이메일",
       "count": 2,
       "sample_lines": [
-        14715,
-        15196
+        14740,
+        15221
       ],
       "in_existing_en_dict": false
     },
@@ -11793,7 +11825,7 @@
       "text": "이면 매 렌더마다 해당 쉘 명령을 실행.",
       "count": 1,
       "sample_lines": [
-        13283
+        13308
       ],
       "in_existing_en_dict": false
     },
@@ -11809,7 +11841,7 @@
       "text": "이모지 줄임",
       "count": 1,
       "sample_lines": [
-        13194
+        13219
       ],
       "in_existing_en_dict": false
     },
@@ -11823,7 +11855,7 @@
       "text": "이미 Claude Code CLI 가 설치되어 있으면 자동 감지됩니다.",
       "count": 1,
       "sample_lines": [
-        12021
+        12046
       ],
       "in_existing_en_dict": false
     },
@@ -11831,7 +11863,7 @@
       "text": "이미 감지됨",
       "count": 1,
       "sample_lines": [
-        13911
+        13936
       ],
       "in_existing_en_dict": false
     },
@@ -11839,7 +11871,7 @@
       "text": "이미 권장 설정이 갖춰져 있습니다. 🎉",
       "count": 1,
       "sample_lines": [
-        11251
+        11276
       ],
       "in_existing_en_dict": false
     },
@@ -11847,7 +11879,7 @@
       "text": "이미 동일한 규칙이 존재합니다 — 변경 없음.",
       "count": 1,
       "sample_lines": [
-        10231
+        10256
       ],
       "in_existing_en_dict": false
     },
@@ -11855,7 +11887,7 @@
       "text": "이미 설치되어 있습니다",
       "count": 1,
       "sample_lines": [
-        12141
+        12166
       ],
       "in_existing_en_dict": false
     },
@@ -11863,7 +11895,7 @@
       "text": "이미 설치됨",
       "count": 1,
       "sample_lines": [
-        14008
+        14033
       ],
       "in_existing_en_dict": false
     },
@@ -11879,7 +11911,7 @@
       "text": "이미 유사 내용이 있습니다",
       "count": 1,
       "sample_lines": [
-        11328
+        11353
       ],
       "in_existing_en_dict": false
     },
@@ -11893,7 +11925,7 @@
       "text": "이미 존재하면 덮어쓰기",
       "count": 1,
       "sample_lines": [
-        11041
+        11066
       ],
       "in_existing_en_dict": false
     },
@@ -11933,9 +11965,9 @@
       "text": "이벤트",
       "count": 3,
       "sample_lines": [
-        9342,
-        9498,
-        13822
+        9367,
+        9523,
+        13847
       ],
       "in_existing_en_dict": false
     },
@@ -11943,7 +11975,7 @@
       "text": "이벤트 기반 자동 스크립트",
       "count": 1,
       "sample_lines": [
-        10118
+        10143
       ],
       "in_existing_en_dict": false
     },
@@ -12014,7 +12046,7 @@
       "text": "이전 탭",
       "count": 1,
       "sample_lines": [
-        16603
+        16628
       ],
       "in_existing_en_dict": false
     },
@@ -12022,7 +12054,7 @@
       "text": "인덱스 완료 — 갱신",
       "count": 1,
       "sample_lines": [
-        14962
+        14987
       ],
       "in_existing_en_dict": false
     },
@@ -12038,7 +12070,7 @@
       "text": "인덱싱 중…",
       "count": 1,
       "sample_lines": [
-        14959
+        14984
       ],
       "in_existing_en_dict": false
     },
@@ -12054,7 +12086,7 @@
       "text": "인자 템플릿",
       "count": 1,
       "sample_lines": [
-        12252
+        12277
       ],
       "in_existing_en_dict": false
     },
@@ -12062,8 +12094,8 @@
       "text": "일",
       "count": 2,
       "sample_lines": [
-        13693,
-        14235
+        13718,
+        14260
       ],
       "in_existing_en_dict": false
     },
@@ -12087,7 +12119,7 @@
       "text": "일별 비용 (최근 60일, 소스별 스택)",
       "count": 1,
       "sample_lines": [
-        14232
+        14257
       ],
       "in_existing_en_dict": false
     },
@@ -12095,7 +12127,7 @@
       "text": "일별 비용 타임라인",
       "count": 1,
       "sample_lines": [
-        11766
+        11791
       ],
       "in_existing_en_dict": false
     },
@@ -12103,7 +12135,7 @@
       "text": "일일 비용 또는 토큰 한도를 설정하면 초과 시 알림을 받습니다.",
       "count": 1,
       "sample_lines": [
-        11790
+        11815
       ],
       "in_existing_en_dict": false
     },
@@ -12111,7 +12143,7 @@
       "text": "일일 비용 한도 (USD)",
       "count": 1,
       "sample_lines": [
-        11794
+        11819
       ],
       "in_existing_en_dict": false
     },
@@ -12119,7 +12151,7 @@
       "text": "일일 토큰 한도",
       "count": 1,
       "sample_lines": [
-        11798
+        11823
       ],
       "in_existing_en_dict": false
     },
@@ -12135,7 +12167,7 @@
       "text": "일치하는 메모리 없음",
       "count": 1,
       "sample_lines": [
-        14519
+        14544
       ],
       "in_existing_en_dict": false
     },
@@ -12143,7 +12175,7 @@
       "text": "일치하는 모델이 없습니다.",
       "count": 1,
       "sample_lines": [
-        12530
+        12555
       ],
       "in_existing_en_dict": false
     },
@@ -12204,7 +12236,7 @@
       "text": "임의의 CLI 도구를 AI 프로바이더로 등록합니다. 워크플로우 노드의 assignee 에서 사용 가능.",
       "count": 1,
       "sample_lines": [
-        11620
+        11645
       ],
       "in_existing_en_dict": false
     },
@@ -12213,10 +12245,10 @@
       "count": 6,
       "sample_lines": [
         6280,
-        13348,
-        13378,
-        13410,
-        14317
+        13373,
+        13403,
+        13435,
+        14342
       ],
       "in_existing_en_dict": false
     },
@@ -12257,9 +12289,9 @@
       "text": "자",
       "count": 3,
       "sample_lines": [
-        10799,
-        10806,
-        13307
+        10824,
+        10831,
+        13332
       ],
       "in_existing_en_dict": false
     },
@@ -12276,8 +12308,8 @@
       "count": 3,
       "sample_lines": [
         2894,
-        11660,
-        12395
+        11685,
+        12420
       ],
       "in_existing_en_dict": false
     },
@@ -12285,8 +12317,8 @@
       "text": "자동 선택 (첫 번째 설치 모델)",
       "count": 2,
       "sample_lines": [
-        11654,
-        12388
+        11679,
+        12413
       ],
       "in_existing_en_dict": false
     },
@@ -12302,7 +12334,7 @@
       "text": "자동 승인 규칙",
       "count": 1,
       "sample_lines": [
-        10116
+        10141
       ],
       "in_existing_en_dict": false
     },
@@ -12325,7 +12357,7 @@
       "text": "자동 추출된 제안",
       "count": 1,
       "sample_lines": [
-        13720
+        13745
       ],
       "in_existing_en_dict": false
     },
@@ -12349,7 +12381,7 @@
       "text": "자주 쓰는 Tool",
       "count": 1,
       "sample_lines": [
-        13716
+        13741
       ],
       "in_existing_en_dict": false
     },
@@ -12407,8 +12439,8 @@
       "text": "작업",
       "count": 2,
       "sample_lines": [
-        9345,
-        11721
+        9370,
+        11746
       ],
       "in_existing_en_dict": false
     },
@@ -12457,7 +12489,7 @@
       "text": "잠시만요~! 결과를 불러오고 있어요",
       "count": 1,
       "sample_lines": [
-        16126
+        16151
       ],
       "in_existing_en_dict": false
     },
@@ -12465,7 +12497,7 @@
       "text": "잠시만요…",
       "count": 1,
       "sample_lines": [
-        15948
+        15973
       ],
       "in_existing_en_dict": false
     },
@@ -12474,7 +12506,7 @@
       "count": 2,
       "sample_lines": [
         1493,
-        12461
+        12486
       ],
       "in_existing_en_dict": false
     },
@@ -12522,7 +12554,7 @@
       "text": "재인덱스 실패",
       "count": 1,
       "sample_lines": [
-        14966
+        14991
       ],
       "in_existing_en_dict": false
     },
@@ -12530,7 +12562,7 @@
       "text": "저를 끌어서 옮길 수도 있어요!",
       "count": 1,
       "sample_lines": [
-        15747
+        15772
       ],
       "in_existing_en_dict": false
     },
@@ -12538,7 +12570,7 @@
       "text": "저를 눌러서 대화해요!",
       "count": 1,
       "sample_lines": [
-        15741
+        15766
       ],
       "in_existing_en_dict": false
     },
@@ -12560,9 +12592,9 @@
       "sample_lines": [
         7835,
         8476,
-        10135,
-        10257,
-        10339
+        10160,
+        10282,
+        10364
       ],
       "in_existing_en_dict": false
     },
@@ -12579,9 +12611,9 @@
       "text": "저장 위치",
       "count": 3,
       "sample_lines": [
-        10812,
-        11298,
-        15214
+        10837,
+        11323,
+        15239
       ],
       "in_existing_en_dict": false
     },
@@ -12617,7 +12649,7 @@
         3038,
         3597,
         3740,
-        9738
+        9763
       ],
       "in_existing_en_dict": false
     },
@@ -12625,7 +12657,7 @@
       "text": "저장됨 (",
       "count": 1,
       "sample_lines": [
-        10821
+        10846
       ],
       "in_existing_en_dict": false
     },
@@ -12633,7 +12665,7 @@
       "text": "저장됨 — 다음 세션부터 적용",
       "count": 1,
       "sample_lines": [
-        11308
+        11333
       ],
       "in_existing_en_dict": false
     },
@@ -12641,7 +12673,7 @@
       "text": "적용 중…",
       "count": 1,
       "sample_lines": [
-        10245
+        10270
       ],
       "in_existing_en_dict": false
     },
@@ -12649,7 +12681,7 @@
       "text": "적용됨",
       "count": 1,
       "sample_lines": [
-        10253
+        10278
       ],
       "in_existing_en_dict": false
     },
@@ -12674,7 +12706,7 @@
       "text": "전역",
       "count": 1,
       "sample_lines": [
-        9473
+        9498
       ],
       "in_existing_en_dict": false
     },
@@ -12698,9 +12730,9 @@
       "sample_lines": [
         4324,
         6930,
-        10015,
-        11695,
-        13381
+        10040,
+        11720,
+        13406
       ],
       "in_existing_en_dict": false
     },
@@ -12717,7 +12749,7 @@
       "text": "전체 병합 결과 보기 (raw JSON)",
       "count": 1,
       "sample_lines": [
-        10222
+        10247
       ],
       "in_existing_en_dict": false
     },
@@ -12725,7 +12757,7 @@
       "text": "전체 세션",
       "count": 1,
       "sample_lines": [
-        14329
+        14354
       ],
       "in_existing_en_dict": false
     },
@@ -12741,7 +12773,7 @@
       "text": "전체 키보드 단축키 보기",
       "count": 1,
       "sample_lines": [
-        16427
+        16452
       ],
       "in_existing_en_dict": false
     },
@@ -12750,8 +12782,8 @@
       "count": 3,
       "sample_lines": [
         6279,
-        13347,
-        14316
+        13372,
+        14341
       ],
       "in_existing_en_dict": false
     },
@@ -12767,7 +12799,7 @@
       "text": "전환",
       "count": 1,
       "sample_lines": [
-        15028
+        15053
       ],
       "in_existing_en_dict": false
     },
@@ -12775,7 +12807,7 @@
       "text": "절대 금지 규칙",
       "count": 1,
       "sample_lines": [
-        10117
+        10142
       ],
       "in_existing_en_dict": false
     },
@@ -12783,7 +12815,7 @@
       "text": "점수",
       "count": 1,
       "sample_lines": [
-        10500
+        10525
       ],
       "in_existing_en_dict": false
     },
@@ -12799,7 +12831,7 @@
       "text": "점수 계산 상세",
       "count": 1,
       "sample_lines": [
-        11225
+        11250
       ],
       "in_existing_en_dict": false
     },
@@ -12807,7 +12839,7 @@
       "text": "점수 계산식 상세",
       "count": 1,
       "sample_lines": [
-        10523
+        10548
       ],
       "in_existing_en_dict": false
     },
@@ -12815,7 +12847,7 @@
       "text": "점수 상세 계산 중…",
       "count": 1,
       "sample_lines": [
-        11120
+        11145
       ],
       "in_existing_en_dict": false
     },
@@ -12839,7 +12871,7 @@
       "text": "접힘",
       "count": 1,
       "sample_lines": [
-        16879
+        16904
       ],
       "in_existing_en_dict": false
     },
@@ -12863,8 +12895,8 @@
       "text": "정말 로그아웃 하시겠습니까?",
       "count": 2,
       "sample_lines": [
-        14724,
-        15130
+        14749,
+        15155
       ],
       "in_existing_en_dict": false
     },
@@ -12872,7 +12904,7 @@
       "text": "정의된 에이전트",
       "count": 1,
       "sample_lines": [
-        10422
+        10447
       ],
       "in_existing_en_dict": false
     },
@@ -12880,7 +12912,7 @@
       "text": "정지",
       "count": 1,
       "sample_lines": [
-        11638
+        11663
       ],
       "in_existing_en_dict": false
     },
@@ -12897,10 +12929,10 @@
       "count": 7,
       "sample_lines": [
         1215,
-        9921,
-        9933,
-        9965,
-        9966
+        9946,
+        9958,
+        9990,
+        9991
       ],
       "in_existing_en_dict": false
     },
@@ -12925,9 +12957,9 @@
       "text": "제거됨",
       "count": 3,
       "sample_lines": [
-        9381,
-        9925,
-        13069
+        9406,
+        9950,
+        13094
       ],
       "in_existing_en_dict": false
     },
@@ -12935,7 +12967,7 @@
       "text": "제거됨 (",
       "count": 1,
       "sample_lines": [
-        9940
+        9965
       ],
       "in_existing_en_dict": false
     },
@@ -12943,7 +12975,7 @@
       "text": "제거할 rtk 훅이 없습니다",
       "count": 1,
       "sample_lines": [
-        14037
+        14062
       ],
       "in_existing_en_dict": false
     },
@@ -12968,7 +13000,7 @@
       "text": "제목 (subject)",
       "count": 1,
       "sample_lines": [
-        14597
+        14622
       ],
       "in_existing_en_dict": false
     },
@@ -12985,7 +13017,7 @@
       "count": 2,
       "sample_lines": [
         8460,
-        14631
+        14656
       ],
       "in_existing_en_dict": false
     },
@@ -12993,7 +13025,7 @@
       "text": "제안 (오른쪽) · AI",
       "count": 1,
       "sample_lines": [
-        10805
+        10830
       ],
       "in_existing_en_dict": false
     },
@@ -13001,7 +13033,7 @@
       "text": "제안 적용",
       "count": 1,
       "sample_lines": [
-        10821
+        10846
       ],
       "in_existing_en_dict": false
     },
@@ -13009,7 +13041,7 @@
       "text": "제안된 내용 미리보기",
       "count": 1,
       "sample_lines": [
-        10715
+        10740
       ],
       "in_existing_en_dict": false
     },
@@ -13106,7 +13138,7 @@
       "text": "조금만 기다려주세요…",
       "count": 1,
       "sample_lines": [
-        15947
+        15972
       ],
       "in_existing_en_dict": false
     },
@@ -13114,7 +13146,7 @@
       "text": "조직",
       "count": 1,
       "sample_lines": [
-        14732
+        14757
       ],
       "in_existing_en_dict": false
     },
@@ -13122,7 +13154,7 @@
       "text": "조직 UUID",
       "count": 1,
       "sample_lines": [
-        14736
+        14761
       ],
       "in_existing_en_dict": false
     },
@@ -13138,8 +13170,8 @@
       "text": "조직 역할",
       "count": 2,
       "sample_lines": [
-        14737,
-        15199
+        14762,
+        15224
       ],
       "in_existing_en_dict": false
     },
@@ -13147,7 +13179,7 @@
       "text": "조직 이름",
       "count": 1,
       "sample_lines": [
-        14735
+        14760
       ],
       "in_existing_en_dict": false
     },
@@ -13155,7 +13187,7 @@
       "text": "종",
       "count": 1,
       "sample_lines": [
-        10432
+        10457
       ],
       "in_existing_en_dict": false
     },
@@ -13163,7 +13195,7 @@
       "text": "종 도구",
       "count": 1,
       "sample_lines": [
-        10587
+        10612
       ],
       "in_existing_en_dict": false
     },
@@ -13179,7 +13211,7 @@
       "text": "종류",
       "count": 1,
       "sample_lines": [
-        14791
+        14816
       ],
       "in_existing_en_dict": false
     },
@@ -13195,7 +13227,7 @@
       "text": "주",
       "count": 1,
       "sample_lines": [
-        14236
+        14261
       ],
       "in_existing_en_dict": false
     },
@@ -13203,7 +13235,7 @@
       "text": "주별 비용 (소스별 스택)",
       "count": 1,
       "sample_lines": [
-        14231
+        14256
       ],
       "in_existing_en_dict": false
     },
@@ -13211,7 +13243,7 @@
       "text": "주요 지시자",
       "count": 1,
       "sample_lines": [
-        16710
+        16735
       ],
       "in_existing_en_dict": false
     },
@@ -13235,7 +13267,7 @@
       "text": "준비 중...",
       "count": 1,
       "sample_lines": [
-        11742
+        11767
       ],
       "in_existing_en_dict": false
     },
@@ -13243,7 +13275,7 @@
       "text": "줄 바꿈 많이",
       "count": 1,
       "sample_lines": [
-        13194
+        13219
       ],
       "in_existing_en_dict": false
     },
@@ -13287,7 +13319,7 @@
       "text": "지우기",
       "count": 1,
       "sample_lines": [
-        9106
+        9131
       ],
       "in_existing_en_dict": false
     },
@@ -13335,7 +13367,7 @@
       "count": 2,
       "sample_lines": [
         7060,
-        14577
+        14602
       ],
       "in_existing_en_dict": false
     },
@@ -13343,7 +13375,7 @@
       "text": "진행 중 표시문 (activeForm)",
       "count": 1,
       "sample_lines": [
-        14605
+        14630
       ],
       "in_existing_en_dict": false
     },
@@ -13387,7 +13419,7 @@
       "text": "차단",
       "count": 1,
       "sample_lines": [
-        14780
+        14805
       ],
       "in_existing_en_dict": false
     },
@@ -13395,7 +13427,7 @@
       "text": "차단 규칙 추가",
       "count": 1,
       "sample_lines": [
-        9718
+        9743
       ],
       "in_existing_en_dict": false
     },
@@ -13419,9 +13451,9 @@
       "text": "참고",
       "count": 3,
       "sample_lines": [
-        13878,
-        14750,
-        15076
+        13903,
+        14775,
+        15101
       ],
       "in_existing_en_dict": false
     },
@@ -13429,7 +13461,7 @@
       "text": "찾을 수 없음",
       "count": 1,
       "sample_lines": [
-        11065
+        11090
       ],
       "in_existing_en_dict": false
     },
@@ -13445,7 +13477,7 @@
       "text": "챗봇 열기",
       "count": 1,
       "sample_lines": [
-        16424
+        16449
       ],
       "in_existing_en_dict": false
     },
@@ -13453,7 +13485,7 @@
       "text": "처럼 추가.",
       "count": 1,
       "sample_lines": [
-        12927
+        12952
       ],
       "in_existing_en_dict": false
     },
@@ -13477,7 +13509,7 @@
       "text": "첫 발견",
       "count": 1,
       "sample_lines": [
-        13159
+        13184
       ],
       "in_existing_en_dict": false
     },
@@ -13486,8 +13518,8 @@
       "count": 3,
       "sample_lines": [
         6145,
-        10500,
-        14401
+        10525,
+        14426
       ],
       "in_existing_en_dict": false
     },
@@ -13513,7 +13545,7 @@
       "text": "초 · claude CLI 응답 대기…",
       "count": 1,
       "sample_lines": [
-        10648
+        10673
       ],
       "in_existing_en_dict": false
     },
@@ -13521,7 +13553,7 @@
       "text": "초 소요. 좌측은 현재 파일, 우측은 AI 제안. 편집 후 원하는 쪽 저장.",
       "count": 1,
       "sample_lines": [
-        10317
+        10342
       ],
       "in_existing_en_dict": false
     },
@@ -13584,8 +13616,8 @@
         6126,
         7765,
         8303,
-        10432,
-        10611
+        10457,
+        10636
       ],
       "in_existing_en_dict": false
     },
@@ -13602,7 +13634,7 @@
       "count": 2,
       "sample_lines": [
         8249,
-        14214
+        14239
       ],
       "in_existing_en_dict": false
     },
@@ -13610,7 +13642,7 @@
       "text": "총 비용 (USD)",
       "count": 1,
       "sample_lines": [
-        11760
+        11785
       ],
       "in_existing_en_dict": false
     },
@@ -13643,7 +13675,7 @@
       "text": "총 토큰",
       "count": 1,
       "sample_lines": [
-        11756
+        11781
       ],
       "in_existing_en_dict": false
     },
@@ -13651,7 +13683,7 @@
       "text": "총 호출",
       "count": 1,
       "sample_lines": [
-        14218
+        14243
       ],
       "in_existing_en_dict": false
     },
@@ -13659,7 +13691,7 @@
       "text": "총 호출 수",
       "count": 1,
       "sample_lines": [
-        11752
+        11777
       ],
       "in_existing_en_dict": false
     },
@@ -13673,7 +13705,7 @@
       "text": "최근",
       "count": 1,
       "sample_lines": [
-        13693
+        13718
       ],
       "in_existing_en_dict": false
     },
@@ -13681,7 +13713,7 @@
       "text": "최근 30건",
       "count": 1,
       "sample_lines": [
-        14275
+        14300
       ],
       "in_existing_en_dict": false
     },
@@ -13689,7 +13721,7 @@
       "text": "최근 30일",
       "count": 1,
       "sample_lines": [
-        14330
+        14355
       ],
       "in_existing_en_dict": false
     },
@@ -13697,7 +13729,7 @@
       "text": "최근 30일 세션이 없습니다. Claude Code 를 한 번 이상 사용하세요.",
       "count": 1,
       "sample_lines": [
-        13632
+        13657
       ],
       "in_existing_en_dict": false
     },
@@ -13705,7 +13737,7 @@
       "text": "최근 50 run",
       "count": 1,
       "sample_lines": [
-        13505
+        13530
       ],
       "in_existing_en_dict": false
     },
@@ -13713,7 +13745,7 @@
       "text": "최근 50 세션",
       "count": 1,
       "sample_lines": [
-        13774
+        13799
       ],
       "in_existing_en_dict": false
     },
@@ -13754,7 +13786,7 @@
       "text": "최근 변경 이력 (CHANGELOG.md)",
       "count": 1,
       "sample_lines": [
-        14990
+        15015
       ],
       "in_existing_en_dict": false
     },
@@ -13770,8 +13802,8 @@
       "text": "최근 세션에서 반복되는 패턴을 자동 추출. AI 판단 없이 통계 기반.",
       "count": 2,
       "sample_lines": [
-        13630,
-        13687
+        13655,
+        13712
       ],
       "in_existing_en_dict": false
     },
@@ -13782,7 +13814,7 @@
         7195,
         7368,
         9010,
-        9236
+        9261
       ],
       "in_existing_en_dict": false
     },
@@ -13939,7 +13971,7 @@
       "count": 2,
       "sample_lines": [
         7354,
-        9229
+        9254
       ],
       "in_existing_en_dict": false
     },
@@ -13948,10 +13980,10 @@
       "count": 5,
       "sample_lines": [
         8645,
-        9651,
-        12258,
-        13034,
-        16981
+        9676,
+        12283,
+        13059,
+        17006
       ],
       "in_existing_en_dict": false
     },
@@ -13959,7 +13991,7 @@
       "text": "추가 사용 허용",
       "count": 1,
       "sample_lines": [
-        14719
+        14744
       ],
       "in_existing_en_dict": false
     },
@@ -13967,7 +13999,7 @@
       "text": "추가 설정 없이 바로 설치 가능합니다.",
       "count": 1,
       "sample_lines": [
-        9884
+        9909
       ],
       "in_existing_en_dict": false
     },
@@ -13983,7 +14015,7 @@
       "text": "추가 후 터미널에서",
       "count": 1,
       "sample_lines": [
-        13037
+        13062
       ],
       "in_existing_en_dict": false
     },
@@ -13991,7 +14023,7 @@
       "text": "추가된 노드",
       "count": 1,
       "sample_lines": [
-        16960
+        16985
       ],
       "in_existing_en_dict": false
     },
@@ -13999,7 +14031,7 @@
       "text": "추가됨",
       "count": 1,
       "sample_lines": [
-        13059
+        13084
       ],
       "in_existing_en_dict": false
     },
@@ -14015,7 +14047,7 @@
       "text": "추정 비용 (",
       "count": 1,
       "sample_lines": [
-        13360
+        13385
       ],
       "in_existing_en_dict": false
     },
@@ -14023,7 +14055,7 @@
       "text": "추정)",
       "count": 1,
       "sample_lines": [
-        13382
+        13407
       ],
       "in_existing_en_dict": false
     },
@@ -14031,7 +14063,7 @@
       "text": "추천 비교 & 적용",
       "count": 1,
       "sample_lines": [
-        10781
+        10806
       ],
       "in_existing_en_dict": false
     },
@@ -14039,7 +14071,7 @@
       "text": "추천 없음 — 이 프로젝트는 이미 잘 설정되어 있을 수 있습니다.",
       "count": 1,
       "sample_lines": [
-        10724
+        10749
       ],
       "in_existing_en_dict": false
     },
@@ -14047,7 +14079,7 @@
       "text": "추천 적용",
       "count": 1,
       "sample_lines": [
-        10160
+        10185
       ],
       "in_existing_en_dict": false
     },
@@ -14055,7 +14087,7 @@
       "text": "추천 편집",
       "count": 1,
       "sample_lines": [
-        11285
+        11310
       ],
       "in_existing_en_dict": false
     },
@@ -14063,7 +14095,7 @@
       "text": "추천 프로파일",
       "count": 1,
       "sample_lines": [
-        10102
+        10127
       ],
       "in_existing_en_dict": false
     },
@@ -14087,7 +14119,7 @@
       "text": "축 달성률",
       "count": 1,
       "sample_lines": [
-        11148
+        11173
       ],
       "in_existing_en_dict": false
     },
@@ -14096,10 +14128,10 @@
       "count": 5,
       "sample_lines": [
         6281,
-        13349,
-        13379,
-        13411,
-        14318
+        13374,
+        13404,
+        13436,
+        14343
       ],
       "in_existing_en_dict": false
     },
@@ -14119,7 +14151,7 @@
         5515,
         5918,
         5932,
-        13182
+        13207
       ],
       "in_existing_en_dict": false
     },
@@ -14127,7 +14159,7 @@
       "text": "출력 스타일 삭제",
       "count": 1,
       "sample_lines": [
-        13252
+        13277
       ],
       "in_existing_en_dict": false
     },
@@ -14135,7 +14167,7 @@
       "text": "출력 스타일 편집",
       "count": 1,
       "sample_lines": [
-        13220
+        13245
       ],
       "in_existing_en_dict": false
     },
@@ -14143,7 +14175,7 @@
       "text": "출력 스타일을 삭제할까요?",
       "count": 1,
       "sample_lines": [
-        13253
+        13278
       ],
       "in_existing_en_dict": false
     },
@@ -14159,7 +14191,7 @@
       "text": "출력물이 있는 run 이 없습니다.",
       "count": 1,
       "sample_lines": [
-        13499
+        13524
       ],
       "in_existing_en_dict": false
     },
@@ -14239,7 +14271,7 @@
       "text": "카드 클릭 → 프리셋 내용 미리보기 → 이름/설명 커스터마이즈 후 설치",
       "count": 1,
       "sample_lines": [
-        10955
+        10980
       ],
       "in_existing_en_dict": false
     },
@@ -14255,7 +14287,7 @@
       "text": "카탈로그",
       "count": 1,
       "sample_lines": [
-        11682
+        11707
       ],
       "in_existing_en_dict": false
     },
@@ -14263,7 +14295,7 @@
       "text": "카탈로그 결과 없음",
       "count": 1,
       "sample_lines": [
-        9819
+        9844
       ],
       "in_existing_en_dict": false
     },
@@ -14279,7 +14311,7 @@
       "text": "카테고리 → 서브탭 flyout",
       "count": 1,
       "sample_lines": [
-        16618
+        16643
       ],
       "in_existing_en_dict": false
     },
@@ -14287,7 +14319,7 @@
       "text": "카테고리 고정 open",
       "count": 1,
       "sample_lines": [
-        16619
+        16644
       ],
       "in_existing_en_dict": false
     },
@@ -14312,8 +14344,8 @@
       "count": 3,
       "sample_lines": [
         6283,
-        13351,
-        14320
+        13376,
+        14345
       ],
       "in_existing_en_dict": false
     },
@@ -14322,10 +14354,10 @@
       "count": 5,
       "sample_lines": [
         6282,
-        13350,
-        13380,
-        13412,
-        14319
+        13375,
+        13405,
+        13437,
+        14344
       ],
       "in_existing_en_dict": false
     },
@@ -14381,8 +14413,8 @@
       "text": "커스텀 모델 생성",
       "count": 3,
       "sample_lines": [
-        11687,
-        16698
+        11712,
+        16723
       ],
       "in_existing_en_dict": false
     },
@@ -14390,7 +14422,7 @@
       "text": "커스텀 모델이 생성되었습니다",
       "count": 1,
       "sample_lines": [
-        16734
+        16759
       ],
       "in_existing_en_dict": false
     },
@@ -14414,7 +14446,7 @@
       "text": "커스텀 프로바이더 추가",
       "count": 1,
       "sample_lines": [
-        12240
+        12265
       ],
       "in_existing_en_dict": false
     },
@@ -14422,7 +14454,7 @@
       "text": "커스텀 프로바이더 편집",
       "count": 1,
       "sample_lines": [
-        12240
+        12265
       ],
       "in_existing_en_dict": false
     },
@@ -14467,9 +14499,9 @@
       "count": 4,
       "sample_lines": [
         5627,
-        11716,
-        12554,
-        13451
+        11741,
+        12579,
+        13476
       ],
       "in_existing_en_dict": false
     },
@@ -14478,8 +14510,8 @@
       "count": 3,
       "sample_lines": [
         6497,
-        16613,
-        16619
+        16638,
+        16644
       ],
       "in_existing_en_dict": false
     },
@@ -14487,7 +14519,7 @@
       "text": "클릭 → 에이전트 정의 보기",
       "count": 1,
       "sample_lines": [
-        10440
+        10465
       ],
       "in_existing_en_dict": false
     },
@@ -14495,7 +14527,7 @@
       "text": "클릭 시 Auth 확인 → 변경 미리보기 → 적용까지 안내됩니다.",
       "count": 1,
       "sample_lines": [
-        10103
+        10128
       ],
       "in_existing_en_dict": false
     },
@@ -14524,7 +14556,7 @@
         1419,
         1606,
         2313,
-        16641
+        16666
       ],
       "in_existing_en_dict": false
     },
@@ -14540,7 +14572,7 @@
       "text": "키워드로 검색 (제목/요약/URL)",
       "count": 1,
       "sample_lines": [
-        9102
+        9126
       ],
       "in_existing_en_dict": false
     },
@@ -14596,7 +14628,7 @@
       "count": 2,
       "sample_lines": [
         344,
-        14556
+        14581
       ],
       "in_existing_en_dict": false
     },
@@ -14604,7 +14636,7 @@
       "text": "탭 이동, 기능 검색…",
       "count": 1,
       "sample_lines": [
-        16320
+        16345
       ],
       "in_existing_en_dict": false
     },
@@ -14612,7 +14644,7 @@
       "text": "탭 확인",
       "count": 1,
       "sample_lines": [
-        15245
+        15270
       ],
       "in_existing_en_dict": false
     },
@@ -14620,7 +14652,7 @@
       "text": "탭에서 JSON 루트에",
       "count": 1,
       "sample_lines": [
-        12927
+        12952
       ],
       "in_existing_en_dict": false
     },
@@ -14628,7 +14660,7 @@
       "text": "탭에서.",
       "count": 1,
       "sample_lines": [
-        14783
+        14808
       ],
       "in_existing_en_dict": false
     },
@@ -14636,9 +14668,9 @@
       "text": "탭으로 이동",
       "count": 3,
       "sample_lines": [
-        16203,
-        16258,
-        16280
+        16228,
+        16283,
+        16305
       ],
       "in_existing_en_dict": false
     },
@@ -14646,7 +14678,7 @@
       "text": "터미널",
       "count": 1,
       "sample_lines": [
-        14801
+        14826
       ],
       "in_existing_en_dict": false
     },
@@ -14654,7 +14686,7 @@
       "text": "터미널 창이 열리고 설치 명령이 실행됩니다. 계속할까요?",
       "count": 1,
       "sample_lines": [
-        12133
+        12158
       ],
       "in_existing_en_dict": false
     },
@@ -14662,7 +14694,7 @@
       "text": "터미널 활성화 (",
       "count": 1,
       "sample_lines": [
-        10851
+        10876
       ],
       "in_existing_en_dict": false
     },
@@ -14670,8 +14702,8 @@
       "text": "터미널에서",
       "count": 2,
       "sample_lines": [
-        10198,
-        15203
+        10223,
+        15228
       ],
       "in_existing_en_dict": false
     },
@@ -14679,7 +14711,7 @@
       "text": "터미널에서 로그인 창이 열렸습니다",
       "count": 1,
       "sample_lines": [
-        12173
+        12198
       ],
       "in_existing_en_dict": false
     },
@@ -14687,7 +14719,7 @@
       "text": "터미널에서 설치가 진행 중입니다. 완료 후 새로고침하세요.",
       "count": 1,
       "sample_lines": [
-        12143
+        12168
       ],
       "in_existing_en_dict": false
     },
@@ -14695,7 +14727,7 @@
       "text": "터미널을 확인하세요.",
       "count": 1,
       "sample_lines": [
-        15045
+        15070
       ],
       "in_existing_en_dict": false
     },
@@ -14711,7 +14743,7 @@
       "text": "테스트",
       "count": 1,
       "sample_lines": [
-        11485
+        11510
       ],
       "in_existing_en_dict": false
     },
@@ -14719,7 +14751,7 @@
       "text": "테스트 메시지 전송됨",
       "count": 1,
       "sample_lines": [
-        14024
+        14049
       ],
       "in_existing_en_dict": false
     },
@@ -14733,8 +14765,8 @@
       "text": "테스트 중...",
       "count": 2,
       "sample_lines": [
-        12101,
-        12183
+        12126,
+        12208
       ],
       "in_existing_en_dict": false
     },
@@ -14776,8 +14808,8 @@
       "count": 3,
       "sample_lines": [
         350,
-        13110,
-        13112
+        13135,
+        13137
       ],
       "in_existing_en_dict": false
     },
@@ -14800,7 +14832,7 @@
         1587,
         8788,
         8818,
-        12729
+        12754
       ],
       "in_existing_en_dict": false
     },
@@ -14869,7 +14901,7 @@
         5327,
         5349,
         6150,
-        12892
+        12917
       ],
       "in_existing_en_dict": false
     },
@@ -14877,7 +14909,7 @@
       "text": "토큰 in/out",
       "count": 1,
       "sample_lines": [
-        14255
+        14280
       ],
       "in_existing_en_dict": false
     },
@@ -14886,8 +14918,8 @@
       "count": 3,
       "sample_lines": [
         340,
-        13333,
-        13339
+        13358,
+        13364
       ],
       "in_existing_en_dict": false
     },
@@ -14920,7 +14952,7 @@
       "text": "토큰 입력",
       "count": 1,
       "sample_lines": [
-        13823
+        13848
       ],
       "in_existing_en_dict": false
     },
@@ -14928,7 +14960,7 @@
       "text": "토큰 있는 세션만",
       "count": 1,
       "sample_lines": [
-        13361
+        13386
       ],
       "in_existing_en_dict": false
     },
@@ -14936,7 +14968,7 @@
       "text": "토큰 출력",
       "count": 1,
       "sample_lines": [
-        13824
+        13849
       ],
       "in_existing_en_dict": false
     },
@@ -14944,7 +14976,7 @@
       "text": "토큰 한도",
       "count": 1,
       "sample_lines": [
-        11980
+        12005
       ],
       "in_existing_en_dict": false
     },
@@ -14952,8 +14984,8 @@
       "text": "토큰 한도 초과",
       "count": 2,
       "sample_lines": [
-        11959,
-        11972
+        11984,
+        11997
       ],
       "in_existing_en_dict": false
     },
@@ -15031,8 +15063,8 @@
       "count": 3,
       "sample_lines": [
         354,
-        14670,
-        14709
+        14695,
+        14734
       ],
       "in_existing_en_dict": false
     },
@@ -15056,7 +15088,7 @@
       "text": "팀 멤버 목록·사용량·결제는",
       "count": 1,
       "sample_lines": [
-        14751
+        14776
       ],
       "in_existing_en_dict": false
     },
@@ -15064,7 +15096,7 @@
       "text": "팀/조직 정보를 확인하려면 Claude 계정에 먼저 로그인하세요.",
       "count": 1,
       "sample_lines": [
-        14676
+        14701
       ],
       "in_existing_en_dict": false
     },
@@ -15072,9 +15104,9 @@
       "text": "파라미터",
       "count": 3,
       "sample_lines": [
-        11718,
-        12725,
-        16710
+        11743,
+        12750,
+        16735
       ],
       "in_existing_en_dict": false
     },
@@ -15083,7 +15115,7 @@
       "count": 2,
       "sample_lines": [
         5626,
-        13112
+        13137
       ],
       "in_existing_en_dict": false
     },
@@ -15123,8 +15155,8 @@
       "text": "파일 없음",
       "count": 2,
       "sample_lines": [
-        10281,
-        13150
+        10306,
+        13175
       ],
       "in_existing_en_dict": false
     },
@@ -15132,7 +15164,7 @@
       "text": "파일 없음 / 빈값",
       "count": 1,
       "sample_lines": [
-        10777
+        10802
       ],
       "in_existing_en_dict": false
     },
@@ -15140,7 +15172,7 @@
       "text": "파일 없음 — 필요 시 직접 생성",
       "count": 1,
       "sample_lines": [
-        13289
+        13314
       ],
       "in_existing_en_dict": false
     },
@@ -15148,7 +15180,7 @@
       "text": "파일 존재",
       "count": 1,
       "sample_lines": [
-        13289
+        13314
       ],
       "in_existing_en_dict": false
     },
@@ -15182,7 +15214,7 @@
       "count": 2,
       "sample_lines": [
         6692,
-        11078
+        11103
       ],
       "in_existing_en_dict": false
     },
@@ -15190,7 +15222,7 @@
       "text": "패밀리",
       "count": 1,
       "sample_lines": [
-        11717
+        11742
       ],
       "in_existing_en_dict": false
     },
@@ -15206,7 +15238,7 @@
       "text": "패턴은 반드시",
       "count": 1,
       "sample_lines": [
-        9694
+        9719
       ],
       "in_existing_en_dict": false
     },
@@ -15223,7 +15255,7 @@
       "count": 3,
       "sample_lines": [
         2948,
-        11486
+        11511
       ],
       "in_existing_en_dict": false
     },
@@ -15239,7 +15271,7 @@
       "text": "편집 방법",
       "count": 1,
       "sample_lines": [
-        12927
+        12952
       ],
       "in_existing_en_dict": false
     },
@@ -15247,7 +15279,7 @@
       "text": "편집기 카테고리 접기/펴기",
       "count": 1,
       "sample_lines": [
-        16612
+        16637
       ],
       "in_existing_en_dict": false
     },
@@ -15255,7 +15287,7 @@
       "text": "편집은",
       "count": 1,
       "sample_lines": [
-        14783
+        14808
       ],
       "in_existing_en_dict": false
     },
@@ -15274,7 +15306,7 @@
       "text": "평균",
       "count": 1,
       "sample_lines": [
-        11221
+        11246
       ],
       "in_existing_en_dict": false
     },
@@ -15282,7 +15314,7 @@
       "text": "평균 30~120초 소요 · cwd=",
       "count": 1,
       "sample_lines": [
-        10638
+        10663
       ],
       "in_existing_en_dict": false
     },
@@ -15298,7 +15330,7 @@
       "text": "평균 세션 토큰",
       "count": 1,
       "sample_lines": [
-        13362
+        13387
       ],
       "in_existing_en_dict": false
     },
@@ -15364,7 +15396,7 @@
       "text": "포커스된 항목 실행",
       "count": 1,
       "sample_lines": [
-        16623
+        16648
       ],
       "in_existing_en_dict": false
     },
@@ -15397,7 +15429,7 @@
       "text": "폴더 열림",
       "count": 1,
       "sample_lines": [
-        10847
+        10872
       ],
       "in_existing_en_dict": false
     },
@@ -15405,7 +15437,7 @@
       "text": "폴백 체인",
       "count": 1,
       "sample_lines": [
-        11598
+        11623
       ],
       "in_existing_en_dict": false
     },
@@ -15413,7 +15445,7 @@
       "text": "폴백 체인 저장",
       "count": 1,
       "sample_lines": [
-        11614
+        11639
       ],
       "in_existing_en_dict": false
     },
@@ -15421,7 +15453,7 @@
       "text": "폴백 체인이 저장되었습니다",
       "count": 1,
       "sample_lines": [
-        12205
+        12230
       ],
       "in_existing_en_dict": false
     },
@@ -15453,7 +15485,7 @@
       "text": "표시할 프로젝트 없음",
       "count": 1,
       "sample_lines": [
-        10938
+        10963
       ],
       "in_existing_en_dict": false
     },
@@ -15467,7 +15499,7 @@
       "text": "프로바이더",
       "count": 1,
       "sample_lines": [
-        12847
+        12872
       ],
       "in_existing_en_dict": false
     },
@@ -15491,8 +15523,8 @@
       "text": "프로바이더 사용 가능",
       "count": 2,
       "sample_lines": [
-        11896,
-        11903
+        11921,
+        11928
       ],
       "in_existing_en_dict": false
     },
@@ -15508,7 +15540,7 @@
       "text": "프로바이더 설정",
       "count": 1,
       "sample_lines": [
-        11541
+        11566
       ],
       "in_existing_en_dict": false
     },
@@ -15516,7 +15548,7 @@
       "text": "프로바이더 없음",
       "count": 1,
       "sample_lines": [
-        11854
+        11879
       ],
       "in_existing_en_dict": false
     },
@@ -15524,7 +15556,7 @@
       "text": "프로바이더 헬스",
       "count": 1,
       "sample_lines": [
-        11567
+        11592
       ],
       "in_existing_en_dict": false
     },
@@ -15532,7 +15564,7 @@
       "text": "프로바이더를 먼저 선택하세요",
       "count": 1,
       "sample_lines": [
-        12099
+        12124
       ],
       "in_existing_en_dict": false
     },
@@ -15540,7 +15572,7 @@
       "text": "프로바이더를 선택하세요",
       "count": 1,
       "sample_lines": [
-        12843
+        12868
       ],
       "in_existing_en_dict": false
     },
@@ -15548,7 +15580,7 @@
       "text": "프로바이더를 찾을 수 없습니다",
       "count": 1,
       "sample_lines": [
-        12284
+        12309
       ],
       "in_existing_en_dict": false
     },
@@ -15556,7 +15588,7 @@
       "text": "프로바이더별 비용 비교",
       "count": 1,
       "sample_lines": [
-        11772
+        11797
       ],
       "in_existing_en_dict": false
     },
@@ -15572,7 +15604,7 @@
       "text": "프로바이더별 일별 비용 상세",
       "count": 1,
       "sample_lines": [
-        11780
+        11805
       ],
       "in_existing_en_dict": false
     },
@@ -15583,8 +15615,8 @@
         236,
         6062,
         6146,
-        10350,
-        14385
+        10375,
+        14410
       ],
       "in_existing_en_dict": false
     },
@@ -15598,7 +15630,7 @@
       "text": "프로젝트 MCP 제거",
       "count": 1,
       "sample_lines": [
-        9931
+        9956
       ],
       "in_existing_en_dict": false
     },
@@ -15618,7 +15650,7 @@
       "text": "프로젝트 루트에 CLAUDE.md 없음",
       "count": 1,
       "sample_lines": [
-        10496
+        10521
       ],
       "in_existing_en_dict": false
     },
@@ -15633,7 +15665,7 @@
       "count": 2,
       "sample_lines": [
         342,
-        14489
+        14514
       ],
       "in_existing_en_dict": false
     },
@@ -15650,7 +15682,7 @@
       "count": 2,
       "sample_lines": [
         252,
-        10929
+        10954
       ],
       "in_existing_en_dict": false
     },
@@ -15658,7 +15690,7 @@
       "text": "프로젝트 설정 불러오는 중…",
       "count": 1,
       "sample_lines": [
-        10383
+        10408
       ],
       "in_existing_en_dict": false
     },
@@ -15666,7 +15698,7 @@
       "text": "프로젝트 스냅샷",
       "count": 1,
       "sample_lines": [
-        10519
+        10544
       ],
       "in_existing_en_dict": false
     },
@@ -15680,7 +15712,7 @@
       "text": "프로젝트 없음",
       "count": 1,
       "sample_lines": [
-        10377
+        10402
       ],
       "in_existing_en_dict": false
     },
@@ -15696,7 +15728,7 @@
       "text": "프로젝트 에이전트 편집 —",
       "count": 1,
       "sample_lines": [
-        11067
+        11092
       ],
       "in_existing_en_dict": false
     },
@@ -15712,7 +15744,7 @@
       "text": "프로젝트마다",
       "count": 1,
       "sample_lines": [
-        10930
+        10955
       ],
       "in_existing_en_dict": false
     },
@@ -15744,7 +15776,7 @@
       "text": "프로젝트에 정의된 .claude/agents/*.md 파일 수",
       "count": 1,
       "sample_lines": [
-        10526
+        10551
       ],
       "in_existing_en_dict": false
     },
@@ -15752,7 +15784,7 @@
       "text": "프로파일 적용됨 — 저장을 눌러 반영",
       "count": 1,
       "sample_lines": [
-        10146
+        10171
       ],
       "in_existing_en_dict": false
     },
@@ -15812,9 +15844,9 @@
       "sample_lines": [
         7341,
         8266,
-        9203,
-        11810,
-        12252
+        9228,
+        11835,
+        12277
       ],
       "in_existing_en_dict": false
     },
@@ -15889,8 +15921,8 @@
       "count": 3,
       "sample_lines": [
         7403,
-        9271,
-        12840
+        9296,
+        12865
       ],
       "in_existing_en_dict": false
     },
@@ -15899,8 +15931,8 @@
       "count": 3,
       "sample_lines": [
         5601,
-        13319,
-        14717
+        13344,
+        14742
       ],
       "in_existing_en_dict": false
     },
@@ -15909,7 +15941,7 @@
       "count": 2,
       "sample_lines": [
         237,
-        13302
+        13327
       ],
       "in_existing_en_dict": false
     },
@@ -15917,7 +15949,7 @@
       "text": "플랜 선택 해제됨",
       "count": 1,
       "sample_lines": [
-        15227
+        15252
       ],
       "in_existing_en_dict": false
     },
@@ -15925,7 +15957,7 @@
       "text": "플랜 설정",
       "count": 1,
       "sample_lines": [
-        14722
+        14747
       ],
       "in_existing_en_dict": false
     },
@@ -15933,7 +15965,7 @@
       "text": "플랜 저장됨",
       "count": 1,
       "sample_lines": [
-        15227
+        15252
       ],
       "in_existing_en_dict": false
     },
@@ -15953,7 +15985,7 @@
       "text": "플러그인 hooks.json 직접 수정",
       "count": 1,
       "sample_lines": [
-        9446
+        9471
       ],
       "in_existing_en_dict": false
     },
@@ -15969,7 +16001,7 @@
       "text": "플러그인 마켓플레이스",
       "count": 1,
       "sample_lines": [
-        13028
+        13053
       ],
       "in_existing_en_dict": false
     },
@@ -16009,7 +16041,7 @@
       "text": "플러그인 업데이트 시 복원될 수 있습니다.",
       "count": 1,
       "sample_lines": [
-        9609
+        9634
       ],
       "in_existing_en_dict": false
     },
@@ -16049,7 +16081,7 @@
       "text": "플러그인 훅 삭제",
       "count": 1,
       "sample_lines": [
-        9608
+        9633
       ],
       "in_existing_en_dict": false
     },
@@ -16057,7 +16089,7 @@
       "text": "플러그인 훅 삭제됨",
       "count": 1,
       "sample_lines": [
-        9617
+        9642
       ],
       "in_existing_en_dict": false
     },
@@ -16065,7 +16097,7 @@
       "text": "플러그인 훅 저장됨",
       "count": 1,
       "sample_lines": [
-        9545
+        9570
       ],
       "in_existing_en_dict": false
     },
@@ -16073,7 +16105,7 @@
       "text": "플러그인 훅을 삭제하시겠습니까?",
       "count": 1,
       "sample_lines": [
-        9609
+        9634
       ],
       "in_existing_en_dict": false
     },
@@ -16121,7 +16153,7 @@
       "text": "필수 값 누락",
       "count": 1,
       "sample_lines": [
-        9903
+        9928
       ],
       "in_existing_en_dict": false
     },
@@ -16152,7 +16184,7 @@
       "text": "필터 결과 없음",
       "count": 1,
       "sample_lines": [
-        10046
+        10071
       ],
       "in_existing_en_dict": false
     },
@@ -16185,7 +16217,7 @@
       "text": "하면 파일에 즉시 반영됩니다.",
       "count": 1,
       "sample_lines": [
-        10088
+        10113
       ],
       "in_existing_en_dict": false
     },
@@ -16241,7 +16273,7 @@
       "text": "한도를 하나 이상 입력하세요",
       "count": 1,
       "sample_lines": [
-        11930
+        11955
       ],
       "in_existing_en_dict": false
     },
@@ -16308,7 +16340,7 @@
       "text": "햄버거",
       "count": 1,
       "sample_lines": [
-        16617
+        16642
       ],
       "in_existing_en_dict": false
     },
@@ -16325,8 +16357,8 @@
       "count": 3,
       "sample_lines": [
         5431,
-        9668,
-        14779
+        9693,
+        14804
       ],
       "in_existing_en_dict": false
     },
@@ -16334,7 +16366,7 @@
       "text": "허용 규칙 추가",
       "count": 1,
       "sample_lines": [
-        9718
+        9743
       ],
       "in_existing_en_dict": false
     },
@@ -16350,7 +16382,7 @@
       "text": "허용 호스트",
       "count": 1,
       "sample_lines": [
-        9334
+        9359
       ],
       "in_existing_en_dict": false
     },
@@ -16372,7 +16404,7 @@
       "text": "헬스 체크 실패",
       "count": 1,
       "sample_lines": [
-        11917
+        11942
       ],
       "in_existing_en_dict": false
     },
@@ -16380,7 +16412,7 @@
       "text": "현재 (왼쪽)",
       "count": 1,
       "sample_lines": [
-        10798
+        10823
       ],
       "in_existing_en_dict": false
     },
@@ -16388,7 +16420,7 @@
       "text": "현재 값 유지",
       "count": 1,
       "sample_lines": [
-        10821
+        10846
       ],
       "in_existing_en_dict": false
     },
@@ -16396,7 +16428,7 @@
       "text": "현재 계정 로그아웃",
       "count": 1,
       "sample_lines": [
-        15029
+        15054
       ],
       "in_existing_en_dict": false
     },
@@ -16404,7 +16436,7 @@
       "text": "현재 모델에서 미지원",
       "count": 1,
       "sample_lines": [
-        9157
+        9182
       ],
       "in_existing_en_dict": false
     },
@@ -16412,7 +16444,7 @@
       "text": "현재 뷰 다시 로드",
       "count": 1,
       "sample_lines": [
-        16426
+        16451
       ],
       "in_existing_en_dict": false
     },
@@ -16428,7 +16460,7 @@
       "text": "현재 세션 (rtk session)",
       "count": 1,
       "sample_lines": [
-        13932
+        13957
       ],
       "in_existing_en_dict": false
     },
@@ -16458,10 +16490,10 @@
       "text": "호출",
       "count": 4,
       "sample_lines": [
-        10444,
-        14254,
-        14266,
-        14418
+        10469,
+        14279,
+        14291,
+        14443
       ],
       "in_existing_en_dict": false
     },
@@ -16506,7 +16538,7 @@
       "text": "혹은 전역",
       "count": 1,
       "sample_lines": [
-        11253
+        11278
       ],
       "in_existing_en_dict": false
     },
@@ -16521,9 +16553,9 @@
       "count": 4,
       "sample_lines": [
         7782,
-        14856,
-        14896,
-        14902
+        14881,
+        14921,
+        14927
       ],
       "in_existing_en_dict": false
     },
@@ -16531,7 +16563,7 @@
       "text": "확인 명령",
       "count": 1,
       "sample_lines": [
-        12065
+        12090
       ],
       "in_existing_en_dict": false
     },
@@ -16539,7 +16571,7 @@
       "text": "확인하고 settings.json 에 즉시 저장합니다.",
       "count": 1,
       "sample_lines": [
-        10231
+        10256
       ],
       "in_existing_en_dict": false
     },
@@ -16548,7 +16580,7 @@
       "count": 2,
       "sample_lines": [
         322,
-        12907
+        12932
       ],
       "in_existing_en_dict": false
     },
@@ -16556,7 +16588,7 @@
       "text": "환경 변수(OPENAI_API_KEY 등)가 이미 설정되어 있으면 자동 감지됩니다. 여기서 추가로 설정할 수 있습니다.",
       "count": 1,
       "sample_lines": [
-        11593
+        11618
       ],
       "in_existing_en_dict": false
     },
@@ -16564,7 +16596,7 @@
       "text": "환경변수.",
       "count": 1,
       "sample_lines": [
-        13141
+        13166
       ],
       "in_existing_en_dict": false
     },
@@ -16572,7 +16604,7 @@
       "text": "활성",
       "count": 1,
       "sample_lines": [
-        10032
+        10057
       ],
       "in_existing_en_dict": false
     },
@@ -16586,7 +16618,7 @@
       "text": "활성 세션 없음",
       "count": 1,
       "sample_lines": [
-        12987
+        13012
       ],
       "in_existing_en_dict": false
     },
@@ -16594,7 +16626,7 @@
       "text": "활성 세션이 없습니다.",
       "count": 1,
       "sample_lines": [
-        14805
+        14830
       ],
       "in_existing_en_dict": false
     },
@@ -16602,7 +16634,7 @@
       "text": "활성 소스",
       "count": 1,
       "sample_lines": [
-        14222
+        14247
       ],
       "in_existing_en_dict": false
     },
@@ -16643,7 +16675,7 @@
       "count": 2,
       "sample_lines": [
         6834,
-        9456
+        9481
       ],
       "in_existing_en_dict": false
     },
@@ -16651,7 +16683,7 @@
       "text": "활성만",
       "count": 1,
       "sample_lines": [
-        10018
+        10043
       ],
       "in_existing_en_dict": false
     },
@@ -16667,7 +16699,7 @@
       "text": "활성화 플러그인",
       "count": 1,
       "sample_lines": [
-        10119
+        10144
       ],
       "in_existing_en_dict": false
     },
@@ -16677,7 +16709,7 @@
       "sample_lines": [
         5890,
         6684,
-        10070
+        10095
       ],
       "in_existing_en_dict": false
     },
@@ -16685,7 +16717,7 @@
       "text": "활성화할 도구",
       "count": 1,
       "sample_lines": [
-        9199
+        9224
       ],
       "in_existing_en_dict": false
     },
@@ -16704,7 +16736,7 @@
       "count": 2,
       "sample_lines": [
         6582,
-        12994
+        13019
       ],
       "in_existing_en_dict": false
     },
@@ -16744,8 +16776,8 @@
       "text": "회 위임 ·",
       "count": 2,
       "sample_lines": [
-        10432,
-        10611
+        10457,
+        10636
       ],
       "in_existing_en_dict": false
     },
@@ -16754,8 +16786,8 @@
       "count": 3,
       "sample_lines": [
         6637,
-        10587,
-        13080
+        10612,
+        13105
       ],
       "in_existing_en_dict": false
     },
@@ -16775,7 +16807,7 @@
         5430,
         5918,
         5932,
-        14781
+        14806
       ],
       "in_existing_en_dict": false
     },
@@ -16783,7 +16815,7 @@
       "text": "훅 (Hooks)",
       "count": 1,
       "sample_lines": [
-        9455
+        9480
       ],
       "in_existing_en_dict": false
     },
@@ -16799,7 +16831,7 @@
       "text": "훅 비활성",
       "count": 1,
       "sample_lines": [
-        13852
+        13877
       ],
       "in_existing_en_dict": false
     },
@@ -16807,7 +16839,7 @@
       "text": "훅 삭제",
       "count": 1,
       "sample_lines": [
-        9620
+        9645
       ],
       "in_existing_en_dict": false
     },
@@ -16815,7 +16847,7 @@
       "text": "훅 수정 —",
       "count": 1,
       "sample_lines": [
-        9489
+        9514
       ],
       "in_existing_en_dict": false
     },
@@ -16831,7 +16863,7 @@
       "text": "훅 저장됨",
       "count": 1,
       "sample_lines": [
-        9588
+        9613
       ],
       "in_existing_en_dict": false
     },
@@ -16839,7 +16871,7 @@
       "text": "훅 제거",
       "count": 1,
       "sample_lines": [
-        13913
+        13938
       ],
       "in_existing_en_dict": false
     },
@@ -16855,7 +16887,7 @@
       "text": "훅 활성",
       "count": 1,
       "sample_lines": [
-        13851
+        13876
       ],
       "in_existing_en_dict": false
     },
@@ -16863,7 +16895,7 @@
       "text": "훅 활성 감지 — 탭 새로고침",
       "count": 1,
       "sample_lines": [
-        13989
+        14014
       ],
       "in_existing_en_dict": false
     },
@@ -16871,7 +16903,7 @@
       "text": "훅 활성화 감지 중 — 완료되면 자동 새로고침",
       "count": 1,
       "sample_lines": [
-        13972
+        13997
       ],
       "in_existing_en_dict": false
     },
@@ -16879,7 +16911,7 @@
       "text": "훅이 설정되지 않았습니다. 우측 상단",
       "count": 1,
       "sample_lines": [
-        9481
+        9506
       ],
       "in_existing_en_dict": false
     },
@@ -16895,7 +16927,7 @@
       "text": "＋ MCP 설치",
       "count": 1,
       "sample_lines": [
-        9870
+        9895
       ],
       "in_existing_en_dict": false
     },
@@ -16927,8 +16959,8 @@
       "text": "＋ 만들기",
       "count": 2,
       "sample_lines": [
-        13196,
-        13209
+        13221,
+        13234
       ],
       "in_existing_en_dict": false
     },
@@ -16936,7 +16968,7 @@
       "text": "＋ 새 TODO",
       "count": 1,
       "sample_lines": [
-        14563
+        14588
       ],
       "in_existing_en_dict": false
     },
@@ -16944,7 +16976,7 @@
       "text": "＋ 새 마켓플레이스 추가",
       "count": 1,
       "sample_lines": [
-        13030
+        13055
       ],
       "in_existing_en_dict": false
     },
@@ -16960,7 +16992,7 @@
       "text": "＋ 새 출력 스타일",
       "count": 1,
       "sample_lines": [
-        13193
+        13218
       ],
       "in_existing_en_dict": false
     },
@@ -16968,8 +17000,8 @@
       "text": "＋ 새 훅 추가",
       "count": 2,
       "sample_lines": [
-        9460,
-        9481
+        9485,
+        9506
       ],
       "in_existing_en_dict": false
     },
@@ -16987,7 +17019,7 @@
       "sample_lines": [
         5833,
         5859,
-        9811
+        9836
       ],
       "in_existing_en_dict": false
     },
@@ -16995,7 +17027,7 @@
       "text": "＋ 수동 TODO 추가",
       "count": 1,
       "sample_lines": [
-        14560
+        14585
       ],
       "in_existing_en_dict": false
     },
@@ -17003,7 +17035,7 @@
       "text": "＋ 이 프로젝트에 설치",
       "count": 1,
       "sample_lines": [
-        11045
+        11070
       ],
       "in_existing_en_dict": false
     },
@@ -17027,7 +17059,7 @@
       "text": "＋ 추가",
       "count": 1,
       "sample_lines": [
-        9647
+        9672
       ],
       "in_existing_en_dict": false
     },
@@ -17036,7 +17068,7 @@
       "count": 2,
       "sample_lines": [
         873,
-        15245
+        15270
       ],
       "in_existing_en_dict": false
     },
@@ -17044,7 +17076,7 @@
       "text": "🌐 플랫폼 MCP (claude.ai 연결)",
       "count": 1,
       "sample_lines": [
-        9825
+        9850
       ],
       "in_existing_en_dict": false
     },
@@ -17052,7 +17084,7 @@
       "text": "🌿 Claude Code 환경 변수 카탈로그",
       "count": 1,
       "sample_lines": [
-        12909
+        12934
       ],
       "in_existing_en_dict": false
     },
@@ -17060,7 +17092,7 @@
       "text": "🎉 로그인 성공! 대시보드를 불러옵니다…",
       "count": 1,
       "sample_lines": [
-        15696
+        15721
       ],
       "in_existing_en_dict": false
     },
@@ -17076,7 +17108,7 @@
       "text": "🎭 역할 프리셋 카탈로그 ·",
       "count": 1,
       "sample_lines": [
-        10954
+        10979
       ],
       "in_existing_en_dict": false
     },
@@ -17108,7 +17140,7 @@
       "text": "🎯 분석 중…",
       "count": 1,
       "sample_lines": [
-        15948
+        15973
       ],
       "in_existing_en_dict": false
     },
@@ -17116,7 +17148,7 @@
       "text": "🎯 정리해서 알려드릴게요",
       "count": 1,
       "sample_lines": [
-        16130
+        16155
       ],
       "in_existing_en_dict": false
     },
@@ -17124,7 +17156,7 @@
       "text": "🏆 최고 세션",
       "count": 1,
       "sample_lines": [
-        11244
+        11269
       ],
       "in_existing_en_dict": false
     },
@@ -17132,7 +17164,7 @@
       "text": "🏆 토큰 사용 TOP 10 세션",
       "count": 1,
       "sample_lines": [
-        14399
+        14424
       ],
       "in_existing_en_dict": false
     },
@@ -17152,7 +17184,7 @@
       "text": "💀 하위 세션",
       "count": 1,
       "sample_lines": [
-        11246
+        11271
       ],
       "in_existing_en_dict": false
     },
@@ -17160,7 +17192,7 @@
       "text": "💡 -u/--ultra-compact 플래그로 ASCII 아이콘 사용 + 추가 절감.",
       "count": 1,
       "sample_lines": [
-        13953
+        13978
       ],
       "in_existing_en_dict": false
     },
@@ -17168,7 +17200,7 @@
       "text": "💡 관련 탭을 찾고 있어요",
       "count": 1,
       "sample_lines": [
-        16128
+        16153
       ],
       "in_existing_en_dict": false
     },
@@ -17176,7 +17208,7 @@
       "text": "💡 매칭 규칙 예시",
       "count": 1,
       "sample_lines": [
-        9693
+        9718
       ],
       "in_existing_en_dict": false
     },
@@ -17192,7 +17224,7 @@
       "text": "💡 비활성화",
       "count": 1,
       "sample_lines": [
-        13141
+        13166
       ],
       "in_existing_en_dict": false
     },
@@ -17208,7 +17240,7 @@
       "text": "💡 새 마켓플레이스 추가는 터미널에서",
       "count": 1,
       "sample_lines": [
-        10050
+        10075
       ],
       "in_existing_en_dict": false
     },
@@ -17216,7 +17248,7 @@
       "text": "💡 시크릿 형태(토큰/키) 값은 일부 마스킹됩니다.",
       "count": 1,
       "sample_lines": [
-        12923
+        12948
       ],
       "in_existing_en_dict": false
     },
@@ -17224,7 +17256,7 @@
       "text": "💡 팁",
       "count": 1,
       "sample_lines": [
-        10114
+        10139
       ],
       "in_existing_en_dict": false
     },
@@ -17240,7 +17272,7 @@
       "text": "💭 생각 중…",
       "count": 1,
       "sample_lines": [
-        15949
+        15974
       ],
       "in_existing_en_dict": false
     },
@@ -17248,7 +17280,7 @@
       "text": "💻 Claude Desktop 앱 MCP (claude_desktop_config.json)",
       "count": 1,
       "sample_lines": [
-        9827
+        9852
       ],
       "in_existing_en_dict": false
     },
@@ -17256,7 +17288,7 @@
       "text": "💻 활성 Claude Code 세션 (",
       "count": 1,
       "sample_lines": [
-        12974
+        12999
       ],
       "in_existing_en_dict": false
     },
@@ -17264,7 +17296,7 @@
       "text": "💾 권한 요약",
       "count": 1,
       "sample_lines": [
-        14777
+        14802
       ],
       "in_existing_en_dict": false
     },
@@ -17272,7 +17304,7 @@
       "text": "💾 이 내용으로 저장",
       "count": 1,
       "sample_lines": [
-        11290
+        11315
       ],
       "in_existing_en_dict": false
     },
@@ -17280,8 +17312,8 @@
       "text": "💾 저장",
       "count": 2,
       "sample_lines": [
-        10092,
-        10285
+        10117,
+        10310
       ],
       "in_existing_en_dict": false
     },
@@ -17289,9 +17321,9 @@
       "text": "💾 적용",
       "count": 3,
       "sample_lines": [
-        10235,
-        10259,
-        10264
+        10260,
+        10284,
+        10289
       ],
       "in_existing_en_dict": false
     },
@@ -17315,7 +17347,7 @@
       "text": "📁 최근 텔레메트리 파일",
       "count": 1,
       "sample_lines": [
-        13130
+        13155
       ],
       "in_existing_en_dict": false
     },
@@ -17323,7 +17355,7 @@
       "text": "📁 프로젝트 MCP (.mcp.json)",
       "count": 1,
       "sample_lines": [
-        9824
+        9849
       ],
       "in_existing_en_dict": false
     },
@@ -17331,7 +17363,7 @@
       "text": "📁 프로젝트별 토큰 TOP 20",
       "count": 1,
       "sample_lines": [
-        14383
+        14408
       ],
       "in_existing_en_dict": false
     },
@@ -17339,7 +17371,7 @@
       "text": "📂 정의 에이전트",
       "count": 1,
       "sample_lines": [
-        10526
+        10551
       ],
       "in_existing_en_dict": false
     },
@@ -17347,7 +17379,7 @@
       "text": "📂 폴더",
       "count": 1,
       "sample_lines": [
-        10374
+        10399
       ],
       "in_existing_en_dict": false
     },
@@ -17355,7 +17387,7 @@
       "text": "📂 프로젝트에 정의된 에이전트 (",
       "count": 1,
       "sample_lines": [
-        10406
+        10431
       ],
       "in_existing_en_dict": false
     },
@@ -17363,7 +17395,7 @@
       "text": "📈 일자별 토큰 (최근 60일)",
       "count": 1,
       "sample_lines": [
-        13366
+        13391
       ],
       "in_existing_en_dict": false
     },
@@ -17387,7 +17419,7 @@
       "text": "📊 상위 이벤트 타입",
       "count": 1,
       "sample_lines": [
-        13115
+        13140
       ],
       "in_existing_en_dict": false
     },
@@ -17395,7 +17427,7 @@
       "text": "📊 세션",
       "count": 1,
       "sample_lines": [
-        10524
+        10549
       ],
       "in_existing_en_dict": false
     },
@@ -17411,7 +17443,7 @@
       "text": "📋 복사",
       "count": 1,
       "sample_lines": [
-        10091
+        10116
       ],
       "in_existing_en_dict": false
     },
@@ -17419,7 +17451,7 @@
       "text": "📋 사용 가능 모델",
       "count": 1,
       "sample_lines": [
-        12948
+        12973
       ],
       "in_existing_en_dict": false
     },
@@ -17427,7 +17459,7 @@
       "text": "📋 상세",
       "count": 1,
       "sample_lines": [
-        10372
+        10397
       ],
       "in_existing_en_dict": false
     },
@@ -17435,7 +17467,7 @@
       "text": "📋 설치 spec 미리보기",
       "count": 1,
       "sample_lines": [
-        9886
+        9911
       ],
       "in_existing_en_dict": false
     },
@@ -17475,7 +17507,7 @@
       "text": "📌 수동 단계",
       "count": 1,
       "sample_lines": [
-        11188
+        11213
       ],
       "in_existing_en_dict": false
     },
@@ -17483,7 +17515,7 @@
       "text": "📐 5-축 점수 (계산식 + 실측)",
       "count": 1,
       "sample_lines": [
-        11240
+        11265
       ],
       "in_existing_en_dict": false
     },
@@ -17493,8 +17525,8 @@
       "sample_lines": [
         949,
         6034,
-        10009,
-        10093
+        10034,
+        10118
       ],
       "in_existing_en_dict": false
     },
@@ -17532,7 +17564,7 @@
       "text": "📜 프로젝트 CLAUDE.md",
       "count": 1,
       "sample_lines": [
-        10544
+        10569
       ],
       "in_existing_en_dict": false
     },
@@ -17546,7 +17578,7 @@
       "text": "📝 파일 편집",
       "count": 1,
       "sample_lines": [
-        11189
+        11214
       ],
       "in_existing_en_dict": false
     },
@@ -17554,7 +17586,7 @@
       "text": "📝 편집 & 저장",
       "count": 1,
       "sample_lines": [
-        10719
+        10744
       ],
       "in_existing_en_dict": false
     },
@@ -17578,7 +17610,7 @@
       "text": "📦 이 프로젝트의 에이전트 ·",
       "count": 1,
       "sample_lines": [
-        10940
+        10965
       ],
       "in_existing_en_dict": false
     },
@@ -17610,9 +17642,9 @@
       "text": "🔄 다른 계정으로 로그인",
       "count": 3,
       "sample_lines": [
-        15068,
-        15120,
-        15125
+        15093,
+        15145,
+        15150
       ],
       "in_existing_en_dict": false
     },
@@ -17620,7 +17652,7 @@
       "text": "🔄 다시 받기",
       "count": 1,
       "sample_lines": [
-        10699
+        10724
       ],
       "in_existing_en_dict": false
     },
@@ -17636,9 +17668,9 @@
       "text": "🔄 로그인 확인 중…",
       "count": 3,
       "sample_lines": [
-        15115,
-        15610,
-        15672
+        15140,
+        15635,
+        15697
       ],
       "in_existing_en_dict": false
     },
@@ -17662,7 +17694,7 @@
       "text": "🔄 진행 중",
       "count": 1,
       "sample_lines": [
-        14612
+        14637
       ],
       "in_existing_en_dict": false
     },
@@ -17681,7 +17713,7 @@
       "sample_lines": [
         6432,
         6812,
-        9427
+        9452
       ],
       "in_existing_en_dict": false
     },
@@ -17689,7 +17721,7 @@
       "text": "🔌 플러그인 제공 MCP",
       "count": 1,
       "sample_lines": [
-        9826
+        9851
       ],
       "in_existing_en_dict": false
     },
@@ -17697,7 +17729,7 @@
       "text": "🔌 플러그인 훅 수정 —",
       "count": 1,
       "sample_lines": [
-        9489
+        9514
       ],
       "in_existing_en_dict": false
     },
@@ -17705,7 +17737,7 @@
       "text": "🔍 검색",
       "count": 1,
       "sample_lines": [
-        16314
+        16339
       ],
       "in_existing_en_dict": false
     },
@@ -17713,7 +17745,7 @@
       "text": "🔍 꼼꼼하게 보고 있어요",
       "count": 1,
       "sample_lines": [
-        15950
+        15975
       ],
       "in_existing_en_dict": false
     },
@@ -17735,7 +17767,7 @@
       "text": "🔎 MCP 카탈로그 · 원클릭 설치",
       "count": 1,
       "sample_lines": [
-        9801
+        9826
       ],
       "in_existing_en_dict": false
     },
@@ -17743,7 +17775,7 @@
       "text": "🔐 인증 필요",
       "count": 1,
       "sample_lines": [
-        9947
+        9972
       ],
       "in_existing_en_dict": false
     },
@@ -17751,7 +17783,7 @@
       "text": "🔑 API 키 설정",
       "count": 1,
       "sample_lines": [
-        11592
+        11617
       ],
       "in_existing_en_dict": false
     },
@@ -17803,7 +17835,7 @@
       "text": "🔧 자동 교정",
       "count": 1,
       "sample_lines": [
-        9684
+        9709
       ],
       "in_existing_en_dict": false
     },
@@ -17827,7 +17859,7 @@
       "text": "🕒 세션 히스토리 (점수 포함)",
       "count": 1,
       "sample_lines": [
-        10553
+        10578
       ],
       "in_existing_en_dict": false
     },
@@ -17835,7 +17867,7 @@
       "text": "🕒 일자별 토큰 사용 (최근 30일)",
       "count": 1,
       "sample_lines": [
-        14337
+        14362
       ],
       "in_existing_en_dict": false
     },
@@ -17843,7 +17875,7 @@
       "text": "🖥 Claude Code 로컬 MCP (~/.claude.json)",
       "count": 1,
       "sample_lines": [
-        9823
+        9848
       ],
       "in_existing_en_dict": false
     },
@@ -17851,7 +17883,7 @@
       "text": "🖥 감지된 터미널 / IDE (텔레메트리 기반)",
       "count": 1,
       "sample_lines": [
-        12990
+        13015
       ],
       "in_existing_en_dict": false
     },
@@ -17859,7 +17891,7 @@
       "text": "🖥 디바이스",
       "count": 1,
       "sample_lines": [
-        14767
+        14792
       ],
       "in_existing_en_dict": false
     },
@@ -17867,7 +17899,7 @@
       "text": "🖥️ CLI 프로바이더 (로컬)",
       "count": 1,
       "sample_lines": [
-        11580
+        11605
       ],
       "in_existing_en_dict": false
     },
@@ -17875,7 +17907,7 @@
       "text": "🗂 ~/.claude.json 프로젝트 엔트리",
       "count": 1,
       "sample_lines": [
-        10552
+        10577
       ],
       "in_existing_en_dict": false
     },
@@ -17891,11 +17923,11 @@
       "text": "🚀 Claude 로그인",
       "count": 6,
       "sample_lines": [
-        14693,
-        14694,
-        14696,
-        15652,
-        15676
+        14718,
+        14719,
+        14721,
+        15677,
+        15701
       ],
       "in_existing_en_dict": false
     },
@@ -17911,7 +17943,7 @@
       "text": "🚀 거의 다!",
       "count": 1,
       "sample_lines": [
-        15950
+        15975
       ],
       "in_existing_en_dict": false
     },
@@ -17941,7 +17973,7 @@
       "text": "🚪 로그아웃만 하기",
       "count": 1,
       "sample_lines": [
-        15071
+        15096
       ],
       "in_existing_en_dict": false
     },
@@ -17949,7 +17981,7 @@
       "text": "🚫 차단 (deny)",
       "count": 1,
       "sample_lines": [
-        9690
+        9715
       ],
       "in_existing_en_dict": false
     },
@@ -17957,7 +17989,7 @@
       "text": "🚫 추가될 차단 (",
       "count": 1,
       "sample_lines": [
-        10216
+        10241
       ],
       "in_existing_en_dict": false
     },
@@ -17965,7 +17997,7 @@
       "text": "🛠 cost-tracker.log 도구 랭킹 (참고)",
       "count": 1,
       "sample_lines": [
-        14416
+        14441
       ],
       "in_existing_en_dict": false
     },
@@ -17974,7 +18006,7 @@
       "count": 2,
       "sample_lines": [
         6505,
-        10525
+        10550
       ],
       "in_existing_en_dict": false
     },
@@ -17990,7 +18022,7 @@
       "text": "🛠 도구별 토큰",
       "count": 1,
       "sample_lines": [
-        14346
+        14371
       ],
       "in_existing_en_dict": false
     },
@@ -18006,7 +18038,7 @@
       "text": "🛠 파일별 개선 추천 (",
       "count": 1,
       "sample_lines": [
-        11250
+        11275
       ],
       "in_existing_en_dict": false
     },
@@ -18026,7 +18058,7 @@
       "text": "🤔 좋은 답을 고르는 중…",
       "count": 1,
       "sample_lines": [
-        16127
+        16152
       ],
       "in_existing_en_dict": false
     },
@@ -18042,7 +18074,7 @@
       "text": "🤖 AI 에게 추천",
       "count": 1,
       "sample_lines": [
-        10284
+        10309
       ],
       "in_existing_en_dict": false
     },
@@ -18068,11 +18100,11 @@
       "text": "🤖 AI 추천",
       "count": 7,
       "sample_lines": [
-        9459,
-        9671,
-        9763,
-        10007,
-        10768
+        9484,
+        9696,
+        9788,
+        10032,
+        10793
       ],
       "in_existing_en_dict": false
     },
@@ -18080,7 +18112,7 @@
       "text": "🤖 Claude 가 제안한 개선안 ·",
       "count": 1,
       "sample_lines": [
-        10694
+        10719
       ],
       "in_existing_en_dict": false
     },
@@ -18088,7 +18120,7 @@
       "text": "🤖 Claude 기반 AI 추천 받기 (30~120초)",
       "count": 1,
       "sample_lines": [
-        10533
+        10558
       ],
       "in_existing_en_dict": false
     },
@@ -18096,7 +18128,7 @@
       "text": "🤖 Claude 에게 이 프로젝트 분석 요청 중…",
       "count": 1,
       "sample_lines": [
-        10637
+        10662
       ],
       "in_existing_en_dict": false
     },
@@ -18104,7 +18136,7 @@
       "text": "🤖 글로벌 CLAUDE.md 추천",
       "count": 1,
       "sample_lines": [
-        10321
+        10346
       ],
       "in_existing_en_dict": false
     },
@@ -18134,8 +18166,8 @@
       "text": "🤝 세션에서 위임된 서브에이전트 (Agent 도구 호출)",
       "count": 2,
       "sample_lines": [
-        10419,
-        10431
+        10444,
+        10456
       ],
       "in_existing_en_dict": false
     },
@@ -18151,7 +18183,7 @@
       "text": "🤝 에이전트별 토큰",
       "count": 1,
       "sample_lines": [
-        14363
+        14388
       ],
       "in_existing_en_dict": false
     },
@@ -18159,7 +18191,7 @@
       "text": "🤝 위임 호출",
       "count": 1,
       "sample_lines": [
-        10527
+        10552
       ],
       "in_existing_en_dict": false
     },
@@ -18167,8 +18199,8 @@
       "text": "🤝 프로젝트 에이전트",
       "count": 2,
       "sample_lines": [
-        10545,
-        10946
+        10570,
+        10971
       ],
       "in_existing_en_dict": false
     },
@@ -18184,7 +18216,7 @@
       "text": "🧠 모델별 사용량",
       "count": 1,
       "sample_lines": [
-        13373
+        13398
       ],
       "in_existing_en_dict": false
     },
@@ -18206,7 +18238,7 @@
       "text": "🧬 현재 Settings 키",
       "count": 1,
       "sample_lines": [
-        12941
+        12966
       ],
       "in_existing_en_dict": false
     },
@@ -18222,7 +18254,7 @@
       "text": "🪝 .claude/hooks 파일",
       "count": 1,
       "sample_lines": [
-        10548
+        10573
       ],
       "in_existing_en_dict": false
     }
