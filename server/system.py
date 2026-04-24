@@ -488,6 +488,58 @@ def api_metrics_summary() -> dict:
         "note": "토큰은 세션 DB (~/.claude/projects/*/*.jsonl 에서 파싱) 기반. 비용은 2025 공식 요금표 기반 추정.",
     }
 
+def api_backup_diff(query: dict) -> dict:
+    """v2.33.8 — backups / file-history 아래 파일 두 개(또는 백업 vs 현재)의 unified diff.
+
+    GET /api/backups/diff?a=<path>&b=<path>
+    두 경로 모두 ~/.claude/ 하위여야 함. 파일 크기 1MB 이하만 허용.
+    """
+    import difflib
+    import os
+    a = ((query.get("a", [""])[0] if isinstance(query.get("a"), list) else query.get("a", "")) or "").strip()
+    b = ((query.get("b", [""])[0] if isinstance(query.get("b"), list) else query.get("b", "")) or "").strip()
+    if not a or not b:
+        return {"ok": False, "error": "a and b required"}
+    claude_home_real = os.path.realpath(str(CLAUDE_HOME))
+    home_real = os.path.realpath(str(Path.home()))
+
+    def _allowed(p: str) -> bool:
+        try:
+            rp = os.path.realpath(p)
+        except Exception:
+            return False
+        return rp.startswith(claude_home_real + os.sep) or rp.startswith(home_real + os.sep)
+
+    if not _allowed(a) or not _allowed(b):
+        return {"ok": False, "error": "path outside allowed root"}
+    try:
+        sa = Path(a).stat(); sb = Path(b).stat()
+    except Exception as e:
+        return {"ok": False, "error": f"stat: {e}"}
+    max_bytes = 1024 * 1024
+    if sa.st_size > max_bytes or sb.st_size > max_bytes:
+        return {"ok": False, "error": "file too large (>1MB)"}
+    try:
+        ta = Path(a).read_text(encoding="utf-8", errors="replace").splitlines(keepends=False)
+        tb = Path(b).read_text(encoding="utf-8", errors="replace").splitlines(keepends=False)
+    except Exception as e:
+        return {"ok": False, "error": f"read: {e}"}
+    diff_lines = list(difflib.unified_diff(
+        ta, tb,
+        fromfile=Path(a).name,
+        tofile=Path(b).name,
+        lineterm="",
+        n=3,
+    ))
+    added = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
+    removed = sum(1 for l in diff_lines if l.startswith("-") and not l.startswith("---"))
+    return {
+        "ok": True, "diff": "\n".join(diff_lines),
+        "added": added, "removed": removed,
+        "aSize": sa.st_size, "bSize": sb.st_size,
+    }
+
+
 def api_backups_list() -> dict:
     def _list(root: Path, limit: int = 30):
         if not root.exists():

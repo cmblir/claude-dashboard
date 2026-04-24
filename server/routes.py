@@ -158,7 +158,7 @@ from .sessions import (
 )
 from .skills import get_skill, list_skills, put_skill
 from .system import (
-    api_backups_list, api_bash_history, api_env_config, api_homunculus_projects,
+    api_backup_diff, api_backups_list, api_bash_history, api_env_config, api_homunculus_projects,
     api_ide_status, api_memory_list, api_metrics_summary, api_model_config,
     api_output_style_delete, api_output_style_save, api_output_styles_list,
     api_plans_list, api_scheduled_tasks, api_statusline_info,
@@ -220,6 +220,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/plans/list": lambda q: api_plans_list(),
     "/api/metrics/summary": lambda q: api_metrics_summary(),
     "/api/backups/list": lambda q: api_backups_list(),
+    "/api/backups/diff": api_backup_diff,
     "/api/env/config": lambda q: api_env_config(),
     "/api/model/config": lambda q: api_model_config(),
     "/api/ide/status": lambda q: api_ide_status(),

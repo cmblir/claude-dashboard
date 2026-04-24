@@ -14503,35 +14503,88 @@ AFTER.metrics = () => {
 // ────────────────────────────────────────────────────────────────
 // BACKUPS / FILE HISTORY / SHELL SNAPSHOTS
 // ────────────────────────────────────────────────────────────────
+// v2.33.8 — backups 탭: 2개 파일 선택 → unified diff 모달
+state.data._bkSel = state.data._bkSel || [];
+function _bkToggleSel(path) {
+  const arr = state.data._bkSel;
+  const idx = arr.indexOf(path);
+  if (idx >= 0) arr.splice(idx, 1);
+  else { arr.push(path); if (arr.length > 2) arr.shift(); }
+  renderView();
+  if (arr.length === 2) _bkShowDiff(arr[0], arr[1]);
+}
+async function _bkShowDiff(a, b) {
+  showModalLoading(t('diff 계산 중…'));
+  try {
+    const qs = new URLSearchParams({ a, b });
+    const r = await api('/api/backups/diff?' + qs);
+    if (!r.ok) { closeModal(); toast(r.error || 'diff failed', 'err'); return; }
+    const esc = (s) => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    const colored = r.diff.split('\n').map(line => {
+      let color = 'var(--text-mute)';
+      if (line.startsWith('+++') || line.startsWith('---')) color = '#7dd3fc';
+      else if (line.startsWith('@@')) color = '#c4b5fd';
+      else if (line.startsWith('+')) color = '#4ade80';
+      else if (line.startsWith('-')) color = '#f87171';
+      return `<div style="color:${color}">${esc(line) || '&nbsp;'}</div>`;
+    }).join('');
+    showModal(`
+      <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+        <div>
+          <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${t('파일 비교')}</div>
+          <h2 class="text-lg font-bold">🔀 ${t('유니파이드 diff')}</h2>
+          <div class="text-[11px] text-[var(--text-mute)] mt-1">
+            <span class="text-[#4ade80]">+${r.added}</span>
+            · <span class="text-[#f87171]">-${r.removed}</span>
+            · ${formatBytes(r.aSize)} → ${formatBytes(r.bSize)}
+          </div>
+        </div>
+        <button class="btn-ghost btn" onclick="closeModal(); state.data._bkSel=[]; renderView();">✕</button>
+      </div>
+      <pre class="mono text-[11px] p-5" style="max-height:65vh; overflow:auto; white-space:pre; background:var(--code-bg);">${colored}</pre>
+    `);
+  } catch (e) { closeModal(); toast(String(e), 'err'); }
+}
+
 VIEWS.backups = async () => {
   const d = await api('/api/backups/list');
-  const renderGroup = (title, hint, data) => `
+  const sel = state.data._bkSel || [];
+  const renderGroup = (title, hint, data, compareable) => `
     <div class="card p-5 mb-4">
       <div class="flex items-center justify-between mb-3">
         <div>
           <h3 class="font-semibold text-sm">${title}</h3>
-          <p class="text-[11px] text-[var(--text-mute)] mt-0.5">${hint}</p>
+          <p class="text-[11px] text-[var(--text-mute)] mt-0.5">${hint}${compareable ? ` · <span class="text-[var(--accent)]">${t('파일 2개를 선택해 diff 비교')}</span>` : ''}</p>
         </div>
         <span class="chip">${data.items.length} / 전체 ${data.total||'—'}</span>
       </div>
       ${data.exists ? `
         <table class="data">
-          <thead><tr><th>이름</th><th class="text-right">크기</th><th class="text-right">수정</th></tr></thead>
+          <thead><tr>${compareable ? '<th></th>' : ''}<th>이름</th><th class="text-right">크기</th><th class="text-right">수정</th></tr></thead>
           <tbody>
-            ${data.items.map(x => `
-              <tr>
+            ${data.items.map(x => {
+              const isPicked = sel.includes(x.path);
+              const canPick = compareable && !x.isDir;
+              return `
+              <tr ${canPick ? `class="link-row" onclick="_bkToggleSel(${JSON.stringify(x.path).replace(/"/g,'&quot;')})"` : ''} style="${isPicked?'background:rgba(217,119,87,0.12);':''}">
+                ${compareable ? `<td style="width:30px;">${canPick ? (isPicked ? '✓' : '○') : ''}</td>` : ''}
                 <td class="mono text-xs truncate" style="max-width:420px;">${x.isDir?'📁 ':'📄 '}${escapeHtml(x.name)}</td>
                 <td class="text-right text-xs">${formatBytes(x.size)}</td>
                 <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(x.modifiedAt)}</td>
-              </tr>`).join('') || '<tr><td colspan="3" class="empty text-xs">없음</td></tr>'}
+              </tr>`;
+            }).join('') || `<tr><td colspan="${compareable?4:3}" class="empty text-xs">없음</td></tr>`}
           </tbody>
         </table>` : '<div class="empty text-xs">디렉토리 없음</div>'}
     </div>`;
+  const selHint = sel.length
+    ? `<div class="chip chip-accent mb-3">${t('선택됨')}: ${sel.length}/2 · <button class="btn-ghost text-[10px] ml-1" onclick="state.data._bkSel=[]; renderView();">✕</button></div>`
+    : '';
   return `
     ${viewHeader('백업 / 파일 히스토리', 'Claude Code 가 자동 생성하는 복구/롤백 데이터', 'backups')}
-    ${renderGroup('💾 Backups', '~/.claude/backups/ — 세션 자동 백업', d.backups)}
-    ${renderGroup('📝 File History', '~/.claude/file-history/<sessionId>/ — 세션 중 파일 편집 이력', d.fileHistory)}
-    ${renderGroup('🖥 Shell Snapshots', '~/.claude/shell-snapshots/ — Claude Code 가 덮어쓴 쉘 환경 스냅샷', d.shellSnapshots)}`;
+    ${selHint}
+    ${renderGroup('💾 Backups', '~/.claude/backups/ — 세션 자동 백업', d.backups, true)}
+    ${renderGroup('📝 File History', '~/.claude/file-history/<sessionId>/ — 세션 중 파일 편집 이력', d.fileHistory, false)}
+    ${renderGroup('🖥 Shell Snapshots', '~/.claude/shell-snapshots/ — Claude Code 가 덮어쓴 쉘 환경 스냅샷', d.shellSnapshots, true)}`;
 };
 function formatBytes(n) {
   if (!n) return '0';
