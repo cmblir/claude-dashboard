@@ -6091,16 +6091,67 @@ async function _wfShowRuns() {
       </div>
     </div>`;
   }).join('') : `<div class="empty card p-4">${t('실행 이력 없음')}</div>`;
+  // v2.33.8 — 최근 run 통계 스파크라인 (duration + 총 토큰)
+  const chartHtml = _wfBuildRunsChart(runs);
   showModal(`
     <div class="p-5">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold">📜 ${t('실행 이력')} — ${escapeHtml(__wf.current.name||'')}</h3>
         <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
       </div>
+      ${chartHtml}
       <div class="text-xs text-[var(--text-dim)] mb-2">${t('최근 50건. 클릭하면 상세 결과')}</div>
-      <div class="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">${rows}</div>
+      <div class="flex flex-col gap-2 max-h-[50vh] overflow-y-auto">${rows}</div>
     </div>
   `, { narrow: true });
+}
+
+// v2.33.8 — 워크플로우 최근 run 통계 스파크라인 (SVG)
+function _wfBuildRunsChart(runs) {
+  if (!runs || runs.length < 2) return '';
+  // 최신→과거 순서로 들어오므로 reverse
+  const ordered = [...runs].reverse();
+  const n = ordered.length;
+  const W = 560, H = 80, pad = 8;
+  const xStep = (W - pad * 2) / Math.max(1, n - 1);
+  const durVals = ordered.map(r => r.durationMs || 0);
+  const tokVals = ordered.map(r => {
+    const nr = r.nodeResults || {};
+    return Object.values(nr).reduce((sum, x) => sum + (x.tokens?.total || x.totalTokens || 0), 0);
+  });
+  const maxDur = Math.max(1, ...durVals);
+  const maxTok = Math.max(1, ...tokVals);
+  const durPath = durVals.map((v, i) => {
+    const x = pad + i * xStep;
+    const y = H - pad - (v / maxDur) * (H - pad * 2);
+    return `${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const tokPath = tokVals.map((v, i) => {
+    const x = pad + i * xStep;
+    const y = H - pad - (v / maxTok) * (H - pad * 2);
+    return `${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const statusDots = ordered.map((r, i) => {
+    const x = pad + i * xStep;
+    const color = r.status === 'ok' ? '#22c55e' : r.status === 'err' ? '#ef4444' : '#94a3b8';
+    return `<circle cx="${x.toFixed(1)}" cy="${H-pad+2}" r="2" fill="${color}"/>`;
+  }).join('');
+  return `
+    <div class="card p-2 mb-3">
+      <div class="flex items-center justify-between text-[10px] text-[var(--text-dim)] mb-1">
+        <span>${t('최근')} ${n} ${t('실행')}</span>
+        <span>
+          <span style="color:#d97757">●</span> ${t('지속시간')} max ${(maxDur/1000).toFixed(1)}s
+          <span style="color:#7dd3fc;margin-left:8px">●</span> ${t('토큰')} max ${maxTok.toLocaleString()}
+        </span>
+      </div>
+      <svg viewBox="0 0 ${W} ${H+6}" style="width:100%;height:${H+6}px;display:block;">
+        <path d="${durPath}" fill="none" stroke="#d97757" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <path d="${tokPath}" fill="none" stroke="#7dd3fc" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        ${statusDots}
+      </svg>
+    </div>
+  `;
 }
 
 async function _wfOpenRun(runId) {
