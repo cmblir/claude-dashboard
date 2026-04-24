@@ -7354,10 +7354,19 @@ function drawAgentGraph(g) {
     arrows: 'to', smooth: { type: 'continuous' },
     title: `${e.src} → ${String(e.dst).replace(/^tool:/,'')} : ${e.weight}회`,
   })));
+  // v2.33.6 — stabilization 가벼운 설정 + adaptiveTimestep 으로 20+ 노드에서도 1초 이내 정착
   const net = new vis.Network(container, { nodes, edges }, {
-    physics: { enabled: true, barnesHut: { gravitationalConstant: -3500, springLength: 120, springConstant: 0.04 }, stabilization: { iterations: 250, fit: true } },
+    physics: {
+      enabled: true,
+      solver: 'barnesHut',
+      barnesHut: { gravitationalConstant: -3000, springLength: 110, springConstant: 0.05, avoidOverlap: 0.2 },
+      stabilization: { iterations: 120, updateInterval: 25, onlyDynamicEdges: false, fit: true },
+      adaptiveTimestep: true,
+      timestep: 0.5,
+    },
     interaction: { hover: true, selectable: true, tooltipDelay: 120, zoomView: false, dragView: true, dragNodes: true, navigationButtons: false, keyboard: false },
-    edges: { scaling: { min: 1, max: 8 } },
+    edges: { scaling: { min: 1, max: 8 }, smooth: { enabled: true, type: 'continuous', roundness: 0.3 } },
+    nodes: { shapeProperties: { interpolation: false } },
   });
   container.style.cursor = 'pointer';
   net.once('stabilizationIterationsDone', () => {
