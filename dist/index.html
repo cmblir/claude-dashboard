@@ -6899,15 +6899,29 @@ AFTER.analytics = () => {
 // SESSIONS
 // ────────────────────────────────────────────────────────────────
 VIEWS.sessions = async () => {
-  const q = state.data.sessionsFilter || { q: '', sort: 'recent' };
+  const q = state.data.sessionsFilter || { q: '', sort: 'recent', project: '', minScore: 0, errorsOnly: false };
   const params = new URLSearchParams({ limit: 100, q: q.q, sort: q.sort });
   const res = await api('/api/sessions/list?' + params);
-  state.data.sessions = res;
+  // v2.33.7 — 클라이언트 측 프로젝트 / 스코어 / 오류 필터
+  const allSessions = res.sessions || [];
+  const projects = {};
+  for (const s of allSessions) {
+    const p = s.project || '—';
+    projects[p] = (projects[p] || 0) + 1;
+  }
+  const topProjects = Object.entries(projects).sort((a,b) => b[1]-a[1]).slice(0, 6);
+  const filtered = allSessions.filter(s => {
+    if (q.project && (s.project || '—') !== q.project) return false;
+    if (q.minScore && (s.score || 0) < q.minScore) return false;
+    if (q.errorsOnly && !(s.error_count > 0)) return false;
+    return true;
+  });
+  state.data.sessions = { ...res, sessions: filtered, _rawTotal: allSessions.length };
   return `
     <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">세션 히스토리</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">총 ${res.total}개 세션. 행을 클릭하면 상세 타임라인.</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">총 ${res.total}개 세션 중 ${filtered.length}개 표시. 행을 클릭하면 상세 타임라인.</p>
       </div>
       <div class="flex gap-2">
         <input id="sessQ" class="input max-w-[300px]" placeholder="요청/프로젝트/세션ID 검색…" value="${escapeHtml(q.q)}" />
@@ -6920,6 +6934,15 @@ VIEWS.sessions = async () => {
           <option value="duration" ${q.sort==='duration'?'selected':''}>지속시간순</option>
         </select>
       </div>
+    </div>
+
+    <div class="card p-3 mb-4 flex flex-wrap items-center gap-2">
+      <span class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mr-1">${t('프로젝트')}</span>
+      <button class="chip ${!q.project?'chip-accent':''}" onclick="_sessSet('project','')">${t('전체')} ${allSessions.length}</button>
+      ${topProjects.map(([p,n]) => `<button class="chip ${p===q.project?'chip-accent':''}" onclick="_sessSet('project', ${JSON.stringify(p).replace(/"/g,'&quot;')})">${escapeHtml(p)} ${n}</button>`).join('')}
+      <span class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mx-1 ml-3">${t('스코어')}</span>
+      ${[0, 40, 60, 80].map(n => `<button class="chip ${q.minScore===n?'chip-accent':''}" onclick="_sessSet('minScore', ${n})">${n===0?t('전체'):'≥'+n}</button>`).join('')}
+      <label class="chip cursor-pointer ${q.errorsOnly?'chip-err':''}" onclick="_sessSet('errorsOnly', !state.data.sessionsFilter.errorsOnly)">${q.errorsOnly?'✓':''} ${t('오류만')}</label>
     </div>
 
     <div class="card overflow-hidden">
@@ -6937,7 +6960,7 @@ VIEWS.sessions = async () => {
           <th class="text-right">시작</th>
         </tr></thead>
         <tbody>
-        ${res.sessions.map(s => `
+        ${filtered.map(s => `
           <tr class="link-row" onclick="openSessionDetail('${s.session_id}')">
             <td>
               <div class="inline-flex items-center justify-center w-10 h-8 rounded-lg mono font-bold"
@@ -6971,15 +6994,23 @@ AFTER.sessions = () => {
   qInput.addEventListener('input', e => {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
-      state.data.sessionsFilter = { q: e.target.value, sort: sortInput.value };
-      renderView();
+      _sessSet('q', e.target.value);
     }, 250);
   });
   sortInput.addEventListener('change', () => {
-    state.data.sessionsFilter = { q: qInput.value, sort: sortInput.value };
-    renderView();
+    _sessSet('sort', sortInput.value);
   });
 };
+// v2.33.7 — 부분 업데이트 헬퍼
+function _sessSet(key, value) {
+  state.data.sessionsFilter = Object.assign(
+    { q: '', sort: 'recent', project: '', minScore: 0, errorsOnly: false },
+    state.data.sessionsFilter || {},
+    { [key]: value },
+  );
+  renderView();
+}
+window._sessSet = _sessSet;
 
 async function openSessionDetail(sessionId) {
   showModalLoading(t('세션 불러오는 중…'));
