@@ -10,6 +10,34 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.34.2] — 2026-04-26
+
+### 🌐 v2.34 신규 기능 영어 / 중국어 번역
+
+v2.34.0~1 에서 추가된 한국어 문자열들이 EN / ZH locale 에 누락 → 영어/중국어 모드에서 한국어가 그대로 노출되던 문제 해결.
+
+**변경**:
+- `tools/translations_manual_10.py` 신규 — Crew Wizard, 팔레트 카테고리, slack_approval / obsidian_log 노드, 가이드 모달, WF_NODE_TYPES 다중 문장 desc 등 ~210 키 EN + ZH 번역 추가
+- `tools/translations_manual.py` — `_NEW_EN_10` / `_NEW_ZH_10` 병합 후크 추가
+- `dist/locales/{en,zh,ko}.json` 재생성 — 누락 0건
+- `dist/index.html` — `_wfPickNodeType()` 가 노드 타입 라벨을 자동 채울 때 `t()` 적용 (이전엔 한국어 라벨이 EN/ZH 모드에서도 그대로 채워짐)
+
+**번역 카테고리 매핑**:
+| KO | EN | ZH |
+|---|---|---|
+| 트리거 | Trigger | 触发器 |
+| AI 작업 | AI work | AI 工作 |
+| 흐름 제어 | Flow control | 流程控制 |
+| 데이터 / HTTP | Data / HTTP | 数据 / HTTP |
+| 연동 | Integrations | 集成 |
+| 출력 | Output | 输出 |
+
+**검증**:
+- `python3 build_locales.py` — Missing EN/ZH = 0
+- Playwright QA — EN/ZH 모드에서 위저드 4 스텝 + 가이드 모달 + 팔레트 6 카테고리 + slack_approval/obsidian_log 행 선택 → 한국어 누출 0 (EN), 사전 존재하는 헤더 CLI 상태 표시 2 (ZH; v2.34 무관, MutationObserver 타이밍 이슈)
+- 라이브 스크린샷 확인 — EN 위저드 스텝 4, ZH 가이드 모달, ZH 팔레트 모두 깔끔하게 번역됨
+
+---
 ## [2.34.1] — 2026-04-26
 
 ### 🚨 작은 화면 사이드바 백드롭 긴급 패치 + 워크플로우 팔레트 n8n 식 재설계 + 위저드 가이드
