@@ -12,7 +12,7 @@ _Don't memorize 50+ CLI commands. Just click._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.33.2-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.34.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-architecture)
 
 </div>
@@ -27,6 +27,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 | ver | highlight |
 |---|---|
+| **v2.34.0** | 🧑‍✈️ **Crew Wizard** — Zapier-style 4-step form scaffolds Planner + Personas + Slack approval + Obsidian log in one click. New `slack_approval` (Slack Web API admin gate) and `obsidian_log` workflow nodes. |
 | **v2.33.2** | 🔌 ECC plugin **full auto-install** via `claude plugin install` — one click from Guide & Tools |
 | **v2.33.1** | 🧰 Guide toolkit manager (ECC + CCB install/remove) · flyout viewport fix · first-visit-only login gate |
 | **v2.33.0** | 🎨 Artifacts Viewer — 4-layer safe preview (sandbox + CSP + postMessage + static filter) |
@@ -46,7 +47,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.33.2 🇺🇸│
+│  💤  LazyClaude                                     v2.34.0 🇺🇸│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 New │   🔀 Workflows                                         │
 │ 🏠 Main│   ┌──────┐      ┌──────┐      ┌──────┐                │
@@ -176,9 +177,17 @@ API keys can also be saved via the `🧠 AI Providers` tab — stored in `~/.cla
 
 ## ✨ Features
 
+### 🧑‍✈️ Crew Wizard — Zapier-style scaffolder (v2.34)
+
+- **4-step form** in the `Crew Wizard` tab → planner + personas + Slack approval + Obsidian log workflow built in one click
+- **3 autonomy modes** — `admin_gate` (Slack waits for ✅/❌), `autonomous` (short timeout, agent decides), `no_slack` (pure local crew)
+- **Free-form Slack reply** during a cycle is fed back into the planner as the next step's input — admin can steer mid-flight
+- **Obsidian log node** appends each cycle's report to `<vault>/Projects/<project>/logs/YYYY-MM-DD.md`
+- The generated workflow is just a regular workflow — open it in the canvas and edit freely
+
 ### 🔀 Workflow Engine (n8n-style DAG)
 
-- **16 node types**: `start` · `session` · `subagent` · `aggregate` · `branch` · `output` · `http` · `transform` · `variable` · `subworkflow` · `embedding` · `loop` · `retry` · `error_handler` · `merge` · `delay`
+- **18 node types**: `start` · `session` · `subagent` · `aggregate` · `branch` · `output` · `http` · `transform` · `variable` · `subworkflow` · `embedding` · `loop` · `retry` · `error_handler` · `merge` · `delay` · `slack_approval` · `obsidian_log`
 - **Parallel execution** via topological levels + ThreadPoolExecutor
 - **SSE streaming** for live node progress
 - **🔁 Repeat** — max iterations · interval · schedule window (`HH:MM~HH:MM`) · feedback-note injection
@@ -312,7 +321,7 @@ Atomic writes via `server/utils.py::_safe_write` (`.tmp → rename`), threading 
 
 ---
 
-## 🔢 Stats (v2.33.2)
+## 🔢 Stats (v2.34.0)
 
 | Metric | Value |
 |---|---|

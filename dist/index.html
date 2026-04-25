@@ -1049,6 +1049,9 @@ const NAV = [
   { id: 'sessions',    icon: '🗂️', label: '세션 히스토리',      group: 'main', docUrl: DOCS_BASE+'interactive-mode' },
 
   // build — 워크플로우/에이전트/프롬프트 (8)
+  { id: 'crewWizard',  icon: '🧑‍✈️', label: '크루 위저드', group: 'build',
+    desc: '폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 자동 생성',
+    docUrl: null },
   { id: 'workflows',   icon: '🔀', label: '워크플로우', group: 'build',
     desc: '세션 노드를 DAG 로 연결해 업무 흐름 설계' },
   { id: 'promptLibrary', icon: '📝', label: '프롬프트 라이브러리', group: 'build',
@@ -2313,6 +2316,10 @@ const WF_NODE_TYPES = [
     desc: '여러 병렬 경로를 합류. all/any/count 모드' },
   { id: 'delay', icon: '⏱️', label: '딜레이', portIn: true, portOut: true,
     desc: '지정 시간 대기 후 통과. 고정/랜덤 딜레이' },
+  { id: 'slack_approval', icon: '🛂', label: 'Slack 어드민 게이트', portIn: true, portOut: true,
+    desc: 'Slack 채널에 메시지를 올리고 ✅/❌ 반응 또는 스레드 답장을 기다림. 타임아웃 시 자동 통과/거부/중단/기본값 중 선택. 자율모드에서 어드민 개입 지점.' },
+  { id: 'obsidian_log', icon: '📝', label: 'Obsidian 기록', portIn: true, portOut: true,
+    desc: 'Vault 의 Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 입력을 마크다운으로 append. 사이클 보고/감사 로그용.' },
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 
@@ -2461,8 +2468,13 @@ AFTER.workflows = async () => {
   if (se) se.oninput = (e) => { __wf.search = e.target.value.toLowerCase(); _wfRenderList(); };
   // 캔버스 이벤트 바인딩
   _wfBindCanvas();
-  // current 자동 선택
-  if (!__wf.current && __wf.workflows.length) {
+  // 위저드 → 신규 워크플로우 자동 오픈 (one-shot)
+  let pendingOpenId = '';
+  try { pendingOpenId = localStorage.getItem('__wf_open_id') || ''; } catch(_){}
+  if (pendingOpenId && __wf.workflows.find(w => w.id === pendingOpenId)) {
+    try { localStorage.removeItem('__wf_open_id'); } catch(_){}
+    await _wfOpen(pendingOpenId);
+  } else if (!__wf.current && __wf.workflows.length) {
     await _wfOpen(__wf.workflows[0].id);
   } else if (__wf.current) {
     _wfRenderCanvas();
@@ -2470,6 +2482,400 @@ AFTER.workflows = async () => {
     _wfUpdateToolbar();
   }
 };
+
+// ──────────────────────────────────────────────────────────────────
+// Crew Wizard — Zapier-style step form that scaffolds a Planner +
+// Personas + Slack approval + Obsidian log workflow in one click.
+// Lives in the same module so we share _wfLoadProviders() and the
+// existing palette helpers.
+// ──────────────────────────────────────────────────────────────────
+
+const __cw = {
+  step: 1,
+  form: {
+    project:  '',
+    goal:     '',
+    plannerModel: 'claude:opus',
+    personas: [
+      { role: 'Researcher', model: 'claude:sonnet', focus: '' },
+      { role: 'Builder',    model: 'gemini:gemini-2.5-pro', focus: '' },
+      { role: 'Reviewer',   model: 'ollama:llama3.1', focus: '' },
+    ],
+    autonomy:            'admin_gate',
+    slackChannel:        '',
+    slackTimeoutSeconds: 300,
+    vaultPath:           '~/ObsidianVault',
+    maxIterations:       3,
+    feedbackNote:        '',
+    cwd:                 '',
+  },
+  slackStatus: null,
+  lastResult:  null,
+};
+
+// Thin wrapper so the wizard can call POST endpoints with a plain JSON body.
+async function _cwApi(path, body) {
+  if (body === undefined) return api(path);
+  return api(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+VIEWS.crewWizard = async () => {
+  await _wfLoadProviders();
+  let slack = { configured: false };
+  try { slack = await api('/api/slack/config'); } catch(e) {}
+  __cw.slackStatus = slack;
+  return `
+    ${viewHeader('🧑‍✈️ 크루 위저드',
+       '폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 자동 생성. 워크플로우 탭에서 그대로 캔버스 편집 가능.', 'crewWizard')}
+    <div id="cwRoot" style="display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start;">
+      <div class="card" style="padding:18px;min-width:0;">
+        <div id="cwSteps" class="flex items-center gap-2 text-xs mb-4" style="flex-wrap:wrap;">
+          ${[1,2,3,4].map(s => `
+            <div class="cw-step" data-step="${s}" style="display:flex;align-items:center;gap:6px;">
+              <span class="cw-bullet" style="width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--bg-soft);">${s}</span>
+              <span class="cw-label">${['프로젝트','페르소나','Slack & Obsidian','자율성'][s-1]}</span>
+              ${s<4?'<span style="opacity:.4;">›</span>':''}
+            </div>
+          `).join('')}
+        </div>
+        <div id="cwBody"></div>
+        <div class="flex items-center justify-between gap-2 mt-4 pt-3" style="border-top:1px solid var(--border);">
+          <button id="cwPrev" class="btn">← ${t('이전')}</button>
+          <div class="flex gap-2">
+            <button id="cwPreview" class="btn">${t('미리보기')}</button>
+            <button id="cwNext" class="btn-primary btn">${t('다음')} →</button>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="padding:14px 16px;">
+        <div class="text-xs font-semibold mb-2" style="color:var(--text-dim);">${t('생성 미리보기')}</div>
+        <div id="cwPreviewBody" class="text-[12px]" style="color:var(--text);line-height:1.6;">
+          ${t('아직 미리보기를 생성하지 않았습니다.')}
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+AFTER.crewWizard = () => {
+  _cwRenderBody();
+  _cwBindFooter();
+};
+
+function _cwBindFooter() {
+  const prev = document.getElementById('cwPrev');
+  const next = document.getElementById('cwNext');
+  const prev2 = document.getElementById('cwPreview');
+  if (prev) prev.onclick = () => { if (__cw.step > 1) { __cw.step--; _cwRenderBody(); _cwUpdateStepBadges(); } };
+  if (next) next.onclick = async () => {
+    if (__cw.step < 4) {
+      __cw.step++;
+      _cwRenderBody();
+      _cwUpdateStepBadges();
+    } else {
+      await _cwSubmit();
+    }
+  };
+  if (prev2) prev2.onclick = _cwPreview;
+  _cwUpdateStepBadges();
+}
+
+function _cwUpdateStepBadges() {
+  document.querySelectorAll('.cw-step').forEach(el => {
+    const s = +el.dataset.step;
+    const b = el.querySelector('.cw-bullet');
+    if (!b) return;
+    if (s === __cw.step) { b.style.background = 'var(--cyan)'; b.style.color = '#000'; b.style.borderColor = 'var(--cyan)'; }
+    else if (s < __cw.step) { b.style.background = 'var(--bg-soft)'; b.style.color = 'var(--cyan)'; b.style.borderColor = 'var(--cyan)'; }
+    else { b.style.background = 'var(--bg-soft)'; b.style.color = 'var(--text-dim)'; b.style.borderColor = 'var(--border)'; }
+  });
+  const btn = document.getElementById('cwNext');
+  if (btn) btn.textContent = (__cw.step === 4 ? '🚀 ' + t('워크플로우 생성') : t('다음') + ' →');
+}
+
+function _cwRenderBody() {
+  const host = document.getElementById('cwBody');
+  if (!host) return;
+  if (__cw.step === 1)      host.innerHTML = _cwStep1();
+  else if (__cw.step === 2) host.innerHTML = _cwStep2();
+  else if (__cw.step === 3) host.innerHTML = _cwStep3();
+  else                       host.innerHTML = _cwStep4();
+  _cwBindStepInputs();
+}
+
+function _cwStep1() {
+  const f = __cw.form;
+  return `
+    <div class="grid gap-3">
+      <label class="block">
+        <div class="text-xs font-semibold mb-1">${t('프로젝트 이름')} <span style="color:#ef4444;">*</span></div>
+        <input id="cw_project" class="input w-full" placeholder="예: weekly-report" value="${escapeHtml(f.project)}">
+        <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('영문/숫자/공백/_-./ 만 허용 — Obsidian 폴더와 워크플로우 이름에 그대로 사용됩니다.')}</div>
+      </label>
+      <label class="block">
+        <div class="text-xs font-semibold mb-1">${t('목표 (Planner 가 받는 첫 입력)')}</div>
+        <textarea id="cw_goal" class="input w-full" rows="3" placeholder="예: 다음주까지 신제품 출시 가이드를 작성한다 — 시장조사·초안·리뷰까지">${escapeHtml(f.goal)}</textarea>
+      </label>
+      <label class="block">
+        <div class="text-xs font-semibold mb-1">${t('Planner 모델')}</div>
+        <select id="cw_planner" class="input w-full">${_wfAssigneeOptions(f.plannerModel)}</select>
+        <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('전체 사이클을 지휘하는 두뇌 — Opus 등 가장 깊이 있는 모델 권장.')}</div>
+      </label>
+      <label class="block">
+        <div class="text-xs font-semibold mb-1">${t('작업 디렉터리 (선택)')}</div>
+        <input id="cw_cwd" class="input w-full" placeholder="~/projects/my-project" value="${escapeHtml(f.cwd)}">
+      </label>
+    </div>
+  `;
+}
+
+function _cwStep2() {
+  const f = __cw.form;
+  const rows = f.personas.map((p, i) => `
+    <div class="cw-persona" data-idx="${i}" style="border:1px solid var(--border);border-radius:8px;padding:10px;display:grid;grid-template-columns:140px 1fr 1fr 28px;gap:8px;align-items:end;">
+      <label class="block">
+        <div class="text-[11px] font-semibold mb-1">${t('역할')}</div>
+        <input class="input w-full cw_p_role" placeholder="Researcher" value="${escapeHtml(p.role||'')}">
+      </label>
+      <label class="block">
+        <div class="text-[11px] font-semibold mb-1">${t('모델')}</div>
+        <select class="input w-full cw_p_model">${_wfAssigneeOptions(p.model)}</select>
+      </label>
+      <label class="block">
+        <div class="text-[11px] font-semibold mb-1">${t('중점 영역 (선택)')}</div>
+        <input class="input w-full cw_p_focus" placeholder="시장조사" value="${escapeHtml(p.focus||'')}">
+      </label>
+      <button class="btn text-sm cw_p_del" title="${t('제거')}" style="height:30px;">✕</button>
+    </div>
+  `).join('');
+  return `
+    <div class="grid gap-3">
+      <div class="text-xs" style="color:var(--text-dim);">${t('1~8명. 같은 역할이라도 모델이 다르면 별도 페르소나로 등록 가능 — Claude · Gemini · Ollama 자유 조합.')}</div>
+      <div id="cw_personas" class="grid gap-2">${rows}</div>
+      <button id="cw_addPersona" class="btn text-sm" style="justify-self:start;">＋ ${t('페르소나 추가')}</button>
+    </div>
+  `;
+}
+
+function _cwStep3() {
+  const f = __cw.form;
+  const slack = __cw.slackStatus || { configured: false };
+  return `
+    <div class="grid gap-4">
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <div class="text-xs font-semibold">🛂 Slack ${t('어드민 게이트')}</div>
+          <div class="text-[11px]" style="color:${slack.configured?'#22c55e':'#ef4444'};">
+            ${slack.configured ? `${t('연결됨')} · ${escapeHtml(slack.tokenHint||'')}` : t('미설정')}
+          </div>
+        </div>
+        ${slack.configured ? '' : `
+          <div class="text-[11px] mb-2" style="color:var(--text-dim);">${t('Slack Bot Token (xoxb-…) 이 필요합니다. https://api.slack.com/apps 에서 봇을 만들고 chat:write, reactions:read, channels:history 권한을 부여하세요.')}</div>
+          <div class="grid gap-2 mb-2" style="grid-template-columns:1fr 1fr auto;">
+            <input id="cw_slack_token" class="input" placeholder="xoxb-…">
+            <input id="cw_slack_default" class="input" placeholder="${t('기본 채널 (예: C012345)')}" value="${escapeHtml(f.slackChannel)}">
+            <button id="cw_slack_save" class="btn">${t('저장 + 검증')}</button>
+          </div>
+        `}
+        <div class="grid gap-2" style="grid-template-columns:1fr auto;">
+          <input id="cw_slack_channel" class="input" placeholder="${t('이 워크플로우에서 사용할 채널 ID (선택, 비우면 기본 채널 사용)')}" value="${escapeHtml(f.slackChannel)}">
+          <button id="cw_slack_test" class="btn" ${slack.configured?'':'disabled'}>${t('테스트 메시지')}</button>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <div class="text-xs font-semibold mb-2">📝 Obsidian ${t('기록')}</div>
+        <div class="grid gap-2" style="grid-template-columns:1fr auto;">
+          <input id="cw_vault" class="input" placeholder="~/ObsidianVault" value="${escapeHtml(f.vaultPath)}">
+          <button id="cw_vault_test" class="btn">${t('경로 테스트')}</button>
+        </div>
+        <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 사이클별로 append 됩니다. $HOME 하위만 허용.')}</div>
+      </div>
+    </div>
+  `;
+}
+
+function _cwStep4() {
+  const f = __cw.form;
+  return `
+    <div class="grid gap-4">
+      <div>
+        <div class="text-xs font-semibold mb-2">${t('자율성 모드')}</div>
+        <div class="grid gap-2">
+          ${[
+            ['admin_gate', '🛂 어드민 게이트', '매 사이클마다 Slack 으로 보고하고 어드민이 승인할 때까지 대기. 타임아웃 시 흐름 중단.'],
+            ['autonomous', '🤖 자율 모드', 'Slack 으로 상태 알림은 보내지만 짧은 타임아웃 후 스스로 판단해 다음 사이클 진행. 어드민이 끼어들고 싶을 때만 답장하면 됨.'],
+            ['no_slack',   '🔕 Slack 없음', 'Slack 노드를 빼고 페르소나 → Aggregate → Obsidian → 다음 사이클로 바로 흐름.']
+          ].map(([v, label, desc]) => `
+            <label class="cw-radio" style="display:flex;gap:10px;align-items:flex-start;border:1px solid ${f.autonomy===v?'var(--cyan)':'var(--border)'};border-radius:8px;padding:10px;cursor:pointer;">
+              <input type="radio" name="cw_autonomy" value="${v}" ${f.autonomy===v?'checked':''}>
+              <div>
+                <div class="text-sm font-semibold">${label}</div>
+                <div class="text-[11px]" style="color:var(--text-dim);">${desc}</div>
+              </div>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="grid gap-3" style="grid-template-columns:1fr 1fr;">
+        <label class="block">
+          <div class="text-xs font-semibold mb-1">${t('최대 사이클 수')}</div>
+          <input id="cw_iter" type="number" min="1" max="20" class="input w-full" value="${f.maxIterations}">
+          <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('1=한번만, 3~5 권장. 매 사이클마다 기획자에게 직전 보고가 다시 주입됩니다.')}</div>
+        </label>
+        <label class="block">
+          <div class="text-xs font-semibold mb-1">${t('Slack 응답 대기 (초)')}</div>
+          <input id="cw_slack_to" type="number" min="5" max="14400" class="input w-full" value="${f.slackTimeoutSeconds}">
+        </label>
+      </div>
+
+      <label class="block">
+        <div class="text-xs font-semibold mb-1">${t('루프 피드백 노트 (선택)')}</div>
+        <textarea id="cw_feedback" class="input w-full" rows="3" placeholder="${t('비워두면 기본값 사용: \"이전 사이클 보고를 검토하고 미해결 항목을 우선 처리…\"')}">${escapeHtml(f.feedbackNote||'')}</textarea>
+      </label>
+    </div>
+  `;
+}
+
+function _cwBindStepInputs() {
+  const f = __cw.form;
+  const get = id => document.getElementById(id);
+
+  if (__cw.step === 1) {
+    if (get('cw_project')) get('cw_project').oninput  = e => f.project = e.target.value;
+    if (get('cw_goal'))    get('cw_goal').oninput     = e => f.goal = e.target.value;
+    if (get('cw_planner')) get('cw_planner').onchange = e => f.plannerModel = e.target.value;
+    if (get('cw_cwd'))     get('cw_cwd').oninput      = e => f.cwd = e.target.value;
+  }
+  if (__cw.step === 2) {
+    document.querySelectorAll('.cw-persona').forEach(row => {
+      const i = +row.dataset.idx;
+      const r = row.querySelector('.cw_p_role');
+      const m = row.querySelector('.cw_p_model');
+      const fc= row.querySelector('.cw_p_focus');
+      const dl= row.querySelector('.cw_p_del');
+      if (r)  r.oninput  = e => f.personas[i].role = e.target.value;
+      if (m)  m.onchange = e => f.personas[i].model = e.target.value;
+      if (fc) fc.oninput = e => f.personas[i].focus = e.target.value;
+      if (dl) dl.onclick = () => {
+        if (f.personas.length <= 1) { toast(t('최소 1명은 필요합니다'), 'warn'); return; }
+        f.personas.splice(i, 1); _cwRenderBody();
+      };
+    });
+    const add = get('cw_addPersona');
+    if (add) add.onclick = () => {
+      if (f.personas.length >= 8) { toast(t('최대 8명까지'), 'warn'); return; }
+      f.personas.push({ role: 'Specialist', model: 'claude:sonnet', focus: '' });
+      _cwRenderBody();
+    };
+  }
+  if (__cw.step === 3) {
+    if (get('cw_slack_channel')) get('cw_slack_channel').oninput = e => f.slackChannel = e.target.value.trim();
+    if (get('cw_slack_default')) get('cw_slack_default').oninput = e => f.slackChannel = e.target.value.trim();
+    if (get('cw_vault'))         get('cw_vault').oninput         = e => f.vaultPath = e.target.value.trim();
+
+    const saveBtn = get('cw_slack_save');
+    if (saveBtn) saveBtn.onclick = async () => {
+      const tok = (get('cw_slack_token')||{}).value || '';
+      const ch  = (get('cw_slack_default')||{}).value || '';
+      saveBtn.disabled = true; saveBtn.textContent = '...';
+      try {
+        const r = await _cwApi('/api/slack/config/save', { token: tok.trim(), defaultChannel: ch.trim() });
+        if (r.ok) {
+          toast(t('Slack 토큰 저장 + 검증 성공'), 'ok');
+          __cw.slackStatus = { configured: true, tokenHint: tok.slice(0,6)+'...' };
+          _cwRenderBody();
+        } else {
+          toast(t('실패: ') + (r.error || ''), 'error');
+        }
+      } finally { saveBtn.disabled = false; saveBtn.textContent = t('저장 + 검증'); }
+    };
+    const testBtn = get('cw_slack_test');
+    if (testBtn) testBtn.onclick = async () => {
+      const ch = (get('cw_slack_channel')||{}).value || f.slackChannel;
+      testBtn.disabled = true;
+      try {
+        const r = await _cwApi('/api/slack/test', { channel: ch, text: 'LazyClaude · Crew Wizard 연결 테스트' });
+        if (r.ok) toast(t('Slack 인증 OK') + (r.postedTo?` · ${t('메시지 전송')}: ${r.postedTo}`:''), 'ok');
+        else      toast(t('Slack 실패: ') + (r.error||''), 'error');
+      } finally { testBtn.disabled = false; }
+    };
+    const vTest = get('cw_vault_test');
+    if (vTest) vTest.onclick = async () => {
+      const v = (get('cw_vault')||{}).value || f.vaultPath;
+      vTest.disabled = true;
+      try {
+        const r = await _cwApi('/api/obsidian/test', { vaultPath: v.trim(), project: 'lazyclaude-wizard-probe' });
+        if (r.ok) toast(t('Obsidian 쓰기 성공: ') + r.path, 'ok');
+        else      toast(t('Obsidian 실패: ') + (r.error||''), 'error');
+      } finally { vTest.disabled = false; }
+    };
+  }
+  if (__cw.step === 4) {
+    document.querySelectorAll('input[name="cw_autonomy"]').forEach(el => {
+      el.onchange = e => { f.autonomy = e.target.value; _cwRenderBody(); };
+    });
+    if (get('cw_iter'))     get('cw_iter').oninput     = e => f.maxIterations = Math.max(1, Math.min(20, +e.target.value || 1));
+    if (get('cw_slack_to')) get('cw_slack_to').oninput = e => f.slackTimeoutSeconds = Math.max(5, Math.min(14400, +e.target.value || 60));
+    if (get('cw_feedback')) get('cw_feedback').oninput = e => f.feedbackNote = e.target.value;
+  }
+}
+
+async function _cwPreview() {
+  const f = __cw.form;
+  const host = document.getElementById('cwPreviewBody');
+  if (host) host.innerHTML = `<div class="text-[11px]" style="color:var(--text-dim);">${t('미리보기 생성 중…')}</div>`;
+  try {
+    const r = await _cwApi('/api/wizard/crew/preview', f);
+    if (!r.ok) {
+      if (host) host.innerHTML = `<div class="text-[12px]" style="color:#ef4444;">${escapeHtml(r.error||'')}</div>`;
+      return;
+    }
+    const p = r.preview;
+    if (host) {
+      host.innerHTML = `
+        <div><b>${escapeHtml(p.name)}</b></div>
+        <div class="mt-2 text-[11px]" style="color:var(--text-dim);">
+          ${p.nodes.length} ${t('노드')} · ${p.edges.length} ${t('연결')} · ${p.repeat.maxIterations} ${t('사이클')}
+        </div>
+        <ol class="mt-3 text-[11px]" style="padding-left:18px;line-height:1.7;">
+          ${p.nodes.map(n => `<li><code>${escapeHtml(n.type)}</code> — ${escapeHtml(n.title||'')}</li>`).join('')}
+        </ol>
+      `;
+    }
+  } catch(e) {
+    if (host) host.innerHTML = `<div style="color:#ef4444;">${escapeHtml(e.message||String(e))}</div>`;
+  }
+}
+
+async function _cwSubmit() {
+  const f = __cw.form;
+  const btn = document.getElementById('cwNext');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  try {
+    const r = await _cwApi('/api/wizard/crew/create', f);
+    if (!r.ok) {
+      toast(t('생성 실패: ') + (r.error||''), 'error');
+      return;
+    }
+    __cw.lastResult = r;
+    toast(`${t('생성 완료')} — ${r.name}`, 'ok');
+    // Hand off to the workflow canvas so the user can edit immediately.
+    setTimeout(() => {
+      try { localStorage.setItem('__wf_open_id', r.id); } catch(_){}
+      try { go('workflows'); } catch(_) { location.hash = '#workflows'; }
+    }, 400);
+  } catch(e) {
+    toast(t('오류: ') + (e.message||String(e)), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🚀 ' + t('워크플로우 생성'); }
+  }
+}
 
 function _wfRenderList() {
   const host = document.getElementById('wfListItems');
@@ -4509,6 +4915,51 @@ function _wfInspectorBody(n) {
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('최대 대기 시간 (ms)')}</label>
         <input type="number" class="input w-full mt-1" min="0" value="${d.maxDelayMs||5000}" oninput="_wfNodeSetData('${n.id}','maxDelayMs',parseInt(this.value)||5000)">
       ` : ''}
+    `;
+  }
+  if (n.type === 'slack_approval') {
+    return `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('Slack 채널 ID (Cxxxx, Gxxxx, 또는 #name)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.channel||'')}" oninput="_wfNodeSetData('${n.id}','channel',this.value)" placeholder="C012345 또는 #ops">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('메시지 템플릿')}</label>
+      <textarea class="input w-full mt-1" rows="2" oninput="_wfNodeSetData('${n.id}','messageTemplate',this.value)" placeholder=":memo: 사이클 보고 도착">${escapeHtml(d.messageTemplate||'')}</textarea>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block flex items-center gap-2">
+        <input type="checkbox" ${d.includeInput!==false?'checked':''} onchange="_wfNodeSetData('${n.id}','includeInput',this.checked)">
+        ${t('이전 노드 출력 포함')}
+      </label>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('타임아웃 (초)')}</label>
+      <input type="number" class="input w-full mt-1" min="5" max="14400" value="${d.timeoutSeconds||300}" oninput="_wfNodeSetData('${n.id}','timeoutSeconds',Math.max(5,Math.min(14400,parseInt(this.value)||300)))">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('타임아웃 시 동작')}</label>
+      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','onTimeout',this.value);_wfRenderInspector();">
+        <option value="approve" ${d.onTimeout==='approve'?'selected':''}>${t('자동 승인 (계속 진행)')}</option>
+        <option value="reject"  ${d.onTimeout==='reject'?'selected':''}>${t('자동 거부 (defaultOutput 사용)')}</option>
+        <option value="default" ${d.onTimeout==='default'?'selected':''}>${t('defaultOutput 으로 통과')}</option>
+        <option value="abort"   ${d.onTimeout==='abort'?'selected':''}>${t('워크플로우 중단')}</option>
+      </select>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('Default 출력 (거부 / 타임아웃-default 시)')}</label>
+      <textarea class="input w-full mt-1" rows="2" oninput="_wfNodeSetData('${n.id}','defaultOutput',this.value)">${escapeHtml(d.defaultOutput||'')}</textarea>
+      <div class="text-[10px] mt-2" style="color:var(--text-dim);">${t('승인: ✅ 또는 답장에 \"approve/ok/승인\" · 거부: ❌ 또는 \"reject/거부\" · 자유 답장은 다음 사이클 입력으로 사용됩니다.')}</div>
+    `;
+  }
+  if (n.type === 'obsidian_log') {
+    return `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('Vault 경로 ($HOME 하위)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.vaultPath||'')}" oninput="_wfNodeSetData('${n.id}','vaultPath',this.value)" placeholder="~/ObsidianVault">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('프로젝트 폴더명')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.project||'')}" oninput="_wfNodeSetData('${n.id}','project',this.value)" placeholder="lazyclaude">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('헤딩 (선택)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.heading||'')}" oninput="_wfNodeSetData('${n.id}','heading',this.value)" placeholder="crew cycle">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('태그 (콤마 구분)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.tagsCsv||'')}" oninput="_wfNodeSetData('${n.id}','tagsCsv',this.value)" placeholder="crew,plan">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block flex items-center gap-2">
+        <input type="checkbox" ${d.passThrough!==false?'checked':''} onchange="_wfNodeSetData('${n.id}','passThrough',this.checked);_wfRenderInspector();">
+        ${t('입력을 그대로 다음 노드로 통과')}
+      </label>
+      ${d.passThrough===false ? `
+        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('대신 기록할 텍스트')}</label>
+        <textarea class="input w-full mt-1" rows="2" oninput="_wfNodeSetData('${n.id}','defaultOutput',this.value)">${escapeHtml(d.defaultOutput||'')}</textarea>
+      ` : ''}
+      <div class="text-[10px] mt-2" style="color:var(--text-dim);">${t('파일: <vault>/Projects/<project>/logs/YYYY-MM-DD.md — 사이클마다 append.')}</div>
     `;
   }
   return '';

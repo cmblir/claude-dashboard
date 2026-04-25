@@ -10,6 +10,49 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.34.0] — 2026-04-26
+
+### 🧑‍✈️ Crew Wizard + Slack approval gate + Obsidian logging
+
+워크플로우가 너무 복잡하다는 피드백에 대응. **두 갈래 접근**:
+1. **Wizard 탭 (`crewWizard`)** — Zapier 같은 4-단계 폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 한 번에 깔린다. 결과 워크플로우는 평소처럼 캔버스에서 자유롭게 편집 가능.
+2. **워크플로우 탭은 그대로** — n8n 스타일 고급 편집 유지. 신규 노드(`slack_approval`, `obsidian_log`)는 일반 팔레트에도 노출.
+
+**신규 모듈**
+- `server/slack_api.py` — Slack Web API (Bot Token `xoxb-*`) 클라이언트. `chat.postMessage`, `conversations.replies`, `reactions.get`, `auth.test`. 토큰은 `~/.claude-dashboard-slack.json` 에 chmod 600 으로 저장.
+- `server/obsidian_log.py` — `<vault>/Projects/<프로젝트>/logs/YYYY-MM-DD.md` 에 마크다운 append. `$HOME` 하위 + realpath 검증으로 path traversal 방어.
+- `server/crew_wizard.py` — 폼 → DAG 빌더. `admin_gate` / `autonomous` / `no_slack` 3 가지 자율성 모드.
+
+**신규 워크플로우 노드**
+- `slack_approval` — Slack 채널에 메시지 올리고 ✅/❌ 반응 또는 스레드 답장을 polling. 타임아웃 시 `approve|reject|abort|default` 중 선택. 자유 답장은 다음 사이클 입력으로 사용 → 어드민이 실시간으로 흐름을 조정 가능.
+- `obsidian_log` — 사이클 보고를 자동 기록. pass-through 모드면 입력을 그대로 다음 노드로 전달.
+
+**신규 빌트인 템플릿**
+- `bt-crew` (페르소나 크루) — Planner(Opus) → 3 페르소나(Claude/Gemini/Ollama 혼성) → Aggregate → SlackApproval → ObsidianLog → Output, 3 사이클 루프.
+
+**신규 API**
+- `GET  /api/slack/config`           — 토큰 hint 만 노출
+- `POST /api/slack/config/save`      — `auth.test` 후 저장
+- `POST /api/slack/config/clear`
+- `POST /api/slack/test`             — 채널에 테스트 메시지
+- `POST /api/obsidian/test`          — Vault 쓰기 시도
+- `POST /api/wizard/crew/preview`    — DAG 미리보기 (저장하지 않음)
+- `POST /api/wizard/crew/create`     — 빌드 + 저장 + ID 반환
+
+**파일**
+- `server/slack_api.py` (+283)
+- `server/obsidian_log.py` (+118)
+- `server/crew_wizard.py` (+260)
+- `server/workflows.py` (+~190 — 노드 타입 2종 sanitize/executor + bt-crew 템플릿)
+- `server/routes.py` (+11 — 라우트 등록)
+- `dist/index.html` (+~430 — Wizard 뷰 4-step 폼 + 인스펙터 + 팔레트)
+
+**보안**
+- Slack 토큰: env 변수 `SLACK_BOT_TOKEN` > 파일. 응답에는 `xoxb-1234... ABCD` 형태의 hint 만.
+- Slack API 호출은 `slack.com` 호스트 + HTTPS 만, 토큰 형식 `^xox[bp]-...` regex 검증.
+- Obsidian Vault 경로: `realpath` 후 `$HOME` 하위만 허용, 프로젝트명 `[A-Za-z0-9 _\-./]{1,80}` regex.
+
+---
 ## [2.33.3] — 2026-04-24
 
 ### 🎨 Light theme WCAG AA contrast audit

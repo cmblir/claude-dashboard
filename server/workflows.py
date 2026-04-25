@@ -32,7 +32,10 @@ from .utils import _safe_read, _safe_write
 
 _NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
                "http", "transform", "variable", "subworkflow", "embedding",
-               "loop", "retry", "error_handler", "merge", "delay"}
+               "loop", "retry", "error_handler", "merge", "delay",
+               # v2.34.0 — Crew pattern: interactive Slack approval gate +
+               # Obsidian markdown log appender.
+               "slack_approval", "obsidian_log"}
 _INPUT_MODES = {"concat", "first", "json"}
 _ASSIGNEES = {"opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
@@ -283,6 +286,33 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
             "delayMs": max(0, min(300000, int(d.get("delayMs") or 1000))),
             "delayType": d.get("delayType") if d.get("delayType") in ("fixed", "random") else "fixed",
             "maxDelayMs": max(0, min(300000, int(d.get("maxDelayMs") or 5000))),
+        }
+    elif ntype == "slack_approval":
+        # Interactive admin gate. Posts the input to a Slack channel and
+        # waits for an approval reaction/reply. Falls back to a configured
+        # behaviour on timeout so autonomous mode can keep flowing.
+        on_timeout = d.get("onTimeout") if d.get("onTimeout") in (
+            "approve", "reject", "abort", "default") else "approve"
+        out["data"] = {
+            "channel":         _clamp_str(d.get("channel"), 80),
+            "messageTemplate": _clamp_str(d.get("messageTemplate"), 4000),
+            "timeoutSeconds":  max(5, min(int(d.get("timeoutSeconds") or 300), 60 * 60 * 4)),
+            "pollIntervalSeconds": max(2, min(int(d.get("pollIntervalSeconds") or 5), 60)),
+            "onTimeout":       on_timeout,
+            "defaultOutput":   _clamp_str(d.get("defaultOutput"), 4000),
+            # When True the upstream input is appended after the template.
+            "includeInput":    bool(d.get("includeInput", True)),
+        }
+    elif ntype == "obsidian_log":
+        out["data"] = {
+            "vaultPath":  _clamp_str(d.get("vaultPath"), 500),
+            "project":    _clamp_str(d.get("project"), 80),
+            "heading":    _clamp_str(d.get("heading"), 200),
+            "tagsCsv":    _clamp_str(d.get("tagsCsv"), 200),
+            # Pass-through means the input is forwarded as the output AND
+            # written to disk. False writes a fixed defaultOutput instead.
+            "passThrough":   bool(d.get("passThrough", True)),
+            "defaultOutput": _clamp_str(d.get("defaultOutput"), 4000),
         }
     # start 는 data 비움
     return out
@@ -834,6 +864,14 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     # ── Sub-workflow 노드 — 다른 워크플로우 호출 ──
     if ntype == "subworkflow":
         return _execute_subworkflow_node(data, inputs, _elapsed)
+
+    # ── Slack approval gate (v2.34.0) ──
+    if ntype == "slack_approval":
+        return _execute_slack_approval_node(data, inputs, _elapsed)
+
+    # ── Obsidian markdown log writer (v2.34.0) ──
+    if ntype == "obsidian_log":
+        return _execute_obsidian_log_node(data, inputs, _elapsed)
 
     # ── session / subagent — 멀티 프로바이더 실행 ──
     prompt_parts = []
@@ -1460,6 +1498,134 @@ def _execute_subworkflow_node(data: dict, inputs: list[str], _elapsed) -> dict:
 
     return {"status": "ok", "output": final_out, "durationMs": _elapsed(),
             "sessionId": "", "subRunId": sub_run_id}
+
+
+# ───────── Slack approval gate (v2.34.0) ─────────
+
+def _execute_slack_approval_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Post a Slack message and block until an admin reacts/replies.
+
+    Output of this node mirrors the upstream input on `approve`/`commented`,
+    and switches to `defaultOutput` on `reject`/`abort`. The upstream
+    branch logic can route on the `_approval` field if needed.
+    """
+    from .slack_api import (
+        SlackError, get_token, post_message, wait_for_approval,
+        load_slack_config,
+    )
+
+    cfg = load_slack_config()
+    channel = (data.get("channel") or "").strip() or cfg.get("defaultChannel", "")
+    if not channel:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": "slack channel not configured", "sessionId": ""}
+    if not get_token():
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": "slack token not configured (see Wizard → Slack 설정)",
+                "sessionId": ""}
+
+    template = (data.get("messageTemplate") or "").strip()
+    upstream = inputs[0] if inputs else ""
+    if data.get("includeInput", True) and upstream:
+        body_text = (template + "\n\n" if template else "") + upstream
+    else:
+        body_text = template or upstream or "Approval requested."
+
+    notice = ("\n\n_:white_check_mark: 승인 · :x: 거부 — 또는 스레드에 "
+              "`approve`/`reject` 답장_")
+    full_msg = body_text[:38000] + notice
+
+    try:
+        posted = post_message(channel, full_msg)
+        ts = posted.get("ts") or ""
+    except SlackError as e:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"slack post failed: {e}", "sessionId": ""}
+
+    timeout_s = int(data.get("timeoutSeconds") or 300)
+    poll_s = int(data.get("pollIntervalSeconds") or 5)
+    on_timeout = data.get("onTimeout") or "approve"
+    default_output = (data.get("defaultOutput") or "").strip()
+
+    try:
+        signal = wait_for_approval(channel, ts, timeout_s=timeout_s,
+                                   poll_interval_s=poll_s)
+    except Exception as e:
+        log.exception("slack approval polling failed")
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"slack polling failed: {e}", "sessionId": ""}
+
+    status = signal.get("status")
+    decision = status
+
+    if status == "timeout":
+        # Autonomous-mode fallback.
+        if on_timeout == "abort":
+            return {"status": "err", "output": "",
+                    "durationMs": _elapsed(),
+                    "error": "slack approval timed out (onTimeout=abort)",
+                    "sessionId": "", "_approval": "timeout"}
+        if on_timeout == "reject":
+            decision = "rejected"
+        elif on_timeout == "default":
+            return {"status": "ok", "output": default_output or upstream,
+                    "durationMs": _elapsed(), "sessionId": "",
+                    "_approval": "timeout-default"}
+        else:  # approve
+            decision = "approved"
+
+    if decision == "rejected":
+        return {"status": "ok",
+                "output": default_output or "[approval rejected]",
+                "durationMs": _elapsed(), "sessionId": "",
+                "_approval": "rejected", "messageTs": ts, "channel": channel,
+                "reactor": signal.get("reactor", ""),
+                "replyText": signal.get("replyText", ""),
+                "replyUser": signal.get("replyUser", "")}
+
+    # approved or commented
+    out_text = upstream
+    reply = (signal.get("replyText") or "").strip()
+    if decision == "commented" and reply:
+        # Treat a freeform reply as authoritative override of the input.
+        out_text = reply
+
+    return {"status": "ok", "output": out_text,
+            "durationMs": _elapsed(), "sessionId": "",
+            "_approval": decision, "messageTs": ts, "channel": channel,
+            "reactor": signal.get("reactor", ""),
+            "replyText": reply, "replyUser": signal.get("replyUser", "")}
+
+
+# ───────── Obsidian log writer (v2.34.0) ─────────
+
+def _execute_obsidian_log_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Append the upstream output as a markdown entry under the configured vault."""
+    from .obsidian_log import append_log
+
+    vault = (data.get("vaultPath") or "").strip()
+    project = (data.get("project") or "lazyclaude").strip()
+    heading = (data.get("heading") or "").strip()
+    tags_csv = (data.get("tagsCsv") or "").strip()
+    pass_through = bool(data.get("passThrough", True))
+    default_output = (data.get("defaultOutput") or "").strip()
+
+    upstream = inputs[0] if inputs else ""
+    body = upstream if pass_through else (default_output or upstream)
+    if not body:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": "obsidian_log received empty input", "sessionId": ""}
+
+    tags = [t.strip() for t in tags_csv.split(",") if t.strip()] if tags_csv else None
+    res = append_log(vault, project, body, heading=heading, tags=tags)
+    if not res.get("ok"):
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"obsidian write failed: {res.get('error')}",
+                "sessionId": ""}
+
+    return {"status": "ok", "output": upstream, "durationMs": _elapsed(),
+            "sessionId": "", "logPath": res.get("path"),
+            "bytesWritten": res.get("bytesWritten", 0)}
 
 
 def _parse_hhmm(s: str) -> Optional[tuple[int, int]]:
@@ -2452,6 +2618,64 @@ BUILTIN_TEMPLATES: list[dict] = [
             "maxIterations": 3,
             "intervalSeconds": 0,
             "feedbackNote": "이전 Fix 결과를 반영해 Exec 단계에서 실패 항목을 우선 처리하세요.",
+            "feedbackNodeId": "n-plan",
+        },
+    },
+
+    # ── v2.34.0: Crew (Planner + Personas + Slack approval + Obsidian) ──
+    {
+        "id": "bt-crew", "name": "페르소나 크루", "icon": "🧑‍✈️", "builtin": True,
+        "description": "기획자(Planner) → 페르소나 3명 병렬 작업 → 보고 취합 → "
+                       "Slack 어드민 승인 → Obsidian 기록 → 다음 사이클로 루프. "
+                       "Wizard 탭에서 폼만 채우면 더 쉽게 만들 수 있습니다.",
+        "category": "pattern",
+        "nodes": [
+            {"id": "n-start", "type": "start", "x": 80, "y": 240, "title": "시작", "data": {}},
+            {"id": "n-plan",  "type": "session", "x": 280, "y": 240, "title": "🧭 기획자",
+             "data": {"subject": "프로젝트 목표를 단계별 작업으로 쪼개고 페르소나에 분배",
+                      "description": "각 페르소나별 지시 블록을 '### <role>' 헤딩으로 구분하세요.",
+                      "assignee": "claude:opus", "agentRole": "planner",
+                      "inputsMode": "concat", "continueFromPrev": True}},
+            {"id": "n-p1",    "type": "subagent", "x": 520, "y": 100, "title": "👤 Researcher",
+             "data": {"subject": "Researcher 작업", "agentRole": "researcher",
+                      "assignee": "claude:sonnet", "inputsMode": "concat"}},
+            {"id": "n-p2",    "type": "subagent", "x": 520, "y": 240, "title": "👤 Builder",
+             "data": {"subject": "Builder 작업", "agentRole": "builder",
+                      "assignee": "gemini:gemini-2.5-pro", "inputsMode": "concat"}},
+            {"id": "n-p3",    "type": "subagent", "x": 520, "y": 380, "title": "👤 Reviewer",
+             "data": {"subject": "Reviewer 작업", "agentRole": "reviewer",
+                      "assignee": "ollama:llama3.1", "inputsMode": "concat"}},
+            {"id": "n-agg",   "type": "aggregate", "x": 760, "y": 240, "title": "🧩 보고 취합",
+             "data": {"mode": "concat"}},
+            {"id": "n-slack", "type": "slack_approval", "x": 980, "y": 240, "title": "🛂 어드민 게이트",
+             "data": {"channel": "", "messageTemplate": ":memo: 사이클 보고 도착",
+                      "timeoutSeconds": 300, "pollIntervalSeconds": 5,
+                      "onTimeout": "default",
+                      "defaultOutput": "타임아웃 — 자율 판단으로 계속 진행",
+                      "includeInput": True}},
+            {"id": "n-obs",   "type": "obsidian_log", "x": 1200, "y": 240, "title": "📝 옵시디언 기록",
+             "data": {"vaultPath": "~/ObsidianVault", "project": "lazyclaude",
+                      "heading": "crew cycle", "tagsCsv": "crew",
+                      "passThrough": True}},
+            {"id": "n-out",   "type": "output", "x": 1420, "y": 240, "title": "📤 결과", "data": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": "n-start", "to": "n-plan",  "fromPort": "out", "toPort": "in"},
+            {"id": "e2", "from": "n-plan",  "to": "n-p1",    "fromPort": "out", "toPort": "in"},
+            {"id": "e3", "from": "n-plan",  "to": "n-p2",    "fromPort": "out", "toPort": "in"},
+            {"id": "e4", "from": "n-plan",  "to": "n-p3",    "fromPort": "out", "toPort": "in"},
+            {"id": "e5", "from": "n-p1",    "to": "n-agg",   "fromPort": "out", "toPort": "in"},
+            {"id": "e6", "from": "n-p2",    "to": "n-agg",   "fromPort": "out", "toPort": "in"},
+            {"id": "e7", "from": "n-p3",    "to": "n-agg",   "fromPort": "out", "toPort": "in"},
+            {"id": "e8", "from": "n-agg",   "to": "n-slack", "fromPort": "out", "toPort": "in"},
+            {"id": "e9", "from": "n-slack", "to": "n-obs",   "fromPort": "out", "toPort": "in"},
+            {"id": "e10","from": "n-obs",   "to": "n-out",   "fromPort": "out", "toPort": "in"},
+        ],
+        "repeat": {
+            "enabled": True,
+            "maxIterations": 3,
+            "intervalSeconds": 0,
+            "feedbackNote": "이전 사이클 보고를 검토하고 미해결 항목과 새 리스크를 반영해 다음 단계 업무를 페르소나별로 다시 분배하세요.",
             "feedbackNodeId": "n-plan",
         },
     },
