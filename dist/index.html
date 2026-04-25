@@ -480,6 +480,58 @@ tailwind.config = {
   .wf-list-item { padding: 10px 12px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; }
   .wf-list-item:hover { background: rgba(255,255,255,0.04); }
   .wf-list-item.active { background: var(--grad-soft); border-color: rgba(167,139,250,0.35); }
+
+  /* v2.34.1 — n8n-style accordion palette inside the node editor */
+  .wf-palette { display: flex; flex-direction: column; gap: 6px; }
+  .wf-pal-cat { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: border-color 0.12s; background: rgba(255,255,255,0.015); }
+  .wf-pal-cat.has-current { border-color: rgba(217,119,87,0.45); }
+  .wf-pal-cat-header {
+    display: grid; grid-template-columns: 28px 1fr auto auto; align-items: center;
+    gap: 10px; width: 100%;
+    padding: 8px 12px; background: transparent; border: 0; color: var(--text);
+    cursor: pointer; text-align: left; font-size: 13px;
+    transition: background 0.12s;
+  }
+  .wf-pal-cat-header:hover { background: rgba(255,255,255,0.04); }
+  .wf-pal-cat-icon { font-size: 1.1rem; line-height: 1; text-align: center; }
+  .wf-pal-cat-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .wf-pal-cat-label { font-size: 12.5px; font-weight: 600; color: var(--text); }
+  .wf-pal-cat-desc { font-size: 10.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wf-pal-cat-count {
+    font-size: 10px; color: var(--text-dim); padding: 1px 7px;
+    background: rgba(255,255,255,0.06); border-radius: 8px;
+  }
+  .wf-pal-cat-chev { font-size: 11px; color: var(--text-dim); width: 14px; text-align: center; transition: transform 0.12s; }
+  .wf-pal-cat.open .wf-pal-cat-chev { color: var(--accent); }
+
+  .wf-pal-cat-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 6px;
+    flex-direction: column;
+    gap: 4px;
+    background: rgba(0,0,0,0.18);
+  }
+  .wf-pal-cat.open .wf-pal-cat-body { display: flex; }
+
+  .wf-pal-row {
+    display: grid; grid-template-columns: 22px 1fr; grid-template-rows: auto auto;
+    column-gap: 8px; row-gap: 1px; padding: 6px 8px;
+    background: transparent; border: 1px solid transparent; border-radius: 8px;
+    cursor: pointer; text-align: left; color: var(--text);
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .wf-pal-row:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
+  .wf-pal-row-active {
+    background: rgba(217,119,87,0.14);
+    border-color: rgba(217,119,87,0.55) !important;
+  }
+  .wf-pal-icon { grid-row: 1 / span 2; align-self: center; font-size: 1.05rem; line-height: 1; text-align: center; }
+  .wf-pal-label { font-size: 12px; font-weight: 600; color: var(--text); }
+  .wf-pal-desc { font-size: 10.5px; color: var(--text-dim); line-height: 1.35; }
+
+  body.theme-light .wf-pal-cat { background: rgba(0,0,0,0.02); }
+  body.theme-light .wf-pal-cat-body { background: rgba(0,0,0,0.04); }
   .wf-node { cursor: grab; }
   .wf-node:active { cursor: grabbing; }
   .wf-node-body { fill: var(--card); stroke: var(--border); stroke-width: 1; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); }
@@ -727,18 +779,36 @@ tailwind.config = {
     #sidebar {
       position: fixed; left: 0; top: 0; height: 100vh; z-index: 40;
       transform: translateX(-100%); transition: transform 0.2s;
-      width: min(300px, 85vw) !important;
+      /* v2.34.1 — 320px / 92vw 로 확대해 뒤 콘텐츠 노출을 줄이고
+         아주 좁은 화면(<480px)에서는 전폭(100vw) 으로 풀펼침. */
+      width: min(320px, 92vw) !important;
       overflow-y: auto; overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
     }
+    @media (max-width: 480px) {
+      #sidebar { width: 100vw !important; }
+    }
     #sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,0.6); }
     #content { margin-left: 0 !important; }
-    /* 사이드바 열렸을 때 배경 오버레이 */
+    /* v2.34.1 — 사이드바 열렸을 때 강한 배경 오버레이 + 본문 스크롤 잠금
+       이전(0.5 알파)은 다크 테마에서 너무 약해 콘텐츠가 그대로 비침. 스크롤도
+       그대로 동작해 메뉴 뒤 컨텐츠가 움직이는 어색함이 있었음. */
+    body.sidebar-open { overflow: hidden; }
     body.sidebar-open::after {
-      content: ''; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      content: ''; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.78);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
       z-index: 35; transition: opacity 0.2s;
     }
+    body.theme-light.sidebar-open::after { background: rgba(0,0,0,0.45); }
+    /* v2.34.1 — 모바일 사이드바 열림 시 floating mascot/chatBubble 등은 숨김.
+       이전엔 z-index 1100~1150 라 백드롭 위로 그대로 떠 있어 "이상한 핑크 픽셀" 처럼
+       보였음. */
+    body.sidebar-open #claudeMascot,
+    body.sidebar-open #chatBubble,
+    body.sidebar-open #chatLauncher { display: none !important; }
 
     /* 헤더 / 본문 패딩 축소 */
     #content header { padding: 0.5rem 0.75rem !important; }
@@ -2323,6 +2393,38 @@ const WF_NODE_TYPES = [
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 
+// v2.34.1 — n8n-style palette categories. One category open at a time, compact
+// rows. Replaces the giant 3-column grid that overwhelmed users with 18 large
+// blocks. The mapping is by-id; if a node type isn't listed here it falls into
+// "기타".
+const WF_NODE_CATEGORIES = [
+  { id: 'trigger',  icon: '🚀', label: '트리거',
+    desc: 'DAG 진입점',
+    types: ['start'] },
+  { id: 'ai',       icon: '🤖', label: 'AI 작업',
+    desc: '세션 · 페르소나 · 임베딩',
+    types: ['session', 'subagent', 'embedding'] },
+  { id: 'flow',     icon: '🔁', label: '흐름 제어',
+    desc: '분기 · 루프 · 재시도 · 합류',
+    types: ['branch', 'loop', 'retry', 'error_handler', 'merge', 'delay', 'aggregate'] },
+  { id: 'data',     icon: '🔧', label: '데이터 / HTTP',
+    desc: '변환 · 변수 · 외부 호출 · 서브워크플로우',
+    types: ['http', 'transform', 'variable', 'subworkflow'] },
+  { id: 'integ',    icon: '🔗', label: '연동',
+    desc: 'Slack 어드민 · Obsidian 기록',
+    types: ['slack_approval', 'obsidian_log'] },
+  { id: 'output',   icon: '📤', label: '출력',
+    desc: '워크플로우 종착',
+    types: ['output'] },
+];
+
+// Reverse-lookup: type id → category id (for highlighting current selection).
+const WF_TYPE_TO_CAT = (() => {
+  const m = {};
+  for (const c of WF_NODE_CATEGORIES) for (const t of c.types) m[t] = c.id;
+  return m;
+})();
+
 // ── 멀티 AI 프로바이더 셀렉터 캐시 ──
 let __wfProviders = null; // {providers:[{id,name,icon,type,available,models:[]}]}
 async function _wfLoadProviders() {
@@ -2528,9 +2630,18 @@ VIEWS.crewWizard = async () => {
   let slack = { configured: false };
   try { slack = await api('/api/slack/config'); } catch(e) {}
   __cw.slackStatus = slack;
+  // First-visit auto-guide — shown once, then user can re-open via button.
+  let firstVisit = false;
+  try { firstVisit = !localStorage.getItem('cwGuideSeen'); } catch(_){}
+  if (firstVisit) setTimeout(() => { _cwShowGuide(); try{localStorage.setItem('cwGuideSeen','1');}catch(_){} }, 250);
   return `
     ${viewHeader('🧑‍✈️ 크루 위저드',
        '폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 자동 생성. 워크플로우 탭에서 그대로 캔버스 편집 가능.', 'crewWizard')}
+    <div class="flex items-center gap-2 mb-3 text-[11px]" style="color:var(--text-dim);">
+      <button class="btn text-xs" onclick="_cwShowGuide()" title="${t('사용법')}">📖 ${t('사용법 보기')}</button>
+      <span style="opacity:.6;">·</span>
+      <span>${t('처음이라면 사용법을 먼저 확인하세요')}</span>
+    </div>
     <div id="cwRoot" style="display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start;">
       <div class="card" style="padding:18px;min-width:0;">
         <div id="cwSteps" class="flex items-center gap-2 text-xs mb-4" style="flex-wrap:wrap;">
@@ -2875,6 +2986,114 @@ async function _cwSubmit() {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🚀 ' + t('워크플로우 생성'); }
   }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Crew Wizard — usage guide (modal). Mirrors the workflow tab's tutorial
+// but uses static screenshots/diagrams instead of a Playwright-style
+// animation since wizard is form-driven, not canvas-driven.
+// ──────────────────────────────────────────────────────────────────
+function _cwShowGuide() {
+  const html = `
+    <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+      <div>
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${t('사용법')}</div>
+        <h2 class="text-lg font-bold">🧑‍✈️ ${t('크루 위저드 사용법')}</h2>
+        <div class="text-[11px] text-[var(--text-mute)] mt-1">${t('Zapier 식 4-스텝 폼 → 워크플로우 자동 생성')}</div>
+      </div>
+      <button class="btn-ghost btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="p-5 overflow-y-auto" style="max-height:70vh;">
+
+      <h3 class="text-base font-bold mb-2">${t('이게 뭐죠?')}</h3>
+      <p class="text-[12.5px] leading-relaxed mb-4" style="color:var(--text-mute);">
+        ${t('워크플로우 탭은 자유도가 높지만 처음엔 노드 18종을 보고 어디서 시작할지 막막합니다. 크루 위저드는 가장 흔한 패턴 — "기획자가 페르소나 여러 명에게 일을 분배하고, 보고를 받아 다음 사이클을 지시하는" 구조 — 를 폼 4 스텝으로 추출해 한 번에 만들어 줍니다. 결과는 일반 워크플로우라 워크플로우 탭에서 그대로 자유 편집 가능합니다.')}
+      </p>
+
+      <h3 class="text-base font-bold mb-2">${t('생성되는 구조')}</h3>
+      <pre class="rounded p-3 text-[11px] leading-relaxed overflow-x-auto mb-4" style="background:var(--code-bg);border:1px solid var(--border);color:var(--text);">
+🚀 시작
+  ↓
+🧭 기획자 (Planner — Opus 권장)
+  ↓ ↓ ↓     (페르소나마다 병렬 분기)
+👤 Researcher  👤 Builder  👤 Reviewer ...
+  ↓ ↓ ↓
+🧩 보고 취합 (Aggregate)
+  ↓
+🛂 Slack 어드민 게이트  ← (autonomy 모드에 따라 선택적)
+  ↓
+📝 Obsidian 기록 (logs/YYYY-MM-DD.md)
+  ↓
+📤 결과
+  └─ (loop) ──→ 다시 기획자에게 피드백 주입
+</pre>
+
+      <h3 class="text-base font-bold mb-2">${t('4 스텝 가이드')}</h3>
+      <ol class="text-[12.5px] leading-relaxed mb-4 space-y-3" style="color:var(--text);padding-left:1.2rem;">
+        <li>
+          <b>📝 ${t('스텝 1 · 프로젝트')}</b>
+          <ul class="mt-1 ml-4 list-disc text-[11.5px]" style="color:var(--text-mute);">
+            <li>${t('프로젝트 이름 — Obsidian 폴더명으로 그대로 사용. 영문/숫자/공백/_-./ 만.')}</li>
+            <li>${t('목표 — Planner 가 받는 첫 입력. 한 줄로 명확하게.')}</li>
+            <li>${t('Planner 모델 — Opus 권장. 사이클을 지휘하는 두뇌입니다.')}</li>
+          </ul>
+        </li>
+        <li>
+          <b>👥 ${t('스텝 2 · 페르소나')}</b>
+          <ul class="mt-1 ml-4 list-disc text-[11.5px]" style="color:var(--text-mute);">
+            <li>${t('1~8명. 역할 + 모델 + 중점 영역 입력.')}</li>
+            <li>${t('Claude · Gemini · Ollama 자유 조합 — 서로 다른 모델을 섞을수록 다양한 시각을 얻습니다.')}</li>
+            <li>${t('예: Researcher(Claude Sonnet) + Builder(Gemini Pro) + Reviewer(Ollama)')}</li>
+          </ul>
+        </li>
+        <li>
+          <b>🔌 ${t('스텝 3 · Slack & Obsidian')}</b>
+          <ul class="mt-1 ml-4 list-disc text-[11.5px]" style="color:var(--text-mute);">
+            <li>${t('Slack 봇 토큰(xoxb-…) 을 한 번만 저장 — auth.test 로 즉시 검증. 토큰은 ~/.claude-dashboard-slack.json 에 chmod 600 으로 저장.')}</li>
+            <li>${t('필요한 Slack 권한: chat:write · reactions:read · channels:history (또는 groups:history)')}</li>
+            <li>${t('Obsidian Vault — $HOME 하위 경로만 허용. 사이클별로 Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 append.')}</li>
+            <li>${t('두 항목 다 즉석 테스트 버튼 제공.')}</li>
+          </ul>
+        </li>
+        <li>
+          <b>🎚 ${t('스텝 4 · 자율성')}</b>
+          <ul class="mt-1 ml-4 list-disc text-[11.5px]" style="color:var(--text-mute);">
+            <li><b>${t('admin_gate')}</b> — ${t('매 사이클마다 Slack 으로 보고하고 ✅/❌ 응답을 기다림. 타임아웃 시 흐름 중단.')}</li>
+            <li><b>${t('autonomous')}</b> — ${t('Slack 알림은 보내지만 짧은 타임아웃 후 스스로 다음 사이클 진행. 어드민이 끼어들 때만 답장하면 됨.')}</li>
+            <li><b>${t('no_slack')}</b> — ${t('Slack 노드 없이 페르소나 → Obsidian → 다음 사이클로 바로 흐름.')}</li>
+            <li>${t('최대 사이클 수 1~20. 매 사이클마다 직전 보고가 Planner 입력으로 다시 주입됩니다.')}</li>
+          </ul>
+        </li>
+      </ol>
+
+      <h3 class="text-base font-bold mb-2">${t('Slack 인터랙션')}</h3>
+      <ul class="text-[12.5px] leading-relaxed mb-4 ml-4 list-disc" style="color:var(--text);">
+        <li>${t('승인: ✅ (white_check_mark) / 👍 / 답장에 "approve", "ok", "go", "승인"')}</li>
+        <li>${t('거부: ❌ (x) / 👎 / 답장에 "reject", "stop", "abort", "거부"')}</li>
+        <li>${t('자유 답장 (예: "Reviewer 보고를 더 깊게 다시" ): 다음 사이클 입력으로 사용 → 어드민이 흐름 중간에 방향 조정 가능')}</li>
+      </ul>
+
+      <h3 class="text-base font-bold mb-2">${t('자주 막히는 곳')}</h3>
+      <ul class="text-[12.5px] leading-relaxed mb-4 ml-4 list-disc" style="color:var(--text-mute);">
+        <li>${t('"slack token not configured" — 스텝 3 의 토큰 저장 버튼을 눌렀는지 확인. 또는 환경변수 SLACK_BOT_TOKEN 으로 주입 가능.')}</li>
+        <li>${t('"vault path must resolve under $HOME" — Vault 경로가 ~/ 안에 있는지 확인. realpath 후 검증되므로 symlink 도 주의.')}</li>
+        <li>${t('Slack 메시지가 도착하지 않음 — 봇이 채널에 초대돼 있는지 확인. 비공개 채널에는 /invite @봇이름 필요.')}</li>
+        <li>${t('타임아웃이 너무 짧음 — 자율 모드에서도 사이클당 최소 60s 권장. admin_gate 는 5분~30분이 일반적.')}</li>
+      </ul>
+
+      <h3 class="text-base font-bold mb-2">${t('생성 후 다음 단계')}</h3>
+      <ul class="text-[12.5px] leading-relaxed mb-2 ml-4 list-disc" style="color:var(--text);">
+        <li>${t('자동으로 워크플로우 탭으로 이동 — 캔버스에서 노드 추가/제거/연결 자유 편집')}</li>
+        <li>${t('▶ 실행 버튼으로 바로 시작 · 또는 Webhook URL 로 외부 트리거 연결')}</li>
+        <li>${t('실행 중에는 노드별 진행 상태가 실시간 표시 — Slack 게이트는 응답 대기 상태로 노출됨')}</li>
+      </ul>
+    </div>
+    <div class="p-4 border-t border-[var(--border)] flex items-center justify-between">
+      <span class="text-[11px]" style="color:var(--text-dim);">${t('사용법은 언제든 📖 버튼으로 다시 열 수 있습니다.')}</span>
+      <button class="btn-primary btn" onclick="closeModal()">${t('이해했습니다')}</button>
+    </div>
+  `;
+  showModal(html, { wide: true });
 }
 
 function _wfRenderList() {
@@ -4384,6 +4603,8 @@ function _wfPickNodeType(winId, type) {
   else if (type === 'error_handler') draft.data = { onError:'skip', defaultOutput:'' };
   else if (type === 'merge') draft.data = { mergeMode:'all', requiredCount:1, timeout:300 };
   else if (type === 'delay') draft.data = { delayMs:1000, delayType:'fixed', maxDelayMs:5000 };
+  else if (type === 'slack_approval') draft.data = { channel:'', messageTemplate:'', timeoutSeconds:300, pollIntervalSeconds:5, onTimeout:'approve', defaultOutput:'', includeInput:true };
+  else if (type === 'obsidian_log') draft.data = { vaultPath:'~/ObsidianVault', project:'lazyclaude', heading:'', tagsCsv:'', passThrough:true, defaultOutput:'' };
   else draft.data = {};
   if (!draft.title) draft.title = WF_TYPE_MAP[type].label;
   // 타입 선택 직후 카테고리 그리드 자동 접힘 (UX 개선)
@@ -4417,6 +4638,16 @@ function _wfToggleCat(winId) {
   _wfRenderEditorBody(winId);
 }
 
+// v2.34.1 — n8n-style palette: open/close one category at a time. Persists
+// the open category per editor window so re-opening the editor stays put.
+function _wfPaletteToggleCat(winId, catId) {
+  const key = `wfPaletteOpenCat::${winId}`;
+  let cur = '';
+  try { cur = localStorage.getItem(key) || ''; } catch(_){}
+  try { localStorage.setItem(key, cur === catId ? '' : catId); } catch(_){}
+  _wfRenderEditorBody(winId);
+}
+
 function _wfRenderEditorBody(winId) {
   const w = document.getElementById(winId);
   if (!w) return;
@@ -4429,21 +4660,55 @@ function _wfRenderEditorBody(winId) {
   const curMeta = draft.type ? WF_TYPE_MAP[draft.type] : null;
 
   if (expanded) {
+    // v2.34.1 — n8n-style accordion. Categories are collapsed by default;
+    // clicking a category header expands its compact node list. Only one
+    // category open at a time. Currently selected node's category opens by
+    // default so users see where they are.
+    const openCatKey = `wfPaletteOpenCat::${winId}`;
+    let openCat = '';
+    try { openCat = localStorage.getItem(openCatKey) || ''; } catch(_){}
+    if (!openCat && draft.type) openCat = WF_TYPE_TO_CAT[draft.type] || '';
+    if (!openCat) openCat = WF_NODE_CATEGORIES[0].id;
+
+    const cats = WF_NODE_CATEGORIES.map(cat => {
+      const isOpen = cat.id === openCat;
+      const types = cat.types.map(id => WF_TYPE_MAP[id]).filter(Boolean);
+      const isCurCat = curMeta && cat.types.includes(curMeta.id);
+      const rowsHtml = types.map(tp => {
+        const isCur = draft.type === tp.id;
+        return `
+          <button class="wf-pal-row ${isCur ? 'wf-pal-row-active' : ''}"
+                  onclick="_wfPickNodeType('${winId}','${tp.id}')"
+                  title="${escapeHtml(t(tp.desc))}">
+            <span class="wf-pal-icon">${tp.icon}</span>
+            <span class="wf-pal-label">${escapeHtml(t(tp.label))}</span>
+            <span class="wf-pal-desc">${escapeHtml(t(tp.desc).slice(0, 70))}${(t(tp.desc).length > 70 ? '…' : '')}</span>
+          </button>`;
+      }).join('');
+      return `
+        <div class="wf-pal-cat ${isOpen ? 'open' : ''} ${isCurCat ? 'has-current' : ''}"
+             data-cat="${cat.id}">
+          <button class="wf-pal-cat-header" type="button"
+                  onclick="_wfPaletteToggleCat('${winId}','${cat.id}')"
+                  aria-expanded="${isOpen ? 'true' : 'false'}">
+            <span class="wf-pal-cat-icon">${cat.icon}</span>
+            <span class="wf-pal-cat-meta">
+              <span class="wf-pal-cat-label">${escapeHtml(t(cat.label))}</span>
+              <span class="wf-pal-cat-desc">${escapeHtml(t(cat.desc))}</span>
+            </span>
+            <span class="wf-pal-cat-count">${types.length}</span>
+            <span class="wf-pal-cat-chev">${isOpen ? '▾' : '▸'}</span>
+          </button>
+          <div class="wf-pal-cat-body">${rowsHtml}</div>
+        </div>`;
+    }).join('');
+
     catHost.innerHTML = `
       <div class="flex items-center justify-between mb-2">
-        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('카테고리')}</div>
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('카테고리 → 노드 선택')}</div>
         ${curMeta ? `<button class="btn text-[11px]" onclick="_wfToggleCat('${winId}')" title="Alt+C">▾ ${t('접기')}</button>` : ''}
       </div>
-      <div class="grid grid-cols-3 gap-2">
-        ${WF_NODE_TYPES.map(tp => `
-          <button class="btn text-[11px] ${draft.type === tp.id ? 'btn-active' : ''}"
-                  onclick="_wfPickNodeType('${winId}','${tp.id}')"
-                  title="${escapeHtml(t(tp.desc))}"
-                  style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;">
-            <div style="font-size:1.4rem;line-height:1;">${tp.icon}</div>
-            <div style="font-size:11px;">${t(tp.label)}</div>
-          </button>`).join('')}
-      </div>
+      <div class="wf-palette">${cats}</div>
     `;
   } else if (curMeta) {
     // 접힌 상태: 현재 타입 칩 + "타입 변경" 버튼

@@ -10,6 +10,62 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.34.1] — 2026-04-26
+
+### 🚨 작은 화면 사이드바 백드롭 긴급 패치 + 워크플로우 팔레트 n8n 식 재설계 + 위저드 가이드
+
+#### 1. 작은 화면 플라이아웃 백드롭 (긴급)
+
+670×720 뷰포트에서 사이드바를 열어 카테고리(예: 학습)를 펼치면 우측에 본문 콘텐츠가 그대로 비치고, 본문의 floating 마스코트가 사이드바 위로 떠 보이는 "이상한 핑크 픽셀" 현상이 보고됨. Playwright 로 재현 후 3 가지 원인 확인:
+
+1. `body.sidebar-open::after` 백드롭이 `rgba(0,0,0,0.5)` — 다크 테마에서 너무 약해 콘텐츠가 뚜렷이 비침
+2. 본문 스크롤이 잠기지 않아 사이드바 뒤가 그대로 움직임
+3. `#claudeMascot` (z-index 1150), `#chatBubble`, `#chatLauncher` 가 백드롭(z-index 35) 위로 떠 — 사이드바 옆에 floating 요소가 그대로 남아 핑크 픽셀처럼 보임
+4. 사이드바 폭 `min(300px, 85vw)` — 670 뷰포트에서 우측 370px 노출
+
+**수정**:
+- 백드롭 알파 0.5 → 0.78 (다크) / 0.45 (라이트) + `backdrop-filter: blur(2px)`
+- `body.sidebar-open` 에 `overflow: hidden` 으로 본문 스크롤 잠금
+- 사이드바 폭 `min(320px, 92vw)` 로 확장, **`<480px` 에서는 100vw** (전폭 풀펼침) — 좁은 화면에서 뒷 콘텐츠 노출 0%
+- `body.sidebar-open` 시 `#claudeMascot · #chatBubble · #chatLauncher` 강제 숨김
+
+#### 2. 워크플로우 노드 팔레트 n8n 식 재설계
+
+사용자 피드백: "지금 너무 아이콘도 많고 블럭도 커서 한눈에 보기가 너무 힘듬". 18 종 노드를 3 컬럼 그리드의 큰 블록으로 보여주던 기존 UI 를 **6 카테고리 × 컴팩트 행 아코디언**으로 교체. 한 번에 1 카테고리만 펼침. 카테고리 클릭 → 컴팩트 행 목록 → 행 클릭 → 상세 폼 (Zapier/n8n 식 3단 흐름).
+
+| 카테고리 | 노드 |
+|---|---|
+| 🚀 트리거 | start |
+| 🤖 AI 작업 | session, subagent, embedding |
+| 🔁 흐름 제어 | branch, loop, retry, error_handler, merge, delay, aggregate |
+| 🔧 데이터 / HTTP | http, transform, variable, subworkflow |
+| 🔗 연동 | slack_approval, obsidian_log |
+| 📤 출력 | output |
+
+- 현재 선택된 노드의 카테고리는 자동으로 펼침 + 강조
+- `localStorage` 에 카테고리 펼침 상태 저장 (에디터 재오픈 시 유지)
+- 신규 슬랙/옵시디언 노드도 기본 데이터(`channel`, `vaultPath`, `passThrough` 등) 자동 세팅 — 빈 객체로 시작하던 이전 동작 수정
+
+#### 3. 크루 위저드 사용법 가이드
+
+`📖 사용법 보기` 버튼 + 첫 방문 자동 표시 모달 (재방문 시 `cwGuideSeen` localStorage 로 차단). 6 섹션:
+
+1. 이게 뭐죠? — 위저드의 목적
+2. 생성되는 구조 — ASCII 다이어그램
+3. 4 스텝 가이드 — 스텝별 입력 해설
+4. Slack 인터랙션 — ✅/❌ 반응 + 답장 키워드 매핑
+5. 자주 막히는 곳 — 토큰 미설정, Vault 경로, 봇 채널 초대 등
+6. 생성 후 다음 단계 — 캔버스 편집, Webhook, 실시간 모니터링
+
+**파일**
+- `dist/index.html` — 백드롭/사이드바 CSS, 팔레트 아코디언 (`WF_NODE_CATEGORIES`, `_wfPaletteToggleCat`, `.wf-palette` CSS), 위저드 가이드 모달 (`_cwShowGuide`)
+
+**검증**
+- Playwright 로 670×720 / 420×720 두 뷰포트에서 사이드바 + 학습 카테고리 펼침 시 백드롭/스크롤 잠금/마스코트 숨김 확인
+- 팔레트 6 카테고리 × 18 행 렌더 확인, 한 카테고리만 펼침 동작 확인, 행 클릭 시 `slack_approval` 선택 + 기본 데이터 적용 + 폼 렌더링 확인
+- 위저드 첫 방문 자동 가이드 + 📖 버튼 수동 호출 확인
+
+---
 ## [2.34.0] — 2026-04-26
 
 ### 🧑‍✈️ Crew Wizard + Slack approval gate + Obsidian logging
