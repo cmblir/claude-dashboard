@@ -51,6 +51,9 @@ build/
 dist-build/
 node_modules/
 
+# v2.35.0 — macOS .app bundle is a build artifact (regenerate via `make app`)
+dist/LazyClaude.app/
+
 # MCP list 디스크 캐시 (런타임 생성)
 *-mcp-cache.json
 *-ai-evaluation.json

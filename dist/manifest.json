@@ -1,0 +1,45 @@
+{
+  "name": "LazyClaude — Local Claude Code Dashboard",
+  "short_name": "LazyClaude",
+  "description": "Local-first command center for ~/.claude with an n8n-style multi-AI workflow engine. Zero cloud, zero telemetry.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "lang": "ko",
+  "dir": "ltr",
+  "categories": ["developer", "productivity", "utilities"],
+  "icons": [
+    { "src": "/icons/icon-192.png",          "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png",          "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg",                 "sizes": "any",     "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Workflows",
+      "short_name": "Workflows",
+      "description": "Open the n8n-style workflow editor",
+      "url": "/?tab=workflows",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Crew Wizard",
+      "short_name": "Crew",
+      "description": "Scaffold a planner + personas workflow in 4 steps",
+      "url": "/?tab=crewWizard",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "AI Providers",
+      "short_name": "Providers",
+      "description": "Configure Claude / GPT / Gemini / Ollama",
+      "url": "/?tab=aiProviders",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "prefer_related_applications": false
+}

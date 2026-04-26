@@ -12,7 +12,7 @@ _50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.33.2-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.35.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-아키텍처)
 
 </div>
@@ -27,6 +27,8 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 | 버전 | 요점 |
 |---|---|
+| **v2.35.0** | 📦 **앱 형태로 설치** — PWA(브라우저 "앱 설치" / iOS 홈 화면 추가, 크로스 플랫폼) + 72 KB macOS `.app` 번들(`make install-mac` → Spotlight · Dock · 서버 자동 시작/종료). 매니페스트에 3개 단축 메뉴, dark/light theme-color, maskable 아이콘 포함. |
+| **v2.34.0** | 🧑‍✈️ **크루 위저드** — Zapier 식 4-스텝 폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 자동 생성. 신규 노드 `slack_approval` (Slack Web API), `obsidian_log`. |
 | **v2.33.2** | 🔌 ECC 플러그인 **완전 자동 설치** — 가이드 & 툴 탭에서 원클릭, Claude Code 명령어 입력 불필요 |
 | **v2.33.1** | 🧰 가이드 툴킷 관리자 (ECC / CCB 설치·제거) · flyout viewport 수정 · 로그인 게이트 첫 방문만 |
 | **v2.33.0** | 🎨 Artifacts Viewer — 4중 보안 미리보기 (sandbox + CSP + postMessage + 정적 필터) |
@@ -46,7 +48,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.33.2 🇰🇷│
+│  💤  LazyClaude                                     v2.35.0 🇰🇷│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 신기능│   🔀 워크플로우                                       │
 │ 🏠 메인 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -176,9 +178,17 @@ API 키는 `🧠 AI 프로바이더` 탭에서 저장해도 됩니다 — `~/.cl
 
 ## ✨ 주요 기능
 
+### 🧑‍✈️ 크루 위저드 — Zapier 스타일 자동 생성기 (v2.34)
+
+- **4-스텝 폼** — `크루 위저드` 탭에서 폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 한 번에 자동 생성
+- **자율성 3 모드** — `admin_gate` (Slack 승인 대기) · `autonomous` (짧은 타임아웃 후 스스로 판단) · `no_slack` (로컬만)
+- **Slack 자유 답장**은 다음 사이클의 입력으로 사용됨 — 어드민이 흐름 중간에 끼어들어 방향을 조정 가능
+- **Obsidian 노드** — 사이클별 보고를 `<vault>/Projects/<프로젝트>/logs/YYYY-MM-DD.md` 에 자동 append
+- 생성 결과는 일반 워크플로우 — 캔버스에서 그대로 자유 편집 가능
+
 ### 🔀 워크플로우 엔진 (n8n 스타일 DAG)
 
-- **16개 노드 타입**: `start` · `session` · `subagent` · `aggregate` · `branch` · `output` · `http` · `transform` · `variable` · `subworkflow` · `embedding` · `loop` · `retry` · `error_handler` · `merge` · `delay`
+- **18개 노드 타입**: `start` · `session` · `subagent` · `aggregate` · `branch` · `output` · `http` · `transform` · `variable` · `subworkflow` · `embedding` · `loop` · `retry` · `error_handler` · `merge` · `delay` · `slack_approval` · `obsidian_log`
 - **병렬 실행** — 토폴로지 레벨 + ThreadPoolExecutor
 - **SSE 스트리밍** — 노드별 실시간 진행률
 - **🔁 Repeat** — 최대 횟수 · 간격 · 스케줄 윈도우(`HH:MM~HH:MM`) · 피드백 노트 자동 주입
@@ -312,7 +322,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.33.2)
+## 🔢 통계 (v2.35.0)
 
 | 지표 | 값 |
 |---|---|

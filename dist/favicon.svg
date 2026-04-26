@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 120" width="200" height="171" role="img" aria-label="LazyClaude mascot">
+  <title>LazyClaude — lazy pixel mascot with closed eyes</title>
+  <!-- ground shadow -->
+  <ellipse cx="70" cy="112" rx="28" ry="5" fill="#000" opacity="0.22"/>
+  <!-- ears -->
+  <rect x="42" y="12" width="8" height="14" fill="#E07C4C"/>
+  <rect x="90" y="12" width="8" height="14" fill="#E07C4C"/>
+  <!-- head top ledge -->
+  <rect x="38" y="26" width="64" height="4" fill="#E07C4C"/>
+  <!-- body -->
+  <rect x="34" y="30" width="72" height="40" fill="#E07C4C"/>
+  <!-- closed sleepy eyes (horizontal slits) -->
+  <rect x="50" y="44" width="8" height="2" fill="#1a1a1a"/>
+  <rect x="82" y="44" width="8" height="2" fill="#1a1a1a"/>
+  <!-- blushes -->
+  <rect x="46" y="52" width="6" height="3" fill="#C86139" opacity="0.7"/>
+  <rect x="88" y="52" width="6" height="3" fill="#C86139" opacity="0.7"/>
+  <!-- tiny smile -->
+  <rect x="64" y="56" width="12" height="2" fill="#1a1a1a"/>
+  <rect x="62" y="54" width="2" height="2" fill="#1a1a1a"/>
+  <rect x="76" y="54" width="2" height="2" fill="#1a1a1a"/>
+  <!-- arms (resting, lazy) -->
+  <rect x="22" y="42" width="12" height="8" fill="#E07C4C"/>
+  <rect x="106" y="42" width="12" height="8" fill="#E07C4C"/>
+  <!-- legs -->
+  <rect x="44" y="70" width="12" height="16" fill="#E07C4C"/>
+  <rect x="84" y="70" width="12" height="16" fill="#E07C4C"/>
+  <!-- feet -->
+  <rect x="40" y="86" width="20" height="4" fill="#C86139"/>
+  <rect x="80" y="86" width="20" height="4" fill="#C86139"/>
+  <!-- Zzz — lazy indicator -->
+  <text x="112" y="22" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16" font-weight="700" fill="#E07C4C">z</text>
+  <text x="122" y="14" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="700" fill="#E07C4C" opacity="0.8">z</text>
+  <text x="129" y="8"  font-family="ui-monospace,Menlo,Consolas,monospace" font-size="9"  font-weight="700" fill="#E07C4C" opacity="0.6">z</text>
+</svg>

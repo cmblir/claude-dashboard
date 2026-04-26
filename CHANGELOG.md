@@ -10,6 +10,297 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.35.0] — 2026-04-26
+
+### 📦 Install LazyClaude as a real app (PWA + macOS .app bundle)
+
+LazyClaude can now be installed as an app, both ways:
+
+#### Option A — PWA (cross-platform: macOS / Windows / Linux / iOS / Android)
+
+Open LazyClaude in any modern browser → click the install icon in the
+URL bar (Chrome/Edge) or **Share → Add to Home Screen** (Safari iOS).
+The dashboard launches in its own window with no browser chrome, has a
+Dock/taskbar icon, and registers shortcuts (Workflows / Crew Wizard /
+AI Providers) in the right-click context menu.
+
+- `dist/manifest.json` — `display: standalone`, `display_override`
+  fallback chain (`window-controls-overlay` → `standalone` →
+  `minimal-ui`), 3 launch shortcuts.
+- 4 PNG icons (192 / 512 / 512 maskable / 180 apple-touch) generated
+  from `docs/logo/mascot.svg` via Playwright. Maskable variant uses a
+  dark background so the orange mascot survives Android's adaptive
+  icon mask.
+- `apple-mobile-web-app-capable`, `theme-color` (dark + light media
+  queries), `og:title` / `og:image` / `og:description` for previews.
+
+#### Option B — macOS .app bundle (Spotlight-searchable, Dock-pinnable)
+
+```bash
+make install-mac     # builds + copies LazyClaude.app to /Applications/
+```
+
+Double-click in Finder, or open via Spotlight (`⌘Space → LazyClaude`).
+The launcher:
+
+1. Resolves the project directory: `$LAZYCLAUDE_HOME` env > `~/Lazyclaude`
+   > `~/lazyclaude`. Shows a friendly dialog if none found.
+2. Confirms `python3` is available.
+3. Reuses an already-running server on port 8080 if one is up.
+4. Otherwise starts `python3 server.py` in the background, logging to
+   `~/Library/Logs/LazyClaude/server.log`.
+5. Opens `http://127.0.0.1:8080` in the default browser.
+6. Forwards Quit / SIGTERM to the server so it shuts down cleanly.
+
+The bundle is **72 KB total** — no Python interpreter, no Electron, no
+Node runtime. It depends on the system `python3`, matching LazyClaude's
+stdlib-only philosophy.
+
+#### New Make targets
+
+| Target | What it does |
+|---|---|
+| `make pwa-icons` | regenerate PWA PNG icons from `docs/logo/mascot.svg` |
+| `make app` | build `dist/LazyClaude.app` |
+| `make install-mac` | build + copy to `/Applications/` (replaces existing) |
+| `make uninstall-mac` | remove `/Applications/LazyClaude.app` |
+
+#### Files
+
+- `dist/manifest.json` (new)
+- `dist/icons/{icon-192, icon-512, icon-maskable-512, apple-touch-180}.png` (new)
+- `dist/favicon.svg` + `dist/favicon-32.png` (new)
+- `dist/index.html` — PWA `<head>` block (manifest + theme-color + apple-* + og:*)
+- `tools/build_pwa_icons.mjs` (new) — Playwright-driven SVG → PNG renderer
+- `tools/build_macos_app.sh` (new) — bundle builder using `sips` + `iconutil`
+- `Makefile` — new targets
+
+#### Verification
+
+- Playwright PWA check — manifest parsed, all 4 icons + favicons load,
+  no failed responses, theme-color and apple-* meta tags present.
+- `.app` launcher — runtime simulation: server starts, `/api/version`
+  responds, log file created at `~/Library/Logs/LazyClaude/server.log`,
+  SIGTERM cleanly shuts the server down.
+
+---
+## [2.34.3] — 2026-04-26
+
+### 🚨 Mobile sidebar overlay — second pass
+
+The fix in v2.34.1 was insufficient. User reported (with a 670×720
+screenshot, English locale) that the page content was still readable
+through the dark-theme backdrop — `Documentation` button, the `57`
+optimization score, the green `100` progress bars and labels were all
+clearly visible behind the open sidebar.
+
+Reproduced with Playwright at the same viewport. Two failures of the
+v2.34.1 attempt:
+
+1. `rgba(0,0,0,0.78)` + `blur(2px)` is too weak on a dark theme — the
+   page text is mostly white/grey on near-black, and 78% black-on-black
+   barely changes contrast.
+2. `min(320px, 92vw)` left ~350 px of content visible to the right of
+   the sidebar at 670 px viewport width — and that's the part the
+   backdrop has to do all the work for.
+
+**Fixes**
+- Sidebar full-width (`100vw`) under **720 px** (was 480 px). 720 px
+  covers tablet portrait, narrow desktop windows, and the user's actual
+  viewport — content exposure is now 0 %.
+- Sidebar widened from `min(320px, 92vw)` to `min(360px, 92vw)` for the
+  720–900 px range.
+- Backdrop alpha 0.78 → **0.92** (dark) / 0.85 (light) with
+  `backdrop-filter: blur(10px) saturate(0.6)` — what little leaks past
+  the wider sidebar is heavily blurred and desaturated, no longer
+  readable.
+- Light theme switched from a transparent black overlay to a translucent
+  white overlay — better visual hierarchy on a light background.
+
+**Verification**
+- Playwright at 670×720 — sidebar is now `100vw`; content exposure 0 %.
+- Playwright at 850×720 — sidebar 360 px; right pane is heavily blurred
+  near-black, content unreadable.
+
+---
+## [2.34.2] — 2026-04-26
+
+### 🌐 EN / ZH translations for v2.34 features
+
+The Korean strings introduced in v2.34.0 / v2.34.1 were missing from the
+EN and ZH locales — English and Chinese users saw raw Korean in the Crew
+Wizard, palette categories, and node inspectors.
+
+**Changes**
+- New `tools/translations_manual_10.py` — ~210 EN + ZH entries covering
+  the Crew Wizard, palette categories, `slack_approval` / `obsidian_log`
+  node inspectors, the guide modal, and multi-sentence `WF_NODE_TYPES`
+  descriptions (the audit extractor only captures the first sentence).
+- `tools/translations_manual.py` — wires up `_NEW_EN_10` / `_NEW_ZH_10`.
+- `dist/locales/{en,zh,ko}.json` regenerated; Missing EN/ZH = 0.
+- `dist/index.html` — `_wfPickNodeType()` now wraps the auto-filled node
+  title with `t()` so EN/ZH users see "Start" instead of "시작".
+
+**Palette category labels**
+| KO | EN | ZH |
+|---|---|---|
+| 트리거 | Trigger | 触发器 |
+| AI 작업 | AI work | AI 工作 |
+| 흐름 제어 | Flow control | 流程控制 |
+| 데이터 / HTTP | Data / HTTP | 数据 / HTTP |
+| 연동 | Integrations | 集成 |
+| 출력 | Output | 输出 |
+
+**Verification**
+- `python3 build_locales.py` — Missing EN/ZH = 0.
+- Playwright QA across en / zh / ko cookies — Crew Wizard 4 steps + guide
+  modal + palette accordion + slack_approval / obsidian_log row picks.
+  Korean leak count: EN 0, ZH 2 (pre-existing header CLI status indicator,
+  unrelated to v2.34).
+
+---
+## [2.34.1] — 2026-04-26
+
+### 🚨 Mobile sidebar backdrop + n8n-style palette + wizard guide
+
+#### 1. Small-screen sidebar overlay (urgent)
+
+User reported (with a 670×720 screenshot) that opening a sidebar category
+on a small viewport leaked the page content through the sidebar with a
+"weird pink pixel" floating at the corner. Reproduced with Playwright;
+four root causes:
+
+1. `body.sidebar-open::after` backdrop was `rgba(0,0,0,0.5)` — too weak
+   on the dark theme so the page text was clearly readable.
+2. No body scroll lock — content scrolled behind the open sidebar.
+3. `#claudeMascot` (z-index 1150), `#chatBubble`, `#chatLauncher` floated
+   above the z=35 backdrop — surfacing as the "pink pixel" the user saw.
+4. Sidebar width `min(300px, 85vw)` left ~370 px of content visible on a
+   670 px viewport.
+
+**Fixes**
+- Backdrop alpha 0.5 → 0.78 (dark) / 0.45 (light) + `backdrop-filter: blur(2px)`.
+- `body.sidebar-open { overflow: hidden }` to lock body scroll.
+- Sidebar widened to `min(320px, 92vw)`; **full `100vw` under 480 px** (no
+  background bleed on narrow screens).
+- Floating `#claudeMascot` / `#chatBubble` / `#chatLauncher` force-hidden
+  while the sidebar is open.
+
+#### 2. Workflow node palette redesigned to n8n-style accordion
+
+User feedback: "too many icons, blocks too big". The 18 node types in a
+3-column grid of large blocks were replaced with a **6-category × compact
+row accordion**. One category open at a time. Click a category header →
+expand a list of compact rows (icon + label + truncated description) →
+click a row → detailed form (Zapier / n8n flow).
+
+| Category | Nodes |
+|---|---|
+| 🚀 Trigger | `start` |
+| 🤖 AI work | `session`, `subagent`, `embedding` |
+| 🔁 Flow control | `branch`, `loop`, `retry`, `error_handler`, `merge`, `delay`, `aggregate` |
+| 🔧 Data / HTTP | `http`, `transform`, `variable`, `subworkflow` |
+| 🔗 Integrations | `slack_approval`, `obsidian_log` |
+| 📤 Output | `output` |
+
+- The currently selected node's category auto-opens and is highlighted.
+- Open-category state is persisted per-editor in `localStorage`.
+- The new `slack_approval` and `obsidian_log` nodes also got proper
+  default data on selection (`channel`, `vaultPath`, `passThrough`, …) —
+  previously they started with an empty data object.
+
+#### 3. Crew Wizard usage guide
+
+A `📖 Show how it works` button plus a first-visit auto-open modal (gated
+by `cwGuideSeen` in `localStorage`). Six sections:
+
+1. What is this? — wizard's purpose.
+2. Generated structure — ASCII diagram.
+3. 4-step guide — input explained step-by-step.
+4. Slack interaction — ✅/❌ reactions and reply keyword mapping.
+5. Common gotchas — token not configured, vault path, bot channel
+   invitation, etc.
+6. After generation — canvas editing, Webhook, live monitoring.
+
+**Files**
+- `dist/index.html` — backdrop/sidebar CSS, palette accordion
+  (`WF_NODE_CATEGORIES`, `_wfPaletteToggleCat`, `.wf-palette` CSS), wizard
+  guide modal (`_cwShowGuide`).
+
+**Verification**
+- Playwright on viewports 670×720 and 420×720 — backdrop + mascot hidden
+  + scroll lock confirmed.
+- Palette renders 6 categories × 18 rows; single-open behaviour holds; a
+  row click triggers default data + form render.
+- Wizard auto-guide on first visit + manual `📖` button both work.
+
+---
+## [2.34.0] — 2026-04-26
+
+### 🧑‍✈️ Crew Wizard + Slack approval gate + Obsidian logging
+
+Two-pronged response to the "the workflow editor is too complex"
+feedback:
+
+1. **New Crew Wizard tab (`crewWizard`)** — a Zapier-style 4-step form
+   that scaffolds a planner + N personas + Slack admin gate + Obsidian
+   log workflow in one click. The output is a regular workflow editable
+   in the canvas.
+2. **The Workflows tab stays the n8n-style advanced surface** — two new
+   node types are exposed in the palette and inspector.
+
+**New modules**
+- `server/slack_api.py` — Slack Web API client (Bot Token `xoxb-*`):
+  `chat.postMessage`, `conversations.replies`, `reactions.get`,
+  `auth.test`. Token saved to `~/.claude-dashboard-slack.json` with
+  chmod 600.
+- `server/obsidian_log.py` — markdown appender writing to
+  `<vault>/Projects/<project>/logs/YYYY-MM-DD.md`. `$HOME`-only with
+  `realpath` for path-traversal defence.
+- `server/crew_wizard.py` — form → DAG builder. Three autonomy modes:
+  `admin_gate` / `autonomous` / `no_slack`.
+
+**New workflow nodes**
+- `slack_approval` — posts to a Slack channel and polls for ✅/❌
+  reactions or thread replies. On timeout one of `approve | reject |
+  abort | default`. A free-form reply is used as the next cycle's input
+  so the admin can steer mid-flight.
+- `obsidian_log` — appends each cycle's report. In pass-through mode the
+  input flows on to the next node unchanged.
+
+**New built-in template**
+- `bt-crew` (Persona Crew) — Planner (Opus) → 3 personas (Claude / Gemini
+  / Ollama mix) → Aggregate → SlackApproval → ObsidianLog → Output, with
+  a 3-cycle loop.
+
+**New endpoints**
+- `GET  /api/slack/config` — returns only a redacted token hint.
+- `POST /api/slack/config/save` — `auth.test` then persist.
+- `POST /api/slack/config/clear`
+- `POST /api/slack/test`            — send a test message to a channel.
+- `POST /api/obsidian/test`         — try writing to the vault.
+- `POST /api/wizard/crew/preview`   — build but do not save.
+- `POST /api/wizard/crew/create`    — build + save + return wfId.
+
+**Files**
+- `server/slack_api.py` (+283)
+- `server/obsidian_log.py` (+118)
+- `server/crew_wizard.py` (+260)
+- `server/workflows.py` (+~190 — two node types' sanitize/executor +
+  `bt-crew` template)
+- `server/routes.py` (+11 — route registration)
+- `dist/index.html` (+~430 — Wizard view 4-step form + inspector +
+  palette)
+
+**Security**
+- Slack token: env var `SLACK_BOT_TOKEN` > file. Responses expose only a
+  redacted hint like `xoxb-1234... ABCD`.
+- Slack API calls are restricted to host `slack.com` over HTTPS; token
+  format validated by `^xox[bp]-...` regex.
+- Obsidian vault path: `realpath`-checked under `$HOME` only; project
+  name validated against `[A-Za-z0-9 _\-./]{1,80}` regex.
+
+---
 ## [2.33.3] — 2026-04-24
 
 ### 🎨 Light theme WCAG AA contrast audit

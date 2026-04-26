@@ -90,6 +90,12 @@ from .toolkits import (
     api_toolkit_ccb_install, api_toolkit_ccb_uninstall, api_toolkit_ccb_open,
 )
 from .notify import api_notify_test
+from .slack_api import (
+    api_slack_config_clear, api_slack_config_get, api_slack_config_save,
+    api_slack_test,
+)
+from .obsidian_log import api_obsidian_test
+from .crew_wizard import api_crew_create, api_crew_preview
 from .session_replay import api_session_replay_list, api_session_replay_load
 from .event_forwarder import (
     api_event_forwarder_list, api_event_forwarder_add,
@@ -231,6 +237,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/marketplaces/list": lambda q: api_marketplace_list(),
     "/api/guide/toolkit": lambda q: api_guide_toolkit(),
     "/api/guide/onboarding": lambda q: api_guide_onboarding(),
+    "/api/slack/config": lambda q: api_slack_config_get(q),
     "/api/workflows/list": lambda q: api_workflows_list(q),
     "/api/workflows/run-status": api_workflow_run_status,
     "/api/workflows/runs": api_workflow_runs_list,
@@ -375,6 +382,12 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/toolkit/ccb/uninstall": api_toolkit_ccb_uninstall,
     "/api/toolkit/ccb/open": api_toolkit_ccb_open,
     "/api/notify/test": api_notify_test,
+    "/api/slack/config/save":  api_slack_config_save,
+    "/api/slack/config/clear": api_slack_config_clear,
+    "/api/slack/test":         api_slack_test,
+    "/api/obsidian/test":      api_obsidian_test,
+    "/api/wizard/crew/create":  api_crew_create,
+    "/api/wizard/crew/preview": api_crew_preview,
     "/api/event-forwarder/add": api_event_forwarder_add,
     "/api/event-forwarder/remove": api_event_forwarder_remove,
     "/api/session/spawn": api_session_spawn,
