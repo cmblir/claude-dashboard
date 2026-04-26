@@ -27,6 +27,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 | ver | highlight |
 |---|---|
+| **v2.37.0** | 🔄 **Auto-Resume** — inject a self-healing retry loop into a live Claude session. Background worker classifies the exit reason (rate-limit / context-full / auth-expired / unknown), parses precise reset times, runs `claude --resume <id>` with exponential backoff, snapshot-hash stall detection, and per-project Stop+SessionStart hooks for context preservation. UI panel in session detail; 🔄 AR badge in session list. |
 | **v2.36.3** | 🔄 **Server-restart auto-banner** — dashboard polls `/api/version` every 60s and prompts a one-click reload when `serverStartedAt` changes (no more "I deployed but the user is on a stale build"). |
 | **v2.36.1** | 🩹 **Run Center ECC discovery hotfix + OMC/OMX guide cards** — `_ecc_roots()` reads `installed_plugins.json` and recognises both `ecc@ecc` and `everything-claude-code@everything-claude-code` ids. Guide & Tools gains OMC and OMX cards explaining LazyClaude-absorbed vs CLI-only features. |
 | **v2.36.0** | 🎯 **Run Center** — new tab unifying ECC's 181 skills + 79 slash commands + OMC's 4 modes + OMX's 4 commands into one searchable, runnable catalog. **Workflow Quick Actions** — 4 OMC modes (Autopilot / Ralph / Ultrawork / Deep Interview) launchable from the Workflows tab header. **Commands tab Run buttons** — every slash command card gets a ▶ button and an ECC chip. |

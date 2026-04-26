@@ -1364,6 +1364,8 @@ const __noReloadPaths = [
   '/api/ai-providers/',
   // Ollama — pull/serve/info/settings 는 인라인 상태 업데이트
   '/api/ollama/',
+  // Auto-Resume — 모달 안에서 토글하므로 자동 리로드 시 모달이 닫힘
+  '/api/auto_resume/',
 ];
 // ── 인메모리 GET 캐시 — 빈번한 GET 호출의 중복 네트워크 비용 제거 ──
 const _apiCache = {};
@@ -8370,7 +8372,12 @@ AFTER.analytics = () => {
 VIEWS.sessions = async () => {
   const q = state.data.sessionsFilter || { q: '', sort: 'recent', project: '', minScore: 0, errorsOnly: false };
   const params = new URLSearchParams({ limit: 100, q: q.q, sort: q.sort });
-  const res = await api('/api/sessions/list?' + params);
+  const [res, ar] = await Promise.all([
+    api('/api/sessions/list?' + params),
+    api('/api/auto_resume/status').catch(() => ({ active: [] })),
+  ]);
+  const arActiveIds = new Set((ar.active || []).map(e => e.sessionId));
+  state.data._arActiveCount = arActiveIds.size;
   // v2.33.7 — 클라이언트 측 프로젝트 / 스코어 / 오류 필터
   const allSessions = res.sessions || [];
   const projects = {};
@@ -8439,7 +8446,7 @@ VIEWS.sessions = async () => {
             </td>
             <td class="max-w-[340px] truncate">${escapeHtml((s.first_user_prompt||'(요청 없음)').slice(0,120))}</td>
             <td class="text-xs" title="${escapeHtml(s.projectPath||'')}">
-              <div class="font-semibold">${escapeHtml(s.project || '—')}</div>
+              <div class="font-semibold">${escapeHtml(s.project || '—')}${arActiveIds.has(s.session_id) ? ` <span class="chip chip-accent text-[9px]" title="${t('Auto-Resume 주입 중')}">🔄 AR</span>` : ''}</div>
               <div class="mono text-[10px] text-[var(--text-dim)] truncate" style="max-width:240px;">${escapeHtml(s.projectPath || '')}</div>
             </td>
             <td class="text-right">${s.message_count}</td>
@@ -8557,6 +8564,12 @@ function renderSessionDetail(d, tok, tl) {
     </div>
     <div class="flex-1 overflow-y-auto p-6 space-y-5">
 
+      <!-- Auto-Resume 패널 -->
+      <div id="autoResumePanel" data-session-id="${escapeHtml(s.session_id)}" data-cwd="${escapeHtml(s.cwd || s.projectPath || '')}">
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('Auto-Resume — 세션에 재시도 워커 주입')}</div>
+        <div class="card p-3 text-xs"><div class="empty text-xs">${t('상태 불러오는 중…')}</div></div>
+      </div>
+
       <!-- 1행: 토큰 요약 + 5축 점수 -->
       <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
         ${[
@@ -8642,7 +8655,234 @@ function renderSessionDetail(d, tok, tl) {
   `);
   // 그래프 렌더 — vis-network
   setTimeout(() => drawSessionTimeline(tl), 50);
+  setTimeout(() => _arLoad(s.session_id), 30);
 }
+
+// ────────────────────────────────────────────────────────────────
+// AUTO-RESUME — inject a retry loop into a live Claude Code session.
+// Mirrors the user's reference shell: claude --resume <id> -p "..." in a
+// loop with sleep(pollInterval) between non-zero exits. Backend worker at
+// server/auto_resume.py owns the actual loop; this UI just toggles +
+// shows live status.
+// ────────────────────────────────────────────────────────────────
+const _AR_STATE_LABEL = {
+  watching:  { ko: '대기 중 (idle 미충족)', cls: '' },
+  retrying:  { ko: '실행 중 (claude --resume)', cls: 'chip-accent' },
+  sleeping:  { ko: '쿨다운 중 (다음 시도 예약)', cls: 'chip-warn' },
+  succeeded: { ko: '재개 성공', cls: 'chip-ok' },
+  stopped:   { ko: '중단됨', cls: '' },
+  error:     { ko: '오류', cls: 'chip-err' },
+};
+
+async function _arLoad(sessionId) {
+  if (!sessionId) return;
+  const panel = document.getElementById('autoResumePanel');
+  if (!panel || panel.dataset.sessionId !== sessionId) return;
+  try {
+    const r = await api('/api/auto_resume/get?sessionId=' + encodeURIComponent(sessionId));
+    _arRender(panel, r.entry);
+    _arSchedulePoll(sessionId, !!(r.entry && r.entry.enabled));
+  } catch (e) {
+    panel.querySelector('.card').innerHTML = `<div class="text-xs" style="color:#fca5a5">${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
+
+const _AR_REASON_CHIP = {
+  rate_limit:    { ko: '레이트 한도', cls: 'chip-warn' },
+  context_full:  { ko: '컨텍스트 한도 초과', cls: 'chip-err' },
+  auth_expired:  { ko: '인증 만료', cls: 'chip-err' },
+  clean:         { ko: '정상 종료', cls: 'chip-ok' },
+  unknown:       { ko: '알 수 없음', cls: '' },
+};
+
+function _arRender(panel, entry) {
+  const sid = panel.dataset.sessionId;
+  const cwd = panel.dataset.cwd || '';
+  const card = panel.querySelector('.card');
+  if (!entry || !entry.enabled) {
+    const prevPrompt   = entry && entry.prompt ? entry.prompt : '';
+    const prevPoll     = entry && entry.pollInterval ? entry.pollInterval : 300;
+    const prevIdle     = entry && entry.idleSeconds ? entry.idleSeconds : 90;
+    const prevMax      = entry && entry.maxAttempts ? entry.maxAttempts : 12;
+    const prevContinue = entry && entry.useContinue ? 'checked' : '';
+    const prevHooks    = entry && entry.installHooks ? 'checked' : '';
+    const stoppedNote  = entry && entry.stopReason
+      ? `<div class="text-[10px] mb-2" style="color:#fca5a5">${t('이전 중단 사유')}: ${escapeHtml(entry.stopReason)}</div>`
+      : '';
+    card.innerHTML = `
+      <div class="text-xs text-[var(--text-mute)] mb-2">
+        ${t('이 세션이 토큰/레이트 한도로 멈추면 백그라운드 워커가 claude --resume 으로 자동 재시도합니다 (셸 while-loop 동등).')}
+      </div>
+      ${stoppedNote}
+      <details class="mb-2">
+        <summary class="text-[11px] text-[var(--text-dim)] cursor-pointer mb-2">${t('고급 설정')}</summary>
+        <textarea id="arPrompt" class="input w-full text-xs mb-2" rows="3"
+          placeholder="${t('재개 프롬프트 — 비우면 기본값 사용')}">${escapeHtml(prevPrompt)}</textarea>
+        <div class="flex gap-2 items-center text-xs flex-wrap mb-2">
+          <label class="text-[var(--text-dim)]">${t('재시도 간격(초)')}</label>
+          <input id="arPoll" class="input w-24" type="number" min="30" max="3600" value="${prevPoll}" />
+          <label class="text-[var(--text-dim)]">${t('정지 판정 idle(초)')}</label>
+          <input id="arIdle" class="input w-24" type="number" min="30" value="${prevIdle}" />
+          <label class="text-[var(--text-dim)]">${t('최대 재시도 횟수')}</label>
+          <input id="arMax" class="input w-20" type="number" min="1" max="60" value="${prevMax}" />
+        </div>
+        <div class="flex gap-3 items-center text-xs flex-wrap">
+          <label class="cursor-pointer flex items-center gap-1">
+            <input type="checkbox" id="arUseContinue" ${prevContinue} />
+            <span title="${t('--resume <id> 대신 --continue 사용')}">${t('--continue 모드')}</span>
+          </label>
+          <label class="cursor-pointer flex items-center gap-1">
+            <input type="checkbox" id="arInstallHooks" ${prevHooks} />
+            <span title="${t('Stop hook 으로 매 응답 시 스냅샷 저장 + SessionStart 로 자동 주입')}">${t('Stop+SessionStart Hook 자동 설치 (프로젝트)')}</span>
+          </label>
+        </div>
+      </details>
+      <button class="btn btn-accent text-xs" id="arInjectBtn" onclick="_arSubmit('${sid}', ${JSON.stringify(cwd).replace(/"/g, '&quot;')})">
+        🔄 ${t('Auto-Resume 주입')}
+      </button>
+    `;
+    return;
+  }
+  const lab = _AR_STATE_LABEL[entry.state] || { ko: entry.state, cls: '' };
+  const nextRel = entry.nextAttemptAt ? Math.max(0, Math.round((entry.nextAttemptAt - Date.now()) / 1000)) : 0;
+  const lastRel = entry.lastAttemptAt ? fmtRel(entry.lastAttemptAt) : t('아직 없음');
+  const lastExit = entry.lastExitCode === null || entry.lastExitCode === undefined ? '—' : entry.lastExitCode;
+  const reason = _AR_REASON_CHIP[entry.lastExitReason];
+  const reasonChip = reason ? `<span class="chip ${reason.cls}">${t(reason.ko)}</span>` : '';
+  const maxA = entry.maxAttempts || 12;
+  const pct = Math.min(100, Math.round((entry.attempts / maxA) * 100));
+  const barColor = pct < 50 ? '#86efac' : (pct < 80 ? '#fcd34d' : '#fca5a5');
+  const stallCount = (entry.snapshotHashes || []).length;
+  const fmtClock = (ms) => {
+    if (!ms) return '';
+    try { return new Date(ms).toLocaleTimeString(); } catch { return ''; }
+  };
+  const nextClock = entry.nextAttemptAt ? fmtClock(entry.nextAttemptAt) : '';
+  const resetClock = entry.lastResetAt ? fmtClock(entry.lastResetAt) : '';
+  const snapPreview = entry.snapshotPreview
+    ? `<details class="mb-2">
+         <summary class="text-[10px] text-[var(--text-dim)] cursor-pointer">${t('Stop hook 스냅샷 미리보기')}</summary>
+         <pre class="text-[10px] whitespace-pre-wrap bg-black/20 p-2 rounded mt-1 max-h-40 overflow-auto">${escapeHtml(entry.snapshotPreview)}</pre>
+       </details>`
+    : '';
+  card.innerHTML = `
+    <div class="flex items-center gap-2 mb-2 flex-wrap">
+      <span class="chip ${lab.cls}" id="arStateChip">${t(lab.ko)}</span>
+      ${reasonChip}
+      <span class="chip">${t('시도')} ${entry.attempts}/${maxA}</span>
+      ${entry.state === 'waiting' && nextRel > 0
+        ? `<span class="chip chip-warn">${t('다음 시도까지')} ${nextRel}s${nextClock ? ' (' + nextClock + ')' : ''}</span>`
+        : ''}
+      ${resetClock ? `<span class="chip">${t('리셋')} ${resetClock}</span>` : ''}
+    </div>
+    <div class="h-1.5 bg-white/5 rounded overflow-hidden mb-3">
+      <div style="width:${pct}%; height:100%; background:${barColor}; transition: width .3s;"></div>
+    </div>
+    <div class="grid grid-cols-2 gap-3 text-[10px] text-[var(--text-dim)] mb-2">
+      <div><span class="uppercase">${t('재시도 간격')}:</span> ${entry.pollInterval}s</div>
+      <div><span class="uppercase">${t('정지 idle')}:</span> ${entry.idleSeconds}s</div>
+      <div><span class="uppercase">${t('마지막 시도')}:</span> ${lastRel} · exit=${lastExit}</div>
+      <div><span class="uppercase">${t('스냅샷 해시 기록')}:</span> ${stallCount}/5${stallCount >= 3 ? ' ⚠' : ''}</div>
+    </div>
+    <details class="mb-2">
+      <summary class="text-[10px] text-[var(--text-dim)] cursor-pointer">${t('재개 프롬프트')}</summary>
+      <pre class="text-[11px] whitespace-pre-wrap bg-black/20 p-2 rounded mt-1">${escapeHtml(entry.prompt || '')}</pre>
+    </details>
+    ${snapPreview}
+    ${entry.lastError ? `
+      <details class="mb-2">
+        <summary class="text-[10px] cursor-pointer" style="color:#fca5a5">${t('마지막 오류 출력')}</summary>
+        <pre class="text-[10px] whitespace-pre-wrap bg-black/20 p-2 rounded mt-1 max-h-40 overflow-auto" style="color:#fca5a5">${escapeHtml(entry.lastError)}</pre>
+      </details>
+    ` : ''}
+    ${entry.stopReason ? `<div class="text-[10px] mb-2" style="color:#fcd34d">⚠ ${escapeHtml(entry.stopReason)}</div>` : ''}
+    <div class="flex gap-2 flex-wrap">
+      <button class="btn text-xs" id="arCancelBtn" onclick="_arCancel('${sid}')" style="color:#fca5a5">
+        ⏹ ${t('Auto-Resume 중단')}
+      </button>
+      ${entry.installHooks ? `
+        <button class="btn text-xs" onclick="_arUninstallHooks(${JSON.stringify(cwd).replace(/"/g, '&quot;')}, '${sid}')">
+          🪝 ${t('Hook 제거')}
+        </button>` : `
+        <button class="btn text-xs" onclick="_arInstallHooksOnly(${JSON.stringify(cwd).replace(/"/g, '&quot;')}, '${sid}')">
+          🪝 ${t('Hook 설치')}
+        </button>`}
+    </div>
+  `;
+}
+
+async function _arInstallHooksOnly(cwd, sid) {
+  try {
+    const r = await api('/api/auto_resume/install_hooks', { method:'POST', body: JSON.stringify({ cwd }) });
+    if (r.ok) { toast(t('Hook 설치 완료'), 'ok'); _arLoad(sid); }
+    else      { toast(r.error || t('실패'), 'err'); }
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function _arUninstallHooks(cwd, sid) {
+  try {
+    const r = await api('/api/auto_resume/uninstall_hooks', { method:'POST', body: JSON.stringify({ cwd }) });
+    if (r.ok) { toast(t('Hook 제거 완료'), 'ok'); _arLoad(sid); }
+    else      { toast(r.error || t('실패'), 'err'); }
+  } catch (e) { toast(e.message, 'err'); }
+}
+window._arInstallHooksOnly = _arInstallHooksOnly;
+window._arUninstallHooks   = _arUninstallHooks;
+
+async function _arSubmit(sessionId, cwd) {
+  const promptEl   = document.getElementById('arPrompt');
+  const pollEl     = document.getElementById('arPoll');
+  const idleEl     = document.getElementById('arIdle');
+  const maxEl      = document.getElementById('arMax');
+  const contEl     = document.getElementById('arUseContinue');
+  const hooksEl    = document.getElementById('arInstallHooks');
+  const body = {
+    sessionId,
+    cwd: cwd || '',
+    prompt: promptEl ? promptEl.value : '',
+    pollInterval: pollEl ? Number(pollEl.value) || 300 : 300,
+    idleSeconds: idleEl ? Number(idleEl.value) || 90 : 90,
+    maxAttempts: maxEl ? Number(maxEl.value) || 12 : 12,
+    useContinue: !!(contEl && contEl.checked),
+    installHooks: !!(hooksEl && hooksEl.checked),
+  };
+  try {
+    const r = await api('/api/auto_resume/set', { method: 'POST', body: JSON.stringify(body) });
+    if (r.ok) {
+      toast(t('Auto-Resume 주입 완료'), 'ok');
+      _arLoad(sessionId);
+    } else {
+      toast(r.error || t('실패'), 'err');
+    }
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function _arCancel(sessionId) {
+  if (!confirm(t('Auto-Resume 워커를 중단할까요?'))) return;
+  try {
+    const r = await api('/api/auto_resume/cancel', { method: 'POST', body: JSON.stringify({ sessionId }) });
+    if (r.ok) {
+      toast(t('Auto-Resume 중단됨'), 'ok');
+      _arLoad(sessionId);
+    } else {
+      toast(r.error || t('실패'), 'err');
+    }
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+let _arPollTimer = null;
+function _arSchedulePoll(sessionId, active) {
+  if (_arPollTimer) { clearTimeout(_arPollTimer); _arPollTimer = null; }
+  if (!active) return;
+  _arPollTimer = setTimeout(() => {
+    const panel = document.getElementById('autoResumePanel');
+    if (panel && panel.dataset.sessionId === sessionId) _arLoad(sessionId);
+  }, 5000);
+}
+
+window._arSubmit = _arSubmit;
+window._arCancel = _arCancel;
+window._arLoad   = _arLoad;
 
 function drawSessionTimeline(tl) {
   const el = document.getElementById('sessionTimelineGraph');

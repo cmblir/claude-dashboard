@@ -10,6 +10,59 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.37.0] — 2026-04-27
+
+### ✨ Auto-Resume — inject a self-healing retry loop into a live Claude Code session
+
+Open a session detail in the dashboard, click **🔄 Auto-Resume 주입**, and a
+background worker now watches that session's transcript. When it gets killed
+by a token / rate-limit, the worker spawns `claude --resume <id> -p "<prompt>"`
+in the session's cwd — exactly like the user-supplied reference shell while-loop:
+
+```bash
+while true; do
+  claude "$@"
+  [[ $? -eq 0 ]] && break
+  sleep 300
+done
+```
+
+…but with seven extra mechanisms baked in:
+
+| # | Mechanism | Where |
+|---|---|---|
+| 1 | **Exit-reason classification** — `rate_limit` / `context_full` / `auth_expired` / `clean` / `unknown` via stderr+stdout+jsonl-tail regex | `server/auto_resume.py::_classify_exit` |
+| 2 | **Precise reset-time parsing** — `"resets at 11:30am"`, `"in 30 minutes"`, `"after 2 hours"` → exact next-attempt epoch_ms | `server/auto_resume.py::_parse_reset_time` |
+| 3 | **Stop-hook progress snapshot** — every Claude response writes `<cwd>/.claude/auto-resume/snapshot.md` so we always have the latest state on disk | `server/auto_resume_hooks.py::install` |
+| 4 | **SessionStart-hook injection** — resumed session gets the snapshot piped into context automatically (Claude Code's SessionStart-hook stdout contract) | `server/auto_resume_hooks.py::install` |
+| 5 | **External wrapper restart loop** — supervisor classifies → waits → re-spawns; `--resume <id>` by default, `--continue` toggle available | `server/auto_resume.py::_process_one` |
+| 6 | **Loop guards** — `maxAttempts` (default 12), exponential backoff (1m→2m→4m→8m→16m→30m cap) for `unknown`, snapshot-hash stall detect (3× identical halts the loop) | `server/auto_resume.py::_exponential_backoff`, `_push_hash_and_check_stall` |
+| 7 | **Observable state file** — `~/.claude-dashboard-auto-resume.json` with `running`/`waiting`/`watching`/`done`/`failed`/`exhausted`/`stopped`/`error` state per session | `server/auto_resume.py::_dump_all` |
+
+#### What's new
+
+- **New module**: `server/auto_resume.py` (worker + state machine + classifier + parser + backoff + stall detect)
+- **New module**: `server/auto_resume_hooks.py` (per-project Stop+SessionStart hook installer with backup + idempotent re-install + clean uninstall)
+- **New endpoints** (all under `/api/auto_resume/`): `set`, `cancel`, `get`, `status`, `install_hooks`, `uninstall_hooks`, `hook_status`
+- **New panel**: in the session-detail modal, with state chip, exit-reason chip, attempts/max progress bar, next-attempt countdown, snapshot preview, hook install/remove buttons, advanced settings (prompt, poll, idle, maxAttempts, --continue mode, install hooks)
+- **Sessions list** now shows a `🔄 AR` badge on every session with an active binding
+- **i18n**: 41 new keys in `ko/en/zh` (translations_manual_12.py)
+
+#### Verification
+
+- `npm run test:e2e:auto-resume` — 5 consecutive runs, 3 viewports each (375x667 / 768x800 / 1280x800) — **15/15 PASS**
+- `npm run test:e2e:smoke` — **58/58 tabs PASS** (no regression)
+- Backend unit tests cover all 7 mechanisms; round-trip of hook install/uninstall verified in tmp sandbox
+
+#### Safety
+
+- Default OFF; opt-in per session
+- Never auto-injects `--dangerously-skip-permissions`
+- Hook installation is project-local only; `~/.claude/settings.json` (global) is **never** touched
+- Settings.json backup written to `<cwd>/.claude/settings.json.auto-resume.bak` before first mutation
+- Cancel + uninstall are idempotent and reversible
+
+---
 ## [2.36.3] — 2026-04-26
 
 ### 🩹 Project snapshot modal — scroll fix

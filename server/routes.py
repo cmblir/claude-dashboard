@@ -140,6 +140,12 @@ from .ollama_hub import (
     api_ollama_serve_start, api_ollama_serve_stop, api_ollama_serve_status,
     api_ollama_create_model,
 )
+from .auto_resume import (
+    api_auto_resume_cancel, api_auto_resume_get,
+    api_auto_resume_hook_status, api_auto_resume_install_hooks,
+    api_auto_resume_set, api_auto_resume_status,
+    api_auto_resume_uninstall_hooks,
+)
 
 
 def _ai_providers_by_cap(query: dict) -> dict:
@@ -291,6 +297,9 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/embedding-lab/examples": api_embedding_examples,
     "/api/prompt-library/list": api_prompt_library_list,
     "/api/cost-timeline/summary": api_cost_timeline_summary,
+    "/api/auto_resume/status": api_auto_resume_status,
+    "/api/auto_resume/get": api_auto_resume_get,
+    "/api/auto_resume/hook_status": api_auto_resume_hook_status,
     "/api/rtk/status": api_rtk_status,
     "/api/rtk/config": api_rtk_config,
     "/api/rtk/gain": api_rtk_gain,
@@ -435,6 +444,10 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/prompt-library/delete": api_prompt_library_delete,
     "/api/prompt-library/duplicate": api_prompt_library_duplicate,
     "/api/prompt-library/to-workflow": api_prompt_library_to_workflow,
+    "/api/auto_resume/set": api_auto_resume_set,
+    "/api/auto_resume/cancel": api_auto_resume_cancel,
+    "/api/auto_resume/install_hooks": api_auto_resume_install_hooks,
+    "/api/auto_resume/uninstall_hooks": api_auto_resume_uninstall_hooks,
 }
 
 
