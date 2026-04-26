@@ -551,6 +551,52 @@ tailwind.config = {
   .wf-pal-label { font-size: 12px; font-weight: 600; color: var(--text); }
   .wf-pal-desc { font-size: 10.5px; color: var(--text-dim); line-height: 1.35; }
 
+  /* v2.36.0 — Run Center cards + filters */
+  .rc-filter {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 6px 10px; border-radius: 8px; border: 1px solid transparent;
+    background: transparent; color: var(--text); cursor: pointer; text-align: left;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .rc-filter:hover { background: rgba(255,255,255,0.04); }
+  .rc-filter-on { background: rgba(217,119,87,0.14); border-color: rgba(217,119,87,0.45); }
+  .rc-count { font-size: 10px; color: var(--text-dim); padding: 1px 6px; background: rgba(255,255,255,0.06); border-radius: 8px; }
+
+  .rc-cat {
+    padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); background: transparent;
+    color: var(--text-mute); cursor: pointer; transition: all 0.1s;
+  }
+  .rc-cat:hover { color: var(--text); border-color: var(--border-hi); }
+  .rc-cat-on { background: rgba(167,139,250,0.18); border-color: rgba(167,139,250,0.55); color: var(--text); }
+
+  .rc-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+    background: rgba(255,255,255,0.015); cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.12s;
+    display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  }
+  .rc-card:hover { background: rgba(255,255,255,0.04); border-color: var(--border-hi); transform: translateY(-1px); }
+  .rc-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .rc-source { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; }
+  .rc-fav { background: transparent; border: 0; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 0; }
+  .rc-fav:hover { color: var(--accent); }
+  .rc-name { font-size: 13px; font-weight: 600; line-height: 1.3; word-break: break-word; }
+  .rc-desc {
+    font-size: 11.5px; color: var(--text-mute); line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .rc-card-foot { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 4px; }
+  .rc-cat-tag, .rc-kind-tag {
+    font-size: 10px; padding: 2px 6px; border-radius: 6px;
+    background: rgba(255,255,255,0.06); color: var(--text-dim);
+  }
+  .rc-card-compact { padding: 8px 10px; }
+
+  body.theme-light .rc-card { background: rgba(0,0,0,0.02); }
+  body.theme-light .rc-card:hover { background: rgba(0,0,0,0.05); }
+  body.theme-light .rc-cat-tag, body.theme-light .rc-kind-tag { background: rgba(0,0,0,0.06); }
+  body.theme-light .rc-count { background: rgba(0,0,0,0.06); }
+
   body.theme-light .wf-pal-cat { background: rgba(0,0,0,0.02); }
   body.theme-light .wf-pal-cat-body { background: rgba(0,0,0,0.04); }
   .wf-node { cursor: grab; }
@@ -1146,6 +1192,9 @@ const NAV = [
   // build — 워크플로우/에이전트/프롬프트 (8)
   { id: 'crewWizard',  icon: '🧑‍✈️', label: '크루 위저드', group: 'build',
     desc: '폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 자동 생성',
+    docUrl: null },
+  { id: 'runCenter',   icon: '🎯', label: '런 센터', group: 'build',
+    desc: 'ECC 스킬 181개 + 슬래시 명령 79개 + OMC 4모드 + OMX 명령을 검색·1클릭 실행',
     docUrl: null },
   { id: 'workflows',   icon: '🔀', label: '워크플로우', group: 'build',
     desc: '세션 노드를 DAG 로 연결해 업무 흐름 설계' },
@@ -2512,6 +2561,17 @@ VIEWS.workflows = async () => {
   }
   return `
     ${viewHeader('🔀 워크플로우', '세션 노드를 DAG 로 연결해 업무 흐름 설계. 포트를 드래그해 화살표로 연결.', 'workflows')}
+
+    <!-- v2.36.0 — Quick Actions: OMC 4 modes one-click workflow scaffold -->
+    <div class="card mb-3" style="padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      <span class="text-[11px] font-semibold mr-1" style="color:var(--text-dim);">⚡ ${t('빠른 실행 (OMC 모드)')}</span>
+      <button class="btn text-xs" onclick="_wfQuickAction('autopilot')" title="${t('요구사항 → 계획 → 실행 → 검증 단일 흐름')}">🚀 Autopilot</button>
+      <button class="btn text-xs" onclick="_wfQuickAction('ralph')" title="${t('verify → fix 루프 (최대 5회)')}">🔁 Ralph</button>
+      <button class="btn text-xs" onclick="_wfQuickAction('ultrawork')" title="${t('5 병렬 에이전트 → 합류')}">🤝 Ultrawork</button>
+      <button class="btn text-xs" onclick="_wfQuickAction('deep-interview')" title="${t('소크라테스식 명확화 → 설계 문서')}">🧐 Deep Interview</button>
+      <span class="text-[10px] ml-auto" style="color:var(--text-dim);">${t('클릭 → 목표 입력 → 즉시 실행')}</span>
+    </div>
+
     <details id="wfStatsPanel" class="card mb-3" style="padding:12px 16px;">
       <summary class="cursor-pointer text-sm font-semibold" style="color:var(--text);user-select:none;">📊 ${t('워크플로우 통계')}</summary>
       <div id="wfStatsBody" class="mt-3" style="border-top:1px solid var(--border);padding-top:12px;">
@@ -3121,6 +3181,403 @@ function _cwShowGuide() {
   showModal(html, { wide: true });
 }
 
+// ──────────────────────────────────────────────────────────────────
+// Run Center — ECC skills + ECC slash commands + OMC modes + OMX
+// commands as a single searchable, runnable catalog. Dispatches one
+// shot through the existing `execute_with_assignee` pipeline so the
+// dashboard can launch any of the 268 catalog entries with one click.
+// ──────────────────────────────────────────────────────────────────
+
+const __rc = {
+  catalog:    [],
+  filtered:   [],
+  source:     '',          // '' | 'ecc' | 'omc' | 'omx' | 'fav'
+  kind:       '',          // '' | 'skill' | 'command' | 'mode' | 'diagnostic' | 'knowledge'
+  category:   '',          // '' | 'frontend' | 'backend' | ...
+  query:      '',
+  loaded:     false,
+  eccInstalled: false,
+  history:    [],
+  selectedItem: null,
+  lastResult: null,
+};
+
+async function _rcApi(path, body) {
+  if (body === undefined) return api(path);
+  return api(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+VIEWS.runCenter = async () => {
+  return `
+    ${viewHeader('🎯 ' + t('런 센터'),
+       t('ECC 181 스킬 + 79 슬래시 명령 + OMC 4 모드 + OMX 명령을 한 화면에서 검색·1클릭 실행. 결과는 자동 저장되며 워크플로우로도 변환 가능.'),
+       'runCenter')}
+    <div id="rcRoot" style="display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px;align-items:start;">
+      <aside class="card" id="rcSidebar" style="padding:12px;position:sticky;top:8px;">
+        <div class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--text-dim);">${t('소스')}</div>
+        <div id="rcSourceFilters" class="flex flex-col gap-1 text-[12.5px]"></div>
+        <div class="text-[10px] uppercase tracking-widest mt-4 mb-2" style="color:var(--text-dim);">${t('종류')}</div>
+        <div id="rcKindFilters" class="flex flex-col gap-1 text-[12px]"></div>
+        <div class="text-[10px] uppercase tracking-widest mt-4 mb-2" style="color:var(--text-dim);">${t('카테고리')}</div>
+        <div id="rcCatFilters" class="flex flex-wrap gap-1 text-[11px]"></div>
+        <div class="mt-4 pt-3 border-t border-[var(--border)] text-[10px]" style="color:var(--text-dim);">
+          <div id="rcEccStatus"></div>
+          <div class="mt-1"><a class="text-[11px]" href="#" onclick="go('runHistory');return false;">${t('실행 히스토리 보기')} →</a></div>
+        </div>
+      </aside>
+
+      <main style="min-width:0;display:flex;flex-direction:column;gap:10px;">
+        <div class="card" style="padding:10px 14px;display:flex;align-items:center;gap:10px;">
+          <input id="rcSearch" type="search" class="input flex-1" placeholder="${t('이름 · 설명 · 카테고리 검색…')}" />
+          <span id="rcCountSummary" class="text-[11px]" style="color:var(--text-dim);min-width:80px;text-align:right;"></span>
+        </div>
+
+        <div id="rcFavoriteRow" class="card" style="padding:10px 14px;display:none;">
+          <div class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--text-dim);">⭐ ${t('즐겨찾기')}</div>
+          <div id="rcFavoriteBody" class="grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
+        </div>
+
+        <div id="rcGrid" class="grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));"></div>
+        <div id="rcEmpty" class="text-center py-8 text-[12px]" style="color:var(--text-dim);display:none;">
+          ${t('일치하는 항목 없음. 검색어 또는 필터를 조정하세요.')}
+        </div>
+      </main>
+    </div>
+  `;
+};
+
+AFTER.runCenter = async () => {
+  await _rcLoadCatalog();
+  _rcRenderFilters();
+  _rcApplyFilters();
+
+  const se = document.getElementById('rcSearch');
+  if (se) {
+    se.value = __rc.query;
+    se.oninput = (e) => { __rc.query = e.target.value.trim().toLowerCase(); _rcApplyFilters(); };
+  }
+};
+
+async function _rcLoadCatalog() {
+  try {
+    const r = await api('/api/run/catalog');
+    __rc.catalog = r.items || [];
+    __rc.eccInstalled = !!r.ecc_installed;
+    __rc.loaded = true;
+  } catch (e) {
+    __rc.catalog = [];
+    __rc.eccInstalled = false;
+  }
+  const ecc = document.getElementById('rcEccStatus');
+  if (ecc) {
+    ecc.innerHTML = __rc.eccInstalled
+      ? `<span style="color:#22c55e;">✓ ECC ${t('설치됨')}</span>`
+      : `<span style="color:#ef4444;">✗ ECC ${t('미설치')}</span> · <a class="text-[10px]" href="#" onclick="go('guideHub');return false;">${t('설치하기')} →</a>`;
+  }
+}
+
+function _rcRenderFilters() {
+  const sources = [
+    { id: '',    label: t('전체') },
+    { id: 'ecc', label: 'ECC' },
+    { id: 'omc', label: 'OMC' },
+    { id: 'omx', label: 'OMX' },
+    { id: 'fav', label: '⭐ ' + t('즐겨찾기만') },
+  ];
+  const sCounts = { ecc: 0, omc: 0, omx: 0 };
+  let favCount = 0;
+  __rc.catalog.forEach(it => {
+    sCounts[it.source] = (sCounts[it.source] || 0) + 1;
+    if (it.favorite) favCount++;
+  });
+  const host = document.getElementById('rcSourceFilters');
+  if (host) host.innerHTML = sources.map(s => {
+    const cnt = s.id === ''  ? __rc.catalog.length
+              : s.id === 'fav' ? favCount
+              : (sCounts[s.id] || 0);
+    return `<button class="rc-filter ${__rc.source===s.id?'rc-filter-on':''}" onclick="__rc.source='${s.id}';_rcRenderFilters();_rcApplyFilters();">
+      <span>${escapeHtml(s.label)}</span><span class="rc-count">${cnt}</span>
+    </button>`;
+  }).join('');
+
+  const kinds = [
+    { id: '',           label: t('전체') },
+    { id: 'skill',      label: t('스킬') },
+    { id: 'command',    label: t('슬래시 명령') },
+    { id: 'mode',       label: t('모드') },
+    { id: 'diagnostic', label: t('진단') },
+    { id: 'knowledge',  label: t('지식') },
+  ];
+  const khost = document.getElementById('rcKindFilters');
+  if (khost) khost.innerHTML = kinds.map(k =>
+    `<button class="rc-filter ${__rc.kind===k.id?'rc-filter-on':''}" onclick="__rc.kind='${k.id}';_rcRenderFilters();_rcApplyFilters();">
+      ${escapeHtml(k.label)}
+    </button>`
+  ).join('');
+
+  // Categories from current data
+  const cats = new Set();
+  __rc.catalog.forEach(it => { if (it.category) cats.add(it.category); });
+  const catList = ['', ...Array.from(cats).sort()];
+  const chost = document.getElementById('rcCatFilters');
+  if (chost) chost.innerHTML = catList.map(c =>
+    `<button class="rc-cat ${__rc.category===c?'rc-cat-on':''}" onclick="__rc.category='${c}';_rcRenderFilters();_rcApplyFilters();">
+      ${escapeHtml(c || t('전체'))}
+    </button>`
+  ).join('');
+}
+
+function _rcApplyFilters() {
+  let items = __rc.catalog.slice();
+  if (__rc.source === 'fav') {
+    items = items.filter(it => it.favorite);
+  } else if (__rc.source) {
+    items = items.filter(it => it.source === __rc.source);
+  }
+  if (__rc.kind)     items = items.filter(it => it.kind === __rc.kind);
+  if (__rc.category) items = items.filter(it => it.category === __rc.category);
+  if (__rc.query) {
+    const q = __rc.query;
+    items = items.filter(it => {
+      return (it.name||'').toLowerCase().includes(q)
+          || (it.description||'').toLowerCase().includes(q)
+          || (it.category||'').toLowerCase().includes(q);
+    });
+  }
+  __rc.filtered = items;
+  _rcRenderGrid();
+
+  const sumEl = document.getElementById('rcCountSummary');
+  if (sumEl) sumEl.textContent = `${items.length} / ${__rc.catalog.length}`;
+
+  // Favorite row (only when not already filtering by fav)
+  const favRow = document.getElementById('rcFavoriteRow');
+  const favBody = document.getElementById('rcFavoriteBody');
+  if (favRow && favBody) {
+    if (__rc.source === 'fav') {
+      favRow.style.display = 'none';
+    } else {
+      const favs = __rc.catalog.filter(it => it.favorite).slice(0, 8);
+      if (favs.length) {
+        favRow.style.display = '';
+        favBody.innerHTML = favs.map(_rcRenderCardCompact).join('');
+      } else {
+        favRow.style.display = 'none';
+      }
+    }
+  }
+}
+
+function _rcSourceColor(src) {
+  if (src === 'ecc') return 'var(--accent)';
+  if (src === 'omc') return '#a78bfa';
+  if (src === 'omx') return '#7dd3fc';
+  return 'var(--text-dim)';
+}
+
+function _rcRenderCard(it) {
+  const star = it.favorite ? '⭐' : '☆';
+  return `
+    <div class="rc-card" data-id="${escapeHtml(it.id)}" onclick="_rcOpenItem('${escapeHtml(it.id)}')">
+      <div class="rc-card-head">
+        <span class="rc-source" style="color:${_rcSourceColor(it.source)};">${escapeHtml(it.source.toUpperCase())}</span>
+        <button class="rc-fav" onclick="event.stopPropagation();_rcToggleFavorite('${escapeHtml(it.id)}')" title="${t('즐겨찾기')}">${star}</button>
+      </div>
+      <div class="rc-name">${escapeHtml(it.name || '')}</div>
+      <div class="rc-desc">${escapeHtml((it.description || '').slice(0, 140))}${(it.description||'').length>140?'…':''}</div>
+      <div class="rc-card-foot">
+        <span class="rc-cat-tag">${escapeHtml(it.category || 'general')}</span>
+        <span class="rc-kind-tag">${escapeHtml(it.kind || '')}</span>
+      </div>
+    </div>`;
+}
+
+function _rcRenderCardCompact(it) {
+  return `
+    <div class="rc-card rc-card-compact" data-id="${escapeHtml(it.id)}" onclick="_rcOpenItem('${escapeHtml(it.id)}')">
+      <div class="flex items-center justify-between gap-2">
+        <span class="rc-name" style="font-size:12px;">${escapeHtml(it.name || '')}</span>
+        <span class="rc-source" style="color:${_rcSourceColor(it.source)};font-size:10px;">${escapeHtml(it.source.toUpperCase())}</span>
+      </div>
+      <div class="rc-desc" style="font-size:11px;-webkit-line-clamp:1;">${escapeHtml((it.description || '').slice(0, 80))}${(it.description||'').length>80?'…':''}</div>
+    </div>`;
+}
+
+function _rcRenderGrid() {
+  const host = document.getElementById('rcGrid');
+  const empty = document.getElementById('rcEmpty');
+  if (!host) return;
+  if (!__rc.filtered.length) {
+    host.innerHTML = '';
+    if (empty) empty.style.display = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  // Cap initial render at 200 for performance — use scroll-load if needed.
+  host.innerHTML = __rc.filtered.slice(0, 200).map(_rcRenderCard).join('');
+}
+
+async function _rcToggleFavorite(itemId) {
+  try {
+    const r = await _rcApi('/api/run/favorite/toggle', { id: itemId });
+    if (r.ok) {
+      const it = __rc.catalog.find(x => x.id === itemId);
+      if (it) it.favorite = r.favorite;
+      _rcRenderFilters();
+      _rcApplyFilters();
+    }
+  } catch (e) { toast(t('즐겨찾기 토글 실패'), 'err'); }
+}
+
+function _rcOpenItem(itemId) {
+  const it = __rc.catalog.find(x => x.id === itemId);
+  if (!it) return;
+  __rc.selectedItem = it;
+  __rc.lastResult = null;
+
+  const html = `
+    <div class="p-5 border-b border-[var(--border)] flex items-start justify-between gap-3">
+      <div style="min-width:0;">
+        <div class="text-[11px] uppercase tracking-widest" style="color:var(--text-dim);">
+          ${escapeHtml(it.source.toUpperCase())} · ${escapeHtml(it.kind)} · ${escapeHtml(it.category||'')}
+        </div>
+        <h2 class="text-lg font-bold truncate">${escapeHtml(it.name || '')}</h2>
+        <p class="text-[12px] mt-1" style="color:var(--text-mute);">${escapeHtml(it.description || '')}</p>
+      </div>
+      <button class="btn-ghost btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="p-5 overflow-y-auto" style="max-height:60vh;" id="rcRunBody">
+      <label class="text-[11px] font-semibold mb-1 block">${t('목표 (이 스킬/명령에 전달할 입력)')}</label>
+      <textarea id="rcGoal" class="input w-full" rows="4" placeholder="${t('예: 현재 디렉터리의 보안 취약점을 찾아 우선순위로 정리')}"></textarea>
+
+      <div class="grid gap-3 mt-3" style="grid-template-columns:1fr 160px;">
+        <label class="block">
+          <div class="text-[11px] font-semibold mb-1">${t('모델')}</div>
+          <select id="rcAssignee" class="input w-full">${_wfAssigneeOptions('claude:sonnet')}</select>
+        </label>
+        <label class="block">
+          <div class="text-[11px] font-semibold mb-1">${t('타임아웃 (초)')}</div>
+          <input id="rcTimeout" type="number" class="input w-full" min="15" max="1800" value="180" />
+        </label>
+      </div>
+
+      <div class="text-[10px] mt-2" style="color:var(--text-dim);">
+        ${t('일회성 실행입니다. 다단계 흐름이 필요하면')} ·
+        <a href="#" onclick="event.preventDefault();_rcConvertToWorkflow('${escapeHtml(it.id)}')">${t('워크플로우로 변환')} →</a>
+      </div>
+
+      <div id="rcResultPanel" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-[11px] uppercase tracking-widest" style="color:var(--text-dim);">${t('결과')}</div>
+          <div id="rcResultMeta" class="text-[11px]" style="color:var(--text-dim);"></div>
+        </div>
+        <pre id="rcResultBody" style="background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;"></pre>
+        <div id="rcResultActions" class="flex gap-2 mt-2"></div>
+      </div>
+    </div>
+    <div class="p-4 border-t border-[var(--border)] flex items-center justify-between gap-2">
+      <button class="btn" onclick="_rcConvertToWorkflow('${escapeHtml(it.id)}')">🔀 ${t('워크플로우로 변환')}</button>
+      <div class="flex gap-2">
+        <button class="btn" onclick="closeModal()">${t('닫기')}</button>
+        <button id="rcRunBtn" class="btn-primary btn" onclick="_rcExecute('${escapeHtml(it.id)}')">▶ ${t('실행')}</button>
+      </div>
+    </div>
+  `;
+  showModal(html, { wide: true });
+  setTimeout(() => { try { document.getElementById('rcGoal')?.focus(); } catch(e){} }, 50);
+}
+
+async function _rcExecute(itemId) {
+  const goal     = (document.getElementById('rcGoal')?.value || '').trim();
+  const assignee = document.getElementById('rcAssignee')?.value || 'claude:sonnet';
+  const timeout  = +(document.getElementById('rcTimeout')?.value || 180);
+  if (!goal) { toast(t('목표를 입력하세요'), 'warn'); return; }
+
+  const btn = document.getElementById('rcRunBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ ' + t('실행 중…'); }
+  const panel = document.getElementById('rcResultPanel');
+  const body  = document.getElementById('rcResultBody');
+  const meta  = document.getElementById('rcResultMeta');
+  if (panel) panel.style.display = '';
+  if (body) body.textContent = t('실행 중…');
+  if (meta) meta.textContent = '';
+
+  try {
+    const r = await _rcApi('/api/run/execute', { itemId, goal, assignee, timeoutSeconds: timeout });
+    __rc.lastResult = r;
+    if (body) body.textContent = r.output || r.error || t('(빈 응답)');
+    if (meta) {
+      const sec = ((r.durationMs||0)/1000).toFixed(1);
+      meta.textContent = `${r.provider||''} · ${r.model||''} · ${sec}s · ${r.tokensIn||0}↑ ${r.tokensOut||0}↓ · $${(r.costUsd||0).toFixed(4)}`;
+    }
+    const acts = document.getElementById('rcResultActions');
+    if (acts) acts.innerHTML = `
+      <button class="btn text-xs" onclick="_rcCopyResult()">📋 ${t('결과 복사')}</button>
+      <button class="btn text-xs" onclick="_rcSaveAsPrompt()">📝 ${t('프롬프트로 저장')}</button>
+    `;
+    toast(r.ok ? t('실행 성공') : t('실행 실패: ') + (r.error||''), r.ok ? 'ok' : 'err');
+  } catch (e) {
+    if (body) body.textContent = e.message || String(e);
+    toast(t('실행 오류'), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '▶ ' + t('실행'); }
+  }
+}
+
+function _rcCopyResult() {
+  if (!__rc.lastResult || !__rc.lastResult.output) return;
+  navigator.clipboard.writeText(__rc.lastResult.output).then(
+    () => toast(t('복사됨'), 'ok'),
+    () => toast(t('복사 실패'), 'err'),
+  );
+}
+
+async function _rcSaveAsPrompt() {
+  if (!__rc.lastResult || !__rc.selectedItem) return;
+  const it = __rc.selectedItem;
+  try {
+    const r = await api('/api/prompt-library/save', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        title: `Run: ${it.name}`,
+        body:  __rc.lastResult.output,
+        tags:  [it.source, it.category || ''],
+      }),
+    });
+    toast(r.ok ? t('프롬프트 라이브러리에 저장됨') : t('저장 실패'), r.ok ? 'ok' : 'err');
+  } catch(e) { toast(t('저장 오류'), 'err'); }
+}
+
+async function _rcConvertToWorkflow(itemId) {
+  try {
+    const r = await _rcApi('/api/run/to-workflow', { itemId });
+    if (!r.ok) { toast(t('변환 실패: ') + (r.error||''), 'err'); return; }
+    if (r.kind === 'template') {
+      toast(t('빌트인 템플릿: ') + r.templateId + ' — ' + t('템플릿에서 직접 사용하세요'), 'ok');
+      closeModal();
+      go('workflows');
+      return;
+    }
+    // draft → save then open
+    const saved = await api('/api/workflows/save', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(r.draft),
+    });
+    if (saved.ok) {
+      try { localStorage.setItem('__wf_open_id', saved.id); } catch(_){}
+      toast(t('워크플로우 생성 완료 — 워크플로우 탭으로 이동'), 'ok');
+      closeModal();
+      go('workflows');
+    } else {
+      toast(t('워크플로우 저장 실패'), 'err');
+    }
+  } catch(e) { toast(t('오류: ') + (e.message||String(e)), 'err'); }
+}
+
 function _wfRenderList() {
   const host = document.getElementById('wfListItems');
   if (!host) return;
@@ -3144,6 +3601,103 @@ function _wfRenderList() {
       </div>
     </div>
   `).join('');
+}
+
+// v2.36.0 — One-click OMC mode workflow. Loads the matching `bt-*` built-in
+// template, injects the user's goal into the planner node's description, saves
+// as a new workflow, navigates to it. Optionally auto-runs.
+const _WF_QUICK_TPL = {
+  'autopilot':       { id: 'bt-autopilot',     title: '🚀 Autopilot',
+    desc: '요구사항을 받아 계획 → 실행 → 검증을 단일 흐름으로 끝까지 자율 실행' },
+  'ralph':           { id: 'bt-ralph',          title: '🔁 Ralph',
+    desc: 'verify 통과까지 fix 루프를 자동 반복 (최대 5회)' },
+  'ultrawork':       { id: 'bt-ultrawork',      title: '🤝 Ultrawork',
+    desc: '5명의 병렬 에이전트(Sonnet×2 + Haiku×3)가 동시 작업 후 결과 합류' },
+  'deep-interview':  { id: 'bt-deep-interview', title: '🧐 Deep Interview',
+    desc: '요구사항을 소크라테스식 질문으로 명확히한 후 설계 문서 산출' },
+};
+
+async function _wfQuickAction(modeKey) {
+  const meta = _WF_QUICK_TPL[modeKey];
+  if (!meta) return;
+  const goal = await promptModal({
+    title: meta.title,
+    message: meta.desc,
+    placeholder: t('목표를 한 줄로 입력하세요 (예: 다음주까지 신제품 출시 가이드 작성)'),
+    defaultValue: '',
+    confirmLabel: t('워크플로우 생성 + 실행'),
+    rows: 3,
+  });
+  if (!goal || !goal.trim()) return;
+
+  // Fetch the template
+  let tpl;
+  try {
+    const r = await api('/api/workflows/templates/list');
+    const list = r.templates || [];
+    const ref = list.find(x => x.id === meta.id);
+    if (!ref) { toast(t('빌트인 템플릿을 찾을 수 없습니다: ') + meta.id, 'err'); return; }
+    // Templates list returns metadata; fetch full body via webhook list trick:
+    // there is no /api/workflows/templates/get(id); the catalog endpoint
+    // returns full body when nodes/edges are present. Probe by fetching full.
+    // Fallback: get full template via the (private) builtin lookup endpoint
+    // we wired to /api/workflows/templates/get below — but if not present,
+    // pull from a known list endpoint.
+    try {
+      const fr = await api('/api/workflows/templates/' + encodeURIComponent(meta.id));
+      tpl = fr.template || ref;
+    } catch(_) { tpl = ref; }
+  } catch(e) {
+    toast(t('템플릿 조회 실패: ') + (e.message||String(e)), 'err'); return;
+  }
+
+  if (!tpl.nodes || !tpl.nodes.length) {
+    toast(t('템플릿 본문 비어있음 — 빌트인 등록 확인 필요'), 'err');
+    return;
+  }
+
+  // Inject the user's goal into the planner node (n-plan or first session).
+  const cloneNodes = JSON.parse(JSON.stringify(tpl.nodes));
+  const cloneEdges = JSON.parse(JSON.stringify(tpl.edges || []));
+  const planner = cloneNodes.find(n => n.id === 'n-plan')
+                || cloneNodes.find(n => n.type === 'session' || n.type === 'subagent');
+  if (planner) {
+    planner.data = planner.data || {};
+    const orig = (planner.data.description || planner.data.subject || '').trim();
+    planner.data.description = (orig ? orig + '\n\n# User goal\n' : '# User goal\n') + goal.trim();
+  }
+
+  const body = {
+    name: `${meta.title} · ${goal.slice(0, 40)}${goal.length > 40 ? '…' : ''}`,
+    description: `Quick Action (${modeKey}) — ${goal.slice(0, 200)}`,
+    nodes: cloneNodes, edges: cloneEdges,
+    viewport: tpl.viewport || { panX: 0, panY: 0, zoom: 1 },
+    repeat:   tpl.repeat   || { enabled: false, maxIterations: 1, intervalSeconds: 0 },
+    notify:   { slack: '', discord: '' },
+    policy:   { tokenBudgetTotal: 0, onBudgetExceeded: 'stop', fallbackProvider: '' },
+  };
+
+  const r = await api('/api/workflows/save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { toast(errMsg(r), 'err'); return; }
+  toast(t('워크플로우 생성됨 — 실행 시작'), 'ok');
+
+  const listResp = await api('/api/workflows/list');
+  __wf.workflows = listResp.workflows || [];
+  await _wfOpen(r.id);
+  _wfRenderList();
+
+  // Auto-run
+  try {
+    await api('/api/workflows/run', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: r.id }),
+    });
+  } catch (e) {
+    // Run errors surface in the canvas; don't block the UX.
+  }
 }
 
 async function _wfCreateNew() {
@@ -8624,14 +9178,23 @@ VIEWS.commands = async () => {
       <div class="mb-5">
         <h3 class="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-2">${catLabels[cid]||cid} · ${groups[cid].length}</h3>
         <div class="grid-list">
-          ${groups[cid].map(c => `
+          ${groups[cid].map(c => {
+            // v2.36.0 — Heuristic: ECC commands have plugin scope or path under
+            // ~/.claude/plugins/cache/ecc/. Use this to route Run via Run Center.
+            const isEcc = (c.scope === 'plugin') || /\/plugins\/cache\/ecc\//.test(c.path||'') || /^ecc[:/]/i.test(c.id||'');
+            const cmdName = c.name || c.id;
+            const itemId = isEcc ? `ecc:cmd:${cmdName.replace(/^\//, '')}` : '';
+            return `
             <div class="card p-4 hover-lift">
-              <div class="flex items-center gap-2 mb-2">
+              <div class="flex items-center gap-2 mb-2 flex-wrap">
                 <span class="chip ${c.scope==='user'?'chip-ok':'chip-accent'}">${c.scope}</span>
-                <span class="font-semibold text-sm mono">/${escapeHtml(c.name||c.id)}</span>
+                ${isEcc ? '<span class="chip" style="background:rgba(217,119,87,0.18);border-color:rgba(217,119,87,0.45);color:var(--text);">ECC</span>' : ''}
+                <span class="font-semibold text-sm mono">/${escapeHtml(cmdName)}</span>
+                <button class="btn text-[10px] ml-auto" onclick="_cmdQuickRun('${escapeHtml(itemId || cmdName)}', ${isEcc ? 'true' : 'false'}, '${escapeHtml(cmdName)}')" title="${t('대시보드에서 바로 실행')}">▶ ${t('실행')}</button>
               </div>
               <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(_localDesc(c) || '—')}</div>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
         </div>
       </div>`).join('') : `<div class="card empty">명령어 없음</div>`}
   `;
@@ -8652,6 +9215,74 @@ AFTER.commands = () => {
 function setCmdCat(cat) {
   state.data.cmdCat = cat;
   renderView();
+}
+
+// v2.36.0 — Run a slash command directly from the Commands tab. ECC commands
+// route through Run Center (have full execution context); non-ECC just open
+// the Run Center modal with a generic dispatch.
+async function _cmdQuickRun(itemIdOrName, isEcc, cmdName) {
+  if (!isEcc) {
+    // Non-ECC: invoke as a freeform prompt — show the Run Center generic modal.
+    const item = {
+      id: 'cmd:' + cmdName,
+      source: 'local',
+      kind: 'command',
+      name: '/' + cmdName,
+      description: t('로컬 슬래시 명령 — 대시보드에서 1회성 실행'),
+      category: 'general',
+      invocation: t('You are dispatching the local slash command') + ' /' + cmdName + '. ' +
+                  t('Treat the user goal as the argument to the command.'),
+      favorite: false,
+    };
+    __rc.selectedItem = item;
+    __rc.lastResult = null;
+    // Inject into catalog cache so /api/run/execute can find it — but our
+    // catalog is server-side. For non-ECC we open a workflow scaffold instead.
+    toast(t('이 명령은 ECC가 아니라 즉시 실행 대신 워크플로우로 변환됩니다'), 'info');
+    // Simulate the run-center "to-workflow" path with a 1-node session draft.
+    const draft = {
+      name:        `Cmd · /${cmdName}`,
+      description: `Quick run of /${cmdName} via Commands tab`,
+      nodes: [
+        {id: 'n-rcs', type: 'start',   x: 80,  y: 200, title: 'Start',   data: {}},
+        {id: 'n-rcr', type: 'session', x: 320, y: 200, title: '/' + cmdName,
+         data: {subject: '/' + cmdName, description: t('Run the slash command') + ' /' + cmdName,
+                assignee: 'claude:sonnet', inputsMode: 'concat'}},
+        {id: 'n-rco', type: 'output',  x: 560, y: 200, title: 'Output',  data: {exportTo:''}},
+      ],
+      edges: [
+        {id: 'e1', from: 'n-rcs', to: 'n-rcr', fromPort: 'out', toPort: 'in'},
+        {id: 'e2', from: 'n-rcr', to: 'n-rco', fromPort: 'out', toPort: 'in'},
+      ],
+      viewport: {panX:0,panY:0,zoom:1},
+      repeat: {enabled:false, maxIterations:1, intervalSeconds:0},
+      notify: {slack:'', discord:''},
+      policy: {tokenBudgetTotal:0, onBudgetExceeded:'stop', fallbackProvider:''},
+    };
+    const r = await api('/api/workflows/save', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(draft),
+    });
+    if (r.ok) {
+      try { localStorage.setItem('__wf_open_id', r.id); } catch(_){}
+      go('workflows');
+    }
+    return;
+  }
+  // ECC: open the Run Center modal pre-filled with this command.
+  go('runCenter');
+  // Wait for the catalog to populate, then open the item.
+  let tries = 0;
+  const tryOpen = () => {
+    if (__rc.catalog.length) {
+      _rcOpenItem(itemIdOrName);
+    } else if (++tries < 20) {
+      setTimeout(tryOpen, 150);
+    } else {
+      toast(t('카탈로그 로드 실패'), 'err');
+    }
+  };
+  setTimeout(tryOpen, 200);
 }
 
 // ── description 다국어 헬퍼 ──

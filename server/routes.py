@@ -96,6 +96,10 @@ from .slack_api import (
 )
 from .obsidian_log import api_obsidian_test
 from .crew_wizard import api_crew_create, api_crew_preview
+from .run_center import (
+    api_run_catalog, api_run_execute, api_run_favorite_toggle,
+    api_run_history, api_run_history_get, api_run_to_workflow,
+)
 from .session_replay import api_session_replay_list, api_session_replay_load
 from .event_forwarder import (
     api_event_forwarder_list, api_event_forwarder_add,
@@ -238,6 +242,9 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/guide/toolkit": lambda q: api_guide_toolkit(),
     "/api/guide/onboarding": lambda q: api_guide_onboarding(),
     "/api/slack/config": lambda q: api_slack_config_get(q),
+    "/api/run/catalog":      api_run_catalog,
+    "/api/run/history":      api_run_history,
+    "/api/run/history/get":  api_run_history_get,
     "/api/workflows/list": lambda q: api_workflows_list(q),
     "/api/workflows/run-status": api_workflow_run_status,
     "/api/workflows/runs": api_workflow_runs_list,
@@ -387,6 +394,9 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/slack/test":         api_slack_test,
     "/api/obsidian/test":      api_obsidian_test,
     "/api/wizard/crew/create":  api_crew_create,
+    "/api/run/execute":           api_run_execute,
+    "/api/run/favorite/toggle":   api_run_favorite_toggle,
+    "/api/run/to-workflow":       api_run_to_workflow,
     "/api/wizard/crew/preview": api_crew_preview,
     "/api/event-forwarder/add": api_event_forwarder_add,
     "/api/event-forwarder/remove": api_event_forwarder_remove,

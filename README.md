@@ -12,7 +12,7 @@ _Don't memorize 50+ CLI commands. Just click._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.35.1-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.36.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-architecture)
 
 </div>
@@ -27,7 +27,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 | ver | highlight |
 |---|---|
-| **v2.35.1** | 📦 **Install as a real app** — PWA (Add to Home Screen / install icon, cross-platform) **and** a 72 KB macOS `.app` bundle (`make install-mac` → Spotlight + Dock + auto server lifecycle). Manifest with 3 launch shortcuts, dark/light theme-color, maskable icon. |
+| **v2.36.0** | 📦 **Install as a real app** — PWA (Add to Home Screen / install icon, cross-platform) **and** a 72 KB macOS `.app` bundle (`make install-mac` → Spotlight + Dock + auto server lifecycle). Manifest with 3 launch shortcuts, dark/light theme-color, maskable icon. |
 | **v2.34.0** | 🧑‍✈️ **Crew Wizard** — Zapier-style 4-step form scaffolds Planner + Personas + Slack approval + Obsidian log in one click. New `slack_approval` (Slack Web API admin gate) and `obsidian_log` workflow nodes. |
 | **v2.33.2** | 🔌 ECC plugin **full auto-install** via `claude plugin install` — one click from Guide & Tools |
 | **v2.33.1** | 🧰 Guide toolkit manager (ECC + CCB install/remove) · flyout viewport fix · first-visit-only login gate |
@@ -48,7 +48,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.35.1 🇺🇸│
+│  💤  LazyClaude                                     v2.36.0 🇺🇸│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 New │   🔀 Workflows                                         │
 │ 🏠 Main│   ┌──────┐      ┌──────┐      ┌──────┐                │
@@ -348,7 +348,7 @@ Atomic writes via `server/utils.py::_safe_write` (`.tmp → rename`), threading 
 
 ---
 
-## 🔢 Stats (v2.35.1)
+## 🔢 Stats (v2.36.0)
 
 | Metric | Value |
 |---|---|
