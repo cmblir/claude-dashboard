@@ -12,7 +12,7 @@ _50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.36.2-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.36.3-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-아키텍처)
 
 </div>
@@ -27,7 +27,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 | 버전 | 요점 |
 |---|---|
-| **v2.36.2** | 🔄 **서버 재시작 자동 감지 배너** — 대시보드가 60초마다 `/api/version` 폴링 → `serverStartedAt` 변경 시 화면 하단에 새로고침 배너. "git pull 했는데 사용자는 옛 빌드를 보고 있는" 문제 자동 해결. |
+| **v2.36.3** | 🔄 **서버 재시작 자동 감지 배너** — 대시보드가 60초마다 `/api/version` 폴링 → `serverStartedAt` 변경 시 화면 하단에 새로고침 배너. "git pull 했는데 사용자는 옛 빌드를 보고 있는" 문제 자동 해결. |
 | **v2.36.1** | 🩹 **Run Center ECC 인식 hotfix + OMC/OMX 가이드 카드** — `_ecc_roots()`가 `installed_plugins.json`을 읽어 `ecc@ecc`와 `everything-claude-code@everything-claude-code` 두 플러그인 ID 모두 인식. 가이드 & 툴에 OMC/OMX 카드 추가 (LazyClaude 흡수 vs CLI 전용 비교). |
 | **v2.36.0** | 🎯 **런 센터** — ECC 181 스킬 + 79 슬래시 명령 + OMC 4 모드 + OMX 4 명령을 한 화면에서 검색·1클릭 실행하는 신규 탭. **워크플로우 빠른 실행 (Quick Actions)** — 4 OMC 모드(Autopilot / Ralph / Ultrawork / Deep Interview)를 워크플로우 탭 헤더에서 바로 실행. **슬래시 명령어 탭 Run 버튼** — 모든 명령 카드에 ▶ 버튼 + ECC 칩. |
 | **v2.35.0** | 📦 **앱 형태로 설치** — PWA(브라우저 "앱 설치" / iOS 홈 화면 추가, 크로스 플랫폼) + 72 KB macOS `.app` 번들(`make install-mac` → Spotlight · Dock · 서버 자동 시작/종료). |
@@ -51,7 +51,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.36.2 🇰🇷│
+│  💤  LazyClaude                                     v2.36.3 🇰🇷│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 신기능│   🔀 워크플로우                                       │
 │ 🏠 메인 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -343,7 +343,7 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.36.2)
+## 🔢 통계 (v2.36.3)
 
 | 지표 | 값 |
 |---|---|

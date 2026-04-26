@@ -13026,7 +13026,17 @@ function renderProjectDetail(d) {
 
   window.__projectDetailData = d;
   showModal(`
-    <div class="p-5 border-b border-[var(--border)] flex items-start gap-4">
+    <!-- v2.36.3 — Project snapshot scroll fix.
+         The header + aiRecSlot + projectAgentsSlot all sit above the
+         body in the same flex-column .modal (max-height: 92vh, overflow:
+         hidden). Without flex-shrink-0 on the leading regions and
+         min-h-0 on the body, a long aiRec result or a tall header (chips
+         wrapping over multiple rows) pushed the body out of the modal
+         and the inner overflow-y-auto silently stopped working.
+         Fixes: lock the leading regions to their content height, allow
+         the body to shrink + scroll, and give the body wrapper a
+         dedicated scroll container so children don't have to opt in. -->
+    <div class="p-5 border-b border-[var(--border)] flex items-start gap-4 flex-shrink-0">
       <div class="flex-1 min-w-0">
         <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">프로젝트 스냅샷</div>
         <h2 class="text-xl font-bold truncate">${escapeHtml(d.name)}</h2>
@@ -13049,29 +13059,40 @@ function renderProjectDetail(d) {
       </div>
       <button class="btn-ghost btn" onclick="closeModal()">✕</button>
     </div>
-    <div id="aiRecSlot"></div>
-    <div id="projectAgentsSlot" class="px-5"></div>
-    <div class="flex-1 overflow-y-auto p-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
-      <div>
-        ${section('📜 프로젝트 CLAUDE.md', claudeMdHtml)}
-        ${section('🤝 프로젝트 에이전트', `<div class="grid grid-cols-1 gap-2">${agentsHtml}</div>`, r.agents.length)}
-        ${section('✨ 프로젝트 스킬', `<div class="grid grid-cols-1 gap-2">${skillsHtml}</div>`, r.skills.length)}
-        ${section('/ 프로젝트 명령어', `<div class="grid grid-cols-1 gap-2">${cmdsHtml}</div>`, r.commands.length)}
-        ${section('🪝 .claude/hooks 파일', hooksHtml, r.hooks.length)}
-      </div>
-      <div>
-        ${section('⚙️ .claude/settings.local.json', settingsLocalHtml)}
-        ${section('🗂 ~/.claude.json 프로젝트 엔트리', cjEntryHtml)}
-        ${section('🕒 세션 히스토리 (점수 포함)', sessionsHtml, sessions.length)}
+    <div id="projectSnapshotBody" class="flex-1 min-h-0 overflow-y-auto" style="overscroll-behavior: contain;">
+      <div id="aiRecSlot"></div>
+      <div id="projectAgentsSlot" class="px-5"></div>
+      <div class="p-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="min-w-0">
+          ${section('📜 프로젝트 CLAUDE.md', claudeMdHtml)}
+          ${section('🤝 프로젝트 에이전트', `<div class="grid grid-cols-1 gap-2">${agentsHtml}</div>`, r.agents.length)}
+          ${section('✨ 프로젝트 스킬', `<div class="grid grid-cols-1 gap-2">${skillsHtml}</div>`, r.skills.length)}
+          ${section('/ 프로젝트 명령어', `<div class="grid grid-cols-1 gap-2">${cmdsHtml}</div>`, r.commands.length)}
+          ${section('🪝 .claude/hooks 파일', hooksHtml, r.hooks.length)}
+        </div>
+        <div class="min-w-0">
+          ${section('⚙️ .claude/settings.local.json', settingsLocalHtml)}
+          ${section('🗂 ~/.claude.json 프로젝트 엔트리', cjEntryHtml)}
+          ${section('🕒 세션 히스토리 (점수 포함)', sessionsHtml, sessions.length)}
+        </div>
       </div>
     </div>
-  `);
+  `, { wide: true });
 }
 
 function scrollToSessions() {
-  // 모달 내에서 스크롤 — 가장 가까운 스크롤 컨테이너 찾아 세션 섹션으로
+  // v2.36.3 — scroll inside the dedicated #projectSnapshotBody container so
+  // the smooth-scroll lands the section header at the top of the visible
+  // area rather than scrolling the entire viewport.
   const header = [...document.querySelectorAll('.modal h3, .modal .text-xs')].find(el => el.textContent && el.textContent.includes('세션 히스토리'));
-  if (header) header.scrollIntoView({ behavior:'smooth', block:'start' });
+  if (!header) return;
+  const body = document.getElementById('projectSnapshotBody');
+  if (body) {
+    const top = header.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - 8;
+    body.scrollTo({ top, behavior: 'smooth' });
+  } else {
+    header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 async function openToolBreakdown(cwd) {

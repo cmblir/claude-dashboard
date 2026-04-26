@@ -12,7 +12,7 @@ _Don't memorize 50+ CLI commands. Just click._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.36.2-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.36.3-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-architecture)
 
 </div>
@@ -27,7 +27,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 | ver | highlight |
 |---|---|
-| **v2.36.2** | 🔄 **Server-restart auto-banner** — dashboard polls `/api/version` every 60s and prompts a one-click reload when `serverStartedAt` changes (no more "I deployed but the user is on a stale build"). |
+| **v2.36.3** | 🔄 **Server-restart auto-banner** — dashboard polls `/api/version` every 60s and prompts a one-click reload when `serverStartedAt` changes (no more "I deployed but the user is on a stale build"). |
 | **v2.36.1** | 🩹 **Run Center ECC discovery hotfix + OMC/OMX guide cards** — `_ecc_roots()` reads `installed_plugins.json` and recognises both `ecc@ecc` and `everything-claude-code@everything-claude-code` ids. Guide & Tools gains OMC and OMX cards explaining LazyClaude-absorbed vs CLI-only features. |
 | **v2.36.0** | 🎯 **Run Center** — new tab unifying ECC's 181 skills + 79 slash commands + OMC's 4 modes + OMX's 4 commands into one searchable, runnable catalog. **Workflow Quick Actions** — 4 OMC modes (Autopilot / Ralph / Ultrawork / Deep Interview) launchable from the Workflows tab header. **Commands tab Run buttons** — every slash command card gets a ▶ button and an ECC chip. |
 | **v2.35.0** | 📦 **Install as a real app** — PWA (Add to Home Screen / install icon, cross-platform) **and** a 72 KB macOS `.app` bundle (`make install-mac` → Spotlight + Dock + auto server lifecycle). |
@@ -51,7 +51,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.36.2 🇺🇸│
+│  💤  LazyClaude                                     v2.36.3 🇺🇸│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 New │   🔀 Workflows                                         │
 │ 🏠 Main│   ┌──────┐      ┌──────┐      ┌──────┐                │
@@ -374,7 +374,7 @@ Atomic writes via `server/utils.py::_safe_write` (`.tmp → rename`), threading 
 
 ---
 
-## 🔢 Stats (v2.36.2)
+## 🔢 Stats (v2.36.3)
 
 | Metric | Value |
 |---|---|

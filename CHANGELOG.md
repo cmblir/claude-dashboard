@@ -10,6 +10,58 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.36.3] — 2026-04-26
+
+### 🩹 Project snapshot modal — scroll fix
+
+User reported the project snapshot modal (Projects tab → click a project
+card) wouldn't scroll to the bottom. Symptom: middle and lower content
+was clipped, the inner `overflow-y-auto` region behaved as if its
+height was zero.
+
+#### Root cause
+The modal is a flex-column with `max-height: 92vh` and `overflow:
+hidden`. Inside it sat (in order):
+
+1. Header `<div class="p-5 border-b ...">` — could be tall when chips
+   wrapped over multiple rows.
+2. `<div id="aiRecSlot">` — empty by default but balloons after the AI
+   recommend button is pressed.
+3. `<div id="projectAgentsSlot">` — populated after lazy load.
+4. The body `<div class="flex-1 overflow-y-auto p-5 grid ...">`.
+
+None of regions 1–3 had `flex-shrink-0`, and the body was missing
+`min-h-0`. With even a moderately long aiRec result the body's flex
+share got pushed below zero and `overflow-y-auto` silently stopped
+scrolling (the children rendered at their natural height past the
+modal edge but the scrollbar was attached to a 0-px container).
+
+#### Fixes
+- Header gets `flex-shrink-0` so it never compresses.
+- A new `<div id="projectSnapshotBody" class="flex-1 min-h-0
+  overflow-y-auto" style="overscroll-behavior: contain;">` wraps the
+  three formerly-separate regions (`aiRecSlot`, `projectAgentsSlot`,
+  the grid). Now the modal has exactly two flex children — header and
+  body — and the body owns a single, predictable scroll container.
+- The grid's two columns get `min-w-0` so wide content (long file
+  paths, raw JSON dumps) wraps inside the cell instead of forcing the
+  whole grid wider than the modal.
+- `scrollToSessions()` now scrolls inside `#projectSnapshotBody`
+  rather than calling `scrollIntoView()` on the page (which was
+  scrolling the viewport behind the modal).
+- Modal opens with `{ wide: true }` so the two columns have room on
+  desktop.
+
+#### Verification
+- Playwright opens the modal, measures the body container:
+  `clientHeight=625, scrollHeight=1062` (was effectively 0 on the bug
+  path), `overflowY=auto`, `canScroll=true`.
+- After `body.scrollTop = body.scrollHeight`, the bottom-of-content
+  invariant `scrollTop + clientHeight ≈ scrollHeight` holds within
+  4 px — the section history table at the bottom is now reachable.
+- 0 console errors.
+
+---
 ## [2.36.2] — 2026-04-26
 
 ### 🔄 Server-restart detector — auto-banner when the user is on a stale build
