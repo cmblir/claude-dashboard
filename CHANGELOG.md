@@ -10,6 +10,108 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.36.0] — 2026-04-26
+
+### 🎯 Run Center + Workflow Quick Actions + Commands tab Run buttons
+
+User asked for ECC, OMC, OMX features to be runnable directly from the
+dashboard rather than only inside Claude Code sessions. Three additions
+land here, all wired to the existing `execute_with_assignee` pipeline so
+any provider (Claude / OpenAI / Gemini / Ollama) can serve the request.
+
+#### 1. Run Center — new tab `runCenter` (Build group)
+
+A unified search-and-run catalog over **268 entries** (verified against an
+ECC v1.10 install):
+
+- **ECC** — 181 skills + 79 slash commands, scanned from
+  `~/.claude/plugins/cache/ecc/<version>/{skills,commands}/`. Every
+  entry's frontmatter is parsed (`name` / `description` / `tools`) and
+  auto-categorised (frontend / backend / testing / review / security /
+  ops / ai / data / ml / mobile / general).
+- **OMC** — 4 modes (`/autopilot` / `/ralph` / `/ultrawork` /
+  `/deep-interview`). Each links to its matching `bt-*` built-in
+  template so the user can hand off to a full workflow with one click.
+- **OMX** — 4 commands (`$doctor` / `$wiki` / `$hud` / `$tasks`)
+  exposed as one-shot prompts.
+
+Surface:
+- Left column — 5 source filters (All / ECC / OMC / OMX / Favorites)
+  with live counts, 6 kind filters, category chips, ECC install status
+  badge with deep-link to Guide & Tools.
+- Top bar — search by name / description / category, total count.
+- ⭐ Favorite row — first 8 favorited items as compact cards.
+- Card grid — paginated at 200 cards for performance.
+- Click a card → modal with goal input, model picker (uses existing
+  `_wfAssigneeOptions` so Claude / GPT / Gemini / Ollama appear),
+  timeout slider. Run executes through `execute_with_assignee` and
+  reports tokens / cost / duration. "Save as prompt" pushes the result
+  into the Prompt Library; "Convert to workflow" hands off either to
+  the matching built-in template (OMC) or scaffolds a 1-node workflow
+  (ECC) and switches to the Workflows tab.
+
+Backend (`server/run_center.py`, ~480 lines):
+- `GET  /api/run/catalog?source=&kind=&q=` — filterable, 30 s cached.
+- `POST /api/run/execute` — synchronous, time-bounded one-shot.
+- `GET  /api/run/history?limit=` — runs sorted by recency.
+- `GET  /api/run/history/get?id=` — full row including output / error.
+- `POST /api/run/favorite/toggle` — persisted to
+  `~/.claude-dashboard-run-favorites.json`.
+- `POST /api/run/to-workflow` — return template id (OMC) or draft DAG
+  (ECC) for the Workflows tab to consume.
+- New SQLite table `run_history` (idempotent migration).
+
+#### 2. Workflow Quick Actions (Workflows tab header)
+
+A row of 4 buttons above the workflow stats panel: 🚀 Autopilot / 🔁
+Ralph / 🤝 Ultrawork / 🧐 Deep Interview. Click → modal asks for the
+goal in one line → loads the matching `bt-*` template via
+`/api/workflows/templates/<id>`, injects the user's goal into the
+planner node's `description`, saves a new workflow with the goal
+truncated into the name, navigates the canvas to it, and auto-runs.
+Goes from "I want autopilot on this idea" to a running DAG in two
+clicks.
+
+#### 3. Commands tab — Run buttons + ECC tagging
+
+Each card in the existing Commands tab now shows:
+- An `ECC` chip when the command's path is under
+  `~/.claude/plugins/cache/ecc/` (heuristic — also matches `scope ===
+  'plugin'` for backwards compat).
+- A `▶ Run` button. ECC commands route through the Run Center modal
+  (full execution context). Non-ECC commands scaffold a 1-node
+  workflow and open it in the Workflows tab — they don't have the
+  rich invocation copy that ECC frontmatter provides, so a
+  user-editable workflow is safer than a blind dispatch.
+
+#### Files
+
+- `server/run_center.py` (new, +480) — catalog, executor, history,
+  favorites, to-workflow handoff.
+- `server/routes.py` (+8) — three GET + three POST routes registered.
+- `dist/index.html` (+~530) — Run Center view (tab, sidebar filters,
+  card grid, modal), Workflow Quick Actions header + handler,
+  Commands tab Run buttons + handler, all CSS.
+- `tools/translations_manual_11.py` (new, ~80 keys × EN / ZH).
+- `tools/translations_manual.py` — wires `_NEW_EN_11` / `_NEW_ZH_11`.
+
+#### Verification
+
+- `make i18n-refresh` + `scripts/verify-translations.js` — all 4 stages
+  pass: 3,861 keys × 3 locales matched, 1,091 `t()` Korean call sites
+  covered, audit covered, static DOM covered, 0 Korean residue.
+- Live HTTP — `/api/run/catalog` returns 268 items with the expected
+  4-source split (260 ECC + 4 OMC + 4 OMX), filters work, favorite
+  toggle round-trips, `/api/run/to-workflow` resolves OMC →
+  `bt-autopilot` and ECC → 1-node draft.
+- Playwright e2e — Run Center renders 201 cards (cap 200 + 1 favorite
+  row card) with 11 filters and 12 category chips, OMC filter narrows
+  to 5 cards, card click opens the goal modal with the model picker
+  and "/autopilot" title, Workflows tab shows all 4 Quick Action
+  buttons, Commands tab gets 600 Run buttons + 600 ECC chips, 0
+  console errors.
+
+---
 ## [2.35.1] — 2026-04-26
 
 ### 🌐 i18n hotfix — 18 missing translations caught by CI
