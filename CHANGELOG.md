@@ -10,6 +10,45 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.34.3] — 2026-04-26
+
+### 🚨 Mobile sidebar overlay — second pass
+
+The fix in v2.34.1 was insufficient. User reported (with a 670×720
+screenshot, English locale) that the page content was still readable
+through the dark-theme backdrop — `Documentation` button, the `57`
+optimization score, the green `100` progress bars and labels were all
+clearly visible behind the open sidebar.
+
+Reproduced with Playwright at the same viewport. Two failures of the
+v2.34.1 attempt:
+
+1. `rgba(0,0,0,0.78)` + `blur(2px)` is too weak on a dark theme — the
+   page text is mostly white/grey on near-black, and 78% black-on-black
+   barely changes contrast.
+2. `min(320px, 92vw)` left ~350 px of content visible to the right of
+   the sidebar at 670 px viewport width — and that's the part the
+   backdrop has to do all the work for.
+
+**Fixes**
+- Sidebar full-width (`100vw`) under **720 px** (was 480 px). 720 px
+  covers tablet portrait, narrow desktop windows, and the user's actual
+  viewport — content exposure is now 0 %.
+- Sidebar widened from `min(320px, 92vw)` to `min(360px, 92vw)` for the
+  720–900 px range.
+- Backdrop alpha 0.78 → **0.92** (dark) / 0.85 (light) with
+  `backdrop-filter: blur(10px) saturate(0.6)` — what little leaks past
+  the wider sidebar is heavily blurred and desaturated, no longer
+  readable.
+- Light theme switched from a transparent black overlay to a translucent
+  white overlay — better visual hierarchy on a light background.
+
+**Verification**
+- Playwright at 670×720 — sidebar is now `100vw`; content exposure 0 %.
+- Playwright at 850×720 — sidebar 360 px; right pane is heavily blurred
+  near-black, content unreadable.
+
+---
 ## [2.34.2] — 2026-04-26
 
 ### 🌐 EN / ZH translations for v2.34 features

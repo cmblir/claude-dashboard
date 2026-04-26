@@ -779,30 +779,34 @@ tailwind.config = {
     #sidebar {
       position: fixed; left: 0; top: 0; height: 100vh; z-index: 40;
       transform: translateX(-100%); transition: transform 0.2s;
-      /* v2.34.1 — 320px / 92vw 로 확대해 뒤 콘텐츠 노출을 줄이고
-         아주 좁은 화면(<480px)에서는 전폭(100vw) 으로 풀펼침. */
-      width: min(320px, 92vw) !important;
+      /* v2.34.3 — 720px 미만 (모바일·태블릿 portrait·작은 데스크톱 창) 은
+         사이드바를 100vw 로 풀스크린 → 우측 콘텐츠 노출 0%.
+         720~900px 만 360px / 92vw 로 부분 노출 + 강한 백드롭 차단. */
+      width: min(360px, 92vw) !important;
       overflow-y: auto; overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
     }
-    @media (max-width: 480px) {
+    @media (max-width: 720px) {
       #sidebar { width: 100vw !important; }
     }
     #sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,0.6); }
     #content { margin-left: 0 !important; }
-    /* v2.34.1 — 사이드바 열렸을 때 강한 배경 오버레이 + 본문 스크롤 잠금
-       이전(0.5 알파)은 다크 테마에서 너무 약해 콘텐츠가 그대로 비침. 스크롤도
-       그대로 동작해 메뉴 뒤 컨텐츠가 움직이는 어색함이 있었음. */
+    /* v2.34.3 — 백드롭을 거의 불투명(0.92) + 강한 blur 로 다크 테마에서도
+       뒷 콘텐츠가 절대 읽히지 않도록. 0.78 + blur(2px) 는 부족하다는 사용자 보고. */
     body.sidebar-open { overflow: hidden; }
     body.sidebar-open::after {
       content: ''; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.78);
-      backdrop-filter: blur(2px);
-      -webkit-backdrop-filter: blur(2px);
+      background: rgba(0,0,0,0.92);
+      backdrop-filter: blur(10px) saturate(0.6);
+      -webkit-backdrop-filter: blur(10px) saturate(0.6);
       z-index: 35; transition: opacity 0.2s;
     }
-    body.theme-light.sidebar-open::after { background: rgba(0,0,0,0.45); }
+    body.theme-light.sidebar-open::after {
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(10px) saturate(0.7);
+      -webkit-backdrop-filter: blur(10px) saturate(0.7);
+    }
     /* v2.34.1 — 모바일 사이드바 열림 시 floating mascot/chatBubble 등은 숨김.
        이전엔 z-index 1100~1150 라 백드롭 위로 그대로 떠 있어 "이상한 핑크 픽셀" 처럼
        보였음. */
