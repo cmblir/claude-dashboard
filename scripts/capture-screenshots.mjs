@@ -39,6 +39,12 @@ const TABS = [
   { id: 'promptLibrary', waitFor: '.card',          extraWait: 900 },
   { id: 'projectAgents', waitFor: '.card',          extraWait: 900 },
   { id: 'mcp',           waitFor: '.card',          extraWait: 900 },
+  // v2.36 — new tabs introduced in v2.34 (Crew Wizard) and v2.36 (Run Center).
+  // guideHub also screenshotted because v2.36.1 added OMC + OMX cards there.
+  { id: 'crewWizard',    waitFor: '.card, #cwSteps', extraWait: 1200 },
+  { id: 'runCenter',     waitFor: '.rc-card, .card', extraWait: 1500 },
+  { id: 'guideHub',      waitFor: '.card',          extraWait: 1000 },
+  { id: 'commands',      waitFor: '.card',          extraWait: 1100 },
 ];
 
 // Costs Timeline 모의 응답 — 실 API 호출 없이 의미있는 차트가 그려지도록
@@ -132,6 +138,14 @@ async function capture(browser, lang) {
         ? page.waitForResponse(r => r.url().includes('/api/ai-providers/list') && r.status() === 200, { timeout: 8000 }).catch(() => null)
         : null;
 
+      // v2.36 — pre-mark first-visit modals as seen so they don't pop over
+      // the screenshot of a subsequent tab.
+      await page.evaluate(() => {
+        try {
+          localStorage.setItem('cwGuideSeen', '1');
+        } catch (_) {}
+      });
+
       await page.evaluate((id) => { location.hash = '#/' + id; }, tab.id);
       // fetch 완료 대기 → 콘텐츠 셀렉터 → 여유 시간
       await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
@@ -139,6 +153,15 @@ async function capture(browser, lang) {
       try {
         await page.waitForSelector(tab.waitFor, { state: 'visible', timeout: 4000 });
       } catch {}
+
+      // Auto-dismiss any lingering modal (Crew Wizard guide, login gate, etc.)
+      // before snapping. Without this the next tab inherits the modal overlay.
+      await page.evaluate(() => {
+        try {
+          if (typeof window.closeModal === 'function') window.closeModal();
+        } catch (_) {}
+      });
+      await page.waitForTimeout(150);
       if (tab.id === 'aiProviders') {
         await page.waitForFunction(() => {
           const n = document.querySelectorAll('[data-i18n="available"], [data-i18n="unavailable"]').length;

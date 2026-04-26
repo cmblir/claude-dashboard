@@ -27,7 +27,10 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 | 버전 | 요점 |
 |---|---|
-| **v2.36.0** | 📦 **앱 형태로 설치** — PWA(브라우저 "앱 설치" / iOS 홈 화면 추가, 크로스 플랫폼) + 72 KB macOS `.app` 번들(`make install-mac` → Spotlight · Dock · 서버 자동 시작/종료). 매니페스트에 3개 단축 메뉴, dark/light theme-color, maskable 아이콘 포함. |
+| **v2.36.2** | 🔄 **서버 재시작 자동 감지 배너** — 대시보드가 60초마다 `/api/version` 폴링 → `serverStartedAt` 변경 시 화면 하단에 새로고침 배너. "git pull 했는데 사용자는 옛 빌드를 보고 있는" 문제 자동 해결. |
+| **v2.36.1** | 🩹 **Run Center ECC 인식 hotfix + OMC/OMX 가이드 카드** — `_ecc_roots()`가 `installed_plugins.json`을 읽어 `ecc@ecc`와 `everything-claude-code@everything-claude-code` 두 플러그인 ID 모두 인식. 가이드 & 툴에 OMC/OMX 카드 추가 (LazyClaude 흡수 vs CLI 전용 비교). |
+| **v2.36.0** | 🎯 **런 센터** — ECC 181 스킬 + 79 슬래시 명령 + OMC 4 모드 + OMX 4 명령을 한 화면에서 검색·1클릭 실행하는 신규 탭. **워크플로우 빠른 실행 (Quick Actions)** — 4 OMC 모드(Autopilot / Ralph / Ultrawork / Deep Interview)를 워크플로우 탭 헤더에서 바로 실행. **슬래시 명령어 탭 Run 버튼** — 모든 명령 카드에 ▶ 버튼 + ECC 칩. |
+| **v2.35.0** | 📦 **앱 형태로 설치** — PWA(브라우저 "앱 설치" / iOS 홈 화면 추가, 크로스 플랫폼) + 72 KB macOS `.app` 번들(`make install-mac` → Spotlight · Dock · 서버 자동 시작/종료). |
 | **v2.34.0** | 🧑‍✈️ **크루 위저드** — Zapier 식 4-스텝 폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 자동 생성. 신규 노드 `slack_approval` (Slack Web API), `obsidian_log`. |
 | **v2.33.2** | 🔌 ECC 플러그인 **완전 자동 설치** — 가이드 & 툴 탭에서 원클릭, Claude Code 명령어 입력 불필요 |
 | **v2.33.1** | 🧰 가이드 툴킷 관리자 (ECC / CCB 설치·제거) · flyout viewport 수정 · 로그인 게이트 첫 방문만 |
@@ -48,7 +51,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.36.0 🇰🇷│
+│  💤  LazyClaude                                     v2.36.2 🇰🇷│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 신기능│   🔀 워크플로우                                       │
 │ 🏠 메인 │   ┌──────┐      ┌──────┐      ┌──────┐               │
@@ -63,7 +66,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 └────────┴───────────────────────────────────────────────────────┘
 ```
 
-6 그룹 52 탭 · 16 워크플로우 노드 타입 · 8 AI 프로바이더 · 5 테마 · 3 언어.
+6 그룹 54 탭 · 18 워크플로우 노드 타입 · 8 AI 프로바이더 · 5 테마 · 3 언어 · **Run Center 카탈로그 268 항목 (ECC 181 스킬 + 79 슬래시 명령 + OMC 4 모드 + OMX 4 명령)**.
 
 ### 📸 스크린샷
 
@@ -95,6 +98,14 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 | 👥 프로젝트 서브에이전트 | 🔗 MCP 커넥터 |
 | ![Project Agents](./docs/screenshots/ko/projectAgents.png) | ![MCP](./docs/screenshots/ko/mcp.png) |
 
+**1-클릭 실행 (v2.36)**
+
+| 🎯 런 센터 (ECC + OMC + OMX 통합 카탈로그 268 항목) | 🧑‍✈️ 크루 위저드 (Zapier 식 자동 생성기) |
+|---|---|
+| ![Run Center](./docs/screenshots/ko/runCenter.png) | ![Crew Wizard](./docs/screenshots/ko/crewWizard.png) |
+| / 슬래시 명령어 (Run 버튼 + ECC 칩) | 📚 가이드 & 툴 (ECC · OMC · OMX · 베스트 프랙티스) |
+| ![Commands](./docs/screenshots/ko/commands.png) | ![Guide & Tools](./docs/screenshots/ko/guideHub.png) |
+
 **토큰 최적화**
 
 | 🦀 RTK Optimizer (설치 · 활성 · 통계) |
@@ -113,7 +124,7 @@ _모든 스크린샷은 `scripts/capture-screenshots.mjs` (Playwright · 1440×9
 
 | 이전 방식 | Control Center |
 |---|---|
-| `cat ~/.claude/settings.json` 눈으로 확인 | 52 탭이 각 섹션을 렌더링 |
+| `cat ~/.claude/settings.json` 눈으로 확인 | 54 탭이 각 섹션을 렌더링 |
 | `ls ~/.claude/agents/` → 에디터 열기 | 16 역할 프리셋 · 원클릭 생성 |
 | 쉘 스크립트로 멀티 AI 비교 | 세션 노드 3개 드래그 → merge → output |
 | RAG 파이프라인 수동 구성 | 빌트인 `RAG Pipeline` 템플릿 |
@@ -178,6 +189,16 @@ API 키는 `🧠 AI 프로바이더` 탭에서 저장해도 됩니다 — `~/.cl
 
 ## ✨ 주요 기능
 
+### 🎯 런 센터 — ECC / OMC / OMX 를 대시보드에서 직접 실행 (v2.36)
+
+- **268 항목 통합 카탈로그**: ECC 의 181 스킬 + 79 슬래시 명령(`~/.claude/plugins/cache/<ecc 또는 everything-claude-code>/.../{skills,commands}/` 에서 직접 스캔), OMC 4 모드, OMX 4 명령
+- **1-클릭 실행** — 기존 `execute_with_assignee` 파이프라인 그대로 사용. Claude / GPT / Gemini / Ollama 어떤 프로바이더든 dispatch. 토큰 / 비용 / 소요 시간 모두 보고
+- **필터**: 5 소스 (전체 / ECC / OMC / OMX / ⭐ 즐겨찾기) · 6 종류 (skill / command / mode / diagnostic / knowledge) · 자동 추출 카테고리 칩
+- **결과를 프롬프트로 저장** → Prompt Library, **워크플로우로 변환** → 매칭되는 빌트인 템플릿 (OMC) 또는 1-노드 워크플로우 (ECC) 자동 생성
+- **진단** — `installed_plugins.json` 우선 읽기, 사이드바에 스캔된 모든 root 와 카운트 노출 → "ECC 설치했는데 런 센터에 안 나옴" 사용자 자가 디버그 가능
+- **워크플로우 빠른 실행 (Quick Actions)** — 워크플로우 탭 헤더에 4 OMC 모드 버튼 (🚀 Autopilot / 🔁 Ralph / 🤝 Ultrawork / 🧐 Deep Interview). 클릭 → 목표 입력 → 워크플로우 자동 생성 + 실행
+- **슬래시 명령어 탭 Run 버튼** — 모든 슬래시 명령 카드에 ▶ Run 버튼과 (해당 시) ECC 칩
+
 ### 🧑‍✈️ 크루 위저드 — Zapier 스타일 자동 생성기 (v2.34)
 
 - **4-스텝 폼** — `크루 위저드` 탭에서 폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 한 번에 자동 생성
@@ -232,7 +253,7 @@ API 키는 `🧠 AI 프로바이더` 탭에서 저장해도 됩니다 — `~/.cl
 - **설정 파일 뷰어** — `~/Library/Application Support/rtk/config.toml` (macOS) / `~/.config/rtk/config.toml` (Linux)
 - **명령 레퍼런스** — 30+ 서브커맨드를 6 카테고리(파일 · Git · Test · Build/Lint · Analytics · Utility)로 그룹핑 + `-u/--ultra-compact` 힌트
 
-### 🤝 Claude Code 통합 (53 탭)
+### 🤝 Claude Code 통합 (54 탭)
 
 | 그룹 | 탭 |
 |---|---|
@@ -322,16 +343,20 @@ claude-dashboard/
 
 ---
 
-## 🔢 통계 (v2.36.0)
+## 🔢 통계 (v2.36.2)
 
 | 지표 | 값 |
 |---|---|
-| 백엔드 코드 | ~18,000줄 · 46 모듈 · stdlib only |
-| 프론트엔드 코드 | ~16,600줄 · 단일 HTML |
-| API 라우트 | **190** (GET 102 / POST 85 / PUT 3 + regex webhook) |
-| 탭 수 | **52** (6 그룹) |
-| 워크플로우 노드 타입 | **16** |
+| 백엔드 코드 | ~19,000줄 · 50 모듈 · stdlib only |
+| 프론트엔드 코드 | ~18,500줄 · 단일 HTML |
+| API 라우트 | **199** (GET 105 / POST 91 / PUT 3 + regex webhook) |
+| 탭 수 | **54** (6 그룹) |
+| 워크플로우 노드 타입 | **18** (`slack_approval`, `obsidian_log` 포함) |
+| 런 센터 카탈로그 | **268** 항목 (ECC 181 스킬 + 79 명령 + OMC 4 모드 + OMX 4 명령) |
+| 워크플로우 빌트인 템플릿 | **10** (`bt-autopilot` · `bt-ralph` · `bt-ultrawork` · `bt-deep-interview` · `bt-team-sprint` · `bt-crew` 등) |
 | AI 프로바이더 | **8** 빌트인 + 커스텀 무제한 |
+| 번역 키 | **3,845** × ko / en / zh — 한글 잔존 0 |
+| 설치 방법 | local (`python3 server.py`) · PWA (모든 브라우저) · macOS `.app` (72 KB) |
 | Claude API 플레이그라운드 탭 | **11** (프롬프트 캐시 · Extended Thinking · Tool Use · Batch · Files · Vision · 모델 벤치 · Server Tools · Citations · Agent SDK 스캐폴드 · Embedding Lab) |
 | 통합 비용 타임라인 | ✓ (모든 플레이그라운드 + 워크플로우, 일별 스택) |
 | 워크플로우 run diff / rerun | ✓ (per-node Δ) |
@@ -372,7 +397,7 @@ npx playwright install chromium
 대시보드 서버가 실행 중인 상태에서 (`python3 server.py`):
 
 ```bash
-npm run test:e2e:smoke       # 52 탭 — 뷰 렌더 실패 / console error 검출
+npm run test:e2e:smoke       # 54 탭 — 뷰 렌더 실패 / console error 검출
 npm run test:e2e:workflow    # 빌트인 템플릿 생성 → 실행 → 배너 등장 관찰
 npm run test:e2e:headed      # 브라우저 창 띄워서 실행
 TAB_ID=workflows npm run test:e2e:smoke   # 단일 탭만

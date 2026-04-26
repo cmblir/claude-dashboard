@@ -27,7 +27,10 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 | ver | highlight |
 |---|---|
-| **v2.36.0** | 📦 **Install as a real app** — PWA (Add to Home Screen / install icon, cross-platform) **and** a 72 KB macOS `.app` bundle (`make install-mac` → Spotlight + Dock + auto server lifecycle). Manifest with 3 launch shortcuts, dark/light theme-color, maskable icon. |
+| **v2.36.2** | 🔄 **Server-restart auto-banner** — dashboard polls `/api/version` every 60s and prompts a one-click reload when `serverStartedAt` changes (no more "I deployed but the user is on a stale build"). |
+| **v2.36.1** | 🩹 **Run Center ECC discovery hotfix + OMC/OMX guide cards** — `_ecc_roots()` reads `installed_plugins.json` and recognises both `ecc@ecc` and `everything-claude-code@everything-claude-code` ids. Guide & Tools gains OMC and OMX cards explaining LazyClaude-absorbed vs CLI-only features. |
+| **v2.36.0** | 🎯 **Run Center** — new tab unifying ECC's 181 skills + 79 slash commands + OMC's 4 modes + OMX's 4 commands into one searchable, runnable catalog. **Workflow Quick Actions** — 4 OMC modes (Autopilot / Ralph / Ultrawork / Deep Interview) launchable from the Workflows tab header. **Commands tab Run buttons** — every slash command card gets a ▶ button and an ECC chip. |
+| **v2.35.0** | 📦 **Install as a real app** — PWA (Add to Home Screen / install icon, cross-platform) **and** a 72 KB macOS `.app` bundle (`make install-mac` → Spotlight + Dock + auto server lifecycle). |
 | **v2.34.0** | 🧑‍✈️ **Crew Wizard** — Zapier-style 4-step form scaffolds Planner + Personas + Slack approval + Obsidian log in one click. New `slack_approval` (Slack Web API admin gate) and `obsidian_log` workflow nodes. |
 | **v2.33.2** | 🔌 ECC plugin **full auto-install** via `claude plugin install` — one click from Guide & Tools |
 | **v2.33.1** | 🧰 Guide toolkit manager (ECC + CCB install/remove) · flyout viewport fix · first-visit-only login gate |
@@ -48,7 +51,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.36.0 🇺🇸│
+│  💤  LazyClaude                                     v2.36.2 🇺🇸│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 New │   🔀 Workflows                                         │
 │ 🏠 Main│   ┌──────┐      ┌──────┐      ┌──────┐                │
@@ -63,7 +66,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 └────────┴───────────────────────────────────────────────────────┘
 ```
 
-52 tabs across 6 groups · 16 workflow node types · 8 AI providers · 5 themes · 3 languages.
+54 tabs across 6 groups · 18 workflow node types · 8 AI providers · 5 themes · 3 languages · **Run Center catalog with 268 entries (181 ECC skills + 79 ECC commands + 4 OMC modes + 4 OMX commands)**.
 
 ### 📸 Screenshots
 
@@ -95,6 +98,14 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 | 👥 Project Sub-agents | 🔗 MCP Connectors |
 | ![Project Agents](./docs/screenshots/en/projectAgents.png) | ![MCP](./docs/screenshots/en/mcp.png) |
 
+**One-click execution (v2.36)**
+
+| 🎯 Run Center (ECC + OMC + OMX, 268 items) | 🧑‍✈️ Crew Wizard (Zapier-style scaffolder) |
+|---|---|
+| ![Run Center](./docs/screenshots/en/runCenter.png) | ![Crew Wizard](./docs/screenshots/en/crewWizard.png) |
+| / Slash commands with Run buttons + ECC chips | 📚 Guide & Tools (ECC · OMC · OMX · best practice) |
+| ![Commands](./docs/screenshots/en/commands.png) | ![Guide & Tools](./docs/screenshots/en/guideHub.png) |
+
 **Token Optimization**
 
 | 🦀 RTK Optimizer (install, activate, stats) |
@@ -113,7 +124,7 @@ You already use Claude Code. But as you add more tools — GPT, Gemini, Ollama, 
 
 | Before | With Control Center |
 |---|---|
-| `cat ~/.claude/settings.json` and eyeball it | 52 tabs, each rendering the relevant slice |
+| `cat ~/.claude/settings.json` and eyeball it | 54 tabs, each rendering the relevant slice |
 | `ls ~/.claude/agents/` → open in editor | 16 role presets · one-click create |
 | Shell-script multi-AI comparison | Drag 3 session nodes → merge → output |
 | Manual RAG pipeline assembly | Built-in `RAG Pipeline` template |
@@ -204,6 +215,16 @@ Uninstall with `make uninstall-mac`.
 
 ## ✨ Features
 
+### 🎯 Run Center — execute ECC / OMC / OMX from the dashboard (v2.36)
+
+- **Unified catalog over 268 entries**: ECC's 181 skills + 79 slash commands (parsed from `~/.claude/plugins/cache/<ecc-or-everything-claude-code>/.../{skills,commands}/`), OMC's 4 modes, OMX's 4 commands.
+- **One-click execution** via the existing `execute_with_assignee` pipeline — runs through Claude / GPT / Gemini / Ollama, reports tokens / cost / duration.
+- **Filters**: 5 sources (All / ECC / OMC / OMX / ⭐ Favorites), 6 kinds (skill / command / mode / diagnostic / knowledge), auto-derived category chips.
+- **Save-to-prompt** pushes the result into the Prompt Library; **Convert-to-workflow** hands off either to the matching built-in template (OMC) or scaffolds a 1-node workflow (ECC).
+- **Diagnostics** — `installed_plugins.json` is read first; the sidebar surfaces every scanned root with per-root counts so users can debug "ECC installed but Run Center empty" on their own.
+- **Workflow Quick Actions** — 4 OMC mode buttons (🚀 Autopilot / 🔁 Ralph / 🤝 Ultrawork / 🧐 Deep Interview) at the top of the Workflows tab. Click → enter a goal → workflow scaffolded + auto-run.
+- **Commands tab Run buttons** — every slash command card now has a ▶ Run button and an ECC chip when applicable.
+
 ### 🧑‍✈️ Crew Wizard — Zapier-style scaffolder (v2.34)
 
 - **4-step form** in the `Crew Wizard` tab → planner + personas + Slack approval + Obsidian log workflow built in one click
@@ -258,13 +279,14 @@ Integrates [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk), a Rust CLI proxy that 
 - **Config viewer** — read `~/Library/Application Support/rtk/config.toml` (macOS) or `~/.config/rtk/config.toml` (Linux)
 - **Command reference** — 30+ subcommands grouped into 6 categories (file ops · git · test · build/lint · analytics · utility), with the `-u/--ultra-compact` flag hint
 
-### 🤝 Claude Code Integration (53 tabs)
+### 🤝 Claude Code Integration (54 tabs)
 
 | Group | Tabs |
 |---|---|
 | 🆕 New | `features` · `onboarding` · `guideHub` · `claudeDocs` |
 | 🏠 Main | `overview` · `projects` · `analytics` · `aiEval` · `sessions` |
-| 🛠️ Work | `workflows` · `aiProviders` · `agents` · `projectAgents` · `skills` · `commands` · `promptCache` · `thinkingLab` · `toolUseLab` · `batchJobs` · `apiFiles` · `visionLab` · `modelBench` · `serverTools` · `citationsLab` · `agentSdkScaffold` · `embeddingLab` · `promptLibrary` · 🆕 `rtk` |
+| 🛠️ Build | `workflows` · 🆕 `runCenter` · 🆕 `crewWizard` · `agents` · `projectAgents` · `skills` · `commands` · `promptLibrary` · `agentSdkScaffold` · `rtk` |
+| 🧪 Playground | `aiProviders` · `promptCache` · `thinkingLab` · `toolUseLab` · `batchJobs` · `apiFiles` · `visionLab` · `modelBench` · `serverTools` · `citationsLab` · `embeddingLab` · `sessionReplay` |
 | ⚙️ Config | `hooks` · `permissions` · `mcp` · `plugins` · `settings` · `claudemd` |
 | 🎛️ Advanced | `outputStyles` · `statusline` · `plans` · `envConfig` · `modelConfig` · `ideStatus` · `marketplaces` · `scheduled` |
 | 📈 System | `usage` · `metrics` · `memory` · `tasks` · `backups` · `bashHistory` · `telemetry` · `homunculus` · `team` · `system` |
@@ -300,7 +322,11 @@ claude-dashboard/
 │   ├── ai_providers.py           # 8 providers · registry · rate limiter (1,723)
 │   ├── ai_keys.py                # Key mgmt · custom providers · cost tracking (734)
 │   ├── ollama_hub.py             # Catalog · pull/delete/create · serve mgmt (606)
-│   ├── nav_catalog.py            # Single source of truth for 52 tabs + i18n descriptions
+│   ├── nav_catalog.py            # Single source of truth for 54 tabs + i18n descriptions
+│   ├── run_center.py             # Run Center: ECC + OMC + OMX catalog + executor + history (~480)
+│   ├── crew_wizard.py            # Crew Wizard form → DAG builder
+│   ├── slack_api.py              # Slack Web API client (chat.postMessage, reactions.get)
+│   ├── obsidian_log.py           # Obsidian markdown appender (host-rooted, realpath checked)
 │   ├── features.py               # Feature discovery · AI evaluation · recommendations
 │   ├── projects.py               # Project browser · 16 sub-agent role presets
 │   ├── sessions.py               # Session indexing · quality scoring · agent graph
@@ -348,17 +374,21 @@ Atomic writes via `server/utils.py::_safe_write` (`.tmp → rename`), threading 
 
 ---
 
-## 🔢 Stats (v2.36.0)
+## 🔢 Stats (v2.36.2)
 
 | Metric | Value |
 |---|---|
-| Backend code | ~18,000 lines · 46 modules · stdlib only |
-| Frontend code | ~16,600 lines · single HTML file |
-| API routes | **190** (GET 102 / POST 85 / PUT 3 + regex webhook) |
-| Tabs | **52** across 6 groups |
-| Workflow node types | **16** |
+| Backend code | ~19,000 lines · 50 modules · stdlib only |
+| Frontend code | ~18,500 lines · single HTML file |
+| API routes | **199** (GET 105 / POST 91 / PUT 3 + regex webhook) |
+| Tabs | **54** across 6 groups |
+| Workflow node types | **18** (incl. `slack_approval`, `obsidian_log`) |
+| Run Center catalog | **268** entries (181 ECC skills + 79 ECC commands + 4 OMC modes + 4 OMX commands) |
+| Workflow built-in templates | **10** (incl. `bt-autopilot`, `bt-ralph`, `bt-ultrawork`, `bt-deep-interview`, `bt-team-sprint`, `bt-crew`) |
 | AI providers | **8** built-in + unlimited custom |
 | Claude API playground tabs | **11** (prompt cache · extended thinking · tool use · batch · files · vision · model bench · server tools · citations · agent sdk scaffold · embedding lab) |
+| Translations | **3,845** keys × ko / en / zh — 0 Korean residue |
+| Install paths | local (`python3 server.py`) · PWA (any browser) · macOS `.app` (72 KB) |
 | Unified cost timeline | ✓ (all playgrounds + workflows, daily stacked) |
 | Workflow run diff / rerun | ✓ (per-node Δ) |
 | Prompt Library | ✓ (tag search + convert to workflow) |
@@ -398,7 +428,7 @@ npx playwright install chromium
 Then with the dashboard running (`python3 server.py`):
 
 ```bash
-npm run test:e2e:smoke       # 52 tabs — view-render-fail / console-error detection
+npm run test:e2e:smoke       # 54 tabs — view-render-fail / console-error detection
 npm run test:e2e:ui          # workflow DOM + v2.10.x UX regression checks (v2.18.0)
 npm run test:e2e:workflow    # builtin template create → run → banner observed
 npm run test:e2e:all         # smoke + ui in sequence
