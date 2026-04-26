@@ -115,6 +115,12 @@ NEW_EN: dict[str, str] = {
     "경로는 발견됐지만 항목 0개": "Path found but 0 items parsed",
     "진단 보기": "Show diagnostics",
     "스캔된 경로": "Scanned paths",
+
+    # ── v2.36.2 — version-mismatch refresh banner ──────────────
+    "새 버전 설치됨": "New version installed",
+    "서버가 재시작되었습니다 — 새 코드 적용 가능성": "Server restarted — new code may be live",
+    "지금 새로고침": "Reload now",
+    "나중에": "Later",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -227,4 +233,10 @@ NEW_ZH: dict[str, str] = {
     "경로는 발견됐지만 항목 0개": "路径已找到但解析到 0 项",
     "진단 보기": "查看诊断",
     "스캔된 경로": "已扫描路径",
+
+    # ── v2.36.2 — version-mismatch refresh banner ──────────────
+    "새 버전 설치됨": "已安装新版本",
+    "서버가 재시작되었습니다 — 새 코드 적용 가능성": "服务器已重启 — 可能有新代码生效",
+    "지금 새로고침": "立即刷新",
+    "나중에": "稍后",
 }

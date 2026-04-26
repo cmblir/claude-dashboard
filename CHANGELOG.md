@@ -10,6 +10,61 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.36.2] — 2026-04-26
+
+### 🔄 Server-restart detector — auto-banner when the user is on a stale build
+
+User reported v2.36.1 features (OMC/OMX cards, ECC discovery fix) **still
+weren't visible** after the release. The code was correct on disk and on
+`origin/main`, but the user's running server was still v2.35.x — the
+`git pull` happened without restarting `python3 server.py`. The browser
+was also caching the previous `index.html` despite `Cache-Control:
+no-store`.
+
+The dashboard had no way to surface this. v2.36.2 makes it self-healing:
+
+#### Backend (`server/version.py`)
+- Capture `_SERVER_STARTED_AT_MS = int(time.time() * 1000)` at module
+  import. The value never changes for the life of the process.
+- `/api/version` now returns `{version, changelog, serverStartedAt}`.
+
+#### Frontend (`dist/index.html`)
+- On first load, the dashboard remembers `__bootedAt = {version,
+  serverStartedAt}` from the first `/api/version` call.
+- A 60-second poll (`_scheduleVersionPoll`) compares the current
+  `/api/version` response to the booted snapshot.
+- Mismatch on either field pops a sticky bottom-of-screen banner with
+  two buttons — **Reload now** (`location.reload()`) and **Later**
+  (dismiss). The banner uses the gradient `--accent → purple` so it's
+  visually unmistakable.
+
+#### Why this also catches the cache-bust case
+
+Even when the user's `git pull` is correct, browsers occasionally cache
+the inline-everything `dist/index.html`. As long as they restart the
+server, the version-mismatch banner fires within 60 s and offers a
+one-click hard-reload. In the rare case where neither version nor PID
+changed (server still running an old build), the user sees no banner —
+which is correct, because in that case there really is nothing new.
+
+### Verification
+
+- `make i18n-refresh` + `scripts/verify-translations.js` — all 4 stages
+  pass: 3,845 keys × 3 locales matched, 1,107 `t()` Korean call sites
+  covered, 0 Korean residue.
+- Live HTTP — `/api/version` returns the new `serverStartedAt` field;
+  consecutive calls within the same process return the same value
+  (1777200287684 → 1777200287684). Restarting the process produces a
+  larger value, exactly the trigger the polling code looks for.
+
+### What this means for the v2.36.1 issue
+
+The user sees nothing **new** until they reload. After they reload once
+(per the diagnosis), every subsequent server restart is auto-detected
+within 60 s. The "I deployed but the user is on the old build" failure
+mode is now self-correcting.
+
+---
 ## [2.36.1] — 2026-04-26
 
 ### 🩹 Run Center didn't see ECC after install + Guide had no OMC/OMX card

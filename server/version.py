@@ -1,10 +1,17 @@
 """버전 + CHANGELOG 로딩 — 프론트 사이드바, 챗봇 프롬프트가 공유."""
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from .config import ROOT
 from .utils import _safe_read
+
+# v2.36.2 — process-start timestamp captured at module import. The dashboard
+# polls /api/version every 60s and shows a "server restarted, refresh" toast
+# when this value changes — automatically catching the "I pulled new code but
+# the user is still on the old build" race.
+_SERVER_STARTED_AT_MS = int(time.time() * 1000)
 
 
 def get_version() -> str:
@@ -40,6 +47,7 @@ def get_latest_changelog(max_entries: int = 3) -> str:
 
 def api_version_info() -> dict:
     return {
-        "version": get_version(),
-        "changelog": get_latest_changelog(3),
+        "version":         get_version(),
+        "changelog":       get_latest_changelog(3),
+        "serverStartedAt": _SERVER_STARTED_AT_MS,
     }

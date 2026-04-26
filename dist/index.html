@@ -17642,6 +17642,56 @@ function _showVersionModal() {
   `, { narrow: true });
 }
 
+// v2.36.2 — Server-restart / new-build detector.
+// The dashboard caches index.html aggressively in some browsers despite the
+// no-store header; on top of that, the user might forget to restart `python3
+// server.py` after `git pull`. Both cases leave the user staring at a stale
+// build that they can't tell apart from a current one. We compare the server's
+// startup timestamp every 60s and pop a sticky "new version" toast on change.
+function _scheduleVersionPoll() {
+  if (window.__verPollTimer) return;
+  window.__verPollTimer = setInterval(async () => {
+    try {
+      const v = await api('/api/version');
+      if (!window.__bootedAt) return;
+      const startedAtChanged = (v.serverStartedAt || 0) !== window.__bootedAt.serverStartedAt;
+      const versionChanged   = v.version && v.version !== window.__bootedAt.version;
+      if (startedAtChanged || versionChanged) {
+        clearInterval(window.__verPollTimer);
+        _showRefreshBanner(window.__bootedAt.version, v.version, versionChanged);
+      }
+    } catch (_) { /* network blip, retry next tick */ }
+  }, 60_000);
+}
+
+function _showRefreshBanner(oldVer, newVer, isVersionBump) {
+  if (document.getElementById('verRefreshBanner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'verRefreshBanner';
+  banner.style.cssText = `
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    z-index: 9999; padding: 12px 18px; border-radius: 12px;
+    background: linear-gradient(135deg, rgba(217,119,87,0.95), rgba(167,139,250,0.95));
+    color: #fff; box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+    display: flex; align-items: center; gap: 14px; font-size: 13px;
+    max-width: calc(100vw - 32px);
+  `;
+  const headline = isVersionBump
+    ? `🚀 ${t('새 버전 설치됨')}: v${escapeHtml(oldVer)} → v${escapeHtml(newVer)}`
+    : `🔄 ${t('서버가 재시작되었습니다 — 새 코드 적용 가능성')}`;
+  banner.innerHTML = `
+    <span>${headline}</span>
+    <button class="btn-primary btn text-xs" style="background:rgba(255,255,255,0.92);color:#1a1a1a;" onclick="location.reload()">
+      ${t('지금 새로고침')}
+    </button>
+    <button class="btn-ghost btn text-xs" style="color:#fff;" onclick="document.getElementById('verRefreshBanner').remove();">
+      ${t('나중에')}
+    </button>
+  `;
+  document.body.appendChild(banner);
+  _translateDOM(banner);
+}
+
 async function loadCliFoot() {
   // 사이드바 하단 버전 chip 업데이트 (한 번만 로드하고 캐시)
   try {
@@ -17650,6 +17700,15 @@ async function loadCliFoot() {
     if (el && v && v.version) {
       window.__appVersionInfo = v;
       el.textContent = 'v' + v.version;
+      // v2.36.2 — remember the first-load server identity so we can detect a
+      // restart later (server PID changes ⇒ serverStartedAt changes).
+      if (!window.__bootedAt) {
+        window.__bootedAt = {
+          version:        v.version,
+          serverStartedAt: v.serverStartedAt || 0,
+        };
+        _scheduleVersionPoll();
+      }
     }
   } catch (e) { /* silent */ }
   try {
