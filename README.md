@@ -12,7 +12,7 @@ _Don't memorize 50+ CLI commands. Just click._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.34.3-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.35.0-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-architecture)
 
 </div>
@@ -27,7 +27,8 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 | ver | highlight |
 |---|---|
-| **v2.34.3** | 🧑‍✈️ **Crew Wizard** — Zapier-style 4-step form scaffolds Planner + Personas + Slack approval + Obsidian log in one click. New `slack_approval` (Slack Web API admin gate) and `obsidian_log` workflow nodes. |
+| **v2.35.0** | 📦 **Install as a real app** — PWA (Add to Home Screen / install icon, cross-platform) **and** a 72 KB macOS `.app` bundle (`make install-mac` → Spotlight + Dock + auto server lifecycle). Manifest with 3 launch shortcuts, dark/light theme-color, maskable icon. |
+| **v2.34.0** | 🧑‍✈️ **Crew Wizard** — Zapier-style 4-step form scaffolds Planner + Personas + Slack approval + Obsidian log in one click. New `slack_approval` (Slack Web API admin gate) and `obsidian_log` workflow nodes. |
 | **v2.33.2** | 🔌 ECC plugin **full auto-install** via `claude plugin install` — one click from Guide & Tools |
 | **v2.33.1** | 🧰 Guide toolkit manager (ECC + CCB install/remove) · flyout viewport fix · first-visit-only login gate |
 | **v2.33.0** | 🎨 Artifacts Viewer — 4-layer safe preview (sandbox + CSP + postMessage + static filter) |
@@ -47,7 +48,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  💤  LazyClaude                                     v2.34.3 🇺🇸│
+│  💤  LazyClaude                                     v2.35.0 🇺🇸│
 ├────────┬───────────────────────────────────────────────────────┤
 │ 🆕 New │   🔀 Workflows                                         │
 │ 🏠 Main│   ┌──────┐      ┌──────┐      ┌──────┐                │
@@ -172,6 +173,32 @@ ANTHROPIC_API_KEY=sk-...             # Optional
 ```
 
 API keys can also be saved via the `🧠 AI Providers` tab — stored in `~/.claude-dashboard-config.json`.
+
+### Install as an app (v2.35)
+
+#### Option A — PWA (any browser, any OS)
+
+1. Run `python3 server.py` and open `http://127.0.0.1:8080`.
+2. Click the **install icon** in the address bar (Chrome / Edge / Brave),
+   or **Share → Add to Home Screen** in Safari (iOS).
+3. LazyClaude launches in its own window with no browser chrome,
+   pinnable to the Dock / taskbar / home screen, with `Workflows`,
+   `Crew Wizard`, and `AI Providers` shortcuts in the right-click menu.
+
+#### Option B — macOS `.app` bundle (Spotlight + Dock)
+
+```bash
+make install-mac     # builds + copies LazyClaude.app to /Applications/
+```
+
+Then double-click in Finder, or `⌘Space → LazyClaude` from Spotlight.
+The launcher starts the server on first open, reuses an already-running
+server on subsequent opens, opens the dashboard in your default browser,
+and shuts the server down on Quit. Logs go to `~/Library/Logs/LazyClaude/server.log`.
+
+The bundle is **72 KB** — no Python interpreter, no Electron. It calls
+your system `python3`, matching LazyClaude's stdlib-only philosophy.
+Uninstall with `make uninstall-mac`.
 
 ---
 
@@ -321,7 +348,7 @@ Atomic writes via `server/utils.py::_safe_write` (`.tmp → rename`), threading 
 
 ---
 
-## 🔢 Stats (v2.34.3)
+## 🔢 Stats (v2.35.0)
 
 | Metric | Value |
 |---|---|

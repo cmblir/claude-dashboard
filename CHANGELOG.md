@@ -10,6 +10,80 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.35.0] — 2026-04-26
+
+### 📦 Install LazyClaude as a real app (PWA + macOS .app bundle)
+
+LazyClaude can now be installed as an app, both ways:
+
+#### Option A — PWA (cross-platform: macOS / Windows / Linux / iOS / Android)
+
+Open LazyClaude in any modern browser → click the install icon in the
+URL bar (Chrome/Edge) or **Share → Add to Home Screen** (Safari iOS).
+The dashboard launches in its own window with no browser chrome, has a
+Dock/taskbar icon, and registers shortcuts (Workflows / Crew Wizard /
+AI Providers) in the right-click context menu.
+
+- `dist/manifest.json` — `display: standalone`, `display_override`
+  fallback chain (`window-controls-overlay` → `standalone` →
+  `minimal-ui`), 3 launch shortcuts.
+- 4 PNG icons (192 / 512 / 512 maskable / 180 apple-touch) generated
+  from `docs/logo/mascot.svg` via Playwright. Maskable variant uses a
+  dark background so the orange mascot survives Android's adaptive
+  icon mask.
+- `apple-mobile-web-app-capable`, `theme-color` (dark + light media
+  queries), `og:title` / `og:image` / `og:description` for previews.
+
+#### Option B — macOS .app bundle (Spotlight-searchable, Dock-pinnable)
+
+```bash
+make install-mac     # builds + copies LazyClaude.app to /Applications/
+```
+
+Double-click in Finder, or open via Spotlight (`⌘Space → LazyClaude`).
+The launcher:
+
+1. Resolves the project directory: `$LAZYCLAUDE_HOME` env > `~/Lazyclaude`
+   > `~/lazyclaude`. Shows a friendly dialog if none found.
+2. Confirms `python3` is available.
+3. Reuses an already-running server on port 8080 if one is up.
+4. Otherwise starts `python3 server.py` in the background, logging to
+   `~/Library/Logs/LazyClaude/server.log`.
+5. Opens `http://127.0.0.1:8080` in the default browser.
+6. Forwards Quit / SIGTERM to the server so it shuts down cleanly.
+
+The bundle is **72 KB total** — no Python interpreter, no Electron, no
+Node runtime. It depends on the system `python3`, matching LazyClaude's
+stdlib-only philosophy.
+
+#### New Make targets
+
+| Target | What it does |
+|---|---|
+| `make pwa-icons` | regenerate PWA PNG icons from `docs/logo/mascot.svg` |
+| `make app` | build `dist/LazyClaude.app` |
+| `make install-mac` | build + copy to `/Applications/` (replaces existing) |
+| `make uninstall-mac` | remove `/Applications/LazyClaude.app` |
+
+#### Files
+
+- `dist/manifest.json` (new)
+- `dist/icons/{icon-192, icon-512, icon-maskable-512, apple-touch-180}.png` (new)
+- `dist/favicon.svg` + `dist/favicon-32.png` (new)
+- `dist/index.html` — PWA `<head>` block (manifest + theme-color + apple-* + og:*)
+- `tools/build_pwa_icons.mjs` (new) — Playwright-driven SVG → PNG renderer
+- `tools/build_macos_app.sh` (new) — bundle builder using `sips` + `iconutil`
+- `Makefile` — new targets
+
+#### Verification
+
+- Playwright PWA check — manifest parsed, all 4 icons + favicons load,
+  no failed responses, theme-color and apple-* meta tags present.
+- `.app` launcher — runtime simulation: server starts, `/api/version`
+  responds, log file created at `~/Library/Logs/LazyClaude/server.log`,
+  SIGTERM cleanly shuts the server down.
+
+---
 ## [2.34.3] — 2026-04-26
 
 ### 🚨 Mobile sidebar overlay — second pass
