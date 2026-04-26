@@ -80,12 +80,20 @@ def _count_tasks_in_todos() -> int:
 
 def briefing_overview() -> dict:
     today = _today_history_stats()
+    auto_resume_active = 0
+    try:
+        from .auto_resume import _load_all as _ar_load_all
+        store = _ar_load_all()
+        auto_resume_active = sum(1 for e in store.values() if e.get("enabled"))
+    except Exception:
+        pass
     return {
         "projectCount": _count_projects(),
         "taskCount": _count_tasks_in_todos(),
         "sessionCount": _count_active_sessions(),
         "commandCount": today["commandCount"],
         "todayProjectCount": today["projectCount"],
+        "autoResumeActiveCount": auto_resume_active,
         "lastUpdate": int(time.time() * 1000),
     }
 

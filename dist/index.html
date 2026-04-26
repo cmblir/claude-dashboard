@@ -8726,7 +8726,7 @@ function _arRender(panel, entry) {
           <label class="text-[var(--text-dim)]">${t('최대 재시도 횟수')}</label>
           <input id="arMax" class="input w-20" type="number" min="1" max="60" value="${prevMax}" />
         </div>
-        <div class="flex gap-3 items-center text-xs flex-wrap">
+        <div class="flex gap-3 items-center text-xs flex-wrap mb-2">
           <label class="cursor-pointer flex items-center gap-1">
             <input type="checkbox" id="arUseContinue" ${prevContinue} />
             <span title="${t('--resume <id> 대신 --continue 사용')}">${t('--continue 모드')}</span>
@@ -8735,6 +8735,13 @@ function _arRender(panel, entry) {
             <input type="checkbox" id="arInstallHooks" ${prevHooks} />
             <span title="${t('Stop hook 으로 매 응답 시 스냅샷 저장 + SessionStart 로 자동 주입')}">${t('Stop+SessionStart Hook 자동 설치 (프로젝트)')}</span>
           </label>
+        </div>
+        <div class="flex gap-2 items-center text-xs flex-wrap">
+          <label class="text-[var(--text-dim)] w-full text-[10px] uppercase">${t('알림 (선택) — 상태 전이 시 webhook')}</label>
+          <input id="arSlackUrl" class="input flex-1 min-w-[200px] text-xs" type="url"
+            placeholder="https://hooks.slack.com/..." value="${escapeHtml((entry && entry.notify && entry.notify.slack) || '')}" />
+          <input id="arDiscordUrl" class="input flex-1 min-w-[200px] text-xs" type="url"
+            placeholder="https://discord.com/api/webhooks/..." value="${escapeHtml((entry && entry.notify && entry.notify.discord) || '')}" />
         </div>
       </details>
       <button class="btn btn-accent text-xs" id="arInjectBtn" onclick="_arSubmit('${sid}', ${JSON.stringify(cwd).replace(/"/g, '&quot;')})">
@@ -8836,6 +8843,8 @@ async function _arSubmit(sessionId, cwd) {
   const maxEl      = document.getElementById('arMax');
   const contEl     = document.getElementById('arUseContinue');
   const hooksEl    = document.getElementById('arInstallHooks');
+  const slackEl    = document.getElementById('arSlackUrl');
+  const discordEl  = document.getElementById('arDiscordUrl');
   const body = {
     sessionId,
     cwd: cwd || '',
@@ -8845,6 +8854,10 @@ async function _arSubmit(sessionId, cwd) {
     maxAttempts: maxEl ? Number(maxEl.value) || 12 : 12,
     useContinue: !!(contEl && contEl.checked),
     installHooks: !!(hooksEl && hooksEl.checked),
+    notify: {
+      slack:   slackEl ? (slackEl.value || '').trim() : '',
+      discord: discordEl ? (discordEl.value || '').trim() : '',
+    },
   };
   try {
     const r = await api('/api/auto_resume/set', { method: 'POST', body: JSON.stringify(body) });

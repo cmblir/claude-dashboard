@@ -60,6 +60,8 @@ NEW_EN: dict[str, str] = {
     "인증 만료": "Auth expired",
     "정상 종료": "Clean exit",
     "알 수 없음": "Unknown",
+    "알림 (선택) — 상태 전이 시 webhook":
+        "Notifications (optional) — webhook on state transitions",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -115,4 +117,6 @@ NEW_ZH: dict[str, str] = {
     "인증 만료": "认证已过期",
     "정상 종료": "正常退出",
     "알 수 없음": "未知",
+    "알림 (선택) — 상태 전이 시 webhook":
+        "通知(可选) — 状态转换时触发 webhook",
 }

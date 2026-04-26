@@ -406,6 +406,7 @@ def _claude_bin() -> Optional[str]:
 # ───────── Public state helper ─────────
 
 def _public_state(entry: dict) -> dict:
+    notify = entry.get("notify") or {}
     return {
         "sessionId":      entry.get("sessionId"),
         "enabled":        bool(entry.get("enabled")),
@@ -418,6 +419,10 @@ def _public_state(entry: dict) -> dict:
         "useContinue":    bool(entry.get("useContinue")),
         "extraArgs":      list(entry.get("extraArgs") or []),
         "installHooks":   bool(entry.get("installHooks")),
+        "notify":         {
+            "slack":   (notify.get("slack") or "")[:500],
+            "discord": (notify.get("discord") or "")[:500],
+        },
         "attempts":       int(entry.get("attempts") or 0),
         "lastAttemptAt":  entry.get("lastAttemptAt") or 0,
         "nextAttemptAt":  entry.get("nextAttemptAt") or 0,
@@ -430,6 +435,49 @@ def _public_state(entry: dict) -> dict:
         "lastResetAt":    entry.get("lastResetAt") or 0,
         "createdAt":      entry.get("createdAt") or 0,
     }
+
+
+def _sanitize_notify(raw: dict) -> dict:
+    """Accept only https://hooks.slack.com or discord.com webhook URLs.
+    Validation is enforced again at send-time by notify._validate."""
+    if not isinstance(raw, dict):
+        return {}
+    out: dict = {}
+    for k in ("slack", "discord"):
+        v = (raw.get(k) or "").strip()
+        if v:
+            out[k] = v[:500]
+    return out
+
+
+def _send_notify(entry: dict, kind: str, summary: str) -> None:
+    """Fire-and-forget Slack/Discord notification on state transition.
+    `kind` ∈ {succeeded, failed, exhausted, retrying}."""
+    notify = entry.get("notify") or {}
+    slack = (notify.get("slack") or "").strip()
+    discord = (notify.get("discord") or "").strip()
+    if not slack and not discord:
+        return
+    try:
+        from .notify import send_slack, send_discord
+        emoji = {
+            "succeeded": "✅",
+            "failed":    "🚫",
+            "exhausted": "⛔",
+            "retrying":  "🔄",
+        }.get(kind, "ℹ️")
+        sid = entry.get("sessionId") or "?"
+        cwd = entry.get("cwd") or "?"
+        title = f"{emoji} LazyClaude Auto-Resume · {kind} · {sid[:8]}"
+        body = f"session: {sid}\ncwd: {cwd}\nattempts: {entry.get('attempts')}/{entry.get('maxAttempts')}\nstate: {entry.get('state')}\n\n{summary[:1200]}"
+        if slack:
+            try: send_slack(slack, title, body)
+            except Exception as e: log.warning("auto_resume notify slack: %s", e)
+        if discord:
+            try: send_discord(discord, title, body)
+            except Exception as e: log.warning("auto_resume notify discord: %s", e)
+    except Exception as e:
+        log.warning("auto_resume notify failed: %s", e)
 
 
 # ───────── Public API ─────────
@@ -465,6 +513,7 @@ def api_auto_resume_set(body: dict) -> dict:
     if not isinstance(extra_args_raw, list):
         return {"ok": False, "error": "extraArgs must be list"}
     extra_args = [str(a) for a in extra_args_raw if isinstance(a, (str, int, float))]
+    notify_clean = _sanitize_notify(body.get("notify") or {})
 
     # Optional: install Stop + SessionStart hooks for this cwd
     hook_result = None
@@ -493,6 +542,7 @@ def api_auto_resume_set(body: dict) -> dict:
             "useContinue":     use_continue,
             "extraArgs":       extra_args,
             "installHooks":    install_hooks,
+            "notify":          notify_clean,
             "createdAt":       existing.get("createdAt") or _now_ms(),
             "attempts":        int(existing.get("attempts") or 0),
             "lastAttemptAt":   existing.get("lastAttemptAt") or 0,
@@ -764,17 +814,25 @@ def _process_one(session_id: str) -> None:
         if reset_ms:
             e["lastResetAt"] = reset_ms
 
+        notify_kind = None
+        notify_summary = ""
         if reason == "clean":
             e["state"] = STATE_DONE
             e["nextAttemptAt"] = 0
+            notify_kind = "succeeded"
+            notify_summary = "Session resumed successfully on attempt #" + str(e.get("attempts"))
         elif reason == "context_full":
             e["state"] = STATE_FAILED
             e["enabled"] = False
             e["stopReason"] = "context window exceeded — manual intervention required"
+            notify_kind = "failed"
+            notify_summary = "context_full — session needs manual cleanup"
         elif reason == "auth_expired":
             e["state"] = STATE_FAILED
             e["enabled"] = False
             e["stopReason"] = "auth expired — run `claude /login` and re-enable"
+            notify_kind = "failed"
+            notify_summary = "auth_expired — run `claude /login` and re-enable"
         elif stalled:
             e["state"] = STATE_EXHAUSTED
             e["enabled"] = False
@@ -782,6 +840,8 @@ def _process_one(session_id: str) -> None:
                 f"snapshot hash stalled ({SNAPSHOT_STALL_LIMIT}× identical) "
                 "— same place repeating, halting"
             )
+            notify_kind = "exhausted"
+            notify_summary = "snapshot hash stalled — same place repeating"
         else:
             # rate_limit or unknown — schedule next attempt
             if reason == "rate_limit" and reset_ms:
@@ -798,6 +858,13 @@ def _process_one(session_id: str) -> None:
                 max(0, (e["nextAttemptAt"] - _now_ms()) // 1000),
             )
         _dump_all(store)
+        # Also exhaustion via maxAttempts is handled at top of _process_one
+        # — for the in-flight attempt, we emit the appropriate notify here.
+        if notify_kind:
+            try:
+                _send_notify(e, notify_kind, notify_summary)
+            except Exception as ex:
+                log.warning("auto_resume: notify dispatch failed: %s", ex)
 
 
 def _worker_loop() -> None:

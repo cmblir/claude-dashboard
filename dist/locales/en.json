@@ -2346,6 +2346,7 @@
   "알려진": "Known",
   "알려진 MCP 카탈로그 + 현재 설치 상태.": "Known MCP catalog + current install status.",
   "알려진 마켓플레이스 없음": "No known marketplaces",
+  "알림 (선택) — 상태 전이 시 webhook": "Notifications (optional) — webhook on state transitions",
   "알림 권한 요청": "Request Notification Permission",
   "알림 설정 저장": "Save Alert Settings",
   "알림 전송": "Send Alert",
