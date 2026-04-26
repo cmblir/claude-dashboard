@@ -330,6 +330,40 @@ NEW_EN: dict[str, str] = {
         "Statically scan all of ~/.claude (settings · hooks · agents · MCP) for secrets, risky hooks, over-broad permissions, and untrusted MCP servers. 100% local, no AI calls.",
     "전체 키보드 단축키 보기": "Show all keyboard shortcuts",
     "누적 토큰": "Cumulative tokens",
+
+    # ── v2.35.1 — verify-translations.js exact-match keys (the audit
+    # extractor truncates these at sentence boundaries; t() calls them
+    # in full so we must register the full string). ─────────────────
+    'Slack Bot Token (xoxb-…) 이 필요합니다. https://api.slack.com/apps 에서 봇을 만들고 chat:write, reactions:read, channels:history 권한을 부여하세요.':
+        'A Slack bot token (xoxb-…) is required. Create a bot at https://api.slack.com/apps and grant chat:write, reactions:read, channels:history.',
+    'Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 사이클별로 append 됩니다. $HOME 하위만 허용.':
+        'Each cycle appends to Projects/<project>/logs/YYYY-MM-DD.md. $HOME-only.',
+    '비워두면 기본값 사용: "이전 사이클 보고를 검토하고 미해결 항목을 우선 처리…"':
+        'Leave empty for the default: "Review the previous cycle\'s report and prioritise unresolved items…"',
+    'Slack 실패: ': 'Slack failed: ',
+    'Obsidian 쓰기 성공: ': 'Obsidian write OK: ',
+    'Obsidian 실패: ': 'Obsidian failed: ',
+    '생성 실패: ': 'Generation failed: ',
+    '오류: ': 'Error: ',
+    '워크플로우 탭은 자유도가 높지만 처음엔 노드 18종을 보고 어디서 시작할지 막막합니다. 크루 위저드는 가장 흔한 패턴 — "기획자가 페르소나 여러 명에게 일을 분배하고, 보고를 받아 다음 사이클을 지시하는" 구조 — 를 폼 4 스텝으로 추출해 한 번에 만들어 줍니다. 결과는 일반 워크플로우라 워크플로우 탭에서 그대로 자유 편집 가능합니다.':
+        'The Workflows tab is powerful but the 18 node types can feel overwhelming. The Crew Wizard distils the most common pattern — "a planner who delegates to multiple personas, then steers the next cycle from their reports" — into 4 form steps. The output is a regular workflow you can freely edit on the canvas.',
+    'Obsidian Vault — $HOME 하위 경로만 허용. 사이클별로 Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 append.':
+        'Obsidian vault — $HOME-only path. Each cycle appends to Projects/<project>/logs/YYYY-MM-DD.md.',
+    '승인: ✅ (white_check_mark) / 👍 / 답장에 "approve", "ok", "go", "승인"':
+        'Approve: ✅ (white_check_mark) / 👍 / reply contains "approve", "ok", "go"',
+    '거부: ❌ (x) / 👎 / 답장에 "reject", "stop", "abort", "거부"':
+        'Reject: ❌ (x) / 👎 / reply contains "reject", "stop", "abort"',
+    '자유 답장 (예: "Reviewer 보고를 더 깊게 다시" ): 다음 사이클 입력으로 사용 → 어드민이 흐름 중간에 방향 조정 가능':
+        'Free-form reply (e.g. "Re-run Reviewer with more depth"): used as the next cycle\'s input → admin can steer mid-flight.',
+    '"slack token not configured" — 스텝 3 의 토큰 저장 버튼을 눌렀는지 확인. 또는 환경변수 SLACK_BOT_TOKEN 으로 주입 가능.':
+        '"slack token not configured" — make sure you pressed Save in Step 3, or set the SLACK_BOT_TOKEN env var.',
+    '"vault path must resolve under $HOME" — Vault 경로가 ~/ 안에 있는지 확인. realpath 후 검증되므로 symlink 도 주의.':
+        '"vault path must resolve under $HOME" — make sure the vault path is under ~/. realpath is checked so symlinks count.',
+    '승인: ✅ 또는 답장에 "approve/ok/승인" · 거부: ❌ 또는 "reject/거부" · 자유 답장은 다음 사이클 입력으로 사용됩니다.':
+        'Approve: ✅ or reply "approve" / "ok" · Reject: ❌ or reply "reject" · A free-form reply becomes the next cycle\'s input.',
+    'Vault 경로 ($HOME 하위)': 'Vault path ($HOME-only)',
+    '파일: <vault>/Projects/<project>/logs/YYYY-MM-DD.md — 사이클마다 append.':
+        'File: <vault>/Projects/<project>/logs/YYYY-MM-DD.md — appended each cycle.',
 }
 
 NEW_ZH: dict[str, str] = {
@@ -655,4 +689,36 @@ NEW_ZH: dict[str, str] = {
         "对 ~/.claude 全部(设置·钩子·代理·MCP)进行静态检查 — 密钥 · 风险钩子 · 过度权限 · 不可信 MCP。100% 本地，无 AI 调用。",
     "전체 키보드 단축키 보기": "查看全部键盘快捷键",
     "누적 토큰": "累计令牌",
+
+    # ── v2.35.1 — verify-translations.js exact-match keys ──────────
+    'Slack Bot Token (xoxb-…) 이 필요합니다. https://api.slack.com/apps 에서 봇을 만들고 chat:write, reactions:read, channels:history 권한을 부여하세요.':
+        '需要 Slack Bot Token (xoxb-…)。在 https://api.slack.com/apps 创建机器人并授予 chat:write, reactions:read, channels:history 权限。',
+    'Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 사이클별로 append 됩니다. $HOME 하위만 허용.':
+        '每个周期 append 到 Projects/<项目>/logs/YYYY-MM-DD.md。仅允许 $HOME 下路径。',
+    '비워두면 기본값 사용: "이전 사이클 보고를 검토하고 미해결 항목을 우선 처리…"':
+        '留空则使用默认值: "复核上一周期报告并优先处理未解项…"',
+    'Slack 실패: ': 'Slack 失败: ',
+    'Obsidian 쓰기 성공: ': 'Obsidian 写入成功: ',
+    'Obsidian 실패: ': 'Obsidian 失败: ',
+    '생성 실패: ': '生成失败: ',
+    '오류: ': '错误: ',
+    '워크플로우 탭은 자유도가 높지만 처음엔 노드 18종을 보고 어디서 시작할지 막막합니다. 크루 위저드는 가장 흔한 패턴 — "기획자가 페르소나 여러 명에게 일을 분배하고, 보고를 받아 다음 사이클을 지시하는" 구조 — 를 폼 4 스텝으로 추출해 한 번에 만들어 줍니다. 결과는 일반 워크플로우라 워크플로우 탭에서 그대로 자유 편집 가능합니다.':
+        '工作流标签很灵活，但 18 种节点初看很容易迷失。团队向导提取了最常见的模式 — "策划者将任务分发给多个角色、接收报告并指挥下一个周期" — 提炼为 4 步表单一次生成。结果是普通工作流，可在画布中自由编辑。',
+    'Obsidian Vault — $HOME 하위 경로만 허용. 사이클별로 Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 append.':
+        'Obsidian vault — 仅允许 $HOME 下路径。每个周期 append 到 Projects/<项目>/logs/YYYY-MM-DD.md。',
+    '승인: ✅ (white_check_mark) / 👍 / 답장에 "approve", "ok", "go", "승인"':
+        '批准: ✅ (white_check_mark) / 👍 / 回复包含 "approve", "ok", "go"',
+    '거부: ❌ (x) / 👎 / 답장에 "reject", "stop", "abort", "거부"':
+        '拒绝: ❌ (x) / 👎 / 回复包含 "reject", "stop", "abort"',
+    '자유 답장 (예: "Reviewer 보고를 더 깊게 다시" ): 다음 사이클 입력으로 사용 → 어드민이 흐름 중간에 방향 조정 가능':
+        '自由回复 (例如 "Reviewer 重做并加深" ): 用作下个周期输入 → 管理员可中途调整方向',
+    '"slack token not configured" — 스텝 3 의 토큰 저장 버튼을 눌렀는지 확인. 또는 환경변수 SLACK_BOT_TOKEN 으로 주입 가능.':
+        '"slack token not configured" — 检查是否点击了步骤 3 的保存按钮，或通过 SLACK_BOT_TOKEN 环境变量注入。',
+    '"vault path must resolve under $HOME" — Vault 경로가 ~/ 안에 있는지 확인. realpath 후 검증되므로 symlink 도 주의.':
+        '"vault path must resolve under $HOME" — 检查 vault 路径是否在 ~/ 之下。会进行 realpath 校验，注意 symlink。',
+    '승인: ✅ 또는 답장에 "approve/ok/승인" · 거부: ❌ 또는 "reject/거부" · 자유 답장은 다음 사이클 입력으로 사용됩니다.':
+        '批准: ✅ 或回复 "approve" / "ok" · 拒绝: ❌ 或回复 "reject" · 自由回复将作为下一周期的输入。',
+    'Vault 경로 ($HOME 하위)': 'Vault 路径 ($HOME 下)',
+    '파일: <vault>/Projects/<project>/logs/YYYY-MM-DD.md — 사이클마다 append.':
+        '文件: <vault>/Projects/<项目>/logs/YYYY-MM-DD.md — 每周期 append。',
 }

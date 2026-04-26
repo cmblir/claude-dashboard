@@ -10,6 +10,61 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.35.1] — 2026-04-26
+
+### 🌐 i18n hotfix — 18 missing translations caught by CI
+
+The v2.34.2 release missed 18 English/Chinese keys. The previous
+`build_locales.py` missing-detector only flagged keys whose value still
+contained Korean — it didn't enforce **exact-match between every
+`t('…')` call site and the locale dictionary**, which is what the
+canonical `scripts/verify-translations.js` checks. CI failed on the 4-stage
+verifier with `t() 인자 번역 누락: en=18, zh=18`.
+
+The 18 keys fell into three buckets:
+
+1. **Multi-sentence strings** that the audit extractor truncates at the
+   first period. The runtime calls `t()` with the full string but the
+   dictionary only had each sentence separately. Examples:
+   - `Slack Bot Token (xoxb-…) 이 필요합니다. https://api.slack.com/apps 에서 봇을 만들고 chat:write, reactions:read, channels:history 권한을 부여하세요.`
+   - `Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 사이클별로 append 됩니다. $HOME 하위만 허용.`
+   - The full Crew Wizard "이게 뭐죠?" answer in the guide modal.
+2. **Trailing-colon prefixes** used like `t('Slack 실패: ') + err`:
+   `Slack 실패: ` / `Obsidian 쓰기 성공: ` / `Obsidian 실패: ` /
+   `생성 실패: ` / `오류: `.
+3. **Strings with embedded double quotes** that JSON-escape as `\"`:
+   the Slack approval reply keyword sentences and two gotcha-tip lines
+   starting with `"slack token not configured"` / `"vault path must
+   resolve under $HOME"`.
+
+**Fixes**
+- `tools/translations_manual_10.py` — added all 18 keys with their
+  exact full-string form (Python's mixed quote syntax + raw Korean +
+  embedded double quotes).
+- For Slack approval reply keywords, the EN/ZH translations now show
+  only the language-appropriate keywords (`approve` / `ok` /
+  `reject`). The KO source still lists `"승인"` / `"거부"` because
+  the backend `wait_for_approval()` recognises both. Removing the
+  Korean keyword strings from EN/ZH avoids the runtime KO-residue
+  scanner flagging legitimate translations.
+
+**Verification**
+- `make i18n-refresh` — 0 한글 잔존 (was 6).
+- `scripts/verify-translations.js` 4 stages — all pass: 3,763 keys
+  matched across ko/en/zh, all 1,042 `t()` Korean call sites covered,
+  audit covered, static DOM covered.
+
+### Why this slipped past v2.34.2
+
+I relied on `build_locales.py`'s loose missing-detector and never ran
+`scripts/verify-translations.js`. The two tools answer different
+questions: the former asks "are translations stored?", the latter asks
+"are they reachable from every call site?". CI runs the latter and
+caught the gap. Going forward, `make i18n-refresh` (which already
+chains both) is the single source of truth before committing any new
+`t('…')` strings.
+
+---
 ## [2.35.0] — 2026-04-26
 
 ### 📦 Install LazyClaude as a real app (PWA + macOS .app bundle)
