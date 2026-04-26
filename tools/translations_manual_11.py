@@ -96,6 +96,25 @@ NEW_EN: dict[str, str] = {
         "Treat the user goal as the argument to the command.",
     "Run the slash command": "Run the slash command",
     "카탈로그 로드 실패": "Catalog load failed",
+
+    # ── v2.36.1 — Run Center info banner + diagnostics ──────────
+    "ECC / OMC / OMX 의 출처와 설치": "Where ECC / OMC / OMX come from",
+    "가이드 & 툴 탭에서 원클릭 설치. 181 스킬 + 79 슬래시 명령은 ~/.claude/plugins/ 의 ECC plugin을 직접 스캔.":
+        "One-click install from the Guide & Tools tab. The 181 skills + 79 slash commands are scanned directly from the ECC plugin under ~/.claude/plugins/.",
+    "별도 설치 불필요. 4 모드(autopilot/ralph/ultrawork/deep-interview)는 v2.25 부터 LazyClaude 빌트인 워크플로우 템플릿으로 흡수됨.":
+        "No separate install needed. Since v2.25 the four modes (autopilot/ralph/ultrawork/deep-interview) ship as built-in LazyClaude workflow templates.",
+    "별도 설치 불필요. 4 명령(doctor/wiki/hud/tasks)은 정적 매핑으로 임의 프로바이더에 dispatch.":
+        "No separate install needed. The four commands (doctor/wiki/hud/tasks) are statically mapped and dispatched to any provider.",
+    "진짜 OMC/OMX CLI를 Claude Code 세션에서 슬래시 명령으로 쓰고 싶다면 가이드 & 툴 탭의 카드를 참고하세요.":
+        "If you want to invoke the real OMC/OMX CLIs as slash commands inside a Claude Code session, see the cards in the Guide & Tools tab.",
+    "카탈로그 새로고침": "Refresh catalog",
+    "카탈로그 새로고침 중…": "Refreshing catalog…",
+    "카탈로그 갱신됨": "Catalog refreshed",
+    "items": "items",
+    "명령": "commands",
+    "경로는 발견됐지만 항목 0개": "Path found but 0 items parsed",
+    "진단 보기": "Show diagnostics",
+    "스캔된 경로": "Scanned paths",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -189,4 +208,23 @@ NEW_ZH: dict[str, str] = {
         "将用户目标作为该命令的参数处理。",
     "Run the slash command": "运行斜杠命令",
     "카탈로그 로드 실패": "目录加载失败",
+
+    # ── v2.36.1 — Run Center info banner + diagnostics ──────────
+    "ECC / OMC / OMX 의 출처와 설치": "ECC / OMC / OMX 的来源与安装",
+    "가이드 & 툴 탭에서 원클릭 설치. 181 스킬 + 79 슬래시 명령은 ~/.claude/plugins/ 의 ECC plugin을 직접 스캔.":
+        "在「指南与工具」标签一键安装。181 技能 + 79 斜杠命令直接从 ~/.claude/plugins/ 的 ECC plugin 扫描。",
+    "별도 설치 불필요. 4 모드(autopilot/ralph/ultrawork/deep-interview)는 v2.25 부터 LazyClaude 빌트인 워크플로우 템플릿으로 흡수됨.":
+        "无需另行安装。自 v2.25 起，4 个模式 (autopilot/ralph/ultrawork/deep-interview) 已作为 LazyClaude 内置工作流模板提供。",
+    "별도 설치 불필요. 4 명령(doctor/wiki/hud/tasks)은 정적 매핑으로 임의 프로바이더에 dispatch.":
+        "无需另行安装。4 个命令 (doctor/wiki/hud/tasks) 通过静态映射分派到任意 provider。",
+    "진짜 OMC/OMX CLI를 Claude Code 세션에서 슬래시 명령으로 쓰고 싶다면 가이드 & 툴 탭의 카드를 참고하세요.":
+        "如需在 Claude Code 会话中以斜杠命令调用真正的 OMC/OMX CLI，请参见「指南与工具」标签的卡片。",
+    "카탈로그 새로고침": "刷新目录",
+    "카탈로그 새로고침 중…": "正在刷新目录…",
+    "카탈로그 갱신됨": "目录已更新",
+    "items": "项",
+    "명령": "命令",
+    "경로는 발견됐지만 항목 0개": "路径已找到但解析到 0 项",
+    "진단 보기": "查看诊断",
+    "스캔된 경로": "已扫描路径",
 }

@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.36.1] — 2026-04-26
+
+### 🩹 Run Center didn't see ECC after install + Guide had no OMC/OMX card
+
+User reported two related gaps after v2.36.0:
+
+1. **"Guide & Tools에 OMC OMX가 없어. 어떻게 써?"** — Run Center had OMC/OMX cards but Guide & Tools only had ECC. Users couldn't tell where they came from or whether anything needed installing.
+2. **"ECC 설치했는데 런센터에 안나와."** — After installing ECC from Guide & Tools, Run Center still showed 0 ECC items. Root cause: I scanned only `~/.claude/plugins/cache/ecc/ecc/` but `toolkits.py` installs as `everything-claude-code@everything-claude-code`, which lives at `~/.claude/plugins/cache/everything-claude-code/everything-claude-code/`. **My initial "181 + 79" verification was on my own machine where both ids happened to coexist; I didn't recognise the path-name dependency until the user surfaced it.**
+
+#### Fixes
+
+**Run Center backend (`server/run_center.py`)**
+- Replaced single-root resolution with `_ecc_roots()` returning every detected install: (1) `installed_plugins.json` entries for `ecc@ecc` **and** `everything-claude-code@everything-claude-code` (authoritative), (2) cache glob over both package names, (3) marketplaces fallback. Items are deduped across roots.
+- `_build_catalog()` now returns `(items, debug)` and the catalog API exposes that `debug` blob with per-root scan counts.
+- Added `?refresh=1` query param to bust the 30 s cache so a freshly installed ECC shows up immediately.
+
+**Run Center UI (`dist/index.html`)**
+- New info banner at the top of the tab explaining where ECC / OMC / OMX come from and that OMC/OMX need no separate install.
+- Manual `🔄` refresh button next to the search input.
+- Sidebar ECC status now distinguishes 3 states with deep diagnostics:
+  - ✓ ECC installed — shows skill + command counts.
+  - ⚠ Path found but 0 items — collapsible JSON of every scanned root.
+  - ✗ ECC not installed — link to Guide & Tools + scanned-paths diagnostic.
+
+**Guide & Tools (`server/guide.py`)**
+- Two new toolkit cards: `oh-my-claudecode` (OMC) and `oh-my-codex` (OMX). Each card explains:
+  - What's already absorbed by LazyClaude (no install needed).
+  - When the external CLI is still useful (in-session slash commands).
+  - The npm install command if the user wants the external CLI anyway.
+  - Which features are in LazyClaude only vs CLI only.
+
+#### Verification
+
+- `make i18n-refresh` + `scripts/verify-translations.js` — all 4 stages pass: 3,841 keys × 3 locales matched, 1,103 `t()` Korean call sites covered, 0 Korean residue.
+- Live HTTP — `/api/run/catalog` returns 270 items (262 ECC + 4 OMC + 4 OMX) on a machine with both `ecc@ecc` and `everything-claude-code@everything-claude-code` installed; debug blob lists 4 roots with per-root counts.
+- `/api/guide/toolkit` returns 5 toolkit cards (was 3): everything-claude-code, claude-code-best-practice, **oh-my-claudecode**, **oh-my-codex**, wikidocs-claude-code-guide.
+
+#### What I got wrong in v2.36.0
+
+The "181 skills + 79 slash commands" headline was true on my dev box. I should have flagged that it depends on which ECC plugin id was installed, and I should have run `_ecc_root()` against an environment that only had the `everything-claude-code` id (which is what most users get from the dashboard installer). Future audits will trace `installed_plugins.json` first, not glob the cache directly.
+
+---
 ## [2.36.0] — 2026-04-26
 
 ### 🎯 Run Center + Workflow Quick Actions + Commands tab Run buttons

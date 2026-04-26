@@ -132,6 +132,102 @@ _TOOLKIT_SOURCES: list[dict[str, Any]] = [
         ],
     },
     {
+        "id": "oh-my-claudecode",
+        "title": "OMC · oh-my-claudecode",
+        "subtitle": "Claude Code 세션 안에서 슬래시 명령으로 호출하는 팀 오케스트레이션 (autopilot · ralph · ultrawork · deep-interview)",
+        "author": "Yeachan-Heo",
+        "repo": "https://github.com/Yeachan-Heo/oh-my-claudecode",
+        "stars": "30.8k",
+        "license": "MIT",
+        "highlights": [
+            "🎯 LazyClaude는 OMC의 4 모드를 이미 흡수 — 별도 설치 없이 워크플로우 탭의 빌트인 템플릿(bt-autopilot/ralph/ultrawork/deep-interview) 또는 런 센터에서 즉시 사용 가능",
+            "외부 OMC CLI를 추가로 설치하면 Claude Code 세션 안에서도 슬래시 명령으로 호출 가능 (보완 관계, 충돌 없음)",
+            "Smart routing — Haiku/Opus 자동 선택 (LazyClaude는 modelHint 'auto/fast/deep' 으로 흡수)",
+            "Stop-callback — Slack/Discord/Telegram 알림 (LazyClaude는 워크플로우 notify 필드로 흡수)",
+        ],
+        "install": [
+            {
+                "label": "외부 OMC CLI 설치 (선택)",
+                "code": "npm i -g oh-my-claudecode",
+            },
+            {
+                "label": "Claude Code 세션 안에서 사용",
+                "code": "/autopilot 다음 작업 자동 실행해줘",
+            },
+            {
+                "label": "LazyClaude 흡수 기능만 쓰려면 (설치 불필요)",
+                "code": "→ 워크플로우 탭 헤더의 Quick Actions 또는 런 센터의 OMC 카드",
+            },
+        ],
+        "categories": [
+            {
+                "name": "LazyClaude에 흡수된 4 모드 (별도 설치 불필요)",
+                "items": [
+                    "/autopilot — 요구사항 → 계획 → 실행 → 검증 단일 흐름 (bt-autopilot)",
+                    "/ralph — verify → fix 루프 (bt-ralph, max 5 cycles)",
+                    "/ultrawork — 5 병렬 에이전트 → merge (bt-ultrawork)",
+                    "/deep-interview — 소크라테스식 명확화 → 설계 (bt-deep-interview)",
+                ],
+            },
+            {
+                "name": "외부 CLI 전용 기능 (LazyClaude 흡수 안 됨)",
+                "items": [
+                    "터미널 status bar HUD (LazyClaude는 브라우저 대시보드 자체가 HUD)",
+                    "Claude Code 세션 내부에서 직접 슬래시 명령 호출",
+                    "OpenClaw Gateway 외부 연동 (LazyClaude는 Event Forwarder 탭으로 부분 대체)",
+                ],
+            },
+        ],
+    },
+    {
+        "id": "oh-my-codex",
+        "title": "OMX · oh-my-codex",
+        "subtitle": "OMC 의 Codex 버전 — Codex 세션 안에서 $ 키워드로 호출하는 워크플로우 도구",
+        "author": "Yeachan-Heo",
+        "repo": "https://github.com/Yeachan-Heo/oh-my-codex",
+        "stars": "25.2k",
+        "license": "MIT",
+        "highlights": [
+            "🎯 LazyClaude는 OMX의 4 명령을 정적 매핑으로 노출 — 런 센터에서 임의 프로바이더(Claude/GPT/Gemini/Ollama)로 dispatch",
+            "외부 OMX CLI를 추가로 설치하면 Codex 세션 안에서 $ 키워드로 호출 가능",
+            "Wiki 시스템 — 세션 내 지식 베이스 (LazyClaude는 Claude Docs Hub + Prompt Library 로 대체)",
+            "Doctor 진단 — 설치 무결성 (LazyClaude는 Security Scan + AI 평가 탭으로 대체)",
+        ],
+        "install": [
+            {
+                "label": "외부 OMX CLI 설치 (선택)",
+                "code": "npm i -g oh-my-codex",
+            },
+            {
+                "label": "Codex 세션 안에서 사용",
+                "code": "$doctor",
+            },
+            {
+                "label": "LazyClaude 흡수 기능만 쓰려면 (설치 불필요)",
+                "code": "→ 런 센터에서 OMX 카드 클릭",
+            },
+        ],
+        "categories": [
+            {
+                "name": "LazyClaude에 흡수된 4 명령 (런 센터)",
+                "items": [
+                    "$doctor — 설치/헬스 진단 (의존성 · lockfile · env mismatch 체크리스트)",
+                    "$wiki — 작업 컨텍스트를 1페이지 레퍼런스로 요약",
+                    "$hud — 현재 상태 1-2줄 요약 (phase · last action · next blocker)",
+                    "$tasks — 입력에서 actionable TODO/FIXME/BUG 추출",
+                ],
+            },
+            {
+                "name": "외부 CLI 전용 기능",
+                "items": [
+                    "Codex 세션 내부에서 $ 키워드 직접 호출",
+                    ".omx/wiki 영구 저장소 (LazyClaude는 Prompt Library 로 대체)",
+                    "omx hud --watch 터미널 라이브 갱신",
+                ],
+            },
+        ],
+    },
+    {
         "id": "wikidocs-claude-code-guide",
         "title": "Claude Code 가이드 (한국어 · 위키독스)",
         "subtitle": "클래스 101 + 레퍼런스 21개 · 한국어 전체 가이드북",

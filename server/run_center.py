@@ -76,26 +76,70 @@ _ensure_history_table()
 
 # ── Catalog: ECC skills + ECC commands ──────────────────────────────────────
 
-# Where the ECC plugin lives once installed via `claude plugin install ecc`.
-# Path is computed dynamically because the version in the directory changes.
-_ECC_PLUGIN_GLOB_ROOTS = [
-    Path.home() / ".claude" / "plugins" / "cache" / "ecc" / "ecc",
-    # Fallback: if marketplaces/ has a synced copy.
-    Path.home() / ".claude" / "plugins" / "marketplaces" / "ecc",
-]
+# ECC ships under two plugin ids — `ecc@ecc` (canonical) and
+# `everything-claude-code@everything-claude-code` (the same package re-published
+# under its full name; this is what toolkits.py installs from Guide & Tools).
+# Both list themselves in installed_plugins.json with the real install path,
+# so we trust that file first and fall back to known locations.
+_ECC_PLUGIN_IDS = ("ecc@ecc", "everything-claude-code@everything-claude-code")
+_ECC_PKG_NAMES  = ("ecc", "everything-claude-code")
+_INSTALLED_PLUGINS_PATH = Path.home() / ".claude" / "plugins" / "installed_plugins.json"
+
+
+def _ecc_roots() -> list[Path]:
+    """Return every install path that looks like ECC, deduped, ordered by recency.
+
+    Resolution order:
+      1. installed_plugins.json — authoritative when the user clicked install
+         from Guide & Tools.
+      2. ~/.claude/plugins/cache/<pkg>/<pkg>/<version>/ — older installs that
+         haven't updated the json yet.
+      3. ~/.claude/plugins/marketplaces/<pkg>/ — when only the marketplace is
+         registered (skills/commands are still readable as a fallback).
+    """
+    seen: set[str] = set()
+    roots: list[Path] = []
+
+    # 1. installed_plugins.json
+    try:
+        if _INSTALLED_PLUGINS_PATH.exists():
+            data = json.loads(_safe_read(_INSTALLED_PLUGINS_PATH) or "{}")
+            for pid, entries in (data.get("plugins") or {}).items():
+                if pid not in _ECC_PLUGIN_IDS:
+                    continue
+                for ent in entries or []:
+                    p = ent.get("installPath")
+                    if not p:
+                        continue
+                    pp = Path(p)
+                    if (pp / "skills").exists() and str(pp) not in seen:
+                        roots.append(pp); seen.add(str(pp))
+    except Exception as e:
+        log.warning("installed_plugins.json read failed: %s", e)
+
+    # 2. cache glob
+    cache_base = Path.home() / ".claude" / "plugins" / "cache"
+    for pkg in _ECC_PKG_NAMES:
+        outer = cache_base / pkg / pkg
+        if outer.exists():
+            for ver in sorted(outer.iterdir(), reverse=True):
+                if ver.is_dir() and (ver / "skills").exists() and str(ver) not in seen:
+                    roots.append(ver); seen.add(str(ver))
+
+    # 3. marketplace
+    mp_base = Path.home() / ".claude" / "plugins" / "marketplaces"
+    for pkg in _ECC_PKG_NAMES:
+        mp = mp_base / pkg
+        if mp.exists() and (mp / "skills").exists() and str(mp) not in seen:
+            roots.append(mp); seen.add(str(mp))
+
+    return roots
 
 
 def _ecc_root() -> Optional[Path]:
-    """Find the latest installed ECC plugin path. Returns None if not installed."""
-    for base in _ECC_PLUGIN_GLOB_ROOTS:
-        if not base.exists():
-            continue
-        # Pick the highest-version subdirectory.
-        candidates = [p for p in base.iterdir() if p.is_dir() and (p / "skills").exists()]
-        if candidates:
-            candidates.sort(key=lambda p: p.name, reverse=True)
-            return candidates[0]
-    return None
+    """Backwards-compat wrapper — returns the first detected ECC root."""
+    rs = _ecc_roots()
+    return rs[0] if rs else None
 
 
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
@@ -334,30 +378,55 @@ OMX_COMMANDS = [
 ]
 
 
-_CATALOG_CACHE: dict = {"ts": 0, "items": []}
+_CATALOG_CACHE: dict = {"ts": 0, "items": [], "debug": {}}
 _CATALOG_TTL_S = 30
 
 
-def _build_catalog() -> list[dict]:
-    """Combine all sources. Cached for 30s to avoid re-reading 260 markdown files."""
+def _build_catalog() -> tuple[list[dict], dict]:
+    """Combine all sources. Returns (items, debug_info).
+
+    Debug info captures every ECC root that was scanned plus how many skills /
+    commands each contributed — surfaced in the API so the UI can show "ECC 0
+    items? scanned these roots:" diagnostics when the user installed something
+    we didn't recognise.
+    """
     items: list[dict] = []
-    root = _ecc_root()
-    if root:
-        items.extend(_list_ecc_skills(root))
-        items.extend(_list_ecc_commands(root))
+    debug: dict = {"ecc_roots": [], "ecc_skill_total": 0, "ecc_cmd_total": 0}
+    seen_ids: set[str] = set()
+
+    for root in _ecc_roots():
+        skills = _list_ecc_skills(root)
+        commands = _list_ecc_commands(root)
+        added_s = 0
+        added_c = 0
+        for it in skills:
+            if it["id"] in seen_ids:
+                continue
+            items.append(it); seen_ids.add(it["id"]); added_s += 1
+        for it in commands:
+            if it["id"] in seen_ids:
+                continue
+            items.append(it); seen_ids.add(it["id"]); added_c += 1
+        debug["ecc_roots"].append({
+            "path": str(root), "skills": added_s, "commands": added_c,
+        })
+        debug["ecc_skill_total"] += added_s
+        debug["ecc_cmd_total"]   += added_c
+
     items.extend(OMC_MODES)
     items.extend(OMX_COMMANDS)
-    return items
+    return items, debug
 
 
-def _get_catalog() -> list[dict]:
+def _get_catalog(force: bool = False) -> tuple[list[dict], dict]:
     now = time.time()
-    if now - _CATALOG_CACHE["ts"] < _CATALOG_TTL_S and _CATALOG_CACHE["items"]:
-        return _CATALOG_CACHE["items"]
-    items = _build_catalog()
-    _CATALOG_CACHE["ts"] = now
+    if (not force) and now - _CATALOG_CACHE["ts"] < _CATALOG_TTL_S and _CATALOG_CACHE["items"]:
+        return _CATALOG_CACHE["items"], _CATALOG_CACHE.get("debug", {})
+    items, debug = _build_catalog()
+    _CATALOG_CACHE["ts"]    = now
     _CATALOG_CACHE["items"] = items
-    return items
+    _CATALOG_CACHE["debug"] = debug
+    return items, debug
 
 
 # ── Favorites ───────────────────────────────────────────────────────────────
@@ -385,13 +454,15 @@ def _save_favorites(ids: set[str]) -> bool:
 # ── Public APIs ─────────────────────────────────────────────────────────────
 
 def api_run_catalog(query: dict | None = None) -> dict:
-    """GET /api/run/catalog?source=ecc|omc|omx&kind=skill|command|mode|diagnostic|knowledge&q=..."""
+    """GET /api/run/catalog?source=ecc|omc|omx&kind=skill|command|mode|diagnostic|knowledge&q=...&refresh=1"""
     q = query or {}
     src    = (q.get("source", [""])[0] if isinstance(q.get("source"), list) else q.get("source", "")).strip()
     kind   = (q.get("kind",   [""])[0] if isinstance(q.get("kind"),   list) else q.get("kind",   "")).strip()
     needle = (q.get("q",      [""])[0] if isinstance(q.get("q"),      list) else q.get("q",      "")).strip().lower()
+    refresh_raw = q.get("refresh", [""])[0] if isinstance(q.get("refresh"), list) else q.get("refresh", "")
+    force = str(refresh_raw).lower() in ("1", "true", "yes")
 
-    items = _get_catalog()
+    items, debug = _get_catalog(force=force)
     if src:
         items = [it for it in items if it.get("source") == src]
     if kind:
@@ -422,7 +493,8 @@ def api_run_catalog(query: dict | None = None) -> dict:
         "items": out_items,
         "counts": counts,
         "total": len(out_items),
-        "ecc_installed": _ecc_root() is not None,
+        "ecc_installed": bool(_ecc_roots()),
+        "debug": debug,
     }
 
 
@@ -565,7 +637,7 @@ def api_run_execute(body: dict) -> dict:
     if not goal:
         return {"ok": False, "error": "goal required"}
 
-    items = _get_catalog()
+    items, _ = _get_catalog()
     item = next((it for it in items if it["id"] == item_id), None)
     if not item:
         return {"ok": False, "error": f"item not found: {item_id}"}
@@ -645,7 +717,7 @@ def api_run_to_workflow(body: dict) -> dict:
     if not isinstance(body, dict):
         return {"ok": False, "error": "bad body"}
     item_id = (body.get("itemId") or "").strip()
-    items = _get_catalog()
+    items, _ = _get_catalog()
     item = next((it for it in items if it["id"] == item_id), None)
     if not item:
         return {"ok": False, "error": f"item not found: {item_id}"}

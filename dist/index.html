@@ -3231,8 +3231,25 @@ VIEWS.runCenter = async () => {
       </aside>
 
       <main style="min-width:0;display:flex;flex-direction:column;gap:10px;">
+        <!-- v2.36.1 — info banner explaining the OMC/OMX origin so users know
+             they don't need to install anything extra. -->
+        <details class="card" style="padding:10px 14px;font-size:12px;color:var(--text-mute);">
+          <summary class="cursor-pointer font-semibold" style="color:var(--text);user-select:none;">
+            ℹ️ ${t('ECC / OMC / OMX 의 출처와 설치')}
+          </summary>
+          <div class="mt-2 space-y-1">
+            <div><b>ECC</b> — ${t('가이드 & 툴 탭에서 원클릭 설치. 181 스킬 + 79 슬래시 명령은 ~/.claude/plugins/ 의 ECC plugin을 직접 스캔.')}</div>
+            <div><b>OMC</b> — ${t('별도 설치 불필요. 4 모드(autopilot/ralph/ultrawork/deep-interview)는 v2.25 부터 LazyClaude 빌트인 워크플로우 템플릿으로 흡수됨.')}</div>
+            <div><b>OMX</b> — ${t('별도 설치 불필요. 4 명령(doctor/wiki/hud/tasks)은 정적 매핑으로 임의 프로바이더에 dispatch.')}</div>
+            <div class="mt-2 text-[11px]" style="color:var(--text-dim);">
+              ${t('진짜 OMC/OMX CLI를 Claude Code 세션에서 슬래시 명령으로 쓰고 싶다면 가이드 & 툴 탭의 카드를 참고하세요.')}
+            </div>
+          </div>
+        </details>
+
         <div class="card" style="padding:10px 14px;display:flex;align-items:center;gap:10px;">
           <input id="rcSearch" type="search" class="input flex-1" placeholder="${t('이름 · 설명 · 카테고리 검색…')}" />
+          <button class="btn text-[11px]" onclick="_rcReload()" title="${t('카탈로그 새로고침')}">🔄</button>
           <span id="rcCountSummary" class="text-[11px]" style="color:var(--text-dim);min-width:80px;text-align:right;"></span>
         </div>
 
@@ -3262,22 +3279,46 @@ AFTER.runCenter = async () => {
   }
 };
 
-async function _rcLoadCatalog() {
+async function _rcLoadCatalog(force) {
   try {
-    const r = await api('/api/run/catalog');
+    const r = await api('/api/run/catalog' + (force ? '?refresh=1' : ''));
     __rc.catalog = r.items || [];
     __rc.eccInstalled = !!r.ecc_installed;
+    __rc.debug = r.debug || {};
     __rc.loaded = true;
   } catch (e) {
     __rc.catalog = [];
     __rc.eccInstalled = false;
+    __rc.debug = {};
   }
   const ecc = document.getElementById('rcEccStatus');
   if (ecc) {
-    ecc.innerHTML = __rc.eccInstalled
-      ? `<span style="color:#22c55e;">✓ ECC ${t('설치됨')}</span>`
-      : `<span style="color:#ef4444;">✗ ECC ${t('미설치')}</span> · <a class="text-[10px]" href="#" onclick="go('guideHub');return false;">${t('설치하기')} →</a>`;
+    const dbg = __rc.debug || {};
+    const totalEcc = (dbg.ecc_skill_total||0) + (dbg.ecc_cmd_total||0);
+    if (__rc.eccInstalled && totalEcc > 0) {
+      ecc.innerHTML = `<span style="color:#22c55e;">✓ ECC ${t('설치됨')}</span>
+        <span style="color:var(--text-dim);"> · ${dbg.ecc_skill_total||0} ${t('스킬')} + ${dbg.ecc_cmd_total||0} ${t('명령')}</span>`;
+    } else if (__rc.eccInstalled) {
+      // ECC root found but 0 items parsed — likely permission/parse error.
+      ecc.innerHTML = `<span style="color:#fbbf24;">⚠ ECC ${t('경로는 발견됐지만 항목 0개')}</span>
+        <details class="text-[10px] mt-1"><summary>${t('진단 보기')}</summary>
+        <pre style="white-space:pre-wrap;margin-top:4px;color:var(--text-dim);font-size:9px;">${escapeHtml(JSON.stringify(dbg, null, 2))}</pre></details>`;
+    } else {
+      ecc.innerHTML = `<span style="color:#ef4444;">✗ ECC ${t('미설치')}</span>
+        · <a class="text-[10px]" href="#" onclick="go('guideHub');return false;">${t('설치하기')} →</a>
+        <details class="text-[10px] mt-1"><summary>${t('스캔된 경로')}</summary>
+        <pre style="white-space:pre-wrap;margin-top:4px;color:var(--text-dim);font-size:9px;">${escapeHtml(JSON.stringify(dbg, null, 2))}</pre></details>`;
+    }
   }
+}
+
+async function _rcReload() {
+  toast(t('카탈로그 새로고침 중…'), 'info');
+  await _rcLoadCatalog(true);
+  _rcRenderFilters();
+  _rcApplyFilters();
+  const total = __rc.catalog.length;
+  toast(`${t('카탈로그 갱신됨')} — ${total} ${t('items')}`, 'ok');
 }
 
 function _rcRenderFilters() {
