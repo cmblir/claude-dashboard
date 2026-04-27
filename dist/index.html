@@ -3818,7 +3818,21 @@ function _wfRenderList() {
     host.innerHTML = `<div class="text-[11px] text-[var(--text-dim)] text-center py-4">${t('워크플로우 없음')}</div>`;
     return;
   }
-  host.innerHTML = list.map(w => `
+  // v2.42.1 — surface recent run statuses inline so the user doesn't have to
+  // open each workflow into the canvas to know whether it last passed.
+  const _runIcon = (s) => s === 'ok' ? '✅' : s === 'err' ? '❌' : s === 'running' ? '⏳' : '·';
+  const _runColor = (s) => s === 'ok' ? '#22c55e' : s === 'err' ? '#ef4444' : s === 'running' ? '#3b82f6' : 'var(--text-dim)';
+  host.innerHTML = list.map(w => {
+    const lastRuns = w.lastRuns || [];
+    const runningCount = w.runningCount || 0;
+    const totalRuns = w.totalRuns || 0;
+    const recentChips = lastRuns.length
+      ? lastRuns.map(r => `<span title="${escapeHtml(r.status)} ${r.error?'· '+escapeHtml(r.error):''} ${r.durationMs?'· '+(r.durationMs/1000).toFixed(1)+'s':''}" style="color:${_runColor(r.status)};font-size:11px;">${_runIcon(r.status)}</span>`).join('')
+      : `<span style="color:var(--text-dim);font-size:10px;">${escapeHtml(t('실행 기록 없음'))}</span>`;
+    const runningBadge = runningCount > 0
+      ? `<span class="chip chip-accent text-[9px]" style="background:rgba(59,130,246,0.25);color:#93c5fd;animation:pulse 1.5s infinite;">⏳ ${runningCount} ${t('실행 중')}</span>`
+      : '';
+    return `
     <div class="wf-list-item ${__wf.current && __wf.current.id === w.id ? 'active' : ''}" onclick="_wfOpen('${w.id}')">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0 flex-1">
@@ -3826,12 +3840,17 @@ function _wfRenderList() {
           <div class="text-[10px] text-[var(--text-dim)] mt-0.5">
             ${w.nodeCount} ${t('노드')} · ${w.edgeCount} ${t('연결')} · ${fmtRel(w.updatedAt)}
           </div>
+          <div class="flex items-center gap-1.5 mt-1">
+            <span class="flex gap-0.5">${recentChips}</span>
+            ${totalRuns > 0 ? `<span class="text-[10px]" style="color:var(--text-dim);">${totalRuns} ${t('회')}</span>` : ''}
+            ${runningBadge}
+          </div>
         </div>
         <button class="text-[var(--text-dim)] hover:text-[var(--cyan)] text-sm" onclick="event.stopPropagation();_wfClone('${w.id}')" title="${t('복제')}">📋</button>
         <button class="text-[var(--text-dim)] hover:text-red-400 text-sm" onclick="event.stopPropagation();_wfDelete('${w.id}')" title="${t('삭제')}">🗑️</button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 // v2.36.0 — One-click OMC mode workflow. Loads the matching `bt-*` built-in
@@ -4007,13 +4026,30 @@ async function _wfOpen(wfId) {
   _wfRenderCanvas();
   _wfRenderInspector();
   _wfUpdateToolbar();
-  // 저장된 viewport 가 기본값이면 자동으로 노드들이 화면에 들어오게 맞춤
   const v = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
   const isDefault = (Math.abs(v.panX) < 1 && Math.abs(v.panY) < 1 && Math.abs((v.zoom||1) - 1) < 0.01);
   if (isDefault && (__wf.current.nodes || []).length) {
-    // host DOM 이 아직 레이아웃 확정 전일 수 있으므로 next frame 에 호출
     requestAnimationFrame(() => _wfFitView());
   }
+  // v2.42.1 — auto-restore last/active run state on canvas entry. Without
+  // this, opening a workflow with a recent run shows blank nodes — the user
+  // had to click 📜 이력 + a specific run row to colour them. Now: if a run
+  // is in flight, attach the live polling; if the most recent run finished,
+  // hydrate node colours one-shot.
+  try {
+    const meta = (__wf.workflows || []).find(w => w.id === wfId) || {};
+    const activeRunId = meta.activeRunId
+      || (meta.lastRuns && meta.lastRuns[0] && meta.lastRuns[0].status === 'running' && meta.lastRuns[0].runId)
+      || '';
+    const fallbackRunId = (meta.lastRuns && meta.lastRuns[0] && meta.lastRuns[0].runId) || '';
+    if (activeRunId) {
+      __wf.runId = activeRunId;
+      _wfStartPolling();
+    } else if (fallbackRunId) {
+      const s = await api('/api/workflows/run-status?runId=' + encodeURIComponent(fallbackRunId));
+      if (s && s.ok && s.run) _wfApplyRunStatus(s.run);
+    }
+  } catch (e) { console.warn('wf auto-restore failed', e); }
 }
 
 function _wfRepeatSet(field, value) {

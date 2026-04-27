@@ -551,8 +551,39 @@ def _new_run_id() -> str:
 
 def api_workflows_list(query: dict | None = None) -> dict:
     store = _load_all()
+    # v2.42.1 — group runs by wfId so each list card can surface the latest 3
+    # statuses + a "running" badge inline. Without this the user has to open
+    # the workflow into the canvas just to see whether it last passed/failed.
+    runs_by_wf: dict[str, list[dict]] = {}
+    for rid, r in (store.get("runs") or {}).items():
+        wid = r.get("wfId") or ""
+        if not wid:
+            continue
+        runs_by_wf.setdefault(wid, []).append(r)
     out = []
     for wfId, wf in store["workflows"].items():
+        runs = runs_by_wf.get(wfId, [])
+        runs.sort(key=lambda x: x.get("startedAt") or 0, reverse=True)
+        last_runs = []
+        running_count = 0
+        for r in runs[:3]:
+            if r.get("status") == "running":
+                running_count += 1
+            last_runs.append({
+                "runId":      r.get("id") or r.get("runId") or "",
+                "status":     r.get("status") or "",
+                "startedAt":  r.get("startedAt") or 0,
+                "finishedAt": r.get("finishedAt") or 0,
+                "durationMs": (r.get("finishedAt") or 0) - (r.get("startedAt") or 0)
+                              if r.get("finishedAt") else 0,
+                "currentNodeId": r.get("currentNodeId") or "",
+                "error":      (r.get("error") or "")[:200],
+            })
+        active_run_id = ""
+        for r in runs:
+            if r.get("status") == "running":
+                active_run_id = r.get("id") or r.get("runId") or ""
+                break
         out.append({
             "id": wfId,
             "name": wf.get("name", "Untitled"),
@@ -561,6 +592,10 @@ def api_workflows_list(query: dict | None = None) -> dict:
             "edgeCount": len(wf.get("edges", [])),
             "createdAt": wf.get("createdAt", 0),
             "updatedAt": wf.get("updatedAt", 0),
+            "lastRuns":     last_runs,
+            "runningCount": running_count,
+            "activeRunId":  active_run_id,
+            "totalRuns":    len(runs),
         })
     out.sort(key=lambda x: x["updatedAt"], reverse=True)
     return {"ok": True, "workflows": out}
