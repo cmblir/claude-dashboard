@@ -1036,6 +1036,11 @@ tailwind.config = {
           <button class="settings-item" onclick="setLang('ko')"><span>🇰🇷</span><span>한국어</span><span class="settings-check lang-check" data-lang="ko">✓</span></button>
           <button class="settings-item" onclick="setLang('en')"><span>🇺🇸</span><span>English</span><span class="settings-check lang-check" data-lang="en" style="display:none;">✓</span></button>
           <button class="settings-item" onclick="setLang('zh')"><span>🇨🇳</span><span>中文</span><span class="settings-check lang-check" data-lang="zh" style="display:none;">✓</span></button>
+          <div style="border-top:1px solid var(--border);"></div>
+          <button class="settings-item" onclick="toggleSettingsDropdown(); openQuickSettings()" title="⌘,">
+            <span>⚡</span><span data-i18n="settings.quickSettings">빠른 설정 — 모든 파라미터</span>
+            <span style="margin-left:auto;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.04em;">⌘,</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1366,6 +1371,13 @@ const __noReloadPaths = [
   '/api/ollama/',
   // Auto-Resume — 모달 안에서 토글하므로 자동 리로드 시 모달이 닫힘
   '/api/auto_resume/',
+  // Crew Wizard — preview/create/test 호출 후 renderView() 가 트리거되면
+  // 입력 중인 4-step 폼 상태(__cw.form)가 날아감 (v2.38.0 hotfix)
+  '/api/wizard/',
+  '/api/slack/',
+  '/api/obsidian/',
+  // Quick Settings prefs — 사이드 드로어 안에서 토글하므로 리로드 시 닫힘
+  '/api/prefs/',
 ];
 // ── 인메모리 GET 캐시 — 빈번한 GET 호출의 중복 네트워크 비용 제거 ──
 const _apiCache = {};
@@ -18600,6 +18612,531 @@ document.getElementById('globalSearch').addEventListener('click', () => openSpot
 document.getElementById('globalSearch').addEventListener('keydown', e => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSpotlight(); }
 });
+
+// ────────────────────────────────────────────────────────────────
+// QUICK SETTINGS — Per-user prefs (UI · AI · Behavior · Workflow)
+// Persisted server-side at ~/.claude-dashboard-prefs.json. The dropdown
+// in the header still handles theme/lang quickly; this drawer exposes
+// every parameter in PREFS_SCHEMA with full validation.
+// ────────────────────────────────────────────────────────────────
+(function _injectQuickSettingsCSS() {
+  const css = `
+  /* density */
+  body[data-density="compact"]    .feat-win,
+  body[data-density="compact"]    .card { padding: 10px 12px; }
+  body[data-density="spacious"]   .feat-win,
+  body[data-density="spacious"]   .card { padding: 22px 26px; }
+  /* font size scale */
+  body[data-font-size="small"]    { font-size: 13px; }
+  body[data-font-size="medium"]   { font-size: 14px; }
+  body[data-font-size="large"]    { font-size: 16px; }
+  body[data-font-size="xlarge"]   { font-size: 18px; }
+  /* reduced motion override */
+  body[data-reduced-motion="true"] *,
+  body[data-reduced-motion="true"] *::before,
+  body[data-reduced-motion="true"] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* accent color overrides */
+  body[data-accent="blue"]   { --accent: #3b82f6; --accent-2: #60a5fa; }
+  body[data-accent="purple"] { --accent: #a855f7; --accent-2: #c084fc; }
+  body[data-accent="green"]  { --accent: #22c55e; --accent-2: #4ade80; }
+  body[data-accent="orange"] { --accent: #f97316; --accent-2: #fb923c; }
+  body[data-accent="pink"]   { --accent: #ec4899; --accent-2: #f472b6; }
+  /* mascot hidden */
+  body[data-mascot-hidden="true"] #claudeMascot { display: none !important; }
+
+  /* ── Drawer ── */
+  #qsBackdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px); z-index: 1300;
+    opacity: 0; pointer-events: none; transition: opacity .18s ease;
+  }
+  #qsBackdrop.open { opacity: 1; pointer-events: auto; }
+  #qsDrawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(520px, 100vw);
+    background: var(--bg-soft); border-left: 1px solid var(--border-hi);
+    box-shadow: -16px 0 40px rgba(0,0,0,0.35); z-index: 1301;
+    transform: translateX(100%); transition: transform .22s cubic-bezier(.2,.8,.2,1);
+    display: flex; flex-direction: column;
+  }
+  #qsDrawer.open { transform: translateX(0); }
+  body[data-reduced-motion="true"] #qsDrawer { transition: none; }
+  #qsHead {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  #qsHead h3 { margin: 0; font-size: 0.95rem; letter-spacing: 0.02em; }
+  #qsHead .qs-spacer { flex: 1; }
+  #qsTabs {
+    display: flex; gap: 4px; padding: 8px 12px;
+    border-bottom: 1px solid var(--border); overflow-x: auto;
+  }
+  .qs-tab {
+    padding: 6px 12px; border-radius: 8px; font-size: 0.78rem;
+    border: 1px solid transparent; color: var(--text-mute);
+    background: transparent; cursor: pointer; white-space: nowrap;
+  }
+  .qs-tab:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+  body.theme-light .qs-tab:hover { background: rgba(0,0,0,0.04); }
+  .qs-tab.active {
+    background: rgba(217,119,87,0.15); border-color: rgba(217,119,87,0.3);
+    color: var(--text);
+  }
+  #qsBody { flex: 1; overflow-y: auto; padding: 16px 18px; }
+  .qs-row {
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 10px 16px; align-items: center;
+    padding: 10px 0; border-bottom: 1px dashed var(--border);
+  }
+  .qs-row:last-child { border-bottom: none; }
+  .qs-row .qs-label { font-size: 0.82rem; color: var(--text); }
+  .qs-row .qs-hint  { display: block; font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
+  .qs-row .qs-control { min-width: 160px; text-align: right; }
+  .qs-row select, .qs-row input[type="text"], .qs-row input[type="number"] {
+    background: var(--bg); border: 1px solid var(--border-hi);
+    color: var(--text); padding: 6px 10px; border-radius: 6px;
+    font-size: 0.78rem; min-width: 140px;
+  }
+  .qs-row input[type="range"] { width: 160px; vertical-align: middle; }
+  .qs-row .qs-num-readout { font-variant-numeric: tabular-nums; font-size: 0.75rem; color: var(--text-mute); margin-left: 8px; }
+  /* toggle switch */
+  .qs-toggle {
+    width: 38px; height: 22px; border-radius: 11px;
+    background: rgba(255,255,255,0.1); position: relative; cursor: pointer;
+    transition: background .15s ease;
+  }
+  body.theme-light .qs-toggle { background: rgba(0,0,0,0.12); }
+  .qs-toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; transition: left .15s ease;
+  }
+  .qs-toggle.on { background: var(--accent); }
+  .qs-toggle.on::after { left: 18px; }
+  /* segmented control */
+  .qs-seg { display: inline-flex; gap: 0; border: 1px solid var(--border-hi); border-radius: 6px; overflow: hidden; }
+  .qs-seg button {
+    background: transparent; border: 0; color: var(--text-mute);
+    padding: 5px 10px; font-size: 0.74rem; cursor: pointer;
+  }
+  .qs-seg button.on { background: var(--accent); color: #fff; }
+  .qs-seg button + button { border-left: 1px solid var(--border); }
+  /* section title */
+  .qs-section-desc {
+    font-size: 0.72rem; color: var(--text-dim); margin-bottom: 8px;
+    line-height: 1.5;
+  }
+  /* footer */
+  #qsFoot {
+    padding: 10px 18px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: space-between; align-items: center;
+  }
+  #qsFoot .qs-saved { font-size: 0.7rem; color: var(--text-dim); }
+  @media (max-width: 480px) {
+    #qsDrawer { width: 100vw; }
+    .qs-row { grid-template-columns: 1fr; }
+    .qs-row .qs-control { text-align: left; min-width: 0; }
+  }
+  `;
+  const s = document.createElement('style');
+  s.id = 'qs-style';
+  s.textContent = css;
+  document.head.appendChild(s);
+})();
+
+// ── Pref store ─────────────────────────────────────────────────
+window.CC_PREFS = null;
+window.CC_PREFS_SCHEMA = null;
+window.CC_PREFS_DEFAULTS = null;
+let _prefsSavedAt = 0;
+
+function getPref(section, key, fallback) {
+  const p = window.CC_PREFS;
+  if (!p || !p[section] || !(key in p[section])) {
+    const d = window.CC_PREFS_DEFAULTS;
+    if (d && d[section] && key in d[section]) return d[section][key];
+    return fallback;
+  }
+  return p[section][key];
+}
+
+let _prefsPushTimer = null;
+const _prefsPendingPatch = {};
+function setPref(section, key, value, opts) {
+  opts = opts || {};
+  if (!window.CC_PREFS) window.CC_PREFS = {};
+  if (!window.CC_PREFS[section]) window.CC_PREFS[section] = {};
+  window.CC_PREFS[section][key] = value;
+  // queue to backend (debounced 250ms)
+  if (!_prefsPendingPatch[section]) _prefsPendingPatch[section] = {};
+  _prefsPendingPatch[section][key] = value;
+  if (_prefsPushTimer) clearTimeout(_prefsPushTimer);
+  _prefsPushTimer = setTimeout(_flushPrefs, 250);
+  if (!opts.skipApply) _applyPrefsToDOM(window.CC_PREFS);
+}
+
+async function _flushPrefs() {
+  _prefsPushTimer = null;
+  const patch = JSON.parse(JSON.stringify(_prefsPendingPatch));
+  for (const k of Object.keys(_prefsPendingPatch)) delete _prefsPendingPatch[k];
+  if (!Object.keys(patch).length) return;
+  try {
+    const r = await fetch('/api/prefs/set', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({patch})
+    });
+    const j = await r.json();
+    if (j.ok) {
+      window.CC_PREFS = j.prefs;
+      _prefsSavedAt = j.savedAt || Date.now();
+      const el = document.getElementById('qsSaved');
+      if (el) el.textContent = (typeof t === 'function' ? t('저장됨') : 'Saved') + ' · ' + new Date(_prefsSavedAt).toLocaleTimeString();
+    }
+  } catch (e) {
+    console.warn('[prefs] push failed', e);
+  }
+}
+
+function _applyPrefsToDOM(prefs) {
+  if (!prefs) return;
+  const ui = prefs.ui || {};
+  document.body.dataset.density       = ui.density   || 'comfortable';
+  document.body.dataset.fontSize      = ui.fontSize  || 'medium';
+  document.body.dataset.reducedMotion = (ui.reducedMotion ? 'true' : 'false');
+  document.body.dataset.accent        = ui.accentColor || 'claude';
+  document.body.dataset.mascotHidden  = (ui.mascotEnabled === false ? 'true' : 'false');
+}
+
+async function _bootPrefs() {
+  try {
+    const r = await fetch('/api/prefs/get', {cache: 'no-store'});
+    const j = await r.json();
+    if (j && j.ok) {
+      window.CC_PREFS = j.prefs;
+      window.CC_PREFS_SCHEMA = j.schema;
+      window.CC_PREFS_DEFAULTS = j.defaults;
+      _prefsSavedAt = j.savedAt || 0;
+      _applyPrefsToDOM(j.prefs);
+    }
+  } catch (e) {
+    console.warn('[prefs] boot failed', e);
+  }
+}
+_bootPrefs();
+
+// ── Drawer renderer ────────────────────────────────────────────
+const _QS_SECTIONS = [
+  { id: 'ui',       icon: '🎨', label: 'UI · 외관' },
+  { id: 'ai',       icon: '🤖', label: 'AI 기본값' },
+  { id: 'behavior', icon: '⚙️', label: '동작' },
+  { id: 'workflow', icon: '🔀', label: '워크플로우 기본값' },
+];
+
+// ko labels per (section, key) — fall back to key when missing
+const _QS_LABELS = {
+  'ui.theme':            ['테마', 'auto/dark/light/midnight/forest/sunset'],
+  'ui.lang':             ['언어', 'ko/en/zh — 변경 시 페이지 새로고침'],
+  'ui.density':          ['밀도', '카드/창의 안쪽 여백'],
+  'ui.fontSize':         ['글자 크기', '본문 기본 폰트 크기'],
+  'ui.reducedMotion':    ['모션 감소', '애니메이션·전환을 거의 0으로'],
+  'ui.accentColor':      ['강조 색', '액티브 상태·버튼 강조 색'],
+  'ui.sidebarCollapsed': ['사이드바 접힘', '데스크톱에서 사이드바 기본 접힘'],
+  'ui.mascotEnabled':    ['마스코트 표시', '우하단 점프 캐릭터'],
+  'ui.compactSidebar':   ['컴팩트 사이드바', '카테고리 라벨 숨김'],
+
+  'ai.defaultProvider':  ['기본 프로바이더', '예: claude:sonnet, openai:gpt-4.1, ollama:llama3.1'],
+  'ai.effort':           ['Effort', 'low / medium / high — 추론 깊이'],
+  'ai.temperature':      ['Temperature', '0.0 결정적 ↔ 2.0 다양'],
+  'ai.topP':             ['Top-p', '핵 샘플링 누적 확률'],
+  'ai.maxOutputTokens':  ['Max output tokens', '응답 최대 토큰'],
+  'ai.thinkingBudget':   ['Thinking budget', '확장 사고 예산 (0 = 비활성)'],
+  'ai.extendedThinking': ['Extended thinking', 'Claude 확장 사고 모드'],
+  'ai.streamResponses':  ['스트리밍 응답', 'SSE 토큰 스트리밍'],
+  'ai.fallbackChain':    ['폴백 체인 사용', '실패 시 다음 프로바이더로 자동 폴백'],
+
+  'behavior.autoResume':         ['Auto-Resume', '한도 도달 시 자동 재개 워커'],
+  'behavior.notifySlack':        ['Slack 알림', '워크플로우 완료/실패 알림'],
+  'behavior.notifyDiscord':      ['Discord 알림', '워크플로우 완료/실패 알림'],
+  'behavior.telemetryRefresh':   ['텔레메트리 갱신(초)', '0 = 비활성'],
+  'behavior.confirmSpawn':       ['세션 spawn 전 확인', 'CLI 세션 시작 직전 모달'],
+  'behavior.autosaveWorkflows':  ['워크플로우 자동 저장', '편집 시 디바운스 저장'],
+  'behavior.liveTickerSeconds':  ['라이브 티커(초)', '실시간 상태 폴링 주기'],
+  'behavior.soundOnComplete':    ['완료 알림 소리', '워크플로우 종료 시 비프'],
+  'behavior.openLastTab':        ['마지막 탭 자동 열기', '재방문 시 직전 탭 복원'],
+
+  'workflow.defaultIterations':     ['기본 반복 횟수', 'Repeat 노드 기본값'],
+  'workflow.defaultRepeatDelaySec': ['반복 간격(초)', '반복 간 대기'],
+  'workflow.dryRunByDefault':       ['Dry-run 기본', '실행 시 dry-run 토글 기본 ON'],
+  'workflow.showMinimap':           ['미니맵 표시', '캔버스 우하단 미니맵'],
+  'workflow.snapToGrid':            ['그리드 스냅', '노드 이동 시 격자 정렬'],
+  'workflow.gridSize':              ['그리드 크기(px)', '8~64'],
+};
+
+function _qsLabelHint(section, key) {
+  const v = _QS_LABELS[section + '.' + key];
+  if (v) return v;
+  return [key, ''];
+}
+
+function openQuickSettings(initialSection) {
+  if (!window.CC_PREFS) {
+    // boot still in flight — defer
+    _bootPrefs().then(() => openQuickSettings(initialSection));
+    return;
+  }
+  let bd = document.getElementById('qsBackdrop');
+  let dr = document.getElementById('qsDrawer');
+  if (!bd) {
+    bd = document.createElement('div'); bd.id = 'qsBackdrop';
+    bd.onclick = closeQuickSettings;
+    document.body.appendChild(bd);
+  }
+  if (!dr) {
+    dr = document.createElement('div'); dr.id = 'qsDrawer';
+    dr.setAttribute('role', 'dialog');
+    dr.setAttribute('aria-label', 'Quick Settings');
+    document.body.appendChild(dr);
+  }
+  const sec = initialSection || dr.dataset.section || 'ui';
+  dr.dataset.section = sec;
+  dr.innerHTML = _qsRenderShell(sec);
+  // bind tab switches
+  dr.querySelectorAll('.qs-tab').forEach(tab => {
+    tab.onclick = () => {
+      dr.dataset.section = tab.dataset.section;
+      dr.innerHTML = _qsRenderShell(tab.dataset.section);
+      // re-bind after innerHTML rewrite — call openQuickSettings recursively to re-attach
+      openQuickSettings(tab.dataset.section);
+    };
+  });
+  _qsBindControls(sec);
+  requestAnimationFrame(() => { bd.classList.add('open'); dr.classList.add('open'); });
+}
+
+function closeQuickSettings() {
+  const bd = document.getElementById('qsBackdrop');
+  const dr = document.getElementById('qsDrawer');
+  if (bd) bd.classList.remove('open');
+  if (dr) dr.classList.remove('open');
+}
+
+function _qsRenderShell(section) {
+  const tabs = _QS_SECTIONS.map(s => `
+    <button class="qs-tab ${s.id === section ? 'active' : ''}" data-section="${s.id}">
+      <span>${s.icon}</span> <span data-i18n="${_qsI18nKey(s.label)}">${_qsEscape(s.label)}</span>
+    </button>
+  `).join('');
+  const savedTxt = _prefsSavedAt
+    ? (typeof t === 'function' ? t('저장됨') : 'Saved') + ' · ' + new Date(_prefsSavedAt).toLocaleTimeString()
+    : '';
+  return `
+    <div id="qsHead">
+      <h3 data-i18n="settings.quickSettings">빠른 설정 — 모든 파라미터</h3>
+      <span class="qs-spacer"></span>
+      <button class="btn-ghost btn" onclick="closeQuickSettings()" aria-label="닫기">✕</button>
+    </div>
+    <div id="qsTabs">${tabs}</div>
+    <div id="qsBody">${_qsRenderSection(section)}</div>
+    <div id="qsFoot">
+      <span class="qs-saved" id="qsSaved">${_qsEscape(savedTxt)}</span>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-ghost btn" onclick="_qsResetSection('${section}')" data-i18n="이 섹션 초기화">이 섹션 초기화</button>
+        <button class="btn-ghost btn" onclick="_qsResetAll()" data-i18n="모두 초기화">모두 초기화</button>
+      </div>
+    </div>
+  `;
+}
+
+function _qsI18nKey(label) {
+  const m = {
+    'UI · 외관': 'qs.section.ui',
+    'AI 기본값': 'qs.section.ai',
+    '동작': 'qs.section.behavior',
+    '워크플로우 기본값': 'qs.section.workflow',
+  };
+  return m[label] || '';
+}
+
+function _qsEscape(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _qsRenderSection(section) {
+  const schema = window.CC_PREFS_SCHEMA && window.CC_PREFS_SCHEMA[section];
+  const cur = (window.CC_PREFS && window.CC_PREFS[section]) || {};
+  if (!schema) return '<div class="qs-section-desc">스키마 로딩 실패</div>';
+  const sectionDesc = {
+    ui:       '테마·언어·밀도·강조 색 등 외관 관련 설정. 즉시 적용됩니다.',
+    ai:       'AI 호출의 기본 파라미터. 워크플로우 노드와 챗봇이 이 값을 시작점으로 사용합니다.',
+    behavior: '대시보드의 기본 동작·알림·폴링 주기.',
+    workflow: '워크플로우 에디터의 기본값. 새 노드 생성 시 이 값으로 prefill 됩니다.',
+  }[section] || '';
+  const rows = Object.keys(schema).map(key => _qsRenderRow(section, key, schema[key], cur[key])).join('');
+  return `<div class="qs-section-desc" data-i18n="${_qsEscape('section.desc.' + section)}">${_qsEscape(sectionDesc)}</div>${rows}`;
+}
+
+function _qsRenderRow(section, key, def, value) {
+  const [label, hint] = _qsLabelHint(section, key);
+  let control = '';
+  if (def.kind === 'bool') {
+    control = `<div class="qs-toggle ${value ? 'on' : ''}" data-section="${section}" data-key="${key}" role="switch" aria-checked="${!!value}" tabindex="0"></div>`;
+  } else if (def.kind === 'enum') {
+    if (def.choices.length <= 4) {
+      control = `<div class="qs-seg" data-section="${section}" data-key="${key}">${
+        def.choices.map(c => `<button class="${c === value ? 'on' : ''}" data-val="${_qsEscape(c)}">${_qsEscape(c)}</button>`).join('')
+      }</div>`;
+    } else {
+      control = `<select data-section="${section}" data-key="${key}">${
+        def.choices.map(c => `<option value="${_qsEscape(c)}" ${c === value ? 'selected' : ''}>${_qsEscape(c)}</option>`).join('')
+      }</select>`;
+    }
+  } else if (def.kind === 'int' || def.kind === 'float') {
+    const step = def.kind === 'float' ? '0.05' : '1';
+    control = `
+      <input type="range" min="${def.min}" max="${def.max}" step="${step}" value="${value}" data-section="${section}" data-key="${key}" data-numkind="${def.kind}" />
+      <span class="qs-num-readout" id="qs-readout-${section}-${key}">${value}</span>
+    `;
+  } else if (def.kind === 'str') {
+    control = `<input type="text" maxlength="${def.maxLen || 120}" value="${_qsEscape(value || '')}" data-section="${section}" data-key="${key}" placeholder="claude:sonnet" />`;
+  }
+  return `
+    <div class="qs-row">
+      <label class="qs-label">
+        <span>${_qsEscape(label)}</span>
+        ${hint ? `<span class="qs-hint">${_qsEscape(hint)}</span>` : ''}
+      </label>
+      <div class="qs-control">${control}</div>
+    </div>
+  `;
+}
+
+function _qsBindControls(section) {
+  const dr = document.getElementById('qsDrawer');
+  if (!dr) return;
+  // toggle
+  dr.querySelectorAll('.qs-toggle').forEach(el => {
+    const fn = () => {
+      const next = !el.classList.contains('on');
+      el.classList.toggle('on', next);
+      el.setAttribute('aria-checked', String(next));
+      _qsApplyAndPersist(el.dataset.section, el.dataset.key, next);
+    };
+    el.onclick = fn;
+    el.onkeydown = (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); fn(); } };
+  });
+  // segmented
+  dr.querySelectorAll('.qs-seg').forEach(seg => {
+    seg.querySelectorAll('button').forEach(b => {
+      b.onclick = () => {
+        seg.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+        b.classList.add('on');
+        _qsApplyAndPersist(seg.dataset.section, seg.dataset.key, b.dataset.val);
+      };
+    });
+  });
+  // select
+  dr.querySelectorAll('select[data-section]').forEach(sel => {
+    sel.onchange = () => _qsApplyAndPersist(sel.dataset.section, sel.dataset.key, sel.value);
+  });
+  // range
+  dr.querySelectorAll('input[type="range"][data-section]').forEach(r => {
+    const ro = document.getElementById('qs-readout-' + r.dataset.section + '-' + r.dataset.key);
+    r.oninput = () => {
+      const v = r.dataset.numkind === 'float' ? parseFloat(r.value) : parseInt(r.value, 10);
+      if (ro) ro.textContent = v;
+    };
+    r.onchange = () => {
+      const v = r.dataset.numkind === 'float' ? parseFloat(r.value) : parseInt(r.value, 10);
+      _qsApplyAndPersist(r.dataset.section, r.dataset.key, v);
+    };
+  });
+  // text
+  dr.querySelectorAll('input[type="text"][data-section]').forEach(inp => {
+    inp.onchange = () => _qsApplyAndPersist(inp.dataset.section, inp.dataset.key, inp.value);
+  });
+}
+
+function _qsApplyAndPersist(section, key, value) {
+  setPref(section, key, value);
+  // Side-effects for keys that need immediate behavior beyond data-* attrs
+  if (section === 'ui' && key === 'theme')  setTheme(value);
+  if (section === 'ui' && key === 'lang' && value !== _curLang)  setLang(value);
+  if (section === 'ui' && key === 'sidebarCollapsed') {
+    document.body.classList.toggle('sb-collapsed', !!value);
+    try { localStorage.setItem('sb-collapsed', value ? '1' : '0'); } catch {}
+    if (typeof _syncNavToggleVisibility === 'function') _syncNavToggleVisibility();
+  }
+}
+
+async function _qsResetSection(section) {
+  if (!confirm((typeof t === 'function' ? t('이 섹션의 모든 값을 기본값으로 되돌릴까요?') : 'Reset this section?'))) return;
+  const r = await fetch('/api/prefs/reset', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({section})});
+  const j = await r.json();
+  if (j.ok) {
+    window.CC_PREFS = j.prefs;
+    _applyPrefsToDOM(j.prefs);
+    openQuickSettings(section); // re-render
+  }
+}
+
+async function _qsResetAll() {
+  if (!confirm((typeof t === 'function' ? t('모든 빠른 설정을 초기화할까요? 이 작업은 되돌릴 수 없습니다.') : 'Reset all Quick Settings? This cannot be undone.'))) return;
+  const r = await fetch('/api/prefs/reset', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})});
+  const j = await r.json();
+  if (j.ok) {
+    window.CC_PREFS = j.prefs;
+    _applyPrefsToDOM(j.prefs);
+    openQuickSettings();
+  }
+}
+
+// Keyboard shortcut: ⌘, / Ctrl+,
+document.addEventListener('keydown', (e) => {
+  if (e.key !== ',' || !(e.metaKey || e.ctrlKey)) return;
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable)) return;
+  e.preventDefault();
+  const dr = document.getElementById('qsDrawer');
+  if (dr && dr.classList.contains('open')) closeQuickSettings();
+  else openQuickSettings();
+});
+// Esc closes drawer
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const dr = document.getElementById('qsDrawer');
+  if (dr && dr.classList.contains('open')) { e.stopPropagation(); closeQuickSettings(); }
+});
+
+// Mirror existing setTheme/setLang into prefs so they survive reload
+(function _bridgeLegacyToggles() {
+  const _origSetTheme = window.setTheme;
+  if (typeof _origSetTheme === 'function') {
+    window.setTheme = function (th) {
+      _origSetTheme(th);
+      if (window.CC_PREFS) setPref('ui', 'theme', th, {skipApply: true});
+    };
+  }
+  const _origSetLang = window.setLang;
+  if (typeof _origSetLang === 'function') {
+    window.setLang = function (lang) {
+      // push synchronously before the page reload that setLang triggers
+      try {
+        navigator.sendBeacon && navigator.sendBeacon(
+          '/api/prefs/set',
+          new Blob([JSON.stringify({patch: {ui: {lang}}})], {type: 'application/json'})
+        );
+      } catch {}
+      _origSetLang(lang);
+    };
+  }
+})();
 
 // ────────────────────────────────────────────────────────────────
 // LOGIN GATE — 서버 시작 시 항상 로그인 화면을 먼저 표시

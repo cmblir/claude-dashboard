@@ -146,6 +146,7 @@ from .auto_resume import (
     api_auto_resume_set, api_auto_resume_status,
     api_auto_resume_uninstall_hooks,
 )
+from .prefs import api_prefs_get, api_prefs_reset, api_prefs_set
 
 
 def _ai_providers_by_cap(query: dict) -> dict:
@@ -314,6 +315,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/mcp-server/info": api_mcp_server_info,
     "/api/artifacts/list": api_artifacts_list,
     "/api/artifacts/render": api_artifacts_render,
+    "/api/prefs/get": api_prefs_get,
 }
 
 
@@ -448,6 +450,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/auto_resume/cancel": api_auto_resume_cancel,
     "/api/auto_resume/install_hooks": api_auto_resume_install_hooks,
     "/api/auto_resume/uninstall_hooks": api_auto_resume_uninstall_hooks,
+    "/api/prefs/set": api_prefs_set,
+    "/api/prefs/reset": api_prefs_reset,
 }
 
 

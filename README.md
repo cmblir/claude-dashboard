@@ -27,6 +27,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 | ver | highlight |
 |---|---|
+| **v2.38.0** | ⚡ **Quick Settings** — one keyboard-accessible drawer (`⌘,` / `Ctrl+,`) for every dashboard parameter. 33 keys across UI · AI · Behavior · Workflow (effort, temperature, accent color, density, font size, reduced motion, telemetry refresh, autoResume, mascot, …). Schema-driven controls (toggle / segmented / select / range / text), strict server-side validation, atomic JSON persistence at `~/.claude-dashboard-prefs.json`. |
 | **v2.37.0** | 🔄 **Auto-Resume** — inject a self-healing retry loop into a live Claude session. Background worker classifies the exit reason (rate-limit / context-full / auth-expired / unknown), parses precise reset times, runs `claude --resume <id>` with exponential backoff, snapshot-hash stall detection, and per-project Stop+SessionStart hooks for context preservation. UI panel in session detail; 🔄 AR badge in session list. |
 | **v2.36.3** | 🔄 **Server-restart auto-banner** — dashboard polls `/api/version` every 60s and prompts a one-click reload when `serverStartedAt` changes (no more "I deployed but the user is on a stale build"). |
 | **v2.36.1** | 🩹 **Run Center ECC discovery hotfix + OMC/OMX guide cards** — `_ecc_roots()` reads `installed_plugins.json` and recognises both `ecc@ecc` and `everything-claude-code@everything-claude-code` ids. Guide & Tools gains OMC and OMX cards explaining LazyClaude-absorbed vs CLI-only features. |

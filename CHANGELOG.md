@@ -10,6 +10,57 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.38.0] — 2026-04-27
+
+### ⚡ Quick Settings — per-user prefs drawer (UI · AI · Behavior · Workflow)
+
+A single keyboard-accessible drawer (`⌘,` / `Ctrl+,`) exposes every dashboard
+parameter. Values persist server-side at `~/.claude-dashboard-prefs.json`,
+boot synchronously on every page load, and apply via body `data-*` attributes
+so the rest of the app can react via CSS — no rerender needed.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/prefs.py` (new) | Whitelisted schema with 4 sections (UI · AI · Behavior · Workflow), 33 keys total. Strict validation per key — enum check, int/float clamp, str length cap, bool coerce. Unknown keys silently dropped. Atomic JSON writes via `_safe_write`. |
+| 2 | `server/routes.py` | 3 new routes: `GET /api/prefs/get` (returns `{prefs, defaults, schema, savedAt}`), `POST /api/prefs/set` (single-key or batch `patch:` form), `POST /api/prefs/reset` (whole or single-section reset). |
+| 3 | `dist/index.html` | Slide-in drawer with section tabs + per-control widgets: toggle (bool), segmented (≤4-choice enum), select (>4-choice enum), range (int/float with live readout), text (str). Reads schema from server — no hard-coded constraints. |
+| 4 | `dist/index.html` | CSS overrides driven by body `data-*` attrs: `data-density` (compact/comfortable/spacious), `data-font-size` (small→xlarge), `data-reduced-motion` (animation kill switch), `data-accent` (5 alt accent colors), `data-mascot-hidden`. |
+| 5 | `dist/index.html` | Existing `setTheme` / `setLang` are bridged so legacy dropdown toggles also persist to the prefs store (sendBeacon used pre-reload for lang). |
+| 6 | `tools/translations_manual_13.py` (new) | Korean → EN/ZH manual overrides for every drawer label, hint, section description. Wired into `tools/translations_manual.py`. |
+| 7 | `scripts/e2e-quick-settings.mjs` (new) | Playwright smoke: ⌘,/Esc keyboard, 4 tabs, bool toggle persistence, range slider value, server round-trip. Passes alongside the 58-tab smoke. |
+
+#### Parameters covered (33 total)
+- **UI (9):** theme, lang, density, fontSize, reducedMotion, accentColor, sidebarCollapsed, mascotEnabled, compactSidebar
+- **AI (9):** defaultProvider, effort, temperature, topP, maxOutputTokens, thinkingBudget, extendedThinking, streamResponses, fallbackChain
+- **Behavior (9):** autoResume, notifySlack, notifyDiscord, telemetryRefresh, confirmSpawn, autosaveWorkflows, liveTickerSeconds, soundOnComplete, openLastTab
+- **Workflow (6):** defaultIterations, defaultRepeatDelaySec, dryRunByDefault, showMinimap, snapToGrid, gridSize
+
+#### Why
+The dashboard had ~30 user-tunable knobs scattered across modal dialogs, settings page, and localStorage. v2.38 centralises them behind one keyboard shortcut so a user can flip effort to high, lower autoResume polling, switch accent to purple, and turn the mascot off without leaving the current tab.
+
+#### Migration / compatibility
+- New file `~/.claude-dashboard-prefs.json` is created on first write — defaults are derived from `DEFAULT_PREFS` until then.
+- Existing `cc-theme` / `cc-lang` localStorage / cookie remain authoritative for the boot path so no flash of wrong theme/lang on reload.
+- Override the path with env `CLAUDE_DASHBOARD_PREFS=/some/path`.
+
+### 🩹 Hotfix — Crew Wizard preview wiped form state (pre-existing bug)
+
+While shipping v2.38.0, a long-standing bug was discovered: the global `api()`
+helper auto-fires `_scheduleAutoReload()` after every successful POST that
+isn't on the `__noReloadPaths` allow-list, then `renderView()` re-runs and
+nukes the in-memory `__cw.form` state. Symptom: clicking 미리보기 in the
+Crew Wizard loaded for ~1s then snapped back to an empty form.
+
+`__noReloadPaths` was extended (`dist/index.html:1373-1382`):
+- `/api/wizard/` — preview / create
+- `/api/slack/` — slack config save / test (called inside the wizard step 3)
+- `/api/obsidian/` — obsidian vault test
+- `/api/prefs/` — Quick Settings (precautionary; would close the drawer otherwise)
+
+Verification: scripted Crew Wizard flow (project + goal → click 미리보기) →
+**0 reloads, form state preserved, preview rendered** (9 nodes · 10 edges · 3 cycles).
+
+---
 ## [2.37.1] — 2026-04-27
 
 ### ✨ Auto-Resume v2.37 follow-on — CLI watch · Haiku snapshot · scheduled-tasks · live ticker
