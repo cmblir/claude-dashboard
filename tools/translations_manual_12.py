@@ -62,6 +62,26 @@ NEW_EN: dict[str, str] = {
     "알 수 없음": "Unknown",
     "알림 (선택) — 상태 전이 시 webhook":
         "Notifications (optional) — webhook on state transitions",
+    "Auto-Resume 바인딩": "Auto-Resume binding",
+    "Slack 어드민 · Obsidian 기록 · Auto-Resume":
+        "Slack admin · Obsidian log · Auto-Resume",
+    "동작": "Action",
+    "set — 워커 바인딩 / 갱신": "set — bind / refresh worker",
+    "cancel — 워커 해제":      "cancel — release worker",
+    "대상 세션 ID (비우면 입력 문자열에서 첫 UUID 추출)":
+        "Target session ID (leave empty to extract first UUID from upstream input)",
+    "cwd (비우면 자동 추정)": "cwd (leave empty to auto-detect)",
+    "재개 프롬프트 (비우면 기본값)": "Resume prompt (leave empty for default)",
+    "정지 idle(초)": "Idle threshold (s)",
+    "최대 재시도": "Max retries",
+    "--continue 모드 (--resume <id> 대신)":
+        "--continue mode (instead of --resume <id>)",
+    "Stop+SessionStart Hook 자동 설치":
+        "Auto-install Stop + SessionStart hooks",
+    "워크플로우는 즉시 다음 노드로 진행 — 워커는 백그라운드에서 동작.":
+        "Workflow advances immediately — worker runs in the background.",
+    "Auto-Resume 활성 세션 — 클릭하여 세션 목록으로 이동":
+        "Auto-Resume active sessions — click to go to session list",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -119,4 +139,24 @@ NEW_ZH: dict[str, str] = {
     "알 수 없음": "未知",
     "알림 (선택) — 상태 전이 시 webhook":
         "通知(可选) — 状态转换时触发 webhook",
+    "Auto-Resume 바인딩": "Auto-Resume 绑定",
+    "Slack 어드민 · Obsidian 기록 · Auto-Resume":
+        "Slack 管理员 · Obsidian 日志 · Auto-Resume",
+    "동작": "操作",
+    "set — 워커 바인딩 / 갱신": "set — 绑定 / 刷新工作进程",
+    "cancel — 워커 해제":      "cancel — 释放工作进程",
+    "대상 세션 ID (비우면 입력 문자열에서 첫 UUID 추출)":
+        "目标会话 ID(留空则从上游输入提取首个 UUID)",
+    "cwd (비우면 자동 추정)": "cwd(留空则自动检测)",
+    "재개 프롬프트 (비우면 기본값)": "恢复提示词(留空则使用默认)",
+    "정지 idle(초)": "停顿 idle(秒)",
+    "최대 재시도": "最大重试次数",
+    "--continue 모드 (--resume <id> 대신)":
+        "--continue 模式(代替 --resume <id>)",
+    "Stop+SessionStart Hook 자동 설치":
+        "自动安装 Stop + SessionStart 钩子",
+    "워크플로우는 즉시 다음 노드로 진행 — 워커는 백그라운드에서 동작.":
+        "工作流立即推进 — 工作进程在后台运行。",
+    "Auto-Resume 활성 세션 — 클릭하여 세션 목록으로 이동":
+        "Auto-Resume 活跃会话 — 点击跳转到会话列表",
 }

@@ -35,7 +35,10 @@ _NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
                "loop", "retry", "error_handler", "merge", "delay",
                # v2.34.0 — Crew pattern: interactive Slack approval gate +
                # Obsidian markdown log appender.
-               "slack_approval", "obsidian_log"}
+               "slack_approval", "obsidian_log",
+               # v2.37.0 — bind a target Claude session to the Auto-Resume
+               # supervisor from inside a workflow.
+               "auto_resume"}
 _INPUT_MODES = {"concat", "first", "json"}
 _ASSIGNEES = {"opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
@@ -313,6 +316,22 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
             # written to disk. False writes a fixed defaultOutput instead.
             "passThrough":   bool(d.get("passThrough", True)),
             "defaultOutput": _clamp_str(d.get("defaultOutput"), 4000),
+        }
+    elif ntype == "auto_resume":
+        # v2.37.0 — bind a Claude Code session UUID to the Auto-Resume
+        # supervisor. If sessionId is empty, the upstream input is parsed
+        # as a UUID. Workflow flow stays alive — the supervisor runs in
+        # its own background thread.
+        out["data"] = {
+            "sessionId":     _clamp_str(d.get("sessionId"), 80),
+            "cwd":           _clamp_str(d.get("cwd"), 500),
+            "prompt":        _clamp_str(d.get("prompt"), 4000),
+            "pollInterval":  max(30, min(3600, int(d.get("pollInterval") or 300))),
+            "idleSeconds":   max(30, int(d.get("idleSeconds") or 90)),
+            "maxAttempts":   max(1, min(60, int(d.get("maxAttempts") or 12))),
+            "useContinue":   bool(d.get("useContinue")),
+            "installHooks":  bool(d.get("installHooks")),
+            "action":        d.get("action") if d.get("action") in ("set", "cancel") else "set",
         }
     # start 는 data 비움
     return out
@@ -872,6 +891,10 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     # ── Obsidian markdown log writer (v2.34.0) ──
     if ntype == "obsidian_log":
         return _execute_obsidian_log_node(data, inputs, _elapsed)
+
+    # ── Auto-Resume binding (v2.37.0) ──
+    if ntype == "auto_resume":
+        return _execute_auto_resume_node(data, inputs, _elapsed)
 
     # ── session / subagent — 멀티 프로바이더 실행 ──
     prompt_parts = []
@@ -1626,6 +1649,67 @@ def _execute_obsidian_log_node(data: dict, inputs: list[str], _elapsed) -> dict:
     return {"status": "ok", "output": upstream, "durationMs": _elapsed(),
             "sessionId": "", "logPath": res.get("path"),
             "bytesWritten": res.get("bytesWritten", 0)}
+
+
+# Pattern for "session_id is the first hex UUID in the upstream input".
+_AUTO_RESUME_UUID_RE = re.compile(
+    r"\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b",
+    re.IGNORECASE,
+)
+
+
+def _execute_auto_resume_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Bind / cancel an Auto-Resume worker for a target session.
+
+    sessionId resolution order:
+      1. data['sessionId'] if explicitly set
+      2. first UUID found in the upstream input string
+
+    The workflow flow continues immediately — the supervisor runs
+    independently in its background thread.
+    """
+    from .auto_resume import api_auto_resume_set, api_auto_resume_cancel
+
+    action = (data.get("action") or "set").strip()
+    sid = (data.get("sessionId") or "").strip()
+    if not sid:
+        upstream = inputs[0] if inputs else ""
+        m = _AUTO_RESUME_UUID_RE.search(upstream or "")
+        if m:
+            sid = m.group(1)
+    if not sid:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": "auto_resume node: no sessionId (set explicitly or "
+                         "pipe a string containing a UUID into this node)",
+                "sessionId": ""}
+
+    if action == "cancel":
+        r = api_auto_resume_cancel({"sessionId": sid})
+    else:
+        r = api_auto_resume_set({
+            "sessionId":    sid,
+            "cwd":          (data.get("cwd") or "").strip(),
+            "prompt":       (data.get("prompt") or "").strip(),
+            "pollInterval": int(data.get("pollInterval") or 300),
+            "idleSeconds":  int(data.get("idleSeconds") or 90),
+            "maxAttempts":  int(data.get("maxAttempts") or 12),
+            "useContinue":  bool(data.get("useContinue")),
+            "installHooks": bool(data.get("installHooks")),
+        })
+    if not r.get("ok"):
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"auto_resume {action}: {r.get('error') or '?'}",
+                "sessionId": ""}
+    entry = r.get("entry") or {}
+    summary = (
+        f"auto_resume {action} ok\n"
+        f"  sessionId: {sid}\n"
+        f"  state:     {entry.get('state')}\n"
+        f"  attempts:  {entry.get('attempts')}/{entry.get('maxAttempts')}\n"
+        f"  cwd:       {entry.get('cwd')}\n"
+    )
+    return {"status": "ok", "output": summary, "durationMs": _elapsed(),
+            "sessionId": "", "autoResumeEntry": entry}
 
 
 def _parse_hhmm(s: str) -> Optional[tuple[int, int]]:

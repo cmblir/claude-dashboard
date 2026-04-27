@@ -2466,6 +2466,8 @@ const WF_NODE_TYPES = [
     desc: 'Slack 채널에 메시지를 올리고 ✅/❌ 반응 또는 스레드 답장을 기다림. 타임아웃 시 자동 통과/거부/중단/기본값 중 선택. 자율모드에서 어드민 개입 지점.' },
   { id: 'obsidian_log', icon: '📝', label: 'Obsidian 기록', portIn: true, portOut: true,
     desc: 'Vault 의 Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 입력을 마크다운으로 append. 사이클 보고/감사 로그용.' },
+  { id: 'auto_resume', icon: '🔄', label: 'Auto-Resume 바인딩', portIn: true, portOut: true,
+    desc: '대상 Claude 세션 UUID(또는 입력 문자열에서 추출)에 Auto-Resume 워커를 바인딩/해제. 워크플로우는 즉시 다음 노드로 진행되고, 워커는 백그라운드에서 토큰/레이트 한도 발생 시 claude --resume 으로 자동 재시도.' },
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 
@@ -2487,8 +2489,8 @@ const WF_NODE_CATEGORIES = [
     desc: '변환 · 변수 · 외부 호출 · 서브워크플로우',
     types: ['http', 'transform', 'variable', 'subworkflow'] },
   { id: 'integ',    icon: '🔗', label: '연동',
-    desc: 'Slack 어드민 · Obsidian 기록',
-    types: ['slack_approval', 'obsidian_log'] },
+    desc: 'Slack 어드민 · Obsidian 기록 · Auto-Resume',
+    types: ['slack_approval', 'obsidian_log', 'auto_resume'] },
   { id: 'output',   icon: '📤', label: '출력',
     desc: '워크플로우 종착',
     types: ['output'] },
@@ -5227,6 +5229,7 @@ function _wfPickNodeType(winId, type) {
   else if (type === 'delay') draft.data = { delayMs:1000, delayType:'fixed', maxDelayMs:5000 };
   else if (type === 'slack_approval') draft.data = { channel:'', messageTemplate:'', timeoutSeconds:300, pollIntervalSeconds:5, onTimeout:'approve', defaultOutput:'', includeInput:true };
   else if (type === 'obsidian_log') draft.data = { vaultPath:'~/ObsidianVault', project:'lazyclaude', heading:'', tagsCsv:'', passThrough:true, defaultOutput:'' };
+  else if (type === 'auto_resume') draft.data = { sessionId:'', cwd:'', prompt:'', pollInterval:300, idleSeconds:90, maxAttempts:12, useContinue:false, installHooks:false, action:'set' };
   else draft.data = {};
   if (!draft.title) draft.title = t(WF_TYPE_MAP[type].label);
   // 타입 선택 직후 카테고리 그리드 자동 접힘 (UX 개선)
@@ -5847,6 +5850,44 @@ function _wfInspectorBody(n) {
         <textarea class="input w-full mt-1" rows="2" oninput="_wfNodeSetData('${n.id}','defaultOutput',this.value)">${escapeHtml(d.defaultOutput||'')}</textarea>
       ` : ''}
       <div class="text-[10px] mt-2" style="color:var(--text-dim);">${t('파일: <vault>/Projects/<project>/logs/YYYY-MM-DD.md — 사이클마다 append.')}</div>
+    `;
+  }
+  if (n.type === 'auto_resume') {
+    return `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('동작')}</label>
+      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','action',this.value)">
+        <option value="set"    ${(d.action||'set')==='set'?'selected':''}>${t('set — 워커 바인딩 / 갱신')}</option>
+        <option value="cancel" ${d.action==='cancel'?'selected':''}>${t('cancel — 워커 해제')}</option>
+      </select>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('대상 세션 ID (비우면 입력 문자열에서 첫 UUID 추출)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.sessionId||'')}" oninput="_wfNodeSetData('${n.id}','sessionId',this.value)" placeholder="00000000-0000-0000-0000-000000000000">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('cwd (비우면 자동 추정)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.cwd||'')}" oninput="_wfNodeSetData('${n.id}','cwd',this.value)" placeholder="/Users/.../my-project">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('재개 프롬프트 (비우면 기본값)')}</label>
+      <textarea class="input w-full mt-1" rows="2" oninput="_wfNodeSetData('${n.id}','prompt',this.value)" placeholder="Continue the previous task...">${escapeHtml(d.prompt||'')}</textarea>
+      <div class="grid grid-cols-3 gap-2 mt-3">
+        <div>
+          <label class="text-[10px] text-[var(--text-dim)] uppercase block">${t('재시도 간격(초)')}</label>
+          <input class="input w-full mt-1" type="number" min="30" max="3600" value="${d.pollInterval||300}" oninput="_wfNodeSetData('${n.id}','pollInterval',Number(this.value))">
+        </div>
+        <div>
+          <label class="text-[10px] text-[var(--text-dim)] uppercase block">${t('정지 idle(초)')}</label>
+          <input class="input w-full mt-1" type="number" min="30" value="${d.idleSeconds||90}" oninput="_wfNodeSetData('${n.id}','idleSeconds',Number(this.value))">
+        </div>
+        <div>
+          <label class="text-[10px] text-[var(--text-dim)] uppercase block">${t('최대 재시도')}</label>
+          <input class="input w-full mt-1" type="number" min="1" max="60" value="${d.maxAttempts||12}" oninput="_wfNodeSetData('${n.id}','maxAttempts',Number(this.value))">
+        </div>
+      </div>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block flex items-center gap-2">
+        <input type="checkbox" ${d.useContinue?'checked':''} onchange="_wfNodeSetData('${n.id}','useContinue',this.checked)">
+        ${t('--continue 모드 (--resume <id> 대신)')}
+      </label>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-1 block flex items-center gap-2">
+        <input type="checkbox" ${d.installHooks?'checked':''} onchange="_wfNodeSetData('${n.id}','installHooks',this.checked)">
+        ${t('Stop+SessionStart Hook 자동 설치')}
+      </label>
+      <div class="text-[10px] mt-2" style="color:var(--text-dim);">${t('워크플로우는 즉시 다음 노드로 진행 — 워커는 백그라운드에서 동작.')}</div>
     `;
   }
   return '';
@@ -7731,12 +7772,18 @@ VIEWS.overview = async () => {
       </div>
     </div>
 
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4">
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4">
       ${statCard('인덱스된 세션', stats.totalSessions)}
       ${statCard('평균 세션 스코어', stats.avgScore, scoreColor(stats.avgScore))}
       ${statCard('총 도구 호출', stats.totalTools)}
       ${statCard('에이전트 위임', stats.totalAgentCalls, '#67e8f9')}
       ${statCard('활성 프로젝트', briefing.projectCount)}
+      ${(briefing.autoResumeActiveCount || 0) > 0
+        ? `<a class="card p-4 cursor-pointer hover-lift" href="#/sessions" title="${t('Auto-Resume 활성 세션 — 클릭하여 세션 목록으로 이동')}" style="background: linear-gradient(135deg, rgba(217,119,87,0.10), rgba(217,119,87,0.02));">
+             <div class="text-[10px] uppercase tracking-wider text-[var(--text-dim)] flex items-center gap-1">🔄 ${t('Auto-Resume')}</div>
+             <div class="text-2xl font-bold mono mt-1" style="color:#d97757">${briefing.autoResumeActiveCount}</div>
+           </a>`
+        : statCard('Auto-Resume', briefing.autoResumeActiveCount || 0)}
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
