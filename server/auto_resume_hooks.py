@@ -86,6 +86,59 @@ tail_blob=$(tail -c 204800 "$jsonl")
 exit 0
 """
 
+# Haiku-summarised variant — uses `claude --print --model haiku-4.5` to compress
+# the jsonl tail into a tight "where you left off" markdown brief. Falls back
+# to the raw tail if Haiku invocation fails (no API key, claude binary missing).
+SNAPSHOT_SH_BODY_HAIKU = r"""#!/usr/bin/env bash
+# {sig}
+# Stop hook — Haiku-summarised snapshot variant.
+set -e
+cwd="{cwd}"
+out_dir="$cwd/.claude/auto-resume"
+out_file="$out_dir/snapshot.md"
+mkdir -p "$out_dir"
+
+slug="-$(echo "$cwd" | sed 's,^/,,;s,/,-,g')"
+proj_dir="$HOME/.claude/projects/$slug"
+[ -d "$proj_dir" ] || exit 0
+
+jsonl=$(ls -t "$proj_dir"/*.jsonl 2>/dev/null | head -n1 || true)
+[ -n "$jsonl" ] || exit 0
+
+tail_blob=$(tail -c 204800 "$jsonl")
+brief=""
+if command -v claude >/dev/null 2>&1; then
+  brief=$(printf '%s\\n' "$tail_blob" \
+    | tail -c 60000 \
+    | claude --print --model haiku-4.5 --bare \
+        -p "Summarise where this Claude Code session left off in <= 12 bullet points. Capture: (1) the user's overarching task, (2) what's been completed, (3) what's in flight, (4) any unresolved error or blocker, (5) the immediate next action. Be concrete; reference files / commands by name. Output markdown only." 2>/dev/null \
+    || true)
+fi
+
+{{
+  echo "# Auto-Resume snapshot (Haiku-summarised)"
+  echo
+  echo "_Source: \\\`$jsonl\\\`_  "
+  echo "_Captured: $(date -u +%Y-%m-%dT%H:%M:%SZ)_"
+  echo
+  if [ -n "$brief" ]; then
+    echo "## Summary (Haiku 4.5)"
+    echo
+    echo "$brief"
+    echo
+  else
+    echo "_Haiku summary unavailable — falling back to raw tail._"
+    echo
+  fi
+  echo "## Tail of session transcript (most recent ~6 KB)"
+  echo
+  echo '```'
+  printf '%s\\n' "$tail_blob" | tail -c 6000
+  echo '```'
+}} > "$out_file.tmp" && mv "$out_file.tmp" "$out_file"
+exit 0
+"""
+
 INJECT_SH_BODY = r"""#!/usr/bin/env bash
 # {sig}
 # SessionStart hook — feed the most recent snapshot to Claude.
@@ -193,7 +246,7 @@ def _remove_hook(settings: dict, hook_name: str, command: str) -> int:
     return before - len(keep)
 
 
-def install(cwd: str) -> dict:
+def install(cwd: str, *, use_haiku_summary: bool = False) -> dict:
     cwd_p = Path(cwd).expanduser().resolve()
     if not cwd_p.is_dir():
         return {"ok": False, "error": f"cwd is not a directory: {cwd_p}"}
@@ -204,7 +257,8 @@ def install(cwd: str) -> dict:
     snapshot_sh = _snapshot_sh_path(str(cwd_p))
     inject_sh = _inject_sh_path(str(cwd_p))
 
-    snapshot_body = SNAPSHOT_SH_BODY.format(sig=HOOK_SIGNATURE, cwd=str(cwd_p))
+    body_template = SNAPSHOT_SH_BODY_HAIKU if use_haiku_summary else SNAPSHOT_SH_BODY
+    snapshot_body = body_template.format(sig=HOOK_SIGNATURE, cwd=str(cwd_p))
     inject_body = INJECT_SH_BODY.format(sig=HOOK_SIGNATURE, cwd=str(cwd_p))
     if not _safe_write(snapshot_sh, snapshot_body):
         return {"ok": False, "error": "failed to write snapshot.sh"}
@@ -231,8 +285,8 @@ def install(cwd: str) -> dict:
         return {"ok": False, "error": "failed to write settings.json"}
 
     log.info(
-        "auto_resume_hooks: installed for %s (stop+%s start+%s)",
-        cwd_p, int(added_stop), int(added_start),
+        "auto_resume_hooks: installed for %s (stop+%s start+%s haiku=%s)",
+        cwd_p, int(added_stop), int(added_start), use_haiku_summary,
     )
     return {
         "ok": True,
@@ -243,6 +297,7 @@ def install(cwd: str) -> dict:
         "addedStop": added_stop,
         "addedSessionStart": added_start,
         "backupPath": str(bak) if bak.exists() else "",
+        "useHaikuSummary": use_haiku_summary,
     }
 
 

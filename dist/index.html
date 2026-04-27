@@ -8743,6 +8743,7 @@ const _AR_REASON_CHIP = {
 };
 
 function _arRender(panel, entry) {
+  _arRememberNext(entry);
   const sid = panel.dataset.sessionId;
   const cwd = panel.dataset.cwd || '';
   const card = panel.querySelector('.card');
@@ -8931,13 +8932,42 @@ async function _arCancel(sessionId) {
 }
 
 let _arPollTimer = null;
+let _arTickerTimer = null;
+let _arNextAttemptAtCache = 0;
+
 function _arSchedulePoll(sessionId, active) {
   if (_arPollTimer) { clearTimeout(_arPollTimer); _arPollTimer = null; }
+  if (_arTickerTimer) { clearInterval(_arTickerTimer); _arTickerTimer = null; }
   if (!active) return;
+  // Full re-fetch every 5s — picks up state transitions / new attempts.
   _arPollTimer = setTimeout(() => {
     const panel = document.getElementById('autoResumePanel');
     if (panel && panel.dataset.sessionId === sessionId) _arLoad(sessionId);
   }, 5000);
+  // 1s ticker — surgically rewrites the "next attempt in Ns" chip so the
+  // countdown looks live instead of jumping by 5s. Cheap: just sets one
+  // textContent, no fetch.
+  _arTickerTimer = setInterval(() => {
+    const panel = document.getElementById('autoResumePanel');
+    if (!panel || panel.dataset.sessionId !== sessionId) {
+      clearInterval(_arTickerTimer); _arTickerTimer = null; return;
+    }
+    if (!_arNextAttemptAtCache) return;
+    const left = Math.max(0, Math.round((_arNextAttemptAtCache - Date.now()) / 1000));
+    const chips = panel.querySelectorAll('.chip.chip-warn');
+    chips.forEach(c => {
+      // Match the "다음 시도까지 Ns (HH:MM:SS)" chip created by _arRender
+      if (/\d+s/.test(c.textContent)) {
+        c.textContent = c.textContent.replace(/\d+s/, left + 's');
+      }
+    });
+  }, 1000);
+}
+
+// Save next-attempt epoch from each render so the 1s ticker can compute
+// the live countdown without re-fetching.
+function _arRememberNext(entry) {
+  _arNextAttemptAtCache = (entry && entry.state === 'waiting' && entry.nextAttemptAt) ? entry.nextAttemptAt : 0;
 }
 
 window._arSubmit = _arSubmit;

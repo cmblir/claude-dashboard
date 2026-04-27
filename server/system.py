@@ -679,7 +679,7 @@ def api_ide_status() -> dict:
     }
 
 def api_scheduled_tasks() -> dict:
-    """~/.claude/scheduled-tasks/ 목록."""
+    """~/.claude/scheduled-tasks/ 목록 + Auto-Resume 활성 워커."""
     out = []
     if SCHEDULED_TASKS_DIR.exists():
         for d in sorted(SCHEDULED_TASKS_DIR.iterdir()):
@@ -697,7 +697,20 @@ def api_scheduled_tasks() -> dict:
                 "path": str(d),
                 "hasSkill": skill_md.exists(),
             })
-    return {"tasks": out, "dirExists": SCHEDULED_TASKS_DIR.exists()}
+    auto_resume_entries = []
+    try:
+        from .auto_resume import _load_all as _ar_load_all, _public_state
+        store = _ar_load_all()
+        for sid, entry in store.items():
+            if entry.get("enabled"):
+                auto_resume_entries.append(_public_state(entry))
+    except Exception:
+        pass
+    return {
+        "tasks": out,
+        "dirExists": SCHEDULED_TASKS_DIR.exists(),
+        "autoResume": auto_resume_entries,
+    }
 
 def api_bash_history(query: dict) -> dict:
     """bash-commands.log tail. q= 검색어, limit= 기본 200."""

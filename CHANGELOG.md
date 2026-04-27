@@ -10,6 +10,33 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.37.1] — 2026-04-27
+
+### ✨ Auto-Resume v2.37 follow-on — CLI watch · Haiku snapshot · scheduled-tasks · live ticker
+
+Five quality-of-life additions on top of v2.37.0:
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/auto_resume_cli.py` | New `watch` subcommand — foreground supervisor: prints one status line every `--refresh` seconds, cancels cleanly on SIGINT, exits 0 on `done` / non-zero on `failed`/`exhausted`. No HTTP server needed. |
+| 2 | `server/auto_resume_hooks.py` | New `SNAPSHOT_SH_BODY_HAIKU` template + `install(cwd, *, use_haiku_summary=True)` flag. Stop-hook now optionally pipes the jsonl tail through `claude --print --model haiku-4.5 --bare` for a tight ≤12-bullet "where you left off" markdown brief — falls back to raw tail if Haiku unavailable. |
+| 3 | `server/auto_resume.py` | `useHaikuSummary` field forwarded from `api_auto_resume_set` and `api_auto_resume_install_hooks` to the hook installer. |
+| 4 | `dist/index.html` | Live 1-second countdown ticker for the "다음 시도까지 Ns" chip — surgical DOM rewrite, no extra fetch. Full status re-fetch still on the existing 5-second cadence. |
+| 5 | `server/system.py` | `/api/scheduled-tasks/list` now exposes an `autoResume` array of active worker entries so a future timeline view can stitch the two together. |
+
+#### Verification
+
+- Backend unit: hooks Haiku variant install/uninstall round-trip · default variant unchanged · CLI `--help` advertises `watch` · `api_scheduled_tasks` returns `autoResume` key.
+- `npm run test:e2e:auto-resume` — 3/3 viewports PASS.
+- `npm run test:e2e:smoke` — 58/58 tabs PASS, no regression.
+
+#### Backwards compatibility
+
+- `install(cwd)` signature is `install(cwd, *, use_haiku_summary=False)` — old callers see no change.
+- `useHaikuSummary` is opt-in; default snapshot template is identical to v2.37.0.
+- `/api/scheduled-tasks/list` still returns `tasks` and `dirExists` exactly as before; `autoResume` is additive.
+
+---
 ## [2.37.0] — 2026-04-27
 
 ### ✨ Auto-Resume — inject a self-healing retry loop into a live Claude Code session

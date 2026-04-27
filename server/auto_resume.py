@@ -515,12 +515,14 @@ def api_auto_resume_set(body: dict) -> dict:
     extra_args = [str(a) for a in extra_args_raw if isinstance(a, (str, int, float))]
     notify_clean = _sanitize_notify(body.get("notify") or {})
 
+    use_haiku_summary = bool(body.get("useHaikuSummary"))
+
     # Optional: install Stop + SessionStart hooks for this cwd
     hook_result = None
     if install_hooks:
         try:
             from .auto_resume_hooks import install as _hooks_install
-            hook_result = _hooks_install(cwd)
+            hook_result = _hooks_install(cwd, use_haiku_summary=use_haiku_summary)
             if not hook_result.get("ok"):
                 return {"ok": False, "error": "hook install failed: " + (hook_result.get("error") or "?")}
         except Exception as e:
@@ -631,8 +633,9 @@ def api_auto_resume_install_hooks(body: dict) -> dict:
     cwd = (body.get("cwd") or "").strip()
     if not cwd:
         return {"ok": False, "error": "cwd required"}
+    use_haiku_summary = bool(body.get("useHaikuSummary"))
     from .auto_resume_hooks import install as _hooks_install
-    return _hooks_install(cwd)
+    return _hooks_install(cwd, use_haiku_summary=use_haiku_summary)
 
 
 def api_auto_resume_uninstall_hooks(body: dict) -> dict:
