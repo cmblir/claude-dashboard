@@ -10,6 +10,39 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.42.1] — 2026-04-27
+
+### 🔄 Workflow run visibility — list cards + canvas auto-restore
+
+User: "워크플로우 실행결과랑 현재 실행중인지? 그리고 어느 노드에 실행중인지
+인터렉티브하게 보여줘야해. 지금 기록을 볼수 없으니까 쓸수가 없어." Backend
+already had per-run state (`runs[runId].nodeResults[nid]`) but the workflow
+list cards rendered no run history at all, and re-opening the canvas of a
+running workflow showed an idle topology — the SSE poller only started after
+a fresh `Run` click. So users couldn't tell which workflows were live, which
+had finished, or which had failed without opening each one.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/workflows.py::api_workflows_list` (+35 LoC) | Each workflow item now carries `lastRuns` (last 3 runs with `runId/status/startedAt/finishedAt/durationMs/currentNodeId/error`), `runningCount` (number of in-flight runs), `activeRunId` (most recent running run, if any), and `totalRuns`. Reads from the existing `runs` map — no schema migration. |
+| 2 | `dist/index.html::_wfRenderList` (+~30 LoC) | List cards now show inline status chips (✅ ok / ❌ err / ⏳ running) for the last 3 runs, a pulsing `● 실행 중` badge if any run is in flight, and `(N회)` total count. Empty state shows `실행 기록 없음` instead of nothing. `_runIcon`/`_runColor` helpers. |
+| 3 | `dist/index.html::_wfOpen` (+~15 LoC) | When entering a canvas, auto-restore: if `activeRunId` exists, attach `__wf.runId` and start `_wfStartPolling()` so node colors animate live; otherwise fetch the latest finished run via `/api/workflows/run-status` and `_wfApplyRunStatus()` to hydrate node colors one-shot. Wrapped in try/catch so a stale runId never blocks canvas rendering. |
+| 4 | `tools/translations_manual_20.py` (new) | KO → EN/ZH for `실행 기록 없음` / `실행 중` / `회`. |
+
+#### Verification
+```
+GET /api/workflows/list                     →  200, 3 wf, lastRuns/runningCount/activeRunId/totalRuns present
+UI smoke (renderView WF list)               →  3 cards, 3 chip blocks, "실행 기록 없음" copy rendered
+e2e-hyper-projects-and-sidebar.mjs          →  11/11
+e2e-tabs-smoke.mjs                          →  58/58
+make i18n-verify                            →  0 missing across EN/ZH
+```
+
+#### Compatibility
+- Backend payload only adds fields. Older `dist/index.html` ignores them.
+- Polling cadence unchanged; we reuse the existing 1-Hz SSE-style loop.
+
+---
 ## [2.42.0] — 2026-04-27
 
 ### 🖱️🧩🧭🔁 Four Anthropic features in one release — Computer Use / Memory / Advisor / Routines
