@@ -12635,22 +12635,85 @@ VIEWS.hooks = async () => {
     </div>`;
   };
 
+  // v2.40.2 — emergency UX upgrade: search · scope · event filter · risk chip
+  // · "panic" disable for risky PreToolUse(Edit|Write|Bash) hooks. With 100+
+  // plugin hooks installed, the previous flat list was unscannable.
+  const _hRiskRe = /\b(Edit|Write|Bash|MultiEdit|NotebookEdit)\b/;
+  const isRisky = (h) => h.event === 'PreToolUse' && (h.matcher && _hRiskRe.test(h.matcher));
+
+  const q       = (state.data.hooksFilter || '').toLowerCase().trim();
+  const scopeF  = state.data.hooksScope  || 'all';   // all | user | plugin
+  const eventF  = state.data.hooksEvent  || '';      // '' | <event>
+  const riskOnly = !!state.data.hooksRiskOnly;
+
+  const matches = (h) => {
+    if (scopeF !== 'all' && h.scope !== scopeF) return false;
+    if (eventF && h.event !== eventF) return false;
+    if (riskOnly && !isRisky(h)) return false;
+    if (!q) return true;
+    const hay = [h.event, h.matcher, h.command, h.type, h.source, h.pluginKey, h.description, h.id]
+      .filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(q);
+  };
+
+  const userFiltered   = userFlat.filter(matches);
+  const pluginFiltered = pluginFlat.filter(matches);
+  const totalShown     = userFiltered.length + pluginFiltered.length;
+  const totalAll       = userFlat.length + pluginFlat.length;
+  const riskCount = [...userFlat, ...pluginFlat].filter(isRisky).length;
+
+  // wrap user/plugin renderers to add a 🚨 chip + danger background for risky entries.
+  const _decorateRisk = (html, h) => isRisky(h)
+    ? html.replace('class="rounded-lg', 'data-risk="1" class="rounded-lg')
+          .replace('">', `" style="border-color: rgba(239,68,68,0.45); box-shadow: 0 0 0 1px rgba(239,68,68,0.15);">`)
+          .replace('<div class="flex items-center gap-2 mb-1 flex-wrap">',
+                   `<div class="flex items-center gap-2 mb-1 flex-wrap"><span class="chip chip-warn text-[9px]" style="background:rgba(239,68,68,0.2);color:#fca5a5;white-space:nowrap;" title="${t('PreToolUse + Edit/Write/Bash 매처 — 작업이 막히는 원인일 가능성')}">🚨 ${t('위험')}</span>`)
+    : html;
+
+  const eventChip = (ev) => {
+    const c = orderedEvents.includes(ev) ? [...userFlat, ...pluginFlat].filter(h => h.event === ev).length : 0;
+    const active = eventF === ev;
+    return `<button class="chip text-[10px] cursor-pointer" style="${active?'background:var(--accent);color:#fff;':''}"
+      onclick="state.data.hooksEvent='${active?'':escapeHtml(ev)}';renderView();">${escapeHtml(ev)} <span class="text-[9px] opacity-70">${c}</span></button>`;
+  };
+
   return `
     <div class="mb-4 flex items-center justify-between gap-2 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">훅 (Hooks)</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1"><b>활성(사용자 설정) ${counts.user||userFlat.length}개</b> · 플러그인 제공 ${counts.pluginEnabled||0}/${counts.plugin||pluginFlat.length} (별도) · ${allEvents.length}개 이벤트</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1"><b>활성(사용자 설정) ${counts.user||userFlat.length}개</b> · 플러그인 제공 ${counts.pluginEnabled||0}/${counts.plugin||pluginFlat.length} (별도) · ${allEvents.length}개 이벤트${riskCount?` · <span style="color:#fca5a5;">🚨 위험 ${riskCount}개</span>`:''}</p>
       </div>
       <div class="flex gap-2">
+        ${riskCount ? `<button class="btn text-xs" style="background:rgba(239,68,68,0.18);color:#fca5a5;border:1px solid rgba(239,68,68,0.4);" onclick="_panicDisableRiskyHooks()" title="${t('PreToolUse + Edit/Write/Bash 매처를 가진 모든 훅을 한 번에 비활성화 (삭제)')}">🚨 ${t('위험 훅 일괄 비활성화')}</button>`:''}
         <button class="btn text-xs" onclick="startFeatureRecommend('hooks')">🤖 AI 추천</button>
         <button class="btn text-xs" onclick="_openHookPresets()">📚 ${t('프리셋')}</button>
         <button class="btn-primary btn" onclick="openHookEditor()">＋ 새 훅 추가</button>
         <a class="btn text-xs" href="${DOCS_BASE}hooks" target="_blank" rel="noopener">📖</a>
       </div>
     </div>
-    ${(userFlat.length+pluginFlat.length) ? orderedEvents.map(ev => {
-      const userGroup = userFlat.filter(h => h.event === ev);
-      const pluginGroup = pluginFlat.filter(h => h.event === ev);
+
+    <!-- v2.40.2 — search + filter bar (always visible, no flyout). -->
+    <div class="card p-3 mb-3" style="display:flex;flex-direction:column;gap:8px;">
+      <div class="flex items-center gap-2 flex-wrap">
+        <input id="hookSearch" class="input flex-1 min-w-[220px]" type="search" placeholder="${t('훅 검색 — 매처 / 명령 / 플러그인 / 설명')}…" value="${escapeHtml(q)}" />
+        <div class="flex items-center gap-1">
+          ${['all','user','plugin'].map(sc => `<button class="chip text-[10px] cursor-pointer" style="${scopeF===sc?'background:var(--accent);color:#fff;':''}" onclick="state.data.hooksScope='${sc}';renderView();">${({all:t('전체'),user:t('사용자'),plugin:t('플러그인')})[sc]}</button>`).join('')}
+        </div>
+        <label class="flex items-center gap-1 text-xs cursor-pointer" style="color:#fca5a5;">
+          <input type="checkbox" id="hooksRiskOnly" ${riskOnly?'checked':''}/> 🚨 ${t('위험 훅만')}
+        </label>
+        ${(q||eventF||scopeF!=='all'||riskOnly)?`<button class="btn text-[10px]" onclick="state.data.hooksFilter='';state.data.hooksEvent='';state.data.hooksScope='all';state.data.hooksRiskOnly=false;renderView();">✕ ${t('필터 초기화')}</button>`:''}
+        <span class="text-[10px] text-[var(--text-dim)]">${totalShown}/${totalAll} ${t('표시')}</span>
+      </div>
+      <div class="flex items-center gap-1 flex-wrap">
+        <span class="text-[10px] text-[var(--text-dim)] mr-1">${t('이벤트')}:</span>
+        ${orderedEvents.map(eventChip).join('')}
+      </div>
+    </div>
+
+    ${totalShown ? orderedEvents.map(ev => {
+      const userGroup = userFiltered.filter(h => h.event === ev);
+      const pluginGroup = pluginFiltered.filter(h => h.event === ev);
       if (!userGroup.length && !pluginGroup.length) return '';
       return `
       <div class="card p-4 mb-3">
@@ -12661,13 +12724,84 @@ VIEWS.hooks = async () => {
           </div>
         </div>
         <div class="space-y-2">
-          ${userGroup.map(renderUserCard).join('')}
-          ${pluginGroup.map(renderPluginCard).join('')}
+          ${userGroup.map(h => _decorateRisk(renderUserCard(h), h)).join('')}
+          ${pluginGroup.map(h => _decorateRisk(renderPluginCard(h), h)).join('')}
         </div>
       </div>`;
-    }).join('') : `<div class="card empty">훅이 설정되지 않았습니다. 우측 상단 <b>＋ 새 훅 추가</b> 를 눌러 추가하세요.</div>`}
+    }).join('') : (totalAll
+      ? `<div class="card empty">${t('필터에 매치되는 훅 없음')} — <button class="btn text-[10px]" onclick="state.data.hooksFilter='';state.data.hooksEvent='';state.data.hooksScope='all';state.data.hooksRiskOnly=false;renderView();">${t('필터 초기화')}</button></div>`
+      : `<div class="card empty">훅이 설정되지 않았습니다. 우측 상단 <b>＋ 새 훅 추가</b> 를 눌러 추가하세요.</div>`)}
   `;
 };
+
+AFTER.hooks = () => {
+  const inp = document.getElementById('hookSearch');
+  if (inp) {
+    let d;
+    inp.addEventListener('input', e => {
+      clearTimeout(d);
+      d = setTimeout(() => { state.data.hooksFilter = e.target.value; renderView(); }, 180);
+    });
+  }
+  const ro = document.getElementById('hooksRiskOnly');
+  if (ro) ro.onchange = e => { state.data.hooksRiskOnly = e.target.checked; renderView(); };
+};
+
+// v2.40.2 — Panic button. Walks every user + plugin hook entry whose matcher
+// matches the danger pattern (PreToolUse + Edit/Write/Bash) and deletes them
+// in place. User hooks are removed from settings.json; plugin hooks call
+// /api/hooks/plugin/update with op:'delete'. The user confirms the count
+// first, then sees a toast per phase.
+async function _panicDisableRiskyHooks() {
+  const all = (await api('/api/hooks')).hooks || [];
+  const settings = await api('/api/settings');
+  const targets = all.filter(h => {
+    if (h.event !== 'PreToolUse') return false;
+    return h.matcher && /\b(Edit|Write|Bash|MultiEdit|NotebookEdit)\b/.test(h.matcher);
+  });
+  if (!targets.length) { toast(t('위험 훅 없음'), 'ok'); return; }
+  if (!confirm(t('PreToolUse + Edit/Write/Bash 매처를 가진 ') + targets.length + t('개 훅을 모두 삭제할까요? 이 작업은 즉시 적용됩니다.'))) return;
+
+  let userRemoved = 0, pluginRemoved = 0, errs = 0;
+  // 1) Remove user hooks: filter out matching entries in settings.hooks.PreToolUse
+  try {
+    const newSettings = JSON.parse(JSON.stringify(settings || {}));
+    const ev = (newSettings.hooks || {}).PreToolUse;
+    if (Array.isArray(ev)) {
+      const before = ev.length;
+      newSettings.hooks.PreToolUse = ev.filter(item => {
+        const m = item && item.matcher;
+        return !(m && /\b(Edit|Write|Bash|MultiEdit|NotebookEdit)\b/.test(m));
+      });
+      userRemoved = before - newSettings.hooks.PreToolUse.length;
+      if (!newSettings.hooks.PreToolUse.length) delete newSettings.hooks.PreToolUse;
+      if (userRemoved > 0) {
+        await api('/api/settings', {
+          method: 'PUT', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(newSettings),
+        });
+      }
+    }
+  } catch (e) { errs++; console.warn('panic user-hooks remove failed', e); }
+
+  // 2) Plugin hooks: call /api/hooks/plugin/update op:delete for each. Walk
+  //    by descending (groupIdx, subIdx) so removing earlier entries doesn't
+  //    shift later indices.
+  const pluginTargets = targets.filter(h => h.scope === 'plugin');
+  pluginTargets.sort((a,b) => (b.groupIdx-a.groupIdx) || (b.subIdx-a.subIdx));
+  for (const h of pluginTargets) {
+    try {
+      const r = await api('/api/hooks/plugin/update', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ op:'delete', pluginKey: h.pluginKey, event: h.event, groupIdx: h.groupIdx, subIdx: h.subIdx }),
+      });
+      if (r.ok) pluginRemoved++; else errs++;
+    } catch (e) { errs++; console.warn('panic plugin-hook delete failed', e); }
+  }
+
+  toast(t('위험 훅 비활성화 완료') + ` — ${t('사용자')} ${userRemoved} · ${t('플러그인')} ${pluginRemoved}` + (errs?` · ${t('실패')} ${errs}`:''), errs?'warn':'ok');
+  renderView();
+}
 
 // v2.33.7 — 훅 프리셋 카탈로그 (선택 후 기본값 채워서 editor 열기)
 const _HOOK_PRESETS = [

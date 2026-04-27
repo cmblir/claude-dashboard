@@ -10,6 +10,53 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.40.2] — 2026-04-27
+
+### 🚨 Hooks tab — emergency UX (search · filter · risk chip · panic disable)
+
+User reported "100+ hooks installed but the dashboard doesn't show them /
+no way to disable specific ones." The hooks API was already returning
+everything (1 user + ~120 plugin hooks across many marketplaces) but the
+UI dumped them all as a flat per-event list with no search/filter, so the
+ones causing actual blocked work (PreToolUse + Edit/Write/Bash matchers)
+were impossible to find and kill quickly.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `dist/index.html` `VIEWS.hooks` | **Always-visible filter bar** above the per-event grouping: full-text `<input>` over matcher · command · plugin · description · id; scope chips (All / User / Plugin); per-event chips (PreToolUse / PostToolUse / SessionStart / …); risky-only checkbox; "✕ Clear filter" appears as soon as any filter is set. Live counter shows `<shown>/<total>`. |
+| 2 | `VIEWS.hooks` | **🚨 Risk chip + danger highlight** on every card whose event is `PreToolUse` and whose matcher matches `Edit\|Write\|Bash\|MultiEdit\|NotebookEdit`. Chip lives next to the existing scope badge so users can spot the offenders at a glance, even before searching. |
+| 3 | `VIEWS.hooks` header | **🚨 Bulk-disable button** appears whenever ≥1 risky hook exists. Asks for confirmation with the exact count, then walks every matching entry: user hooks → `PUT /api/settings` with the `PreToolUse` matcher entries filtered out; plugin hooks → `POST /api/hooks/plugin/update {op:'delete'}` per entry, descending by (groupIdx, subIdx) so removing earlier entries doesn't shift later indices. Reports `<userRemoved> · <pluginRemoved>` (and any `failed` count) in a single toast. |
+| 4 | `dist/index.html` `AFTER.hooks` | New hook lifecycle wires the search input (180 ms debounced) and the risky-only checkbox to `state.data.*` and re-renders. |
+| 5 | `tools/translations_manual_16.py` (new) | KO → EN/ZH for every new label, chip, tooltip, and confirm. Bare common words ("전체"/"이벤트"/"실패") already mapped earlier; manual_16 adds the hooks-specific ones. `make i18n-refresh` reports 0 missing across 4012+ keys × 3 languages. |
+
+#### What this lets the user do, immediately
+- Type "fact-force" or any other plugin hook id — the list filters in real time.
+- Tick "🚨 위험 훅만" to surface only the PreToolUse + Edit/Write/Bash hooks
+  that are most likely to be the cause of blocked work.
+- Click **🚨 위험 훅 일괄 비활성화** to delete every such hook in one
+  confirmed click — both user and plugin entries.
+- Each card still has its own [수정] / [삭제] buttons (already shipped); the
+  panic button is a shortcut, not a replacement.
+
+#### Compatibility
+- No backend changes. Existing routes (`/api/hooks` / `/api/settings` PUT /
+  `/api/hooks/plugin/update`) handle the panic flow.
+- Filter state lives in `state.data.hooks{Filter,Scope,Event,RiskOnly}` —
+  not persisted, intentionally (resets on tab leave so users don't have a
+  stale filter on next visit).
+- Plugin hook deletion still rewrites the plugin's `hooks/hooks.json`
+  in place; reinstalling the plugin restores it. No marketplace-side
+  side effects.
+
+#### Verification
+- e2e regression — **0 failures**:
+  - `e2e-hyper-projects-and-sidebar.mjs` (v2.40)  — 11/11
+  - `e2e-quick-settings.mjs` (v2.38)              — 6/6
+  - `e2e-tabs-smoke.mjs`                          — 58/58
+- Live UI smoke (Playwright eval): hooks tab renders search input · risky-only
+  checkbox · panic button · 16 risk chips · 41 cards · 0 console errors.
+
+---
 ## [2.40.1] — 2026-04-27
 
 ### 🚀 Performance hotfix — gzip + defer + fetch dedupe
