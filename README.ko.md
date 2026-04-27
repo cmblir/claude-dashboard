@@ -27,6 +27,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 | 버전 | 요점 |
 |---|---|
+| **v2.42.2** | 🖥️ **워크플로우 노드 spawn → 해당 AI CLI** — `@gemini:gemini-2.5-pro` 노드의 🖥️ 누르면 **Gemini CLI**, `@ollama:llama3.1` 누르면 **`ollama run llama3.1`**, `@codex:o4-mini` 누르면 **codex** 가 열림. 이전엔 assignee 무시하고 항상 Claude만 떴음. 요청한 CLI 미설치 시 claude 로 폴백 + 경고 토스트. 프롬프트는 배너로 출력되어 인터랙티브 REPL 유지. |
 | **v2.42.1** | 🔄 **워크플로우 실행 가시성** — 리스트 카드에 최근 3회 실행 상태 칩(✅/❌/⏳), 실행 중 펄스 배지(`● 실행 중`), `(N회)` 총 실행 횟수가 인라인 표시. 캔버스 재진입 시 마지막 실행 상태 자동 복원 — 진행 중이면 라이브 폴링, 종료된 실행이면 노드 색상 1회 하이드레이션. 백엔드 `api_workflows_list`에 `lastRuns`/`runningCount`/`activeRunId`/`totalRuns` 추가. |
 | **v2.42.0** | 🖱️🧩🧭🔁 **Anthropic 4 기능 한 번에** — Computer Use Lab (`computer-use-2025-01-24` beta · plan-only), Memory Lab (`memory-2025-08-18` beta · 서버측 memory blocks), Advisor Lab (Executor + Advisor 페어링 · 비용/품질 델타), Claude Code Routines 풀 CRUD + 즉시 실행. 신규 14 엔드포인트, 4 플레이그라운드 탭. |
 | **v2.41.0** | 👥 **에이전트 팀 + 🤝 최근 서브에이전트 활동** — 자주 같이 쓰는 에이전트들을 팀으로 묶고 (`Frontend Crew = ui-designer + frontend-dev + code-reviewer`) 🚀 Spawn 한 번으로 멤버 각자의 `claude /agents <name>` 명령을 한 번에 출력. 프로젝트 상세 모달에 "최근 서브에이전트 활동" 타임라인 — 각 세션이 어떤 작업을 어떤 서브에이전트에게 위임했는지 그룹별로 보고, 🖥 CLI 버튼 클릭으로 정확히 그 세션의 Terminal.app resume 띄우기. |

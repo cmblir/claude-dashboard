@@ -6651,6 +6651,7 @@ async function _wfSpawnSession(nid) {
   const prompt = [d.subject, d.description].filter(Boolean).join('\n\n');
   const body = {
     cwd, prompt,
+    assignee:            d.assignee || '',
     systemPrompt:        d.systemPrompt || '',
     appendSystemPrompt:  d.appendSystemPrompt || '',
     allowedTools:        d.allowedTools || '',
@@ -6662,7 +6663,13 @@ async function _wfSpawnSession(nid) {
     body: JSON.stringify(body),
   });
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
-  toast(t('Claude 세션 시작됨'), 'ok');
+  const PROVIDER_LABELS = { 'claude-cli':'Claude', 'gemini-cli':'Gemini', 'ollama':'Ollama', 'codex':'Codex' };
+  const label = PROVIDER_LABELS[r.provider] || 'Claude';
+  if (r.fallbackReason) {
+    toast(`⚠️ ${label} ${t('세션 시작됨')} — ${r.fallbackReason}`, 'warn');
+  } else {
+    toast(`${label} ${t('세션 시작됨')}${r.model ? ' (' + r.model + ')' : ''}`, 'ok');
+  }
 }
 
 // ─── 워크플로우 템플릿 ───────────────────────────────────────

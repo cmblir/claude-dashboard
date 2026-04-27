@@ -10,6 +10,38 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.42.2] — 2026-04-27
+
+### 🖥️ Workflow node spawn → matching provider CLI
+
+User: "워크플로우에서 Builder나 Reviewer을 누르면 해당 AI의 cli가 아니라
+클로드 코드가 새로 열려. 지금 진행중인 AI cli가 열려야해." Every node's
+🖥️ button on the workflow canvas was hard-wired to `claude` regardless of
+the node's `assignee`, so a node assigned to `@gemini:gemini-2.5-pro` or
+`@ollama:llama3.1` would still launch Claude Code.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/actions.py::_resolve_provider_cli` (new) | Maps `provider:model` (`claude:opus` / `gemini:gemini-2.5-pro` / `ollama:llama3.1` / `codex:o4-mini` + aliases like `anthropic` / `google` / `openai` / `gpt`) to `{provider, bin, args, model}`. Uses the existing `_which()` 11-path fallback to find each CLI. When the requested CLI isn't installed, it returns claude with a `fallback_reason` so the user gets a warning toast instead of a silent re-route. |
+| 2 | `server/actions.py::api_session_spawn` | Now accepts `body.assignee`. For Claude (the only TUI that takes a positional prompt without exiting), the prompt is appended as before. For Gemini / Ollama / Codex, the prompt is printed as a banner (`echo '── Prompt ──'; printf …`) before launching the interactive REPL — passing it as a positional would have caused those CLIs to one-shot and exit. Response now carries `provider` / `cli` / `model` / `fallbackReason`. |
+| 3 | `dist/index.html::_wfSpawnSession` | Sends `n.data.assignee` in the spawn body; success toast becomes provider-aware (`Gemini 세션 시작됨 (gemini-2.5-pro)`); a fallback uses a `warn` toast that surfaces `fallbackReason`. |
+
+#### Verification
+```
+_resolve_provider_cli('claude:opus')        → claude-cli, /Users/o/.local/bin/claude
+_resolve_provider_cli('gemini:gemini-2.5-pro') → gemini-cli, /Users/o/.nvm/.../bin/gemini, --model 'gemini-2.5-pro'
+_resolve_provider_cli('ollama:llama3.1')    → ollama, /opt/homebrew/bin/ollama, run 'llama3.1'
+_resolve_provider_cli('codex:o4-mini')      → claude-cli (codex not installed) + fallback_reason
+JS smoke (6 blocks): parses OK
+```
+
+#### Compatibility
+- Body without `assignee` (e.g. existing chat Spawn buttons elsewhere in the
+  app) still routes to Claude — old callers unchanged.
+- `claude` flags (`systemPrompt` / `allowedTools` / `--resume`) are only
+  appended on the claude-cli path; non-Claude CLIs ignore them.
+
+---
 ## [2.42.1] — 2026-04-27
 
 ### 🔄 Workflow run visibility — list cards + canvas auto-restore

@@ -2288,6 +2288,7 @@
   "세션 생성 실패": "Failed to spawn session",
   "세션 수": "Sessions",
   "세션 스코어 낮음": "Low session score",
+  "세션 시작됨": "session started",
   "세션 재인덱스": "Session Reindex",
   "세션 점수 상세": "Session Score Details",
   "세션 종료 후 대시보드 인덱스 API 호출.": "Call the dashboard reindex API when the session ends.",
