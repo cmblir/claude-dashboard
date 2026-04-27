@@ -12570,7 +12570,11 @@ async function _fwdRemove(event, groupIdx, subIdx) {
 }
 
 VIEWS.hooks = async () => {
-  const [s, hooksAll] = await Promise.all([api('/api/settings'), api('/api/hooks')]);
+  const [s, hooksAll, recentBlocks] = await Promise.all([
+    api('/api/settings'),
+    api('/api/hooks'),
+    api('/api/hooks/recent-blocks').catch(() => ({items:[], totalEvents:0, scanned:0})),
+  ]);
   window.__settingsSnapshot = s;
   const rawHooks = s.hooks || {};
   // 사용자 훅(편집 가능): settings.json 에서 인덱스 보존하며 평탄화
@@ -12609,6 +12613,7 @@ VIEWS.hooks = async () => {
         ${x.timeout ? `<div><span class="text-[var(--text-dim)]">timeout:</span> ${x.timeout}ms</div>`:''}
       </div>
       <div class="flex flex-col gap-1 flex-shrink-0">
+        <button class="btn text-[10px]" onclick="openHookDetail(this.dataset.detail)" data-detail="${jsonAttr(x)}">${t('🔬 상세')}</button>
         <button class="btn text-[10px]" onclick="openHookEditor(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr({scope:"user", event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx, matcher:x.matcher||"", type:x.type||"command", command:x.command||"", timeout:x.timeout})}">수정</button>
         <button class="btn text-[10px]" style="color:#fca5a5" onclick="deleteHook(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr({scope:"user", event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx})}">삭제</button>
       </div>
@@ -12635,6 +12640,7 @@ VIEWS.hooks = async () => {
         ${x.timeout ? `<div><span class="text-[var(--text-dim)]">timeout:</span> ${x.timeout}ms</div>`:''}
       </div>
       <div class="flex flex-col gap-1 flex-shrink-0">
+        <button class="btn text-[10px]" onclick="openHookDetail(this.dataset.detail)" data-detail="${jsonAttr(x)}">${t('🔬 상세')}</button>
         <button class="btn text-[10px]" title="플러그인 hooks.json 직접 수정" onclick="openHookEditor(JSON.parse(this.dataset.payload))" data-payload="${editPayload}">수정</button>
         <button class="btn text-[10px]" style="color:#fca5a5" onclick="deleteHook(JSON.parse(this.dataset.payload))" data-payload="${delPayload}">삭제</button>
       </div>
@@ -12698,6 +12704,42 @@ VIEWS.hooks = async () => {
       </div>
     </div>
 
+    <!-- v2.40.4 — Hook Detective: paste any block-error message, auto-extract
+         hook id, scroll its card into view + pulse highlight. -->
+    <div class="card p-3 mb-3" style="background:rgba(59,130,246,0.06); border-color:rgba(59,130,246,0.3);">
+      <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] mb-1.5 flex items-center gap-2">
+        <span>🔍</span> <span>${t('Hook Detective')}</span>
+        <span class="text-[10px]" style="text-transform:none;letter-spacing:0;color:var(--text-mute);">${t('차단 에러 메시지를 붙여넣으면 어떤 훅인지 자동 식별')}</span>
+      </div>
+      <textarea id="hookDetectiveInput" class="input w-full mono text-[11px]" rows="2" placeholder="${t('PreToolUse:Edit hook returned blocking error from command: …')}"></textarea>
+      <div id="hookDetectiveResult" class="text-[11px] mt-1.5" style="min-height:18px;color:var(--text-dim);"></div>
+    </div>
+
+    <!-- v2.40.4 — Recent Blocks: top-N hook ids that recently blocked work. -->
+    ${recentBlocks.items && recentBlocks.items.length ? `
+    <div class="card p-3 mb-3" style="background:rgba(239,68,68,0.05); border-color:rgba(239,68,68,0.3);">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] flex items-center gap-2">
+          <span>🚨</span> <span>${t('최근 차단된 훅')}</span>
+          <span class="text-[10px]" style="text-transform:none;letter-spacing:0;color:#fca5a5;">${recentBlocks.totalEvents} ${t('차단 이벤트')} · ${recentBlocks.scanned} ${t('파일 스캔')}</span>
+        </div>
+        <span class="text-[10px] text-[var(--text-dim)]">${t('카드를 클릭하면 검색 자동 적용')}</span>
+      </div>
+      <div class="grid gap-2" style="grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));">
+        ${recentBlocks.items.map(rb => {
+          const dt = rb.lastSeen ? new Date(rb.lastSeen).toLocaleString() : '—';
+          return `<button class="rounded-lg p-2 text-left text-xs hover-lift" style="background:rgba(0,0,0,0.2); border:1px solid rgba(239,68,68,0.25); cursor:pointer;"
+            onclick="state.data.hooksFilter=${JSON.stringify(rb.id)};renderView();setTimeout(_pulseHookCard, 200);">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <span class="font-semibold text-[#fca5a5]" style="font-size:0.92rem;">${rb.count}×</span>
+              <span class="text-[10px] text-[var(--text-dim)]">${escapeHtml(dt)}</span>
+            </div>
+            <div class="mono truncate" style="font-size:0.78rem;color:var(--text);">${escapeHtml(rb.id)}</div>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>` : ''}
+
     <!-- v2.40.2 — search + filter bar (always visible, no flyout). -->
     <div class="card p-3 mb-3" style="display:flex;flex-direction:column;gap:8px;">
       <div class="flex items-center gap-2 flex-wrap">
@@ -12751,7 +12793,122 @@ AFTER.hooks = () => {
   }
   const ro = document.getElementById('hooksRiskOnly');
   if (ro) ro.onchange = e => { state.data.hooksRiskOnly = e.target.checked; renderView(); };
+
+  // v2.40.4 — Detective: paste a block error → extract hook id → search + pulse.
+  const det = document.getElementById('hookDetectiveInput');
+  const detRes = document.getElementById('hookDetectiveResult');
+  if (det) {
+    const detect = (txt) => {
+      if (!txt || !txt.trim()) {
+        if (detRes) detRes.textContent = '';
+        return;
+      }
+      const m = txt.match(/\b(?:pre|post|session|notification|user|stop|sub):[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*)+/g);
+      if (!m || !m.length) {
+        if (detRes) detRes.innerHTML = `<span style="color:#fca5a5;">${t('hook id 패턴을 찾지 못했습니다')}</span>`;
+        return;
+      }
+      const ids = [...new Set(m)];
+      if (detRes) detRes.innerHTML = ids.map(id =>
+        `<button class="chip text-[10px] cursor-pointer" style="background:rgba(59,130,246,0.2);color:#93c5fd;margin-right:4px;" onclick="state.data.hooksFilter=${JSON.stringify(id)};renderView();setTimeout(_pulseHookCard, 200);">${escapeHtml(id)} ▶</button>`
+      ).join('') + `<span class="ml-2 text-[10px]" style="color:var(--text-dim);">${t('클릭하면 해당 훅 카드로 이동')}</span>`;
+    };
+    det.addEventListener('input', e => detect(e.target.value));
+    det.addEventListener('paste', () => setTimeout(() => detect(det.value), 0));
+  }
 };
+
+// v2.40.4 — pulse-highlight the (single) filtered hook card so the user
+// sees exactly which entry was matched, even amid scroll.
+function _pulseHookCard() {
+  const cards = document.querySelectorAll('.card .rounded-lg');
+  if (cards.length !== 1) return;
+  const c = cards[0];
+  c.scrollIntoView({behavior:'smooth', block:'center'});
+  c.style.transition = 'box-shadow 0.3s';
+  const original = c.style.boxShadow;
+  let pulses = 0;
+  const t = setInterval(() => {
+    c.style.boxShadow = (pulses % 2 === 0) ? '0 0 0 4px rgba(59,130,246,0.55)' : '0 0 0 2px rgba(59,130,246,0.0)';
+    pulses++;
+    if (pulses >= 6) { clearInterval(t); c.style.boxShadow = original; }
+  }, 280);
+}
+
+// v2.40.4 — decode `node -e "..."` wrapper into the dispatcher chain Claude
+// Code actually invokes. The wrapper resolves CLAUDE_PLUGIN_ROOT, then either
+// requires a bootstrap script or spawns `node <runner.js> <id> <handler.js>
+// <flags>`. We pull out the visible trailing `node ...` invocation since
+// that's the layer that carries the hook id + handler path.
+function _decodeHookCommand(cmd) {
+  if (!cmd || typeof cmd !== 'string') return null;
+  const out = { runner: '', hookId: '', handler: '', flags: '', rawTail: '' };
+  // Look for the trailing chain — flexible because plugin authors compose it
+  // differently. The shape we see in practice: "...require(s)\" node <runner>
+  // <hookId> <handler> <flags>".
+  const m = cmd.match(/(?:require\(s\)["']?\s*)?node\s+(\S+)\s+([a-z]+(?::[a-z][a-z0-9_-]*)+)\s+(\S+)(?:\s+([^"]*))?/);
+  if (m) {
+    out.runner  = m[1];
+    out.hookId  = m[2];
+    out.handler = m[3];
+    out.flags   = (m[4] || '').trim();
+    out.rawTail = m[0];
+  }
+  // Standalone hook id anywhere in the command (fallback for shell-only entries).
+  if (!out.hookId) {
+    const idM = cmd.match(/\b(?:pre|post|session|notification|user|stop|sub):[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*)+/);
+    if (idM) out.hookId = idM[0];
+  }
+  return out;
+}
+
+// v2.40.4 — open a modal that shows the dispatcher chain + full command.
+function openHookDetail(payloadJson) {
+  let h = {};
+  try { h = JSON.parse(payloadJson); } catch { return; }
+  const dec = _decodeHookCommand(h.command || '') || {};
+  const fmtRow = (k, v) => v ? `<div class="mb-2"><div class="text-[10px] uppercase tracking-widest text-[var(--text-dim)] mb-0.5">${escapeHtml(k)}</div><div class="mono text-[12px]" style="overflow-wrap:anywhere;word-break:break-word;">${escapeHtml(v)}</div></div>` : '';
+  const chainBox = (dec.hookId || dec.handler) ? `
+    <div class="card p-3 mb-3" style="background:rgba(59,130,246,0.05); border-color:rgba(59,130,246,0.3);">
+      <div class="text-[10px] uppercase tracking-widest mb-2" style="color:#93c5fd;">${t('Dispatcher chain (디코드됨)')}</div>
+      <div class="flex items-center gap-2 flex-wrap text-[11px]">
+        <span class="chip mono text-[10px]">${t('node')}</span>
+        <span style="color:var(--text-dim);">→</span>
+        ${dec.runner ? `<span class="chip mono text-[10px]" title="${t('runner script')}">${escapeHtml(dec.runner)}</span>`:''}
+        ${dec.runner ? '<span style="color:var(--text-dim);">→</span>':''}
+        <span class="chip mono text-[10px]" style="background:rgba(59,130,246,0.2);color:#93c5fd;" title="${t('hook id')}">${escapeHtml(dec.hookId || '?')}</span>
+        ${dec.handler ? '<span style="color:var(--text-dim);">→</span>':''}
+        ${dec.handler ? `<span class="chip mono text-[10px]" title="${t('handler script')}">${escapeHtml(dec.handler)}</span>`:''}
+        ${dec.flags ? `<span class="chip mono text-[10px] ml-1" title="${t('flags')}">${escapeHtml(dec.flags)}</span>`:''}
+      </div>
+    </div>` : '';
+
+  showModal(`
+    <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+      <div>
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">🔬 ${t('훅 상세')}</div>
+        <h2 class="text-lg font-bold mono">${escapeHtml(h.id || h.name || (h.event + ' · ' + (h.matcher||'-')))}</h2>
+        ${h.description ? `<div class="text-xs text-[var(--text-mute)] mt-1">${escapeHtml(h.description)}</div>`:''}
+      </div>
+      <button class="btn-ghost btn" onclick="closeModal()" aria-label="닫기">✕</button>
+    </div>
+    <div class="p-5 overflow-y-auto" style="max-height:75vh;">
+      ${chainBox}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        ${fmtRow(t('이벤트'), h.event)}
+        ${fmtRow(t('매처'), h.matcher)}
+        ${fmtRow(t('스코프'), h.scope)}
+        ${fmtRow(t('소스'), h.source)}
+        ${fmtRow(t('플러그인 키'), h.pluginKey)}
+        ${fmtRow(t('타입'), h.type)}
+        ${fmtRow(t('타임아웃'), h.timeout ? (h.timeout + 'ms') : '')}
+      </div>
+      ${h.command ? `
+      <div class="mb-2 text-[10px] uppercase tracking-widest text-[var(--text-dim)]">${t('Full command (raw)')}</div>
+      <pre class="mono" style="max-height:300px;overflow-y:auto;background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(h.command)}</pre>`:''}
+    </div>
+  `, {wide: true});
+}
 
 // v2.40.2 — Panic button. Walks every user + plugin hook entry whose matcher
 // matches the danger pattern (PreToolUse + Edit/Write/Bash) and deletes them

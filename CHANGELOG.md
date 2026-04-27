@@ -10,6 +10,55 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.40.4] — 2026-04-27
+
+### 🔬 Hook Detective + 🚨 Recent Blocks + 🧬 Dispatcher decoder
+
+User asked: "How did you know which hook was blocking? Show me the same
+clues inside the dashboard." This release ships A + B + C — three
+additive UI affordances on top of the v2.40.2/.3 hooks tab so the user
+can answer that question without reading log lines:
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/hooks.py` (new `recent_blocked_hooks` + `_scan_jsonl_for_hook_blocks`) | Walks the most recent 60 jsonl transcripts under `~/.claude/projects/<slug>/*.jsonl`, line-scans for hook block markers ("hook returned blocking error", "PreToolUse:", etc.), and harvests every `pre\|post\|session\|notification\|user\|stop\|sub:<scope>:<name>` shape. Aggregates by frequency × last-seen mtime. **No JSON parser required** — the regex line-scan is robust to nested escaping inside tool_result content. New route `GET /api/hooks/recent-blocks` returns `{items, scanned, totalEvents}`. Live measurement on this dev box: 60 files scanned, 14 events, top entry `pre:edit-write:gateguard-fact-force × 4`. |
+| 2 | `dist/index.html` `VIEWS.hooks` — **🔍 Hook Detective box** | Pasted-text introspector at the top of the hooks tab. Type or paste any block-error message; a regex extracts every hook id pattern; each id renders as a clickable chip. Clicking a chip auto-applies the search filter, scrolls the matching card into view, and pulses it (3 cycles of a blue ring). Backed by `_pulseHookCard()` — no other UI helper changed. |
+| 3 | `dist/index.html` `VIEWS.hooks` — **🚨 Recent Blocks panel** | Renders the v2.40.4 backend output as one card per hook id with `<count>×` and last-seen timestamp. Clicking a card sets the search filter and triggers the same pulse as Detective. Panel only renders when `recentBlocks.items.length > 0`, so unblocked sessions don't see the section. |
+| 4 | `dist/index.html` `openHookDetail()` + `_decodeHookCommand()` | New 🔬 **Detail** button on every hook card. Modal shows: synthesised display name, description, every metadata row (event/matcher/scope/source/pluginKey/type/timeout), the **decoded dispatcher chain** as a left-to-right pipeline of chips (`node` → runner → `<hook id>` → handler → flags), and the full raw command in a scrollable `<pre>`. The command decoder accepts the canonical `node -e "...require(s)" node <runner> <hookId> <handler> <flags>` shape used by ECC and falls back to a standalone hook-id match for shell-only entries. |
+| 5 | `tools/translations_manual_17.py` (new) | KO → EN/ZH for Detective box, Recent Blocks panel, Detail modal labels, dispatcher-chain chips, raw-command label. `make i18n-refresh` reports 0 missing across 4012+ keys × 3 languages. |
+
+#### How it composes with v2.40.2/.3
+- v2.40.2 added the search/filter/panic; v2.40.3 surfaced `id` as the
+  card title; v2.40.4 layers on the introspection (Detective, Recent
+  Blocks, Detail). All four levels are additive — disabling any one
+  doesn't break the others.
+- The Recent Blocks card and Detective chip both use the same handler
+  (`state.data.hooksFilter = id; renderView(); _pulseHookCard()`), so
+  the user gets a consistent "click → land on the hook" experience.
+
+#### Verification
+- Live route: `curl /api/hooks/recent-blocks` → `{ok:true, scanned:60,
+  totalEvents:14, items:[...]}` with `pre:edit-write:gateguard-fact-force`
+  × 4 at the top.
+- Live UI: hooks tab renders Detective input · Recent Blocks 5 cards ·
+  41 detail buttons · 0 console errors.
+- Detective paste roundtrip: paste a fragment containing
+  `pre:edit-write:gateguard-fact-force` → result HTML contains the chip;
+  click → search applied · card pulsed.
+- e2e regression — **0 failures**:
+  - `e2e-hyper-projects-and-sidebar.mjs` (v2.40)  — 11/11
+  - `e2e-tabs-smoke.mjs`                          — 58/58
+
+#### Compatibility
+- `server/hooks.py` adds new helpers and a new route; existing
+  `get_hooks` / `api_plugin_hook_update` shapes unchanged.
+- Recent-blocks scan is read-only and bounded (60 files × ~1.5 MB cap
+  per file), so even on a project with many transcripts it adds ≤200 ms
+  to the hooks tab fetch.
+- All UI additions are gated on data presence — empty Recent Blocks
+  panel is hidden, Detective shows nothing until text is pasted.
+
+---
 ## [2.40.3] — 2026-04-27
 
 ### 🏷️ Hook names — surface the same identity Claude Code's `/hooks` shows

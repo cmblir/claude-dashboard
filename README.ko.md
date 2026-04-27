@@ -27,6 +27,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 | 버전 | 요점 |
 |---|---|
+| **v2.40.4** | 🔬 **Hook Detective + 🚨 최근 차단 + 🧬 Dispatcher 디코더** — 훅 차단 에러 메시지 paste → hook id 칩 자동 추출 → 클릭 시 해당 카드로 자동 점프 + 펄스 강조. 백엔드가 최근 60개 jsonl 트랜스크립트를 마이닝해 "최근 차단된 훅" 빈도 패널 surface. 카드마다 🔬 상세 모달 — `node -e "..."` 래퍼를 `node → runner → hook id → handler → flags` 체인으로 디코드. |
 | **v2.40.3** | 🏷️ **훅 이름 표시** — 플러그인 hooks.json 의 group-level `id` / `name` (예: `pre:bash:dispatcher`) 을 sub-hook entry 로 propagate, 카드 헤더에 mono 큰 글자로 surface. Claude Code `/hooks` 와 동일한 식별자 그대로. id 검색 즉시 작동 — `pre:bash:dispatcher` 입력 → 1 카드. |
 | **v2.40.2** | 🚨 **훅 탭 긴급 UX** — 검색 · 스코프/이벤트 칩 · "위험 훅만" 필터 · PreToolUse + Edit/Write/Bash 카드마다 🚨 칩 · 사용자 `settings.json` 과 모든 플러그인 `hooks.json` 을 한 번에 처리하는 "위험 훅 일괄 비활성화" 버튼. 플러그인 훅 100개 넘게 깔린 상태에서 작업 막는 훅을 못 찾는 상황을 위해. |
 | **v2.40.1** | 🚀 **성능 핫픽스** — `dist/index.html` 다운로드 1.12 MB → 270 KB (서버 gzip + mtime 캐시), Chart.js / vis-network / marked 를 `defer` 로 미뤄 첫 paint 가 ~600 KB CDN 스크립트 파싱에 안 막히게, GET 인-플라이트 dedupe 로 동시 fetch 절반, 사이드바 re-render 가 다음 animation frame 으로 묶임. 동작 변경 없음. |

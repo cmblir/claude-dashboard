@@ -4,6 +4,7 @@
 - _scan_plugin_hooks: 두 레이아웃 지원, (pluginKey, groupIdx, subIdx) 포함
 - api_plugin_hook_update: 플러그인 훅 수정/삭제 (update/delete)
 - _plugin_hooks_file: pluginKey → hooks.json 경로 해석
+- recent_blocked_hooks: 세션 jsonl 에서 hook block 이벤트 빈도 mining (v2.40.4)
 """
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 from .claude_md import get_settings
-from .config import PLUGINS_DIR
+from .config import PLUGINS_DIR, PROJECTS_DIR
 from .utils import _safe_read, _safe_write
 
 
@@ -271,3 +272,95 @@ def get_hooks() -> dict:
         "pluginEnabled": sum(1 for h in plugin_hooks if h.get("pluginEnabled")),
     }
     return {"hooks": hooks_out + plugin_hooks, "permissions": permissions, "counts": counts}
+
+
+# ───────── v2.40.4 — Hook block mining ─────────
+
+# Match Claude Code's hook id shape (event:scope:name) anywhere it appears
+# verbatim in transcript content. Keeping the regex strict avoids false
+# positives on unrelated colon-separated identifiers.
+_HOOK_ID_RE = re.compile(r"\b(pre|post|session|notification|user|stop|sub):[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*)+\b")
+# Anchor lines that signal a hook block. Line-based scan keeps us robust to the
+# nested escaping inside jsonl tool_result content (no JSON parser required).
+_HOOK_BLOCK_MARKERS = (
+    "hook returned blocking error",
+    "hook blocking error",
+    "PreToolUse:",
+    "PostToolUse:",
+    "blocked by hook",
+)
+
+
+def _scan_jsonl_for_hook_blocks(file: Path) -> list[tuple[str, int]]:
+    """Scan one jsonl transcript for hook block events.
+
+    Returns a list of (hook_id, mtime_ms) — one tuple per blocking event.
+    The same hook id appearing in N separate lines counts N times so the
+    aggregate can rank by recency × frequency.
+    """
+    text = _safe_read(file, limit=1_500_000) or ""
+    if not text:
+        return []
+    try:
+        mt_ms = int(file.stat().st_mtime * 1000)
+    except Exception:
+        mt_ms = 0
+    out: list[tuple[str, int]] = []
+    for line in text.split("\n"):
+        if not any(m in line for m in _HOOK_BLOCK_MARKERS):
+            continue
+        for hid in _HOOK_ID_RE.findall(line):
+            # findall on a grouped pattern returns the first group only — re-run
+            # with explicit fullmatch to recover the full id.
+            pass
+        for m in _HOOK_ID_RE.finditer(line):
+            out.append((m.group(0), mt_ms))
+    return out
+
+
+def recent_blocked_hooks(*, max_files: int = 60, top_n: int = 20) -> dict:
+    """Aggregate the most recent hook-block events across recent session
+    transcripts. Returns a frequency-ranked list with the latest mtime per id.
+
+    Output shape::
+
+        {
+          "items": [
+            {"id": "pre:edit-write:gateguard-fact-force",
+             "count": 14, "lastSeen": 1777270000000},
+             ...
+          ],
+          "scanned": <files scanned>,
+          "totalEvents": <sum of counts>
+        }
+    """
+    if not PROJECTS_DIR.exists():
+        return {"items": [], "scanned": 0, "totalEvents": 0}
+    files: list[tuple[float, Path]] = []
+    for proj in PROJECTS_DIR.iterdir():
+        if not proj.is_dir():
+            continue
+        for jl in proj.glob("*.jsonl"):
+            try:
+                files.append((jl.stat().st_mtime, jl))
+            except Exception:
+                continue
+    files.sort(key=lambda x: -x[0])
+    files = files[:max_files]
+
+    bucket: dict[str, dict] = {}
+    total = 0
+    for _, jl in files:
+        events = _scan_jsonl_for_hook_blocks(jl)
+        for hid, mt in events:
+            slot = bucket.setdefault(hid, {"id": hid, "count": 0, "lastSeen": 0})
+            slot["count"] += 1
+            if mt > slot["lastSeen"]:
+                slot["lastSeen"] = mt
+            total += 1
+    items = sorted(bucket.values(), key=lambda r: (-r["count"], -r["lastSeen"]))[:top_n]
+    return {"items": items, "scanned": len(files), "totalEvents": total}
+
+
+def api_recent_blocked_hooks(query: dict) -> dict:
+    return {"ok": True, **recent_blocked_hooks()}

@@ -39,7 +39,7 @@ from .features import (
     api_project_ai_recommend, api_project_file_put, api_settings_preview,
 )
 from .guide import api_guide_onboarding, api_guide_toolkit
-from .hooks import api_plugin_hook_update, get_hooks
+from .hooks import api_plugin_hook_update, api_recent_blocked_hooks, get_hooks
 from .prompt_cache import (
     api_prompt_cache_examples, api_prompt_cache_history,
     api_prompt_cache_test,
@@ -322,6 +322,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/artifacts/render": api_artifacts_render,
     "/api/prefs/get": api_prefs_get,
     "/api/hyper-agents/list": api_hyper_list,
+    "/api/hooks/recent-blocks": api_recent_blocked_hooks,
 }
 
 

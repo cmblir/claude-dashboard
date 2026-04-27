@@ -27,6 +27,7 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 
 | ver | highlight |
 |---|---|
+| **v2.40.4** | 🔬 **Hook Detective + 🚨 Recent Blocks + 🧬 Dispatcher decoder** — paste a hook block-error message, get clickable hook-id chips that auto-jump and pulse the matching card; backend mines the most recent 60 jsonl transcripts and surfaces a top-N "🚨 Recently blocked hooks" panel; every card now has a 🔬 Detail modal that decodes `node -e "..."` wrappers into a `node → runner → hook id → handler → flags` chain. |
 | **v2.40.3** | 🏷️ **Hook names** — plugin hooks.json keeps `id` / `name` at the group level (e.g. `pre:bash:dispatcher`); the dashboard now propagates them onto each sub-hook entry and surfaces them as the card's primary title in mono. Search by id works instantly (filter `pre:bash:dispatcher` → 1 card). |
 | **v2.40.2** | 🚨 **Hooks tab emergency UX** — search · scope/event chips · "risky only" filter · 🚨 chip on every PreToolUse + Edit/Write/Bash card · one-click "Bulk-disable risky hooks" that walks both user `settings.json` and every plugin `hooks.json`. Designed for the case where 100+ plugin hooks make finding the one blocking your work impossible. |
 | **v2.40.1** | 🚀 **Performance hotfix** — `dist/index.html` 1.12 MB → 270 KB on the wire (server-side gzip + mtime cache), Chart.js / vis-network / marked deferred so first paint isn't blocked by ~600 KB of CDN script parsing, in-flight GET dedupe halves concurrent fetches, and sidebar re-renders coalesce into the next animation frame. No behaviour changes. |
