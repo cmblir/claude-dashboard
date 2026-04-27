@@ -10,6 +10,47 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.40.3] — 2026-04-27
+
+### 🏷️ Hook names — surface the same identity Claude Code's `/hooks` shows
+
+User reported: "the hook names aren't showing — the names from `/hooks`
+should be visible." Plugin hooks.json keeps `id` (and sometimes `name` /
+`description`) at the **group level** alongside `matcher` and `hooks`,
+e.g. `{ "matcher": "Bash", "hooks": [...], "id": "pre:bash:dispatcher",
+"description": "..." }`. The dashboard's `_collect()` was already
+copying every key off the **sub**-hook dict — but the human-readable
+identity lives one level up, so cards lost it.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/hooks.py::_scan_plugin_hooks::_collect` | When a sub-hook entry doesn't already define `id` / `name` / `description`, propagate the group-level item's value. `description` was already partially propagated; `id` and `name` are the new propagations and the missing piece. |
+| 2 | `server/hooks.py::get_hooks` | Same propagation for **user** hooks in `~/.claude/settings.json` — they too can carry `id` / `name` / `description` at the group level. |
+| 3 | `dist/index.html` `renderUserCard` / `renderPluginCard` | Card header now shows the synthesised display name in `font-semibold mono` as the primary identifier. Priority: explicit `id` → explicit `name` → derived `<event> · <matcher>` (or `<event> · (no matcher)` when matcherless). The existing scope/source chips and matcher rows remain underneath. |
+| 4 | (existing search) | The hooks-tab search bar already indexed `id` from v2.40.2, so once the field is populated the search just works — typing `pre:bash:dispatcher` instantly narrows to 1 card. |
+
+#### Effect (live measurement)
+```
+GET /api/hooks  →  41 entries · 26 with id/name
+First titles rendered:
+  pre:bash:dispatcher                  (PreToolUse/Bash)
+  pre:write:doc-file-warning           (PreToolUse/Write)
+  pre:edit-write:suggest-compact       (PreToolUse/Edit|Write)
+  session:start
+  session:end:marker
+Search "pre:bash:dispatcher" → 1 card
+```
+
+#### Compatibility
+- No new fields introduced on the wire; same `/api/hooks` shape, just
+  more keys surfaced per entry when the source hooks.json defines them.
+- No frontend break for hooks without `id`/`name` — they fall back to
+  the derived `<event> · <matcher>` string.
+- e2e regression — **0 failures**:
+  - `e2e-hyper-projects-and-sidebar.mjs` (v2.40)  — 11/11
+  - `e2e-tabs-smoke.mjs`                          — 58/58
+
+---
 ## [2.40.2] — 2026-04-27
 
 ### 🚨 Hooks tab — emergency UX (search · filter · risk chip · panic disable)

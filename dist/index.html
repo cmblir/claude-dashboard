@@ -12593,9 +12593,15 @@ VIEWS.hooks = async () => {
   const allEvents = Array.from(new Set([...userFlat, ...pluginFlat].map(h => h.event))).sort();
   const orderedEvents = HOOK_EVENTS.filter(ev => allEvents.includes(ev)).concat(allEvents.filter(ev => !HOOK_EVENTS.includes(ev)));
 
+  // v2.40.3 — synthesise the human-readable hook name shown by Claude Code's
+  // `/hooks` command. Priority: explicit id → explicit name → derived from
+  // event + matcher (or "(no matcher)").
+  const _hookDisplayName = (x) => x.id || x.name
+    || (x.event + (x.matcher ? ' · ' + x.matcher : ' · (no matcher)'));
   const renderUserCard = (x) => `
     <div class="rounded-lg bg-white/5 p-3 text-xs border border-[var(--border)]" style="display:flex; align-items:flex-start; gap:0.75rem; min-width:0; max-width:100%; overflow:hidden;">
       <div style="flex:1 1 0; min-width:0; max-width:100%; overflow:hidden;">
+        <div class="font-semibold text-sm mb-1 mono" style="overflow-wrap:anywhere;">${escapeHtml(_hookDisplayName(x))}</div>
         <div class="flex items-center gap-2 mb-1 flex-wrap"><span class="chip chip-ok text-[9px]" style="white-space:nowrap;">✓ 사용자 설정</span></div>
         ${x.matcher ? `<div class="mb-1" style="overflow-wrap:anywhere;"><span class="text-[var(--text-dim)]">matcher:</span> <span class="mono">${escapeHtml(x.matcher)}</span></div>`:''}
         ${x.type ? `<div class="mb-1"><span class="text-[var(--text-dim)]">type:</span> <span class="mono">${escapeHtml(x.type)}</span></div>`:''}
@@ -12617,10 +12623,10 @@ VIEWS.hooks = async () => {
     return `
     <div class="rounded-lg p-3 text-xs border border-[var(--border)]" style="display:flex; align-items:flex-start; gap:0.75rem; background:rgba(217,119,87,0.06); min-width:0; max-width:100%; overflow:hidden;">
       <div style="flex:1 1 0; min-width:0; max-width:100%; overflow:hidden;">
+        <div class="font-semibold text-sm mb-1 mono" style="overflow-wrap:anywhere;">${escapeHtml(_hookDisplayName(x))}</div>
         <div class="flex items-center gap-2 mb-1 flex-wrap">
           ${badge}
           <span class="text-[10px] mono text-[var(--text-dim)] truncate" style="max-width:200px;">${escapeHtml(x.source||'')}</span>
-          ${x.id ? `<span class="text-[10px] mono text-[var(--text-mute)] truncate" style="max-width:200px;" title="hook id">${escapeHtml(x.id)}</span>`:''}
         </div>
         ${x.description ? `<div class="text-[var(--text)] mb-1" style="overflow-wrap:anywhere;">${escapeHtml(x.description)}</div>`:''}
         ${x.matcher ? `<div class="mb-1" style="overflow-wrap:anywhere;"><span class="text-[var(--text-dim)]">matcher:</span> <span class="mono">${escapeHtml(x.matcher)}</span></div>`:''}
