@@ -336,17 +336,86 @@ def _sh_quote(s: str) -> str:
     return "'" + s.replace("'", "'\\''") + "'"
 
 
+def _resolve_provider_cli(assignee: str) -> dict:
+    """Map ``provider:model`` assignee to the actual CLI binary + flags.
+
+    Returns ``{provider, bin, args, model, fallback_reason}``. ``args`` is a
+    list of pre-quoted shell tokens (model flag etc.); the caller appends
+    prompt/options. Falls back to claude when the requested CLI isn't
+    installed and records a ``fallback_reason``."""
+    a = (assignee or "").strip()
+    provider_hint = ""
+    model = ""
+    if ":" in a:
+        provider_hint, model = a.split(":", 1)
+        provider_hint = provider_hint.strip().lower()
+        model = model.strip()
+    elif a:
+        provider_hint = a.strip().lower()
+
+    PROVIDER_ALIASES = {
+        "claude": "claude-cli", "claude-cli": "claude-cli",
+        "anthropic": "claude-cli", "anthropic-api": "claude-cli",
+        "gemini": "gemini-cli", "gemini-cli": "gemini-cli",
+        "google": "gemini-cli", "gemini-api": "gemini-cli",
+        "ollama": "ollama", "ollama-api": "ollama",
+        "codex": "codex",
+        "openai": "codex", "gpt": "codex", "openai-api": "codex",
+    }
+    pid = PROVIDER_ALIASES.get(provider_hint, "claude-cli")
+
+    def _which_safe(name: str) -> str:
+        try:
+            from .ai_providers import _which
+            return _which(name)
+        except Exception:
+            return shutil.which(name) or ""
+
+    fallback_reason = ""
+    if pid == "gemini-cli":
+        b = _which_safe("gemini")
+        if b:
+            args = ["--model", _sh_quote(model)] if model else []
+            return {"provider": "gemini-cli", "bin": b, "args": args, "model": model, "fallback_reason": ""}
+        fallback_reason = "gemini CLI not installed — falling back to claude"
+        pid = "claude-cli"
+    elif pid == "ollama":
+        b = _which_safe("ollama")
+        if b and model:
+            return {"provider": "ollama", "bin": b, "args": ["run", _sh_quote(model)], "model": model, "fallback_reason": ""}
+        if b:
+            return {"provider": "ollama", "bin": b, "args": [], "model": "", "fallback_reason": "no model — opening interactive ollama shell"}
+        fallback_reason = "ollama CLI not installed — falling back to claude"
+        pid = "claude-cli"
+    elif pid == "codex":
+        b = _which_safe("codex")
+        if b:
+            args = ["--model", _sh_quote(model)] if model else []
+            return {"provider": "codex", "bin": b, "args": args, "model": model, "fallback_reason": ""}
+        fallback_reason = "codex CLI not installed — falling back to claude"
+        pid = "claude-cli"
+
+    # claude-cli (default + every fallback)
+    claude_bin = _which_safe("claude") or "claude"
+    return {"provider": "claude-cli", "bin": claude_bin, "args": [],
+            "model": model if pid == "claude-cli" else "",
+            "fallback_reason": fallback_reason}
+
+
 def api_session_spawn(body: dict) -> dict:
-    """새 Terminal 창을 열고 `claude [옵션] [prompt]` 실행. macOS 전용.
+    """Open a new Terminal window and run the AI CLI matching the node's
+    ``assignee`` (e.g. ``claude:opus``, ``gemini:gemini-2.5-pro``,
+    ``ollama:llama3.1``, ``codex:o4-mini``). macOS only.
 
     body:
-      cwd:                 "~/path"   (홈 하위)
-      prompt:              "first message"     (선택)
-      systemPrompt:        "..."      (--system-prompt)
-      appendSystemPrompt:  "..."      (--append-system-prompt)
-      allowedTools:        "Bash,..." (--allowed-tools)
-      disallowedTools:     "..."      (--disallowed-tools)
-      resumeSessionId:     "..."      (--resume)
+      cwd:                 "~/path"   (under $HOME)
+      assignee:            "provider:model"  (optional — defaults to claude)
+      prompt:              "first message"     (optional)
+      systemPrompt:        "..."      (claude only)
+      appendSystemPrompt:  "..."      (claude only)
+      allowedTools:        "Bash,..." (claude only)
+      disallowedTools:     "..."      (claude only)
+      resumeSessionId:     "..."      (claude only)
     """
     if not isinstance(body, dict):
         return {"ok": False, "error": "bad body"}
@@ -362,21 +431,43 @@ def api_session_spawn(body: dict) -> dict:
         return {"ok": False, "error": "cwd not found"}
 
     prompt = (body.get("prompt") or "").strip()
-    sys_prompt = (body.get("systemPrompt") or "").strip()
-    app_prompt = (body.get("appendSystemPrompt") or "").strip()
-    allowed = (body.get("allowedTools") or "").strip()
-    disallowed = (body.get("disallowedTools") or "").strip()
-    resume_id = (body.get("resumeSessionId") or "").strip()
-    claude_bin = shutil.which("claude") or "claude"
+    assignee = (body.get("assignee") or "").strip()
+    resolved = _resolve_provider_cli(assignee)
+    provider = resolved["provider"]
+    bin_path = resolved["bin"]
 
-    parts = [claude_bin]
-    if sys_prompt: parts += ["--system-prompt", _sh_quote(sys_prompt)]
-    if app_prompt: parts += ["--append-system-prompt", _sh_quote(app_prompt)]
-    if allowed:    parts += ["--allowed-tools", _sh_quote(allowed)]
-    if disallowed: parts += ["--disallowed-tools", _sh_quote(disallowed)]
-    if resume_id:  parts += ["--resume", _sh_quote(resume_id)]
-    if prompt:     parts += [_sh_quote(prompt)]
-    shell_cmd = f'cd {_sh_quote(abs_cwd)} && ' + " ".join(parts)
+    parts = [bin_path] + list(resolved["args"])
+
+    if provider == "claude-cli":
+        sys_prompt = (body.get("systemPrompt") or "").strip()
+        app_prompt = (body.get("appendSystemPrompt") or "").strip()
+        allowed = (body.get("allowedTools") or "").strip()
+        disallowed = (body.get("disallowedTools") or "").strip()
+        resume_id = (body.get("resumeSessionId") or "").strip()
+        if resolved.get("model"):
+            parts += ["--model", _sh_quote(resolved["model"])]
+        if sys_prompt: parts += ["--system-prompt", _sh_quote(sys_prompt)]
+        if app_prompt: parts += ["--append-system-prompt", _sh_quote(app_prompt)]
+        if allowed:    parts += ["--allowed-tools", _sh_quote(allowed)]
+        if disallowed: parts += ["--disallowed-tools", _sh_quote(disallowed)]
+        if resume_id:  parts += ["--resume", _sh_quote(resume_id)]
+
+    # claude takes a positional prompt and stays interactive (TUI); the
+    # other CLIs (gemini, ollama run <model>, codex) treat a positional as
+    # one-shot, so we print the prompt as a banner instead and launch the
+    # CLI interactively.
+    cli_cmd = " ".join(parts)
+    if prompt and provider == "claude-cli":
+        shell_cmd = f'cd {_sh_quote(abs_cwd)} && {cli_cmd} {_sh_quote(prompt)}'
+    elif prompt:
+        banner = (
+            "echo '────── Prompt ──────'; "
+            f"printf '%s\\n' {_sh_quote(prompt)}; "
+            "echo '────────────────────'; "
+        )
+        shell_cmd = f'cd {_sh_quote(abs_cwd)} && {banner}{cli_cmd}'
+    else:
+        shell_cmd = f'cd {_sh_quote(abs_cwd)} && {cli_cmd}'
 
     script = f'''
 tell application "Terminal"
@@ -394,5 +485,13 @@ end tell
         return {"ok": False, "error": "osascript not available (macOS only)"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
-    return {"ok": True, "terminal": "Terminal.app", "cwd": abs_cwd}
+    return {
+        "ok": True,
+        "terminal": "Terminal.app",
+        "cwd": abs_cwd,
+        "provider": provider,
+        "cli": bin_path,
+        "model": resolved.get("model", ""),
+        "fallbackReason": resolved.get("fallback_reason", ""),
+    }
 

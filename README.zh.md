@@ -27,6 +27,7 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 | 版本 | 重点 |
 |---|---|
+| **v2.42.2** | 🖥️ **工作流节点 spawn → 对应 AI CLI** — 点击 `@gemini:gemini-2.5-pro` 节点的 🖥️ 现在打开 **Gemini CLI**，`@ollama:llama3.1` 打开 **`ollama run llama3.1`**，`@codex:o4-mini` 打开 **codex**。此前无视 assignee 始终启动 Claude。所请求的 CLI 未安装时回退到 claude 并提示警告 toast。提示词以横幅输出，保持交互式 REPL。 |
 | **v2.42.1** | 🔄 **工作流运行可视化** — 列表卡片内联展示最近 3 次运行状态芯片（✅/❌/⏳）、进行中脉冲徽章（`● 运行中`）、`(N 次)` 总运行次数。重新打开画布时自动恢复最近一次运行状态 — 进行中则启动实时轮询，已结束则一次性 hydrate 节点颜色。后端 `api_workflows_list` 新增 `lastRuns`/`runningCount`/`activeRunId`/`totalRuns`。 |
 | **v2.42.0** | 🖱️🧩🧭🔁 **Anthropic 4 项功能一次发布** — Computer Use Lab (`computer-use-2025-01-24` beta · 仅计划), Memory Lab (`memory-2025-08-18` beta · 服务器端 memory blocks), Advisor Lab (Executor + Advisor 配对 · 成本/质量差异), Claude Code Routines 完整 CRUD + 立即运行。14 个新端点，4 个新 playground 标签页。 |
 | **v2.41.0** | 👥 **代理团队 + 🤝 最近子代理活动** — 将常用代理打包为可复用的团队（`Frontend Crew = ui-designer + frontend-dev + code-reviewer`），🚀 启动 一键输出每个成员的 `claude /agents <name>` 命令。项目详情模态框新增"最近子代理活动"时间线 — 按源会话分组展示每个会话委派给子代理的工作，点击 🖥 CLI 按钮即可在 Terminal.app 中恢复对应会话。 |
