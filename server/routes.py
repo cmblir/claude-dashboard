@@ -148,8 +148,9 @@ from .auto_resume import (
 )
 from .prefs import api_prefs_get, api_prefs_reset, api_prefs_set
 from .hyper_agent import (
-    api_hyper_configure, api_hyper_get, api_hyper_history, api_hyper_list,
-    api_hyper_refine_now, api_hyper_rollback, api_hyper_toggle,
+    api_hyper_configure, api_hyper_get, api_hyper_get_post, api_hyper_history,
+    api_hyper_history_post, api_hyper_list, api_hyper_refine_now,
+    api_hyper_rollback, api_hyper_toggle,
 )
 
 
@@ -461,6 +462,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/hyper-agents/configure": api_hyper_configure,
     "/api/hyper-agents/refine-now": api_hyper_refine_now,
     "/api/hyper-agents/rollback": api_hyper_rollback,
+    "/api/hyper-agents/get": api_hyper_get_post,
+    "/api/hyper-agents/history": api_hyper_history_post,
 }
 
 

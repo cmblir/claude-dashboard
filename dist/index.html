@@ -366,6 +366,42 @@ tailwind.config = {
   .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
   .nav-item.active { background: var(--grad-soft); color: var(--text); border: 1px solid rgba(167,139,250,0.35); }
 
+  /* v2.40.0 — Sidebar discovery aids: Favorites + Recent above the categorical groups */
+  .nav-quick-block { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
+  .nav-quick-header {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 8px; margin: 4px 0 2px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+  .nav-quick-item {
+    display: flex; align-items: center; gap: 0.55rem;
+    padding: 0.4rem 0.7rem; border-radius: 8px;
+    color: var(--text-mute); font-size: 0.84rem; cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .nav-quick-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .nav-quick-item.active { background: var(--grad-soft); color: var(--text); border: 1px solid rgba(167,139,250,0.35); }
+  .nav-quick-icon { font-size: 0.95rem; width: 18px; text-align: center; flex-shrink: 0; }
+  body.theme-light .nav-quick-item:hover { background: rgba(0,0,0,0.04); }
+  body.theme-light .nav-quick-item.active { background: rgba(217,119,87,0.15); border-color: rgba(217,119,87,0.3); }
+  /* Star toggle button — appears on hover for non-favorites, always visible for favorites */
+  .nav-fav-btn {
+    background: transparent; border: 0; color: #fbbf24;
+    padding: 2px 4px; font-size: 13px; line-height: 1; cursor: pointer;
+    border-radius: 4px; transition: opacity 0.12s, background 0.12s;
+    flex-shrink: 0;
+  }
+  .nav-item .nav-fav-btn { opacity: 0; }
+  .nav-item:hover .nav-fav-btn,
+  .nav-item:focus-within .nav-fav-btn { opacity: 1; }
+  /* When already favorite (★ glyph), force visible regardless of hover. */
+  .nav-quick-item .nav-fav-btn { opacity: 1; }
+  .nav-fav-btn:hover { background: rgba(251,191,36,0.15); }
+  @media (max-width: 900px) {
+    .nav-quick-block { margin-bottom: 6px; padding-bottom: 6px; }
+  }
+
   /* v2.26.0 — 상위 카테고리 + hover flyout */
   .nav-category { display:flex; align-items:center; gap:0.7rem; padding:0.6rem 0.8rem; border-radius:10px; color:var(--text-mute); cursor:pointer; transition:background 0.15s, color 0.15s; position:relative; user-select:none; }
   .nav-category:hover, .nav-category:focus-within, .nav-category.open { background: rgba(255,255,255,0.06); color: var(--text); }
@@ -1003,7 +1039,7 @@ tailwind.config = {
     </button>
     <div class="flex-1">
       <div class="relative max-w-[420px] w-full cursor-pointer" onclick="openSpotlight()">
-        <input id="globalSearch" class="input w-full" placeholder="검색… ⌘K" readonly style="cursor:pointer;" />
+        <input id="globalSearch" class="input w-full" placeholder="검색… ⌘K · /" readonly style="cursor:pointer;" />
       </div>
     </div>
     <div class="flex items-center gap-2">
@@ -1494,6 +1530,59 @@ function renderNav() {
   nav.setAttribute('role', 'menubar');
   nav.setAttribute('aria-label', t('메인 네비게이션'));
   nav.innerHTML = '';
+
+  // v2.40.0 — render Favorites + Recent above the categorical groups so the
+  // user reaches frequent tabs in one click instead of opening a flyout.
+  const navById = {};
+  NAV.forEach(n => { navById[n.id] = n; });
+
+  const favIds = ((window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.favoriteTabs) || [])
+    .filter(id => navById[id]);
+  const recIds = _getRecentTabs().filter(id => navById[id] && !favIds.includes(id))
+    .slice(0, ((window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.recentTabsLimit) || 5));
+
+  const _renderQuickItem = (n, kind) => {
+    const item = document.createElement('div');
+    item.className = 'nav-quick-item' + (state.view === n.id ? ' active' : '');
+    item.setAttribute('role', 'menuitem');
+    item.setAttribute('tabindex', '0');
+    item.title = t(n.label) + (n.desc ? ' — ' + t(n.desc) : '');
+    item.innerHTML = `
+      <span class="nav-quick-icon" aria-hidden="true">${n.icon}</span>
+      <span class="nav-quick-label flex-1 truncate">${escapeHtml(t(n.label))}</span>
+      ${kind === 'fav'
+        ? `<button class="nav-fav-btn" aria-label="${t('즐겨찾기 해제')}" title="${t('즐겨찾기 해제')}">★</button>`
+        : `<button class="nav-fav-btn" aria-label="${t('즐겨찾기 추가')}" title="${t('즐겨찾기 추가')}" style="opacity:0.4;">☆</button>`
+      }
+    `;
+    item.onclick = (e) => {
+      if (e.target.closest('.nav-fav-btn')) { toggleFavoriteTab(n.id, e); return; }
+      go(n.id);
+    };
+    item.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(n.id); } };
+    return item;
+  };
+
+  if (favIds.length || recIds.length) {
+    const quick = document.createElement('div');
+    quick.className = 'nav-quick-block';
+    if (favIds.length) {
+      const fh = document.createElement('div');
+      fh.className = 'nav-quick-header';
+      fh.innerHTML = `<span>★</span> <span>${escapeHtml(t('즐겨찾기'))}</span> <span class="ml-auto text-[9px] opacity-60">${favIds.length}</span>`;
+      quick.appendChild(fh);
+      favIds.forEach(id => quick.appendChild(_renderQuickItem(navById[id], 'fav')));
+    }
+    if (recIds.length) {
+      const rh = document.createElement('div');
+      rh.className = 'nav-quick-header';
+      rh.innerHTML = `<span>🕒</span> <span>${escapeHtml(t('최근 사용'))}</span> <span class="ml-auto text-[9px] opacity-60">${recIds.length}</span>`;
+      quick.appendChild(rh);
+      recIds.forEach(id => quick.appendChild(_renderQuickItem(navById[id], 'recent')));
+    }
+    nav.appendChild(quick);
+  }
+
   GROUPS.forEach(g => {
     const items = NAV.filter(n => n.group === g.id);
     if (!items.length) return;
@@ -1540,13 +1629,17 @@ function renderNav() {
       el.setAttribute('aria-label', n.label + (n.desc ? ' — ' + n.desc : ''));
       el.title = n.label + (n.desc ? ' — ' + n.desc : '');
       const descHtml = n.desc ? `<div class="nav-desc text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">${escapeHtml(t(n.desc))}</div>` : '';
+      const isFav = _isFavoriteTab(n.id);
+      const favBtn = `<button class="nav-fav-btn" aria-label="${isFav?t('즐겨찾기 해제'):t('즐겨찾기 추가')}" title="${isFav?t('즐겨찾기 해제'):t('즐겨찾기 추가')}" style="${isFav?'':'opacity:0.4;'}">${isFav?'★':'☆'}</button>`;
       el.innerHTML = `
         <span class="w-5 text-center self-start mt-0.5 flex-shrink-0">${n.icon}</span>
         <div class="nav-label flex-1 min-w-0">
           <div>${escapeHtml(t(n.label))}</div>
           ${descHtml}
-        </div>`;
+        </div>
+        ${favBtn}`;
       el.onclick = (e) => {
+        if (e.target.closest('.nav-fav-btn')) { toggleFavoriteTab(n.id, e); return; }
         e.stopPropagation();
         go(n.id);
         // flyout 닫기
@@ -1677,10 +1770,47 @@ function go(id) {
     if (_tabHistory.length > 20) _tabHistory.shift();
     _tabHistoryIdx = _tabHistory.length - 1;
   }
+  // v2.40.0 — recent-tabs MRU (localStorage). Capped at prefs.ui.recentTabsLimit.
+  try { _pushRecentTab(id); } catch {}
   state.view = id;
   location.hash = '#/' + id;
   renderNav();
   renderView();
+}
+
+// ── v2.40.0 — Sidebar discovery: favorites + recents + '/' spotlight ──
+const _RECENT_TABS_KEY = 'cc-recent-tabs';
+function _getRecentTabs() {
+  try {
+    const raw = localStorage.getItem(_RECENT_TABS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter(s => typeof s === 'string') : [];
+  } catch { return []; }
+}
+function _pushRecentTab(id) {
+  if (!id || typeof id !== 'string') return;
+  const limit = (window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.recentTabsLimit) || 5;
+  if (limit <= 0) return;
+  let cur = _getRecentTabs();
+  cur = cur.filter(x => x !== id);
+  cur.unshift(id);
+  if (cur.length > limit) cur = cur.slice(0, limit);
+  try { localStorage.setItem(_RECENT_TABS_KEY, JSON.stringify(cur)); } catch {}
+}
+function _isFavoriteTab(id) {
+  const f = (window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.favoriteTabs) || [];
+  return Array.isArray(f) && f.includes(id);
+}
+function toggleFavoriteTab(id, ev) {
+  if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+  const cur = ((window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.favoriteTabs) || []).slice();
+  const idx = cur.indexOf(id);
+  if (idx >= 0) cur.splice(idx, 1);
+  else cur.unshift(id);
+  // setPref defined in v2.38 Quick Settings — debounces a POST to /api/prefs/set
+  if (typeof setPref === 'function') setPref('ui', 'favoriteTabs', cur, {skipApply: true});
+  else if (window.CC_PREFS && window.CC_PREFS.ui) window.CC_PREFS.ui.favoriteTabs = cur;
+  renderNav();
 }
 function _tabHistoryBack() {
   if (_tabHistoryIdx <= 0) return;
@@ -9429,22 +9559,34 @@ async function viewAgent(id) {
 // ────────────────────────────────────────────────────────────────
 // HYPER AGENT — auto-refining sub-agent settings (v2.39.0)
 // ────────────────────────────────────────────────────────────────
-async function openHyperAgent(name) {
+async function openHyperAgent(name, cwd) {
   const safe = encodeURIComponent(name);
-  const [meta, hist] = await Promise.all([
-    api('/api/hyper-agents/get/' + safe).catch(e => ({error: String(e)})),
-    api('/api/hyper-agents/history/' + safe).catch(() => ({history:[]})),
-  ]);
+  let metaP, histP;
+  if (cwd) {
+    // Project scope — cwd doesn't fit in URL → POST endpoints
+    metaP = api('/api/hyper-agents/get', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, cwd})
+    }).catch(e => ({error: String(e)}));
+    histP = api('/api/hyper-agents/history', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, cwd})
+    }).catch(() => ({history:[]}));
+  } else {
+    metaP = api('/api/hyper-agents/get/' + safe).catch(e => ({error: String(e)}));
+    histP = api('/api/hyper-agents/history/' + safe).catch(() => ({history:[]}));
+  }
+  const [meta, hist] = await Promise.all([metaP, histP]);
   if (meta.error) { toast(t('Hyper Agent 로드 실패: ') + meta.error, 'err'); return; }
   const ag = meta.agent || {};
   const history = (hist.history || []).slice().reverse();
-  showModal(_hyperModalHTML(name, ag, history));
-  _hyperBindControls(name);
+  showModal(_hyperModalHTML(name, ag, history, cwd));
+  _hyperBindControls(name, cwd);
 }
 
 function _hyperEsc(s) { return escapeHtml(s == null ? '' : String(s)); }
 
-function _hyperModalHTML(name, ag, history) {
+function _hyperModalHTML(name, ag, history, cwd) {
   const targets = ag.refineTargets || ['systemPrompt'];
   const hasTarget = (k) => targets.includes(k) ? 'checked' : '';
   const triggerOpts = ['manual','after_session','interval','any','cron'].map(opt =>
@@ -9533,14 +9675,14 @@ function _hyperModalHTML(name, ag, history) {
       <div class="mt-5">
         <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] mb-2">${t('정교화 이력')} (${history.length})</div>
         <div id="hyperHistory" class="grid gap-2">
-          ${history.map(h => _hyperHistoryRow(name, h)).join('') || `<div class="empty text-xs">${t('아직 정교화 이력이 없습니다.')}</div>`}
+          ${history.map(h => _hyperHistoryRow(name, h, cwd)).join('') || `<div class="empty text-xs">${t('아직 정교화 이력이 없습니다.')}</div>`}
         </div>
       </div>
     </div>
   `;
 }
 
-function _hyperHistoryRow(name, h) {
+function _hyperHistoryRow(name, h, cwd) {
   const dt = h.ts ? new Date(h.ts).toLocaleString() : '—';
   const trigger = _hyperEsc(h.trigger || '');
   const score = (h.scoreBefore != null && h.scoreAfter != null)
@@ -9551,8 +9693,9 @@ function _hyperHistoryRow(name, h) {
   const tokens = h.tokens ? `${h.tokens} tok` : '—';
   const error = h.error ? `<div class="text-[11px] mt-1" style="color:#fca5a5;">⚠️ ${_hyperEsc(h.error)}</div>` : '';
   const dryFlag = h.dryRun ? '<span class="chip chip-warn text-[10px]">dry-run</span>' : '';
+  const cwdArg = cwd ? `, ${JSON.stringify(cwd)}` : '';
   const rollback = (!h.dryRun && h.backupPath && h.appliedTargets && h.appliedTargets.length)
-    ? `<button class="btn text-[10px]" onclick="_hyperRollback('${_hyperEsc(name)}', ${+h.ts})">↩ ${t('롤백')}</button>`
+    ? `<button class="btn text-[10px]" onclick="_hyperRollback('${_hyperEsc(name)}', ${+h.ts}${cwdArg})">↩ ${t('롤백')}</button>`
     : '';
   const showDiff = (h.diff && Object.keys(h.diff).length)
     ? `<button class="btn text-[10px]" onclick="_hyperToggleDiff(this)">📋 diff</button>`
@@ -9618,7 +9761,7 @@ function _hyperCollectPatch() {
   };
 }
 
-function _hyperBindControls(name) {
+function _hyperBindControls(name, cwd) {
   const tg = document.getElementById('hyperToggle');
   if (tg) {
     const flip = () => {
@@ -9634,39 +9777,49 @@ function _hyperBindControls(name) {
   if (save) save.onclick = async () => {
     save.disabled = true; save.textContent = '...';
     try {
+      const body = { name, patch: _hyperCollectPatch() };
+      if (cwd) body.cwd = cwd;
       const r = await api('/api/hyper-agents/configure', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ name, patch: _hyperCollectPatch() }),
+        body: JSON.stringify(body),
       });
-      if (r.ok) { toast(t('저장됨'), 'ok'); window.__hyperAgentsMap = window.__hyperAgentsMap || {}; window.__hyperAgentsMap[name] = r.agent.enabled; }
+      if (r.ok) {
+        toast(t('저장됨'), 'ok');
+        // Only mirror global into the visible-on-list map; project entries
+        // get refreshed via the projectAgents view's own fetch.
+        if (!cwd) { window.__hyperAgentsMap = window.__hyperAgentsMap || {}; window.__hyperAgentsMap[name] = r.agent.enabled; }
+      }
       else toast(t('저장 실패: ') + (r.error || ''), 'err');
     } catch (e) { toast(t('저장 실패: ') + e.message, 'err'); }
     finally { save.disabled = false; save.textContent = t('💾 저장'); }
   };
   const dry = document.getElementById('hyperRefineDry');
-  if (dry) dry.onclick = () => _hyperRefineNow(name, true);
+  if (dry) dry.onclick = () => _hyperRefineNow(name, true, cwd);
   const ref = document.getElementById('hyperRefine');
-  if (ref) ref.onclick = () => _hyperRefineNow(name, false);
+  if (ref) ref.onclick = () => _hyperRefineNow(name, false, cwd);
 }
 
-async function _hyperRefineNow(name, dryRun) {
+async function _hyperRefineNow(name, dryRun, cwd) {
   if (!dryRun && !confirm(t('이 에이전트를 지금 다듬을까요? 메타 LLM 호출 비용이 발생합니다.'))) return;
   const btn = document.getElementById(dryRun ? 'hyperRefineDry' : 'hyperRefine');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ ' + t('진행 중'); }
   try {
     // Save current settings first so the worker uses the latest objective/targets
+    const cfg = { name, patch: _hyperCollectPatch() };
+    if (cwd) cfg.cwd = cwd;
     await api('/api/hyper-agents/configure', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ name, patch: _hyperCollectPatch() }),
+      body: JSON.stringify(cfg),
     });
+    const refineBody = { name, dryRun };
+    if (cwd) refineBody.cwd = cwd;
     const r = await api('/api/hyper-agents/refine-now', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ name, dryRun }),
+      body: JSON.stringify(refineBody),
     });
     if (r.ok) {
       toast(dryRun ? t('Dry-run 완료 — 제안 확인') : t('정교화 적용 완료'), 'ok');
-      // re-open modal with fresh data
-      openHyperAgent(name);
+      openHyperAgent(name, cwd);
     } else {
       toast(t('실패: ') + (r.error || ''), 'err');
       if (btn) { btn.disabled = false; btn.textContent = dryRun ? t('👁 Dry-run 미리보기') : t('⚡ 지금 다듬기'); }
@@ -9677,14 +9830,16 @@ async function _hyperRefineNow(name, dryRun) {
   }
 }
 
-async function _hyperRollback(name, ts) {
+async function _hyperRollback(name, ts, cwd) {
   if (!confirm(t('이 시점의 백업으로 에이전트를 되돌릴까요?'))) return;
   try {
+    const body = { name, versionTs: ts };
+    if (cwd) body.cwd = cwd;
     const r = await api('/api/hyper-agents/rollback', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ name, versionTs: ts }),
+      body: JSON.stringify(body),
     });
-    if (r.ok) { toast(t('롤백 완료'), 'ok'); openHyperAgent(name); }
+    if (r.ok) { toast(t('롤백 완료'), 'ok'); openHyperAgent(name, cwd); }
     else toast(t('롤백 실패: ') + (r.error || ''), 'err');
   } catch (e) { toast(t('롤백 실패: ') + e.message, 'err'); }
 }
@@ -14011,15 +14166,23 @@ VIEWS.projectAgents = async () => {
     state.data.paCwd = validProjects[0]?.path || '';
   }
   const cwd = state.data.paCwd;
-  const [rolesRes, listRes, modelRes] = await Promise.all([
+  const [rolesRes, listRes, modelRes, hyperList] = await Promise.all([
     api('/api/project-agents/roles'),
     cwd ? api('/api/project-agents/list?cwd=' + encodeURIComponent(cwd)) : Promise.resolve({ agents: [], dirExists: false }),
     api('/api/subagent/model-choices'),
+    api('/api/hyper-agents/list').catch(() => ({items:[]})),
   ]);
   window.__subModelChoices = modelRes.choices || [];
   const roles = rolesRes.roles || [];
   const existingAgents = listRes.agents || [];
   const existingIds = new Set(existingAgents.map(a => a.id));
+
+  // Map of project-scoped hyper agents for THIS cwd → enabled bool, used by
+  // the per-card ⚡ chip color.
+  window.__paHyperMap = {};
+  (hyperList.items || []).forEach(h => {
+    if (h.scope === 'project' && h.cwd === cwd) window.__paHyperMap[h.name] = !!h.enabled;
+  });
 
   window.__paRoles = roles;
   window.__paCwd = cwd;
@@ -14032,7 +14195,13 @@ VIEWS.projectAgents = async () => {
     sonnet: 'rgba(217,119,87,0.18)',
     opus: 'rgba(244,114,182,0.18)',
   })[m] || 'rgba(217,119,87,0.14)';
-  const existingGrid = existingAgents.length ? existingAgents.map(a => `
+  const existingGrid = existingAgents.length ? existingAgents.map(a => {
+    const hyperOn = (window.__paHyperMap || {})[a.id];
+    const hyperBtn = `<button class="btn text-[10px]"
+        onclick='openHyperAgent(${JSON.stringify(a.id)}, ${JSON.stringify(cwd)})'
+        title="${t('Hyper Agent — 자동 정교화 토글/설정')}"
+        style="${hyperOn?'background:rgba(244,114,182,0.28);color:#fff;':'background:rgba(244,114,182,0.12);'}">⚡ ${hyperOn?'ON':'Hyper'}</button>`;
+    return `
     <div class="card p-4 hover-lift">
       <div class="flex items-start justify-between gap-2 mb-2">
         <div class="min-w-0">
@@ -14040,6 +14209,7 @@ VIEWS.projectAgents = async () => {
           <div class="text-[10px] mono text-[var(--text-dim)] truncate">.claude/agents/${escapeHtml(a.id)}.md</div>
         </div>
         <div class="flex gap-1 flex-shrink-0">
+          ${hyperBtn}
           <button class="btn text-[10px]" onclick='paEdit(${JSON.stringify(a.name)})'>수정</button>
           <button class="btn text-[10px]" style="color:#fca5a5" onclick='paDelete(${JSON.stringify(a.name)})'>삭제</button>
         </div>
@@ -14055,7 +14225,8 @@ VIEWS.projectAgents = async () => {
           ${(window.__subModelChoices || []).map(m => `<option value="${escapeHtml(m.id)}" ${a.model===m.id?'selected':''}>${escapeHtml(m.label)}</option>`).join('')}
         </select>
       </div>
-    </div>`).join('') : '<div class="empty text-xs" style="grid-column:1/-1;">아직 이 프로젝트에 에이전트가 없습니다. 아래 역할 프리셋에서 하나를 선택해 추가하세요.</div>';
+    </div>`;
+  }).join('') : '<div class="empty text-xs" style="grid-column:1/-1;">아직 이 프로젝트에 에이전트가 없습니다. 아래 역할 프리셋에서 하나를 선택해 추가하세요.</div>';
 
   const roleCards = roles.map(r => {
     const already = existingIds.has(r.defaultName);
@@ -20470,6 +20641,16 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     if (_spotlightOpen) closeSpotlight();
     else openSpotlight();
+  }
+  // v2.40.0 — '/' alone opens spotlight (when not in input/textarea/contentEditable)
+  if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+    const ae = document.activeElement;
+    const tag = (ae && ae.tagName) || '';
+    const inField = ['INPUT','TEXTAREA','SELECT'].includes(tag) || (ae && ae.isContentEditable);
+    if (!inField && !_spotlightOpen) {
+      e.preventDefault();
+      openSpotlight();
+    }
   }
   if (e.key === 'Escape' && _spotlightOpen) {
     closeSpotlight();

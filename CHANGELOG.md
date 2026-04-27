@@ -10,6 +10,49 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.40.0] — 2026-04-27
+
+### ⚡ Hyper Agent → project-scoped sub-agents · 🧭 Sidebar discovery (Favorites + Recent + `/`)
+
+Two upgrades shipped together:
+
+**(A) Hyper Agent now works on project-scoped sub-agents** (`<cwd>/.claude/agents/<name>.md`).
+The same toggle / objective / refine targets / dry-run / rollback flow that
+v2.39.0 introduced for global agents is now available per-project, with each
+project's meta tracked independently — even when a global agent and a project
+agent share the same name.
+
+**(B) Sidebar discovery aids** — for users who said "categories are too many,
+hard to find things." Three additive changes (no category restructure):
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/hyper_agent.py` | Composite key namespace — `global:<name>` for global, `project:<sha8(cwd)>:<name>` for project. Legacy v2.39.0 flat keys are still read as global; subsequent writes auto-migrate to canonical. Every public function (`configure_agent` / `refine_agent` / `apply_proposal` / `rollback` / `get_hyper` / `history` / `toggle_agent`) now accepts an optional `cwd: str | None = None`. `_is_writable_agent` skips builtin/plugin only when scope is global; project scope is writeable when the file exists. Per-iteration `.bak.md` backup lives in the same scope as the agent. |
+| 2 | `server/hyper_agent.py` | Two new POST endpoints `/api/hyper-agents/get` and `/api/hyper-agents/history` accept a `{name, cwd?}` body — required because cwd doesn't fit a URL path parameter. The original GET path-param routes are kept for global lookups (back-compat). `toggle/configure/refine-now/rollback` already accepted bodies; they now also pull `cwd` from the body. List response gains `key`, `scope`, and `cwd` fields per item. |
+| 3 | `server/hyper_agent_worker.py` | After-session trigger now restricts the jsonl scan to the agent's project transcript dir (`~/.claude/projects/<slug>/`, where slug is `<cwd>` with `/` → `-`). A project-scoped agent no longer fires from chatter in unrelated projects. The worker's per-tick loop iterates by composite key and parses scope/name out of it. |
+| 4 | `dist/index.html` | `openHyperAgent(name, cwd?)` and the entire modal call chain (`_hyperModalHTML` / `_hyperBindControls` / `_hyperRefineNow` / `_hyperRollback` / `_hyperHistoryRow`) accept `cwd` and route configure/refine/rollback through the cwd-aware POST shape. Project-agents tab cards gain a per-card ⚡ Hyper / ⚡ ON chip wired to `openHyperAgent(name, cwd)`. |
+| 5 | `dist/index.html` | **Sidebar Favorites** — every `.nav-item` exposes a ★/☆ toggle on hover. Toggling persists to `prefs.ui.favoriteTabs` (new) which surfaces above the categorical groups as a sticky "★ 즐겨찾기" block — one click to a frequent tab, no flyout to navigate. |
+| 6 | `dist/index.html` | **Sidebar Recent** — `go(id)` writes an MRU list to `localStorage['cc-recent-tabs']` capped at `prefs.ui.recentTabsLimit` (default 5). The "🕒 최근 사용" block renders below favorites. Recent items skip duplicates with favorites so the two sections never repeat the same tab. |
+| 7 | `dist/index.html` | **`/` opens Spotlight** — pressing `/` alone (when no input is focused) opens the existing Cmd-K spotlight overlay. The header search input's placeholder reads `검색… ⌘K · /` to advertise the shortcut. |
+| 8 | `server/prefs.py` | New `list_str` schema kind — list of ASCII identifier strings, dedup'd, capped (`maxItems`, `maxItemLen`). Used by `ui.favoriteTabs`. Also adds `ui.recentTabsLimit: int (0..20, default 5)`. Schema serialiser exposes `maxItems` / `maxItemLen` so the frontend can render constraints without hard-coding. |
+| 9 | `tools/translations_manual_15.py` (new) | KO → EN/ZH for "최근 사용", "즐겨찾기 추가/해제", "검색… ⌘K · /". Bare "즐겨찾기" already shipped in manual_11. `make i18n-refresh` reports 0 missing across 4012 keys × 3 languages. |
+| 10 | `scripts/e2e-hyper-projects-and-sidebar.mjs` (new) | Playwright integration smoke: global+project twin separation · list scope/cwd surfacing · POST cwd lookup · rollback path · project modal renders saved objective · favorites persisted+rendered · recent surfaces · `/` opens spotlight. **11/11 checks pass.** |
+
+#### Compatibility / migration
+- Existing v2.39.0 entries (flat keys like `"reviewer"`) keep working: read as global, automatically migrated to `global:reviewer` on the next configure/refine/rollback.
+- v2.39.0's `/api/hyper-agents/get/<name>` and `/api/hyper-agents/history/<name>` GET routes remain — only used for global lookups.
+- All routes / UI controls are additive; no behaviour changes for users who don't enable the new features.
+
+#### Why a sidebar redesign?
+v2.40.0 deliberately doesn't reshuffle the 6 categories (60 tabs). Restructuring forces relearning. Instead, **discovery aids** layer on top: users pin the tabs they reach for, recents auto-surface the rest, and `/` is one keystroke to a fuzzy search. The same hierarchy stays; the *path* to it shortens.
+
+#### Verification
+- `node scripts/e2e-hyper-projects-and-sidebar.mjs` — **11/11**.
+- `node scripts/e2e-hyper-agent.mjs` (v2.39 regression) — **7/7**.
+- `node scripts/e2e-quick-settings.mjs` (v2.38 regression) — **6/6**.
+- `node scripts/e2e-tabs-smoke.mjs` — **58/58**.
+
+---
 ## [2.39.0] — 2026-04-27
 
 ### ⚡ Hyper Agent — sub-agents that self-refine over time
