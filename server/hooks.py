@@ -72,8 +72,12 @@ def _scan_plugin_hooks() -> list:
                             entry["matcher"] = matcher
                         if isinstance(sh, dict):
                             entry.update({k: v for k, v in sh.items() if k not in ("scope",)})
-                        if "description" not in entry and item.get("description"):
-                            entry["description"] = item.get("description")
+                        # v2.40.3 — propagate group-level identity (id / name /
+                        # description) onto each sub-hook so the dashboard card
+                        # surfaces the same name Claude Code's `/hooks` shows.
+                        for k in ("id", "name", "description"):
+                            if k not in entry and item.get(k):
+                                entry[k] = item.get(k)
                         out.append(entry)
                 else:
                     entry = {
@@ -250,6 +254,10 @@ def get_hooks() -> dict:
                             entry["matcher"] = matcher
                         if isinstance(sh, dict):
                             entry.update(sh)
+                        # v2.40.3 — same identity propagation as plugin hooks.
+                        for k in ("id", "name", "description"):
+                            if k not in entry and item.get(k):
+                                entry[k] = item.get(k)
                         hooks_out.append(entry)
                 else:
                     entry = {"event": event, "scope": "user"}

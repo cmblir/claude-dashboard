@@ -27,6 +27,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 | 버전 | 요점 |
 |---|---|
+| **v2.40.3** | 🏷️ **훅 이름 표시** — 플러그인 hooks.json 의 group-level `id` / `name` (예: `pre:bash:dispatcher`) 을 sub-hook entry 로 propagate, 카드 헤더에 mono 큰 글자로 surface. Claude Code `/hooks` 와 동일한 식별자 그대로. id 검색 즉시 작동 — `pre:bash:dispatcher` 입력 → 1 카드. |
 | **v2.40.2** | 🚨 **훅 탭 긴급 UX** — 검색 · 스코프/이벤트 칩 · "위험 훅만" 필터 · PreToolUse + Edit/Write/Bash 카드마다 🚨 칩 · 사용자 `settings.json` 과 모든 플러그인 `hooks.json` 을 한 번에 처리하는 "위험 훅 일괄 비활성화" 버튼. 플러그인 훅 100개 넘게 깔린 상태에서 작업 막는 훅을 못 찾는 상황을 위해. |
 | **v2.40.1** | 🚀 **성능 핫픽스** — `dist/index.html` 다운로드 1.12 MB → 270 KB (서버 gzip + mtime 캐시), Chart.js / vis-network / marked 를 `defer` 로 미뤄 첫 paint 가 ~600 KB CDN 스크립트 파싱에 안 막히게, GET 인-플라이트 dedupe 로 동시 fetch 절반, 사이드바 re-render 가 다음 animation frame 으로 묶임. 동작 변경 없음. |
 | **v2.40.0** | ⚡ **Hyper Agent → 프로젝트 서브 에이전트** + 🧭 **사이드바 발견 강화** (즐겨찾기 + 최근 + `/`). Hyper 토글이 `<cwd>/.claude/agents/<name>.md` 에도 적용되며, composite-key 네임스페이스로 같은 이름의 글로벌과 프로젝트 에이전트가 메타·목표·이력을 독립적으로 유지. 사이드바에 ★ 즐겨찾기 블록 (호버 시 토글), 🕒 최근 사용 MRU (`go()` 호출에서 자동 적립, prefs 로 cap), `/` 단독 키로 Spotlight 즉시 호출 — 카테고리 재편 없이 경로만 단축. |

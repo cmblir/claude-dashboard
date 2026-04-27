@@ -27,6 +27,7 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 | 版本 | 重点 |
 |---|---|
+| **v2.40.3** | 🏷️ **钩子名称显示** — 插件 hooks.json 在组级别保存 `id` / `name`（如 `pre:bash:dispatcher`），仪表板现在将其传播到每个子钩子条目并以 mono 大字体作为卡片主标题显示。与 Claude Code `/hooks` 相同的标识符。按 id 搜索即时生效 — 输入 `pre:bash:dispatcher` → 1 个卡片。 |
 | **v2.40.2** | 🚨 **钩子标签紧急 UX** — 搜索 · 范围/事件芯片 · "仅危险钩子" 过滤 · 每个 PreToolUse + Edit/Write/Bash 卡片显示 🚨 芯片 · 一键"批量禁用危险钩子"，同时处理用户 `settings.json` 与所有插件 `hooks.json`。专为安装了 100+ 插件钩子、找不到阻塞工作的那一个而设计。 |
 | **v2.40.1** | 🚀 **性能热修复** — `dist/index.html` 下载从 1.12 MB 降到 270 KB（服务端 gzip + mtime 缓存），Chart.js / vis-network / marked 改为 `defer` 加载使首屏渲染不再被约 600 KB 的 CDN 脚本解析阻塞，GET 请求 in-flight 去重将并发请求减半，侧栏重新渲染合并到下一个动画帧。无行为变更。 |
 | **v2.40.0** | ⚡ **Hyper Agent → 项目级子代理** + 🧭 **侧栏发现优化**（收藏 + 最近 + `/`）。Hyper 开关现在适用于 `<cwd>/.claude/agents/<name>.md`，复合 key 命名空间让同名的全局代理和项目代理各自保留独立的元数据、目标和历史。侧栏新增置顶的 ★ 收藏区块（悬停时切换）、🕒 最近 MRU（自动从 `go()` 调用收集，由 prefs 设置上限）、`/` 单键直接打开现有的 Cmd-K Spotlight — 不重组分类，只缩短到达路径。 |
