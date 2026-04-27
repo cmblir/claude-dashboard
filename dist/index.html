@@ -1292,6 +1292,19 @@ const NAV = [
   { id: 'sessionReplay', icon: '🎞️', label: 'Session Replay', group: 'playground',
     desc: 'Claude Code JSONL 세션 로그 타임라인 재생 · 툴 호출 강조 · 누적 토큰 차트',
     docUrl: null },
+  // v2.42.0 — four new Anthropic API features
+  { id: 'computerUseLab', icon: '🖱️', label: 'Computer Use', group: 'playground',
+    desc: 'computer-use-2025-01-24 beta · screenshot+mouse+key 시연 (plan-only, 안전)',
+    docUrl: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool' },
+  { id: 'memoryLab', icon: '🧩', label: 'Memory Tool', group: 'playground',
+    desc: 'memory-2025-08-18 beta · 서버측 memory blocks · 기억/회상/삭제 라운드트립',
+    docUrl: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool' },
+  { id: 'advisorLab', icon: '🧭', label: 'Advisor Tool', group: 'playground',
+    desc: 'Executor (Haiku) + Advisor (Opus) 페어링 · 토큰/비용/지연 델타 비교',
+    docUrl: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool' },
+  { id: 'routines', icon: '🔁', label: 'Routines', group: 'config',
+    desc: '~/.claude/scheduled-tasks/*.yaml CRUD + 즉시 실행 — Claude Code Routines',
+    docUrl: 'https://docs.claude.com/en/docs/claude-code/routines' },
   { id: 'learner', icon: '🎓', label: 'Learner', group: 'build',
     desc: '최근 세션 JSONL 에서 반복 tool 시퀀스/프롬프트 자동 추출 → Prompt Library / 워크플로우 제안',
     docUrl: null },
@@ -17780,6 +17793,312 @@ function _learnerToPromptLib(action) {
     go('promptLibrary');
     toast(t('learner_prefilled', '에디터에 미리 채워졌습니다 — 검토 후 저장하세요'), 'ok');
   } catch (e) { toast(String(e), 'err'); }
+}
+
+// ────────────────────────────────────────────────────────────────
+// v2.42.0 — Four new Anthropic API labs:
+//   computerUseLab · memoryLab · advisorLab · routines
+// Compact viewers — single prompt + Run + history. Each uses its own
+// /api/<feature>/* endpoints registered in routes.py.
+// ────────────────────────────────────────────────────────────────
+
+VIEWS.computerUseLab = async () => {
+  const ex = await api('/api/computer-use-lab/examples');
+  const hist = await api('/api/computer-use-lab/history');
+  const items = (hist.items || []).slice(0, 10);
+  const examples = (ex.examples || []).map(e =>
+    `<button class="chip text-[10px] cursor-pointer" onclick="document.getElementById('cuPrompt').value=${jsonAttr(e.prompt)};document.getElementById('cuW').value=${e.screenSize.width};document.getElementById('cuH').value=${e.screenSize.height};">${escapeHtml(e.title)}</button>`).join(' ');
+  return `
+    <h1 class="text-2xl font-bold mb-1">🖱️ ${t('Computer Use Lab')}</h1>
+    <p class="text-sm text-[var(--text-mute)] mb-4">${t('Anthropic computer-use-2025-01-24 beta · plan-only (실행하지 않음)')}</p>
+    <div class="card p-4 mb-3" style="background:rgba(251,191,36,0.06);border-color:rgba(251,191,36,0.3);">
+      <div class="text-[11px] mb-2" style="color:#fcd34d;">⚠ ${t('대시보드는 모델의 tool plan만 표시 — 실제 마우스/키보드 제어는 하지 않습니다.')}</div>
+    </div>
+    <div class="card p-4 mb-3">
+      <div class="flex flex-wrap gap-1 mb-2">${examples}</div>
+      <textarea id="cuPrompt" class="input w-full" rows="3" placeholder="${t('예: Open Finder and click Documents…')}"></textarea>
+      <div class="flex flex-wrap items-center gap-2 mt-2">
+        <select id="cuModel" class="input">${(ex.models||[]).map(m => `<option>${m}</option>`).join('')}</select>
+        <input id="cuW" class="input" type="number" value="1920" style="width:90px" title="width"/>
+        <span>×</span>
+        <input id="cuH" class="input" type="number" value="1080" style="width:90px" title="height"/>
+        <input id="cuShot" class="input flex-1" type="text" placeholder="${t('스크린샷 경로 (~/.claude 하위, 선택)')}"/>
+        <button class="btn-primary btn" onclick="_cuRun()">▶ ${t('실행')}</button>
+      </div>
+    </div>
+    <div id="cuResult" class="mb-3"></div>
+    ${items.length ? `
+    <div class="card p-3 mb-3">
+      <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('최근 호출')}</div>
+      ${items.map(h => `<div class="flex items-center gap-2 py-1 border-b border-[var(--border)] text-[11px]">
+        <span class="mono">${h.model}</span>
+        <span class="flex-1 truncate">${escapeHtml(h.prompt||'')}</span>
+        <span class="chip text-[10px]">${h.toolPlanCount} ${t('툴 호출')}</span>
+        <span class="text-[10px] text-[var(--text-dim)]">${(h.tokensIn+h.tokensOut).toLocaleString()} tok · $${(h.costUsd||0).toFixed(4)}</span>
+        ${h.error ? `<span class="chip chip-err text-[10px]">err</span>` : ''}
+      </div>`).join('')}
+    </div>` : ''}
+  `;
+};
+async function _cuRun() {
+  const prompt = document.getElementById('cuPrompt').value;
+  const model = document.getElementById('cuModel').value;
+  const width = parseInt(document.getElementById('cuW').value, 10) || 1920;
+  const height = parseInt(document.getElementById('cuH').value, 10) || 1080;
+  const screenshotPath = document.getElementById('cuShot').value || '';
+  const out = document.getElementById('cuResult');
+  if (out) out.innerHTML = `<div class="card p-4 text-center text-xs">${t('실행 중…')}</div>`;
+  try {
+    const r = await api('/api/computer-use-lab/run', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt, model, screenSize: {width, height}, screenshotPath }) });
+    if (!r.ok) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(r.error||'')}</div>`; return; }
+    out.innerHTML = `
+      <div class="card p-4">
+        <div class="flex flex-wrap gap-2 text-[11px] mb-2">
+          <span class="chip">${escapeHtml(r.model)}</span>
+          <span class="chip">${r.tokensIn}/${r.tokensOut} tok</span>
+          <span class="chip">$${(r.costUsd||0).toFixed(4)}</span>
+          <span class="chip">${r.durationMs}ms</span>
+        </div>
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mt-2 mb-1">${t('Tool Plan')} (${r.toolPlan.length})</div>
+        ${r.toolPlan.length ? r.toolPlan.map((p,i) => `
+          <div class="card p-2 mb-1" style="background:rgba(0,0,0,0.2);">
+            <div class="text-[11px]"><span class="chip text-[9px]">${i+1}</span> <span class="font-semibold mono">${escapeHtml(p.action)}</span></div>
+            <pre class="mono text-[10px] mt-1" style="white-space:pre-wrap;">${escapeHtml(JSON.stringify(p.params, null, 2))}</pre>
+          </div>`).join('') : `<div class="empty text-xs">${t('툴 호출 없음 — 모델이 텍스트로만 응답')}</div>`}
+        ${r.text ? `<div class="text-[11px] uppercase text-[var(--text-dim)] mt-3 mb-1">${t('텍스트 응답')}</div><div class="text-xs">${escapeHtml(r.text)}</div>` : ''}
+        ${r.imageWarning ? `<div class="text-[11px] mt-2" style="color:#fcd34d;">⚠ ${escapeHtml(r.imageWarning)}</div>` : ''}
+      </div>`;
+  } catch (e) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(e.message)}</div>`; }
+}
+
+VIEWS.memoryLab = async () => {
+  const ex = await api('/api/memory-lab/examples');
+  const hist = await api('/api/memory-lab/history');
+  const blocks = await api('/api/memory-lab/blocks');
+  const items = (hist.items || []).slice(0, 10);
+  const examples = (ex.examples || []).map(e =>
+    `<button class="chip text-[10px] cursor-pointer" onclick="document.getElementById('mlPrompt').value=${jsonAttr(e.prompt)};">${escapeHtml(e.title)}</button>`).join(' ');
+  return `
+    <h1 class="text-2xl font-bold mb-1">🧩 ${t('Memory Lab')}</h1>
+    <p class="text-sm text-[var(--text-mute)] mb-4">${t('Anthropic memory-2025-08-18 beta · 서버측 memory blocks 라운드트립')}</p>
+    <div class="card p-4 mb-3">
+      <div class="flex flex-wrap gap-1 mb-2">${examples}</div>
+      <textarea id="mlPrompt" class="input w-full" rows="3" placeholder="${t('예: 내 이름은 Alex 이고 간결한 답변 선호. 기억해줘.')}"></textarea>
+      <div class="flex items-center gap-2 mt-2">
+        <select id="mlModel" class="input">${(ex.models||[]).map(m => `<option>${m}</option>`).join('')}</select>
+        <button class="btn-primary btn" onclick="_mlRun()">▶ ${t('실행')}</button>
+      </div>
+    </div>
+    <div id="mlResult" class="mb-3"></div>
+    ${(blocks.items && blocks.items.length) ? `
+    <div class="card p-3 mb-3">
+      <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">📦 ${t('관찰된 메모리 블록')} (${blocks.items.length})</div>
+      ${blocks.items.slice(0,20).map(b => `<div class="flex gap-2 py-1 border-b border-[var(--border)] text-[11px]">
+        <span class="mono font-semibold">${escapeHtml(b.key||'')}</span>
+        <span class="flex-1 truncate text-[var(--text-mute)]">${escapeHtml(b.value||'')}</span>
+      </div>`).join('')}
+    </div>` : ''}
+    ${items.length ? `
+    <div class="card p-3 mb-3">
+      <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('최근 호출')}</div>
+      ${items.map(h => `<div class="py-1 border-b border-[var(--border)] text-[11px]">
+        <div class="flex items-center gap-2"><span class="mono">${h.model}</span><span class="flex-1 truncate">${escapeHtml(h.prompt||'')}</span>
+          <span class="chip text-[10px]">${(h.memoryEvents||[]).length} ${t('이벤트')}</span>
+          <span class="text-[10px] text-[var(--text-dim)]">$${(h.costUsd||0).toFixed(4)}</span></div>
+      </div>`).join('')}
+    </div>` : ''}
+  `;
+};
+async function _mlRun() {
+  const prompt = document.getElementById('mlPrompt').value;
+  const model = document.getElementById('mlModel').value;
+  const out = document.getElementById('mlResult');
+  if (out) out.innerHTML = `<div class="card p-4 text-center text-xs">${t('실행 중…')}</div>`;
+  try {
+    const r = await api('/api/memory-lab/run', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt, model }) });
+    if (!r.ok) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(r.error||'')}</div>`; return; }
+    out.innerHTML = `
+      <div class="card p-4">
+        <div class="flex flex-wrap gap-2 text-[11px] mb-2">
+          <span class="chip">${escapeHtml(r.model)}</span>
+          <span class="chip">${r.tokensIn}/${r.tokensOut} tok</span>
+          <span class="chip">$${(r.costUsd||0).toFixed(4)}</span>
+          <span class="chip">${r.durationMs}ms</span>
+        </div>
+        ${r.memoryEvents.length ? `<div class="text-[11px] uppercase text-[var(--text-dim)] mt-2 mb-1">${t('메모리 이벤트')} (${r.memoryEvents.length})</div>
+          ${r.memoryEvents.map(ev => `<div class="card p-2 mb-1" style="background:rgba(0,0,0,0.2);">
+            <span class="chip chip-accent text-[10px]">${escapeHtml(ev.op)}</span>
+            <span class="mono text-[11px] ml-2">${escapeHtml(ev.key||'(no key)')}</span>
+            ${ev.value ? `<div class="text-[11px] mt-1" style="color:var(--text-mute);">${escapeHtml(ev.value)}</div>` : ''}
+          </div>`).join('')}` : `<div class="empty text-xs">${t('메모리 이벤트 없음 — 모델이 메모리를 사용하지 않음')}</div>`}
+        ${r.text ? `<div class="text-[11px] uppercase text-[var(--text-dim)] mt-3 mb-1">${t('응답')}</div><div class="text-xs">${escapeHtml(r.text)}</div>` : ''}
+      </div>`;
+  } catch (e) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(e.message)}</div>`; }
+}
+
+VIEWS.advisorLab = async () => {
+  const ex = await api('/api/advisor-lab/examples');
+  const hist = await api('/api/advisor-lab/history');
+  const items = (hist.items || []).slice(0, 10);
+  const examples = (ex.examples || []).map(e =>
+    `<button class="chip text-[10px] cursor-pointer" onclick="document.getElementById('alPrompt').value=${jsonAttr(e.prompt)};">${escapeHtml(e.title)}</button>`).join(' ');
+  return `
+    <h1 class="text-2xl font-bold mb-1">🧭 ${t('Advisor Lab')}</h1>
+    <p class="text-sm text-[var(--text-mute)] mb-4">${t('Executor (저비용/빠름) + Advisor (고지능/느림) 페어링 — 비용/품질 델타 시각화')}</p>
+    <div class="card p-4 mb-3">
+      <div class="flex flex-wrap gap-1 mb-2">${examples}</div>
+      <textarea id="alPrompt" class="input w-full" rows="3" placeholder="${t('동일 프롬프트가 두 모델에 보내지고 결과가 비교됩니다.')}"></textarea>
+      <div class="flex items-center gap-2 mt-2 flex-wrap">
+        <label class="text-xs">${t('Executor')}: <select id="alExec" class="input">${(ex.executors||[]).map(m => `<option>${m}</option>`).join('')}</select></label>
+        <label class="text-xs">${t('Advisor')}: <select id="alAdv" class="input">${(ex.advisors||[]).map(m => `<option ${m==='claude-opus-4-7'?'selected':''}>${m}</option>`).join('')}</select></label>
+        <button class="btn-primary btn" onclick="_alRun()">▶ ${t('실행')}</button>
+      </div>
+    </div>
+    <div id="alResult" class="mb-3"></div>
+    ${items.length ? `
+    <div class="card p-3 mb-3">
+      <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('최근 호출')}</div>
+      ${items.map(h => `<div class="py-1 border-b border-[var(--border)] text-[11px] flex flex-wrap gap-2">
+        <span class="mono">${h.executor}→${h.advisor}</span>
+        <span class="flex-1 truncate">${escapeHtml(h.prompt||'')}</span>
+        <span class="text-[10px] text-[var(--text-dim)]">$${(h.costUsd||0).toFixed(4)}</span>
+        <span class="text-[10px] text-[var(--text-dim)]">${h.durationMs}ms</span>
+      </div>`).join('')}
+    </div>` : ''}
+  `;
+};
+async function _alRun() {
+  const prompt = document.getElementById('alPrompt').value;
+  const executor = document.getElementById('alExec').value;
+  const advisor = document.getElementById('alAdv').value;
+  const out = document.getElementById('alResult');
+  if (out) out.innerHTML = `<div class="card p-4 text-center text-xs">${t('실행 중 (executor → advisor)…')}</div>`;
+  try {
+    const r = await api('/api/advisor-lab/run', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt, executor, advisor }) });
+    if (!r.ok) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(r.error||'')}${r.stage?` (${r.stage})`:''}</div>`; return; }
+    const e1 = r.executor, e2 = r.advisor, dl = r.delta;
+    out.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+        <div class="card p-4">
+          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">⚡ ${t('Executor')}</div>
+          <div class="font-semibold text-sm mb-2 mono">${escapeHtml(e1.model)}</div>
+          <div class="flex gap-2 mb-2 text-[11px]"><span class="chip">${e1.tokensIn}/${e1.tokensOut} tok</span><span class="chip">$${e1.costUsd.toFixed(4)}</span><span class="chip">${e1.durationMs}ms</span></div>
+          <div class="text-xs" style="white-space:pre-wrap;">${escapeHtml(e1.response||'')}</div>
+        </div>
+        <div class="card p-4" style="border-color:rgba(244,114,182,0.3);">
+          <div class="text-[11px] uppercase" style="color:#f9a8d4;">🧭 ${t('Advisor')}</div>
+          <div class="font-semibold text-sm mb-2 mono">${escapeHtml(e2.model)}</div>
+          <div class="flex gap-2 mb-2 text-[11px]"><span class="chip">${e2.tokensIn}/${e2.tokensOut} tok</span><span class="chip">$${e2.costUsd.toFixed(4)}</span><span class="chip">${e2.durationMs}ms</span></div>
+          <div class="text-xs" style="white-space:pre-wrap;">${escapeHtml(e2.response||'')}</div>
+        </div>
+      </div>
+      <div class="card p-3 text-[11px]">
+        <span class="font-semibold">${t('델타')}:</span>
+        <span class="ml-2">${t('토큰')}: ${dl.tokensDiff>0?'+':''}${dl.tokensDiff}</span>
+        <span class="ml-2">${t('비용')}: ${dl.costDiff>0?'+':''}$${dl.costDiff.toFixed(4)}</span>
+        <span class="ml-2">${t('지연')}: ${dl.latencyDiff>0?'+':''}${dl.latencyDiff}ms</span>
+      </div>`;
+  } catch (e) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(e.message)}</div>`; }
+}
+
+VIEWS.routines = async () => {
+  const r = await api('/api/routines/list');
+  const items = r.items || [];
+  return `
+    <div class="mb-4 flex items-start justify-between gap-2 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">🔁 ${t('Claude Code Routines')}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${t('Path:')} <code class="mono">${escapeHtml(r.dir||'~/.claude/scheduled-tasks')}</code></p>
+      </div>
+      <button class="btn-primary btn" onclick="_routineEdit()">＋ ${t('새 루틴')}</button>
+    </div>
+    ${items.length ? `<div class="grid gap-2" style="grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));">
+      ${items.map(it => `<div class="card p-3" style="background:rgba(167,139,250,0.04);">
+        <div class="font-semibold text-sm mono mb-1 truncate">${escapeHtml(it.name)} ${it.enabled?'':'<span class="chip chip-warn text-[9px]">disabled</span>'}</div>
+        <div class="text-[11px] text-[var(--text-mute)] line-clamp-2 mb-1" style="min-height:2em;">${escapeHtml(it.description||'')}</div>
+        <div class="text-[10px] text-[var(--text-dim)] mb-1">${t('스케줄')}: <span class="mono">${escapeHtml(it.schedule||'(none)')}</span></div>
+        <pre class="mono text-[10px]" style="background:rgba(0,0,0,0.3);padding:6px;border-radius:6px;max-height:80px;overflow:auto;">${escapeHtml(it.command||'(empty)')}</pre>
+        <div class="flex gap-1 mt-2 flex-wrap">
+          <button class="btn text-[10px]" onclick="_routineRun('${escapeHtml(it.name)}', false)">▶ ${t('실행')}</button>
+          <button class="btn text-[10px]" onclick="_routineRun('${escapeHtml(it.name)}', true)">👁 ${t('Dry-run')}</button>
+          <button class="btn text-[10px]" onclick="_routineEdit('${escapeHtml(it.name)}')">${t('편집')}</button>
+          <button class="btn text-[10px]" style="color:#fca5a5;" onclick="_routineDelete('${escapeHtml(it.name)}')">${t('삭제')}</button>
+        </div>
+      </div>`).join('')}</div>` : `<div class="card empty">${t('루틴이 없습니다. ＋ 새 루틴 으로 만들어보세요.')}</div>`}
+  `;
+};
+async function _routineEdit(name) {
+  let initial = { name: name || '', description: '', schedule: '0 */6 * * *', command: '', cwd: '~/', enabled: true };
+  if (name) {
+    const r = await api('/api/routines/get/' + encodeURIComponent(name));
+    if (r.ok) initial = r.meta;
+  }
+  showModal(`
+    <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+      <h2 class="text-lg font-bold">🔁 ${name ? t('루틴 편집') : t('새 루틴')}</h2>
+      <button class="btn-ghost btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="p-5 overflow-y-auto" style="max-height:75vh;">
+      <label class="block mb-2"><div class="text-xs font-semibold mb-1">${t('이름')} *</div>
+        <input id="rtName" class="input w-full mono" value="${escapeHtml(initial.name)}" ${name?'readonly':''} placeholder="my-routine"></label>
+      <label class="block mb-2"><div class="text-xs font-semibold mb-1">${t('설명')}</div>
+        <input id="rtDesc" class="input w-full" value="${escapeHtml(initial.description)}"></label>
+      <label class="block mb-2"><div class="text-xs font-semibold mb-1">${t('스케줄 (cron)')}</div>
+        <input id="rtSched" class="input w-full mono" value="${escapeHtml(initial.schedule)}" placeholder="0 */6 * * *"></label>
+      <label class="block mb-2"><div class="text-xs font-semibold mb-1">${t('명령')} *</div>
+        <textarea id="rtCmd" class="input w-full mono" rows="3" placeholder="claude --print 'do the thing'">${escapeHtml(initial.command)}</textarea></label>
+      <label class="block mb-2"><div class="text-xs font-semibold mb-1">${t('작업 디렉토리 (cwd)')}</div>
+        <input id="rtCwd" class="input w-full mono" value="${escapeHtml(initial.cwd)}" placeholder="~/work/proj"></label>
+      <label class="flex items-center gap-2 mb-3"><input type="checkbox" id="rtEnabled" ${initial.enabled?'checked':''}/> <span class="text-xs">${t('활성')}</span></label>
+      <div class="flex gap-2 pt-3 border-t border-[var(--border)]">
+        <button class="btn-primary btn" onclick="_routineSave()">💾 ${t('저장')}</button>
+        <button class="btn" onclick="closeModal()">${t('취소')}</button>
+      </div>
+    </div>
+  `);
+}
+async function _routineSave() {
+  const body = {
+    name: document.getElementById('rtName').value.trim(),
+    description: document.getElementById('rtDesc').value,
+    schedule: document.getElementById('rtSched').value,
+    command: document.getElementById('rtCmd').value,
+    cwd: document.getElementById('rtCwd').value,
+    enabled: document.getElementById('rtEnabled').checked,
+  };
+  if (!body.name || !body.command) { toast(t('이름과 명령이 필요합니다'), 'err'); return; }
+  try {
+    const r = await api('/api/routines/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (r.ok) { toast(t('저장됨'), 'ok'); closeModal(); renderView(); }
+    else toast(t('저장 실패: ') + (r.error||''), 'err');
+  } catch (e) { toast(t('저장 실패: ') + e.message, 'err'); }
+}
+async function _routineDelete(name) {
+  if (!confirm(t('이 루틴을 삭제할까요?'))) return;
+  const r = await api('/api/routines/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name}) });
+  if (r.ok) { toast(t('삭제됨'), 'ok'); renderView(); }
+  else toast(t('삭제 실패: ') + (r.error||''), 'err');
+}
+async function _routineRun(name, dryRun) {
+  if (!dryRun && !confirm(t('이 루틴을 지금 실행할까요?'))) return;
+  toast(dryRun ? t('Dry-run…') : t('실행 중…'), 'info');
+  const r = await api('/api/routines/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, dryRun}) });
+  showModal(`
+    <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+      <h2 class="text-lg font-bold">${dryRun ? '👁 ' : '▶ '}${escapeHtml(name)} ${r.ok ? '✓' : '✗'}</h2>
+      <button class="btn-ghost btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="p-5 overflow-y-auto" style="max-height:75vh;">
+      ${r.command ? `<div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">${t('명령')}</div><pre class="mono text-[11px] mb-3" style="background:rgba(0,0,0,0.3);padding:6px;border-radius:6px;">${escapeHtml(r.command)}</pre>` : ''}
+      ${r.cwd ? `<div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">cwd</div><pre class="mono text-[11px] mb-3">${escapeHtml(r.cwd)}</pre>` : ''}
+      ${r.error ? `<div style="color:#fca5a5;">${escapeHtml(r.error)}</div>` : ''}
+      ${r.stdout ? `<div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">stdout (returncode=${r.returncode}, ${r.durationMs}ms)</div><pre class="mono text-[11px] mb-3" style="background:rgba(0,0,0,0.3);padding:6px;border-radius:6px;max-height:240px;overflow:auto;white-space:pre-wrap;">${escapeHtml(r.stdout)}</pre>` : ''}
+      ${r.stderr ? `<div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">stderr</div><pre class="mono text-[11px]" style="background:rgba(50,0,0,0.2);padding:6px;border-radius:6px;max-height:240px;overflow:auto;white-space:pre-wrap;">${escapeHtml(r.stderr)}</pre>` : ''}
+    </div>
+  `);
 }
 
 // ────────────────────────────────────────────────────────────────

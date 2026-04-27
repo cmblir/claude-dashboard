@@ -156,6 +156,21 @@ from .agent_teams import (
     api_agent_teams_delete, api_agent_teams_get, api_agent_teams_list,
     api_agent_teams_save, api_agent_teams_spawn,
 )
+from .computer_use_lab import (
+    api_computer_use_examples, api_computer_use_history, api_computer_use_run,
+)
+from .memory_lab import (
+    api_memory_lab_blocks, api_memory_lab_examples, api_memory_lab_history,
+    api_memory_lab_run,
+)
+from .routines import (
+    api_routines_delete, api_routines_get, api_routines_list,
+    api_routines_run, api_routines_save,
+)
+from .advisor_lab import (
+    api_advisor_lab_examples, api_advisor_lab_history, api_advisor_lab_models,
+    api_advisor_lab_run,
+)
 
 
 def _ai_providers_by_cap(query: dict) -> dict:
@@ -328,6 +343,15 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/hyper-agents/list": api_hyper_list,
     "/api/hooks/recent-blocks": api_recent_blocked_hooks,
     "/api/agent-teams/list": api_agent_teams_list,
+    "/api/computer-use-lab/examples": api_computer_use_examples,
+    "/api/computer-use-lab/history":  api_computer_use_history,
+    "/api/memory-lab/examples":       api_memory_lab_examples,
+    "/api/memory-lab/history":        api_memory_lab_history,
+    "/api/memory-lab/blocks":         api_memory_lab_blocks,
+    "/api/routines/list":             api_routines_list,
+    "/api/advisor-lab/examples":      api_advisor_lab_examples,
+    "/api/advisor-lab/history":       api_advisor_lab_history,
+    "/api/advisor-lab/models":        api_advisor_lab_models,
 }
 
 
@@ -473,6 +497,12 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/agent-teams/save":   api_agent_teams_save,
     "/api/agent-teams/delete": api_agent_teams_delete,
     "/api/agent-teams/spawn":  api_agent_teams_spawn,
+    "/api/computer-use-lab/run": api_computer_use_run,
+    "/api/memory-lab/run":       api_memory_lab_run,
+    "/api/routines/save":        api_routines_save,
+    "/api/routines/delete":      api_routines_delete,
+    "/api/routines/run":         api_routines_run,
+    "/api/advisor-lab/run":      api_advisor_lab_run,
 }
 
 
@@ -674,4 +704,5 @@ _ITEM_GET_ROUTES = [
     (re.compile(r"^/api/hyper-agents/get/([a-z0-9][a-z0-9_-]{0,63})$"), api_hyper_get),
     (re.compile(r"^/api/hyper-agents/history/([a-z0-9][a-z0-9_-]{0,63})$"), api_hyper_history),
     (re.compile(r"^/api/agent-teams/get/(tm-[a-z0-9]{6,16})$"), api_agent_teams_get),
+    (re.compile(r"^/api/routines/get/([a-z0-9][a-z0-9_-]{0,63})$"), api_routines_get),
 ]

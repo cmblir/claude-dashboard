@@ -10,6 +10,50 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.42.0] — 2026-04-27
+
+### 🖱️🧩🧭🔁 Four Anthropic features in one release — Computer Use / Memory / Advisor / Routines
+
+User asked which of `advisor tool` / `claude code routines` / `managed
+agents memory` / `computer use` were already in the dashboard. Answer
+was: 0 fully, 2 partially, 2 missing. This release fills the gap with
+**all four**, each as its own playground tab + backend module.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/computer_use_lab.py` (new, ~210 LoC) | Anthropic `computer-use-2025-01-24` beta tool playground. POSTs to `https://api.anthropic.com/v1/messages` with the `computer_20250124` tool definition + optional base64 screenshot, then surfaces the model's tool_use plan (sequence of `screenshot` / `key` / `mouse_*` calls). **Plan-only — the dashboard never moves the user's mouse or keyboard.** Validates screenshot path stays under `$HOME`, clamps screen size to (320..3840, 240..2160), per-call cost calc against bundled price table, history capped at 50. |
+| 2 | `server/memory_lab.py` (new, ~190 LoC) | Anthropic `memory-2025-08-18` beta playground. POSTs with `memory_20250818` tool, walks the response for `tool_use` blocks named `memory`, extracts every `op` (create/read/update/delete) into `memoryEvents`. New `api_memory_lab_blocks` aggregates observed memory blocks across history into a `{key:value}` snapshot so the user can see "what does the model remember about me?" without spelunking through Anthropic's server-side store. |
+| 3 | `server/advisor_lab.py` (new, ~240 LoC) | Pair a fast/cheap **executor** (Haiku 4.5 / Sonnet) with a smart/slow **advisor** (Opus). Sends the prompt to the executor first, then sends `User request + Executor draft` to the advisor with system prompt "review this draft", and surfaces both responses + a `delta {tokensDiff, costDiff, latencyDiff}` so the user can decide when the Opus tax is worth it. |
+| 4 | `server/routines.py` (new, ~210 LoC) | **Full CRUD over `~/.claude/scheduled-tasks/<name>.yaml`** (the existing tab was listing-only). Tiny line-based YAML extractor (no PyYAML — stdlib only) for `name/description/schedule/command/cwd/enabled`. Run-now endpoint uses `subprocess.run(shell=True, timeout=120)` with a strict cwd-under-`$HOME` guard; rejects anything outside. Stdout/stderr capped at 4 KB per stream. Dry-run mode returns the resolved command + cwd without executing. |
+| 5 | `server/routes.py` | Wired all 14 new endpoints — list/examples/history/run for each lab, plus get/save/delete for routines. Item-route added for `/api/routines/get/<name>`. |
+| 6 | `dist/index.html` `NAV` | 4 new tabs — `computerUseLab` / `memoryLab` / `advisorLab` (playground group), `routines` (config group). Each renders a compact form: example chips, prompt textarea, model select, ▶ Run button, results card, history block. |
+| 7 | `dist/index.html` `VIEWS.*` | Compact view implementations (~80 LoC each): inline `_cuRun()` / `_mlRun()` / `_alRun()` / routines `_routineEdit/_routineSave/_routineRun/_routineDelete` handlers. Routines tab also has a full edit modal. |
+| 8 | `tools/translations_manual_19.py` (new) | KO → EN/ZH for every new label, button, toast, confirm. `make i18n-refresh` passes 0 missing across 4012+ keys × 3 languages. |
+
+#### Live verification
+```
+GET /api/computer-use-lab/examples →  200  (5 presets, 4 models)
+GET /api/memory-lab/examples       →  200  (5 presets)
+GET /api/routines/list             →  200
+GET /api/advisor-lab/models        →  200  (3 executors, 2 advisors)
+UI: all 4 view headers render with 0 console errors:
+  🖱️ Computer Use Lab · 🧩 Memory Lab · 🧭 Advisor Lab · 🔁 Claude Code Routines
+```
+
+#### Compatibility
+- All 4 modules are self-contained — no schema or DB migration.
+- `_anthropic_key()` reads from the existing `aiProviders` tab key store
+  (or env `ANTHROPIC_API_KEY` via that store). Without a key the labs
+  surface `needKey: true` instead of crashing.
+- `routines.py` rejects `cwd` outside `$HOME` so a stray YAML can't
+  point the run-now endpoint at a system path.
+
+#### Per-feature pricing (USD per 1M tokens)
+- haiku-4-5: 1.0 / 5.0
+- sonnet-4-5/4-6: 3.0 / 15.0
+- opus-4-6/4-7: 15.0 / 75.0
+
+---
 ## [2.41.0] — 2026-04-27
 
 ### 👥 Agent Teams + 🤝 Recent sub-agent activity (with one-click CLI)
