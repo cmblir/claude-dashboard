@@ -15,6 +15,7 @@ Design rules:
 from __future__ import annotations
 
 import json
+import re
 import time
 from copy import deepcopy
 from pathlib import Path
@@ -50,6 +51,9 @@ PREFS_SCHEMA: dict[str, dict[str, tuple]] = {
         "sidebarCollapsed": ("bool", None),
         "mascotEnabled":    ("bool", None),
         "compactSidebar":   ("bool", None),
+        # v2.40.0 — sidebar discovery aids
+        "favoriteTabs":     ("list_str", (64, 64)),   # (max_items, max_item_len)
+        "recentTabsLimit":  ("int", (0, 20)),
     },
     "ai": {
         "defaultProvider":  ("str", 120),
@@ -94,6 +98,8 @@ DEFAULT_PREFS: dict[str, dict[str, Any]] = {
         "sidebarCollapsed": False,
         "mascotEnabled":    True,
         "compactSidebar":   False,
+        "favoriteTabs":     [],
+        "recentTabsLimit":  5,
     },
     "ai": {
         "defaultProvider":  "claude:sonnet",
@@ -170,6 +176,27 @@ def _coerce(kind: str, constraint: Any, raw: Any, default: Any) -> Any:
             if len(s) > constraint:
                 s = s[:constraint]
             return s
+        if kind == "list_str":
+            # constraint = (max_items, max_item_len). Items must be valid
+            # ASCII identifiers (tab id shape); duplicates dropped.
+            if not isinstance(raw, list):
+                return list(default) if isinstance(default, list) else []
+            max_items, max_item_len = constraint
+            out: list = []
+            seen: set = set()
+            for v in raw:
+                if not isinstance(v, str):
+                    continue
+                s = v.strip()[:max_item_len]
+                if not re.match(r"^[A-Za-z][A-Za-z0-9_-]{0,63}$", s):
+                    continue
+                if s in seen:
+                    continue
+                seen.add(s)
+                out.append(s)
+                if len(out) >= max_items:
+                    break
+            return out
     except Exception:
         return default
     return default
@@ -300,6 +327,8 @@ def _serialise_schema() -> dict:
                 entry["min"], entry["max"] = cons
             elif kind == "str":
                 entry["maxLen"] = cons
+            elif kind == "list_str":
+                entry["maxItems"], entry["maxItemLen"] = cons
             out[section][key] = entry
     return out
 

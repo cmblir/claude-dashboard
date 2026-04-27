@@ -27,6 +27,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 | 버전 | 요점 |
 |---|---|
+| **v2.40.0** | ⚡ **Hyper Agent → 프로젝트 서브 에이전트** + 🧭 **사이드바 발견 강화** (즐겨찾기 + 최근 + `/`). Hyper 토글이 `<cwd>/.claude/agents/<name>.md` 에도 적용되며, composite-key 네임스페이스로 같은 이름의 글로벌과 프로젝트 에이전트가 메타·목표·이력을 독립적으로 유지. 사이드바에 ★ 즐겨찾기 블록 (호버 시 토글), 🕒 최근 사용 MRU (`go()` 호출에서 자동 적립, prefs 로 cap), `/` 단독 키로 Spotlight 즉시 호출 — 카테고리 재편 없이 경로만 단축. |
 | **v2.39.0** | ⚡ **Hyper Agent** — 서브 에이전트가 스스로 정교화. 글로벌 쓰기 가능 에이전트 카드마다 토글 제공. 목표·refine 대상(systemPrompt / tools / description)·트리거(manual / interval / after_session / any) 설정 후 메타 LLM(Opus 기본)이 surgical 수정안을 제안 → `.bak.md` 백업과 함께 원자적 적용 → 매 이터레이션 한 번에 롤백 가능. 예산 한도, dry-run 미리보기, 펼치는 diff 뷰어, 히스토리 타임라인. |
 | **v2.38.0** | ⚡ **빠른 설정** — `⌘,` / `Ctrl+,` 하나로 모든 대시보드 파라미터를 토글하는 드로어. UI · AI · Behavior · Workflow 4개 섹션, 33개 키 (effort, temperature, 강조 색, 밀도, 글자 크기, 모션 감소, 텔레메트리 갱신, autoResume, 마스코트…). 스키마 기반 컨트롤(토글 / 세그먼트 / 셀렉트 / 슬라이더 / 텍스트), 서버 측 엄격 검증, `~/.claude-dashboard-prefs.json` 원자적 영속화. |
 | **v2.37.0** | 🔄 **Auto-Resume** — 살아있는 Claude 세션에 자가치유 재시도 루프 주입. 백그라운드 워커가 종료 사유(레이트/컨텍스트/인증/알 수 없음) 분류, 정확한 리셋 시각 파싱, `claude --resume <id>` 지수 백오프, 스냅샷 해시 정체 감지, 프로젝트별 Stop+SessionStart Hook 자동 설치까지. 세션 디테일 모달에 패널, 세션 목록에 🔄 AR 뱃지. |

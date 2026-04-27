@@ -1,31 +1,40 @@
 """Hyper Agent — sub-agents that self-refine their own settings over time.
 
-A "hyper" sub-agent is a regular Claude Code agent (`~/.claude/agents/<name>.md`)
+A "hyper" sub-agent is a regular Claude Code agent (`<scope>/agents/<name>.md`)
 with an opt-in supervisor that periodically asks a meta-LLM (Opus by default)
 to propose refinements to its system prompt, tool list, and description, given
 the user's stated objective and recent transcripts. Each proposal is applied
 atomically with a `.bak.md` backup so any iteration is reversible.
 
-Storage:
-- Agent body itself stays in ``~/.claude/agents/<name>.md`` (Claude Code
-  compatible, no schema change).
-- Meta + history live in ``~/.claude-dashboard-hyper-agents.json``.
-- Per-iteration backup at ``~/.claude/agents/<name>.<ts>.bak.md``.
+Scope:
+- ``cwd=None`` → global writeable agent at ``~/.claude/agents/<name>.md``.
+- ``cwd=<path>`` → project-scoped agent at ``<cwd>/.claude/agents/<name>.md``.
+  (v2.40.0)
 
-Public API:
-- ``load_meta()`` / ``save_meta(meta)`` — read/write the index.
-- ``configure_agent(name, patch)`` — toggle + set objective + targets + trigger.
-- ``refine_agent(name, *, trigger, dry_run=False)`` — main refinement pipeline.
-- ``apply_proposal(name, proposal, *, trigger, cost_usd, tokens)`` — write file
-  + .bak + history; called by ``refine_agent`` and tests.
-- ``rollback(name, version_ts)`` — restore from a backup file.
-- ``list_hyper()`` / ``get_hyper(name)`` / ``history(name)`` — dashboard reads.
+Storage:
+- Agent body itself stays in its scope-native ``.md`` (Claude Code compatible,
+  no schema change).
+- Meta + history live in ``~/.claude-dashboard-hyper-agents.json`` keyed by a
+  composite ``<scope>:<id>``:
+    * global: ``global:<name>``
+    * project: ``project:<sha8(cwd)>:<name>``
+  Legacy flat keys (``<name>`` alone, written by v2.39.0) are still recognised
+  on read as global; subsequent writes use the canonical composite form.
+- Per-iteration backup at ``<scope>/agents/<name>.<ts>.bak.md``.
+
+Public API (all accept ``cwd: str | None = None`` for project scope):
+- ``configure_agent(name, patch, cwd=None)``
+- ``refine_agent(name, *, trigger, dry_run=False, cwd=None, transcripts=None)``
+- ``apply_proposal(name, proposal, *, ..., cwd=None)``
+- ``rollback(name, version_ts, cwd=None)``
+- ``list_hyper()`` / ``get_hyper(name, cwd=None)`` / ``history(name, cwd=None)``
 - ``api_*`` HTTP entrypoints registered by ``server/routes.py``.
 
 The actual after-session / cron triggers live in ``server/hyper_agent_worker.py``.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import time
@@ -35,7 +44,10 @@ from typing import Any
 from .agents import _BUILTIN_AGENTS, get_agent
 from .config import AGENTS_DIR, _env_path
 from .logger import log
-from .utils import _safe_read, _safe_write
+from .utils import (
+    _parse_frontmatter, _parse_tools_field,
+    _safe_read, _safe_write, _strip_frontmatter,
+)
 
 
 HYPER_AGENTS_PATH = _env_path(
@@ -47,16 +59,23 @@ HYPER_AGENTS_PATH = _env_path(
 # ───────── Schema ─────────
 
 _VALID_TARGETS = {"systemPrompt", "tools", "description"}
-_VALID_TRIGGERS = {"manual", "after_session", "cron", "any"}
+_VALID_TRIGGERS = {"manual", "after_session", "cron", "any", "interval"}
 _AGENT_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+# Composite key shapes — global:NAME or project:HEX:NAME (HEX = sha1[:8])
+_COMPOSITE_KEY_RE = re.compile(
+    r"^(?:global:[a-z0-9][a-z0-9_-]{0,63}"
+    r"|project:[0-9a-f]{8}:[a-z0-9][a-z0-9_-]{0,63})$"
+)
 
 
 def _empty_meta() -> dict:
-    return {"version": 1, "agents": {}}
+    return {"version": 2, "agents": {}}
 
 
 def _default_agent_meta() -> dict:
     return {
+        "scope":              "global",   # "global" | "project"
+        "cwd":                "",          # set when scope == "project"
         "enabled":            False,
         "objective":          "",
         "refineTargets":      ["systemPrompt"],
@@ -80,6 +99,10 @@ def _coerce_agent_meta(raw: Any) -> dict:
     if not isinstance(raw, dict):
         return base
     out = dict(base)
+
+    scope = str(raw.get("scope") or "global")
+    out["scope"] = scope if scope in ("global", "project") else "global"
+    out["cwd"] = str(raw.get("cwd") or "")[:1024]
 
     out["enabled"] = bool(raw.get("enabled", False))
 
@@ -154,11 +177,55 @@ def _coerce_history_entry(h: dict) -> dict:
     }
 
 
+# ───────── Composite-key helpers ─────────
+
+def _cwd_hash(cwd: str) -> str:
+    """8-char sha1 of an absolute cwd. Stable for a given path string."""
+    return hashlib.sha1(str(cwd).encode("utf-8")).hexdigest()[:8]
+
+
+def _agent_key(name: str, cwd: str | None = None) -> str:
+    """Canonical composite key used in the meta JSON."""
+    if cwd:
+        return f"project:{_cwd_hash(cwd)}:{name}"
+    return f"global:{name}"
+
+
+def _legacy_flat_key(name: str) -> str:
+    """v2.39.0 wrote bare ``<name>`` for global agents. Keep recognising it."""
+    return name
+
+
+def _resolve_meta_key(meta: dict, name: str, cwd: str | None = None) -> str:
+    """Return the actual key under which this agent's meta is stored.
+
+    Preference order:
+      1. canonical composite key (post-v2.40.0 writes use this)
+      2. legacy flat key (v2.39.0 writes — only meaningful when cwd is None)
+      3. canonical composite key (used as the *write* target for new entries)
+    """
+    canonical = _agent_key(name, cwd)
+    agents = (meta or {}).get("agents") or {}
+    if canonical in agents:
+        return canonical
+    if not cwd and _legacy_flat_key(name) in agents:
+        return _legacy_flat_key(name)
+    return canonical
+
+
+def _agents_dir(cwd: str | None) -> Path:
+    """Return the directory holding the .md file for this agent's scope."""
+    if cwd:
+        return Path(cwd) / ".claude" / "agents"
+    return AGENTS_DIR
+
+
 # ───────── Persistence ─────────
 
 def load_meta() -> dict:
     """Return meta with defaults applied for every entry. Safe even on missing
-    or corrupted file."""
+    or corrupted file. Both legacy flat keys and v2.40 composite keys are kept
+    intact — callers use ``_resolve_meta_key`` to look up either form."""
     if not HYPER_AGENTS_PATH.exists():
         return _empty_meta()
     raw = _safe_read(HYPER_AGENTS_PATH)
@@ -174,10 +241,12 @@ def load_meta() -> dict:
     out = _empty_meta()
     agents_in = data.get("agents") or {}
     if isinstance(agents_in, dict):
-        for name, entry in agents_in.items():
-            if not _AGENT_NAME_RE.match(str(name)):
+        for key, entry in agents_in.items():
+            key_s = str(key)
+            # Accept either composite or legacy flat (legal agent name) keys.
+            if not (_COMPOSITE_KEY_RE.match(key_s) or _AGENT_NAME_RE.match(key_s)):
                 continue
-            out["agents"][name] = _coerce_agent_meta(entry)
+            out["agents"][key_s] = _coerce_agent_meta(entry)
     return out
 
 
@@ -186,19 +255,49 @@ def save_meta(meta: dict) -> bool:
     return _safe_write(HYPER_AGENTS_PATH, text)
 
 
-def get_hyper(name: str) -> dict:
+def get_hyper(name: str, cwd: str | None = None) -> dict:
     """Return the meta for a single agent, creating defaults if absent."""
     m = load_meta()
-    return m["agents"].get(name) or _default_agent_meta()
+    key = _resolve_meta_key(m, name, cwd)
+    entry = m["agents"].get(key) or _default_agent_meta()
+    # Ensure scope/cwd reflect the lookup even for legacy entries.
+    if cwd:
+        entry["scope"] = "project"
+        entry["cwd"] = cwd
+    elif entry.get("scope") != "project":
+        entry["scope"] = "global"
+        entry["cwd"] = ""
+    return entry
+
+
+def _parse_key(key: str) -> tuple[str, str]:
+    """Return (scope, name) from a key. ``cwd`` itself isn't recoverable from
+    the hash, so callers that need it must look at ``entry['cwd']``."""
+    if key.startswith("global:"):
+        return "global", key[len("global:"):]
+    if key.startswith("project:"):
+        rest = key[len("project:"):]
+        parts = rest.split(":", 1)
+        if len(parts) == 2:
+            return "project", parts[1]
+    # legacy flat
+    return "global", key
 
 
 def list_hyper() -> dict:
     """List all agents with hyper meta (enabled or not)."""
     m = load_meta()
     items = []
-    for name, entry in m["agents"].items():
+    for key, entry in m["agents"].items():
+        scope_from_key, name = _parse_key(key)
+        # Prefer entry-level scope/cwd when present; otherwise derive from key.
+        scope = entry.get("scope") or scope_from_key
+        cwd = entry.get("cwd") or ""
         items.append({
+            "key":               key,
             "name":              name,
+            "scope":             scope,
+            "cwd":               cwd,
             "enabled":           entry["enabled"],
             "objective":         entry["objective"],
             "trigger":           entry["trigger"],
@@ -210,51 +309,62 @@ def list_hyper() -> dict:
             "refineTargets":     entry["refineTargets"],
             "refineProvider":    entry["refineProvider"],
         })
-    items.sort(key=lambda r: (-int(r["enabled"]), -r["lastRefinedAt"], r["name"]))
+    items.sort(key=lambda r: (-int(r["enabled"]), -r["lastRefinedAt"], r["scope"], r["name"]))
     return {"items": items, "count": len(items)}
 
 
-def history(name: str) -> dict:
-    entry = get_hyper(name)
-    return {"name": name, "history": entry.get("history", [])}
+def history(name: str, cwd: str | None = None) -> dict:
+    entry = get_hyper(name, cwd)
+    return {"name": name, "cwd": cwd or "", "history": entry.get("history", [])}
 
 
 # ───────── Configuration ─────────
 
-def _is_writable_agent(name: str) -> tuple[bool, str]:
-    """Hyper Agent only applies to writeable global agents — skip builtin /
-    plugin / unknown."""
+def _is_writable_agent(name: str, cwd: str | None = None) -> tuple[bool, str]:
+    """Hyper Agent only applies to writeable agents — skip builtin / plugin /
+    unknown / nonexistent files. Project scope is always writeable when the
+    file exists."""
     if not _AGENT_NAME_RE.match(name):
         return False, "invalid agent name"
-    for b in _BUILTIN_AGENTS:
-        if b["id"] == name:
-            return False, "builtin agent is read-only"
-    if ":" in name:
-        return False, "plugin agent is read-only"
-    p = AGENTS_DIR / f"{name}.md"
+    if not cwd:
+        # Global scope guards
+        for b in _BUILTIN_AGENTS:
+            if b["id"] == name:
+                return False, "builtin agent is read-only"
+        if ":" in name:
+            return False, "plugin agent is read-only"
+    p = _agents_dir(cwd) / f"{name}.md"
     if not p.exists():
         return False, "agent file not found"
     return True, ""
 
 
-def configure_agent(name: str, patch: dict) -> dict:
+def configure_agent(name: str, patch: dict, cwd: str | None = None) -> dict:
     """Set objective / targets / trigger / budget for an agent. Creates the
     meta entry on first call."""
-    ok, why = _is_writable_agent(name)
+    ok, why = _is_writable_agent(name, cwd)
     if not ok:
         return {"ok": False, "error": why}
     meta = load_meta()
-    cur = meta["agents"].get(name) or _default_agent_meta()
+    canonical = _agent_key(name, cwd)
+    legacy = _resolve_meta_key(meta, name, cwd)
+    cur = meta["agents"].get(legacy) or _default_agent_meta()
     merged = dict(cur)
     if isinstance(patch, dict):
         merged.update(patch)
+    # Always force scope/cwd to match the call — patch can't override these.
+    merged["scope"] = "project" if cwd else "global"
+    merged["cwd"] = cwd or ""
     merged = _coerce_agent_meta(merged)
-    meta["agents"][name] = merged
+    # Migrate legacy flat key → canonical composite on first write.
+    if legacy != canonical and legacy in meta["agents"]:
+        meta["agents"].pop(legacy, None)
+    meta["agents"][canonical] = merged
     return {"ok": save_meta(meta), "agent": merged}
 
 
-def toggle_agent(name: str, enabled: bool) -> dict:
-    return configure_agent(name, {"enabled": bool(enabled)})
+def toggle_agent(name: str, enabled: bool, cwd: str | None = None) -> dict:
+    return configure_agent(name, {"enabled": bool(enabled)}, cwd=cwd)
 
 
 # ───────── Refinement engine ─────────
@@ -285,8 +395,30 @@ Rules:
 """
 
 
-def _read_agent_file(name: str) -> dict:
-    """Read the agent .md file and return parsed parts."""
+def _read_agent_file(name: str, cwd: str | None = None) -> dict:
+    """Read the agent .md file and return parsed parts.
+
+    Global scope reuses ``server.agents.get_agent``. Project scope reads the
+    file directly with ``_safe_read`` + ``_parse_frontmatter`` to avoid
+    crossing into builtin/plugin lookup paths.
+    """
+    if cwd:
+        p = _agents_dir(cwd) / f"{name}.md"
+        if not p.exists():
+            return {"error": "agent file not found"}
+        raw = _safe_read(p)
+        if raw is None:
+            return {"error": "agent file unreadable"}
+        meta = _parse_frontmatter(raw)
+        return {
+            "name":          meta.get("name", name),
+            "description":   meta.get("description", ""),
+            "model":         meta.get("model", "inherit"),
+            "tools":         _parse_tools_field(meta.get("tools", "")),
+            "systemPrompt":  _strip_frontmatter(raw),
+            "raw":           raw,
+            "path":          str(p),
+        }
     a = get_agent(name)
     if "error" in a:
         return {"error": a["error"]}
@@ -305,9 +437,10 @@ def _write_agent_file(name: str, *,
                       description: str,
                       model: str,
                       tools: list,
-                      system_prompt: str) -> bool:
-    """Re-emit ``~/.claude/agents/<name>.md`` from parts."""
-    p = AGENTS_DIR / f"{name}.md"
+                      system_prompt: str,
+                      cwd: str | None = None) -> bool:
+    """Re-emit ``<scope>/agents/<name>.md`` from parts."""
+    p = _agents_dir(cwd) / f"{name}.md"
     tools_str = ", ".join(t for t in tools) if tools else ""
     raw = (
         "---\n"
@@ -318,17 +451,17 @@ def _write_agent_file(name: str, *,
         "---\n\n"
         f"{system_prompt}\n"
     )
-    AGENTS_DIR.mkdir(parents=True, exist_ok=True)
+    p.parent.mkdir(parents=True, exist_ok=True)
     return _safe_write(p, raw)
 
 
-def _backup_agent(name: str, ts_ms: int) -> str:
+def _backup_agent(name: str, ts_ms: int, cwd: str | None = None) -> str:
     """Copy current agent file to ``<name>.<ts>.bak.md`` before overwriting.
     Returns the backup path (string), or empty string on failure."""
-    src = AGENTS_DIR / f"{name}.md"
+    src = _agents_dir(cwd) / f"{name}.md"
     if not src.exists():
         return ""
-    dst = AGENTS_DIR / f"{name}.{ts_ms}.bak.md"
+    dst = _agents_dir(cwd) / f"{name}.{ts_ms}.bak.md"
     try:
         dst.write_bytes(src.read_bytes())
         return str(dst)
@@ -379,18 +512,23 @@ def apply_proposal(name: str, proposal: dict, *,
                    cost_usd: float = 0.0,
                    tokens: int = 0,
                    targets: list | None = None,
-                   dry_run: bool = False) -> dict:
+                   dry_run: bool = False,
+                   cwd: str | None = None) -> dict:
     """Apply a meta-LLM proposal to the agent file. Always records to history."""
-    ok, why = _is_writable_agent(name)
+    ok, why = _is_writable_agent(name, cwd)
     if not ok:
         return {"ok": False, "error": why}
 
-    cur = _read_agent_file(name)
+    cur = _read_agent_file(name, cwd)
     if "error" in cur:
         return {"ok": False, "error": cur["error"]}
 
     meta = load_meta()
-    agent_meta = meta["agents"].get(name) or _default_agent_meta()
+    canonical = _agent_key(name, cwd)
+    legacy = _resolve_meta_key(meta, name, cwd)
+    agent_meta = meta["agents"].get(legacy) or _default_agent_meta()
+    agent_meta["scope"] = "project" if cwd else "global"
+    agent_meta["cwd"] = cwd or ""
 
     new_sys = proposal.get("newSystemPrompt") if isinstance(proposal, dict) else None
     new_tools = proposal.get("newTools") if isinstance(proposal, dict) else None
@@ -427,13 +565,14 @@ def apply_proposal(name: str, proposal: dict, *,
     write_ok = True
 
     if not dry_run and applied:
-        backup_path = _backup_agent(name, ts)
+        backup_path = _backup_agent(name, ts, cwd=cwd)
         write_ok = _write_agent_file(
             name,
             description=next_desc,
             model=cur["model"],
             tools=next_tools,
             system_prompt=next_sys,
+            cwd=cwd,
         )
 
     entry = _coerce_history_entry({
@@ -459,7 +598,9 @@ def apply_proposal(name: str, proposal: dict, *,
         agent_meta["lastError"] = ""
     agent_meta["history"] = (agent_meta.get("history") or []) + [entry]
     agent_meta["history"] = agent_meta["history"][-100:]
-    meta["agents"][name] = _coerce_agent_meta(agent_meta)
+    if legacy != canonical and legacy in meta["agents"]:
+        meta["agents"].pop(legacy, None)
+    meta["agents"][canonical] = _coerce_agent_meta(agent_meta)
     save_meta(meta)
 
     return {
@@ -473,12 +614,18 @@ def apply_proposal(name: str, proposal: dict, *,
         "scoreAfter":  score_after,
         "costUSD":     cost_usd,
         "tokens":      tokens,
+        "scope":       "project" if cwd else "global",
+        "cwd":         cwd or "",
     }
 
 
-def _record_failure(name: str, err: str) -> None:
+def _record_failure(name: str, err: str, cwd: str | None = None) -> None:
     meta = load_meta()
-    a = meta["agents"].get(name) or _default_agent_meta()
+    canonical = _agent_key(name, cwd)
+    legacy = _resolve_meta_key(meta, name, cwd)
+    a = meta["agents"].get(legacy) or _default_agent_meta()
+    a["scope"] = "project" if cwd else "global"
+    a["cwd"] = cwd or ""
     a["lastError"] = str(err)[:1000]
     a["history"] = (a.get("history") or []) + [_coerce_history_entry({
         "ts":      int(time.time() * 1000),
@@ -486,29 +633,33 @@ def _record_failure(name: str, err: str) -> None:
         "error":   err,
     })]
     a["history"] = a["history"][-100:]
-    meta["agents"][name] = _coerce_agent_meta(a)
+    if legacy != canonical and legacy in meta["agents"]:
+        meta["agents"].pop(legacy, None)
+    meta["agents"][canonical] = _coerce_agent_meta(a)
     save_meta(meta)
 
 
 def refine_agent(name: str, *, trigger: str = "manual",
                  dry_run: bool = False,
-                 transcripts: list[str] | None = None) -> dict:
+                 transcripts: list[str] | None = None,
+                 cwd: str | None = None) -> dict:
     """Main pipeline: load agent → call meta-LLM → apply proposal (or dry-run).
 
     ``transcripts`` is injected by the after-session worker; when omitted, no
     transcripts are passed (the meta-LLM still sees the agent definition + the
     objective and can refine generically).
     """
-    ok, why = _is_writable_agent(name)
+    ok, why = _is_writable_agent(name, cwd)
     if not ok:
         return {"ok": False, "error": why}
 
-    cur = _read_agent_file(name)
+    cur = _read_agent_file(name, cwd)
     if "error" in cur:
         return {"ok": False, "error": cur["error"]}
 
     meta = load_meta()
-    agent_meta = meta["agents"].get(name) or _default_agent_meta()
+    legacy = _resolve_meta_key(meta, name, cwd)
+    agent_meta = meta["agents"].get(legacy) or _default_agent_meta()
     if not agent_meta.get("enabled") and trigger != "manual":
         return {"ok": False, "error": "hyper-agent disabled for this agent"}
 
@@ -536,16 +687,16 @@ def refine_agent(name: str, *, trigger: str = "manual",
             timeout=180,
         )
     except Exception as e:
-        _record_failure(name, f"meta-llm call failed: {e}")
+        _record_failure(name, f"meta-llm call failed: {e}", cwd=cwd)
         return {"ok": False, "error": f"meta-llm call failed: {e}"}
 
     if resp.status != "ok":
-        _record_failure(name, f"meta-llm error: {resp.error}")
+        _record_failure(name, f"meta-llm error: {resp.error}", cwd=cwd)
         return {"ok": False, "error": resp.error}
 
     proposal = _parse_proposal(resp.output)
     if not proposal:
-        _record_failure(name, "could not parse JSON proposal")
+        _record_failure(name, "could not parse JSON proposal", cwd=cwd)
         return {"ok": False, "error": "could not parse JSON proposal"}
 
     return apply_proposal(
@@ -557,28 +708,33 @@ def refine_agent(name: str, *, trigger: str = "manual",
         tokens=resp.tokens_total,
         targets=targets,
         dry_run=dry_run,
+        cwd=cwd,
     )
 
 
-def rollback(name: str, version_ts: int) -> dict:
+def rollback(name: str, version_ts: int, cwd: str | None = None) -> dict:
     """Restore the agent from a `.bak.md` snapshot. ``version_ts`` is the
     epoch_ms saved in the history entry's ``backupPath``."""
-    ok, why = _is_writable_agent(name)
+    ok, why = _is_writable_agent(name, cwd)
     if not ok:
         return {"ok": False, "error": why}
-    bak = AGENTS_DIR / f"{name}.{int(version_ts)}.bak.md"
+    bak = _agents_dir(cwd) / f"{name}.{int(version_ts)}.bak.md"
     if not bak.exists():
         return {"ok": False, "error": "backup not found"}
-    target = AGENTS_DIR / f"{name}.md"
+    target = _agents_dir(cwd) / f"{name}.md"
     try:
         ts = int(time.time() * 1000)
-        _backup_agent(name, ts)
+        _backup_agent(name, ts, cwd=cwd)
         target.write_bytes(bak.read_bytes())
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
     meta = load_meta()
-    a = meta["agents"].get(name) or _default_agent_meta()
+    canonical = _agent_key(name, cwd)
+    legacy = _resolve_meta_key(meta, name, cwd)
+    a = meta["agents"].get(legacy) or _default_agent_meta()
+    a["scope"] = "project" if cwd else "global"
+    a["cwd"] = cwd or ""
     a["history"] = (a.get("history") or []) + [_coerce_history_entry({
         "ts":             ts,
         "trigger":        "rollback",
@@ -587,23 +743,60 @@ def rollback(name: str, version_ts: int) -> dict:
         "backupPath":     str(bak),
     })]
     a["history"] = a["history"][-100:]
-    meta["agents"][name] = _coerce_agent_meta(a)
+    if legacy != canonical and legacy in meta["agents"]:
+        meta["agents"].pop(legacy, None)
+    meta["agents"][canonical] = _coerce_agent_meta(a)
     save_meta(meta)
     return {"ok": True, "restoredFrom": str(bak)}
 
 
 # ───────── HTTP handlers ─────────
 
+def _body_cwd(body: dict) -> str | None:
+    """Extract optional ``cwd`` from a request body. Empty string → None."""
+    if not isinstance(body, dict):
+        return None
+    cwd = body.get("cwd")
+    if isinstance(cwd, str) and cwd.strip():
+        return cwd.strip()
+    return None
+
+
 def api_hyper_list(query: dict) -> dict:
     return {"ok": True, **list_hyper()}
 
 
 def api_hyper_get(name: str) -> dict:
+    """Path-param GET for global agents only. Project-scoped agents are
+    fetched via the POST endpoint below to avoid encoding cwd in the URL."""
     return {"ok": True, "name": name, "agent": get_hyper(name)}
+
+
+def api_hyper_get_post(body: dict) -> dict:
+    """POST /api/hyper-agents/get — body: {name, cwd?}.
+
+    Required for project-scoped lookups since cwd doesn't fit cleanly in a
+    URL path parameter."""
+    body = body or {}
+    name = str(body.get("name") or "")
+    if not name:
+        return {"ok": False, "error": "name required"}
+    cwd = _body_cwd(body)
+    return {"ok": True, "name": name, "cwd": cwd or "", "agent": get_hyper(name, cwd)}
 
 
 def api_hyper_history(name: str) -> dict:
     return {"ok": True, **history(name)}
+
+
+def api_hyper_history_post(body: dict) -> dict:
+    """POST /api/hyper-agents/history — body: {name, cwd?}."""
+    body = body or {}
+    name = str(body.get("name") or "")
+    if not name:
+        return {"ok": False, "error": "name required"}
+    cwd = _body_cwd(body)
+    return {"ok": True, **history(name, cwd)}
 
 
 def api_hyper_toggle(body: dict) -> dict:
@@ -612,7 +805,7 @@ def api_hyper_toggle(body: dict) -> dict:
     enabled = bool(body.get("enabled", False))
     if not name:
         return {"ok": False, "error": "name required"}
-    return toggle_agent(name, enabled)
+    return toggle_agent(name, enabled, cwd=_body_cwd(body))
 
 
 def api_hyper_configure(body: dict) -> dict:
@@ -621,7 +814,7 @@ def api_hyper_configure(body: dict) -> dict:
     if not name:
         return {"ok": False, "error": "name required"}
     patch = body.get("patch") if isinstance(body.get("patch"), dict) else {}
-    return configure_agent(name, patch)
+    return configure_agent(name, patch, cwd=_body_cwd(body))
 
 
 def api_hyper_refine_now(body: dict) -> dict:
@@ -630,7 +823,7 @@ def api_hyper_refine_now(body: dict) -> dict:
     if not name:
         return {"ok": False, "error": "name required"}
     dry = bool(body.get("dryRun", False))
-    return refine_agent(name, trigger="manual", dry_run=dry)
+    return refine_agent(name, trigger="manual", dry_run=dry, cwd=_body_cwd(body))
 
 
 def api_hyper_rollback(body: dict) -> dict:
@@ -642,4 +835,4 @@ def api_hyper_rollback(body: dict) -> dict:
         ts = 0
     if not name or not ts:
         return {"ok": False, "error": "name + versionTs required"}
-    return rollback(name, ts)
+    return rollback(name, ts, cwd=_body_cwd(body))

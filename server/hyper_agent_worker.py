@@ -65,14 +65,35 @@ def _interval_due(agent_meta: dict, now_ms: int) -> bool:
     return (now_ms - last) >= hours * 3600 * 1000
 
 
-def _recent_session_files(since_ms: int, limit: int) -> list[Path]:
-    """Return the most recent jsonl transcript files modified after ``since_ms``."""
+def _project_slug(cwd: str) -> str:
+    """Convert an absolute cwd to Claude Code's transcript-dir slug.
+
+    Claude Code stores per-project sessions under
+    ``~/.claude/projects/<slug>/`` where ``<slug>`` replaces every ``/`` in
+    the absolute path with ``-``. e.g. ``/Users/x/work/proj`` →
+    ``-Users-x-work-proj``.
+    """
+    return str(cwd).replace("/", "-")
+
+
+def _recent_session_files(since_ms: int, limit: int,
+                          cwd: str | None = None) -> list[Path]:
+    """Return the most recent jsonl transcript files modified after ``since_ms``.
+
+    When ``cwd`` is provided, only that project's transcript directory is
+    scanned — this prevents a project-scoped agent from being refined based on
+    chatter from a different project."""
     if not PROJECTS_DIR.exists():
         return []
     out: list[tuple[float, Path]] = []
-    for proj in PROJECTS_DIR.iterdir():
-        if not proj.is_dir():
-            continue
+    if cwd:
+        proj = PROJECTS_DIR / _project_slug(cwd)
+        if not proj.exists() or not proj.is_dir():
+            return []
+        candidates = [proj]
+    else:
+        candidates = [d for d in PROJECTS_DIR.iterdir() if d.is_dir()]
+    for proj in candidates:
         for jl in proj.glob("**/*.jsonl"):
             try:
                 mt = jl.stat().st_mtime * 1000
@@ -102,10 +123,14 @@ def _after_session_due(name: str, agent_meta: dict, now_ms: int) -> tuple[bool, 
     "Due" requires at least ``minSessionsBetween`` jsonl files newer than
     ``lastRefinedAt`` that mention the agent. Returns up to 5 short transcript
     snippets to feed the meta-LLM as context.
+
+    Project-scoped agents (entry has non-empty ``cwd``) restrict the scan to
+    that project's transcript dir so cross-project sessions don't trigger.
     """
     last = int(agent_meta.get("lastRefinedAt") or 0)
     threshold = int(agent_meta.get("minSessionsBetween") or 5)
-    files = _recent_session_files(since_ms=last, limit=_AFTER_SESSION_SCAN_LIMIT)
+    cwd = agent_meta.get("cwd") or None
+    files = _recent_session_files(since_ms=last, limit=_AFTER_SESSION_SCAN_LIMIT, cwd=cwd)
     matches = [p for p in files if _file_mentions_agent(p, name)]
     if len(matches) < max(1, threshold):
         return False, []
@@ -117,13 +142,37 @@ def _after_session_due(name: str, agent_meta: dict, now_ms: int) -> tuple[bool, 
     return True, snippets
 
 
-def _tick_one(name: str, agent_meta: dict, now_ms: int) -> None:
-    """Decide whether to fire for one agent and call ``refine_agent``."""
+def _parse_meta_key(key: str) -> tuple[str, str]:
+    """Return ``(scope, name)`` from a meta dict key.
+
+    Mirrors ``hyper_agent._parse_key`` — kept inline to avoid the import edge
+    case on shutdown when modules unwind in arbitrary order.
+    """
+    if key.startswith("global:"):
+        return "global", key[len("global:"):]
+    if key.startswith("project:"):
+        rest = key[len("project:"):]
+        parts = rest.split(":", 1)
+        if len(parts) == 2:
+            return "project", parts[1]
+    return "global", key  # legacy flat
+
+
+def _tick_one(meta_key: str, agent_meta: dict, now_ms: int) -> None:
+    """Decide whether to fire for one agent and call ``refine_agent``.
+
+    ``meta_key`` is the composite key from the JSON store
+    (``global:NAME`` / ``project:HASH:NAME`` / legacy ``NAME``); we extract the
+    actual agent name from it and pull ``cwd`` from the entry itself.
+    """
     if not agent_meta.get("enabled"):
         return
     trig = agent_meta.get("trigger") or "manual"
     if trig == "manual":
         return
+
+    _, name = _parse_meta_key(meta_key)
+    cwd = agent_meta.get("cwd") or None
 
     fire_interval = trig in ("interval", "cron", "any") and _interval_due(agent_meta, now_ms)
     fire_session  = False
@@ -135,9 +184,10 @@ def _tick_one(name: str, agent_meta: dict, now_ms: int) -> None:
         return
 
     actual_trigger = "after_session" if fire_session else "interval"
-    log.info("hyper-agent: refining %s (trigger=%s)", name, actual_trigger)
+    log.info("hyper-agent: refining %s%s (trigger=%s)",
+             name, f" @ {cwd}" if cwd else "", actual_trigger)
     try:
-        r = refine_agent(name, trigger=actual_trigger, transcripts=transcripts)
+        r = refine_agent(name, trigger=actual_trigger, transcripts=transcripts, cwd=cwd)
         if r.get("ok"):
             log.info("hyper-agent: %s refined — applied=%s cost=$%.4f",
                      name, r.get("applied"), r.get("costUSD") or 0.0)
@@ -154,10 +204,10 @@ def _loop() -> None:
         try:
             meta = load_meta()
             now_ms = int(time.time() * 1000)
-            for name, entry in (meta.get("agents") or {}).items():
+            for key, entry in (meta.get("agents") or {}).items():
                 if _STOP.is_set():
                     break
-                _tick_one(name, entry, now_ms)
+                _tick_one(key, entry, now_ms)
         except Exception as e:
             log.exception("hyper-agent loop iteration failed: %s", e)
         _STOP.wait(_TICK_SECONDS)

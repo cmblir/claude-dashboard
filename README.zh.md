@@ -27,6 +27,7 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 | 版本 | 重点 |
 |---|---|
+| **v2.40.0** | ⚡ **Hyper Agent → 项目级子代理** + 🧭 **侧栏发现优化**（收藏 + 最近 + `/`）。Hyper 开关现在适用于 `<cwd>/.claude/agents/<name>.md`，复合 key 命名空间让同名的全局代理和项目代理各自保留独立的元数据、目标和历史。侧栏新增置顶的 ★ 收藏区块（悬停时切换）、🕒 最近 MRU（自动从 `go()` 调用收集，由 prefs 设置上限）、`/` 单键直接打开现有的 Cmd-K Spotlight — 不重组分类，只缩短到达路径。 |
 | **v2.39.0** | ⚡ **Hyper Agent** — 子代理自我精炼。每个可写全局代理卡片上提供独立开关。设置目标 + 精炼范围（systemPrompt / tools / description）+ 触发器（manual / interval / after_session / any），元 LLM（默认 Opus）提出精准修改方案 — 配合 `.bak.md` 备份原子化应用，每次迭代可一键回滚。预算上限、dry-run 预览、可展开的 diff 查看器、历史时间线。 |
 | **v2.38.0** | ⚡ **快速设置** — 用一个键盘可达的抽屉（`⌘,` / `Ctrl+,`）切换所有仪表板参数。UI · AI · Behavior · Workflow 四个分区，共 33 个键（effort、temperature、强调色、密度、字体大小、减少动效、遥测刷新、autoResume、吉祥物等）。基于架构的控件（开关 / 分段 / 下拉 / 滑块 / 文本）、服务器端严格校验、`~/.claude-dashboard-prefs.json` 原子化持久化。 |
 | **v2.37.0** | 🔄 **Auto-Resume** — 向运行中的 Claude 会话注入自愈重试循环。后台工作进程对退出原因(速率限制 / 上下文超限 / 认证过期 / 未知)分类、解析精确重置时间、用 `claude --resume <id>` 指数退避、快照哈希停滞检测、项目级 Stop+SessionStart 钩子自动安装。会话详情模态框中提供面板,会话列表显示 🔄 AR 徽章。 |
