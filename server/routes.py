@@ -483,6 +483,10 @@ CONTENT_TYPES = {
     ".map": "application/json",
 }
 
+# v2.40.1 — process-wide static cache: {abs_path: (mtime, raw_bytes, gz_or_None)}.
+# Invalidates automatically when mtime changes (e.g. after a dist/index.html edit).
+_STATIC_CACHE: dict[str, tuple[float, bytes, "bytes | None"]] = {}
+
 
 # ───────── Handler ─────────
 
@@ -505,18 +509,45 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(403); self.end_headers(); return
         if not fp.exists() or not fp.is_file():
             fp = DIST / "index.html"
-        # i18n 은 이제 런타임 fetch (dist/locales/*.json). index.html 은 단일 파일만 서빙.
+        # v2.40.1 — mtime-keyed in-memory cache + on-the-fly gzip.
+        # dist/index.html is ~1.1 MB raw; gzipped it drops to ~150 KB,
+        # so this cuts first-paint network time by ~80% on every reload.
+        ct = CONTENT_TYPES.get(fp.suffix.lower(), "application/octet-stream")
         try:
-            data = fp.read_bytes()
+            mtime = fp.stat().st_mtime
         except Exception:
             self.send_response(500); self.end_headers(); return
-        ct = CONTENT_TYPES.get(fp.suffix.lower(), "application/octet-stream")
+        entry = _STATIC_CACHE.get(str(fp))
+        if not entry or entry[0] != mtime:
+            try:
+                data = fp.read_bytes()
+            except Exception:
+                self.send_response(500); self.end_headers(); return
+            # gzip pays for itself only on compressible types.
+            if ct.startswith(("text/", "application/javascript", "application/json", "image/svg+xml")):
+                import gzip
+                gz = gzip.compress(data, compresslevel=6)
+            else:
+                gz = None
+            entry = (mtime, data, gz)
+            _STATIC_CACHE[str(fp)] = entry
+        _, raw_body, gz_body = entry
+        accept_enc = self.headers.get("Accept-Encoding", "") or ""
+        if gz_body is not None and "gzip" in accept_enc.lower():
+            body = gz_body
+            content_encoding: str | None = "gzip"
+        else:
+            body = raw_body
+            content_encoding = None
         self.send_response(200)
         self.send_header("Content-Type", ct)
-        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if content_encoding:
+            self.send_header("Content-Encoding", content_encoding)
+            self.send_header("Vary", "Accept-Encoding")
         self.end_headers()
-        self.wfile.write(data)
+        self.wfile.write(body)
 
     def _send_locale(self, lang: str) -> None:
         """/api/locales/{lang}.json 서빙. 화이트리스트 검증."""

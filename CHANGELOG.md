@@ -10,6 +10,34 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.40.1] — 2026-04-27
+
+### 🚀 Performance hotfix — gzip + defer + fetch dedupe
+
+User-reported lag. Three additive perf wins, no behaviour changes:
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/routes.py::_send_static` | **mtime-keyed in-memory cache + on-the-fly gzip** for static responses (text/* / JS / CSS / JSON / SVG). `Accept-Encoding: gzip` from any modern browser triggers compression; raw bytes still served to clients that don't advertise gzip. **`dist/index.html` 1.12 MB → 270 KB on the wire** (76% smaller). Cache invalidates automatically on file mtime change so no manual restart is needed during development. |
+| 2 | `dist/index.html` `<head>` | **`defer` on Chart.js / vis-network / marked** CDN scripts. None of them are touched by the inline boot script — they're only used inside specific views — so deferring them removes ~600 KB of parser-blocking from first paint. Views that need them (overview/analytics/agents/artifacts) work as before because `defer` finishes before `DOMContentLoaded`. |
+| 3 | `dist/index.html` `api()` helper | **In-flight GET dedupe**. Many views fan out the same fetch on entry (e.g. `/api/agents` from agents tab + chatbot prompt rebuild). A `_apiInflight` Map coalesces concurrent identical GETs into one network request, halving boot-time fan-out with zero behaviour change. |
+| 4 | `dist/index.html` sidebar | **`requestAnimationFrame` debounce on `renderNav()`** when `toggleFavoriteTab` fires. Rapid ★ toggles (or recent-tab MRU updates from successive `go()` calls) used to each rebuild the entire sidebar on the same tick; now they coalesce into the next animation frame. |
+
+#### Verification
+- HTML payload measured: 1,120,949 B raw → 270,609 B gzipped (`curl --compressed`).
+- All four globals present after defer (`window.Chart`, `window.vis`, `marked`, `_apiInflight`, `_scheduleRenderNav`).
+- e2e regression sweep — **0 failures** across:
+  - `e2e-hyper-projects-and-sidebar.mjs` (v2.40 — 11/11)
+  - `e2e-hyper-agent.mjs` (v2.39 — 7/7)
+  - `e2e-quick-settings.mjs` (v2.38 — 6/6)
+  - `e2e-tabs-smoke.mjs` — **58/58**
+
+#### Compatibility
+- Server cache holds `(mtime, raw, gzipped|None)` per resolved path; lifetime is the process. No disk write. Memory cost is bounded by the dist tree size (~few MB).
+- Clients that don't send `Accept-Encoding: gzip` (rare, mostly raw HTTP probes) still get uncompressed bytes.
+- No new files; no schema changes; no env var changes.
+
+---
 ## [2.40.0] — 2026-04-27
 
 ### ⚡ Hyper Agent → project-scoped sub-agents · 🧭 Sidebar discovery (Favorites + Recent + `/`)

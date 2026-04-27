@@ -27,6 +27,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 | 버전 | 요점 |
 |---|---|
+| **v2.40.1** | 🚀 **성능 핫픽스** — `dist/index.html` 다운로드 1.12 MB → 270 KB (서버 gzip + mtime 캐시), Chart.js / vis-network / marked 를 `defer` 로 미뤄 첫 paint 가 ~600 KB CDN 스크립트 파싱에 안 막히게, GET 인-플라이트 dedupe 로 동시 fetch 절반, 사이드바 re-render 가 다음 animation frame 으로 묶임. 동작 변경 없음. |
 | **v2.40.0** | ⚡ **Hyper Agent → 프로젝트 서브 에이전트** + 🧭 **사이드바 발견 강화** (즐겨찾기 + 최근 + `/`). Hyper 토글이 `<cwd>/.claude/agents/<name>.md` 에도 적용되며, composite-key 네임스페이스로 같은 이름의 글로벌과 프로젝트 에이전트가 메타·목표·이력을 독립적으로 유지. 사이드바에 ★ 즐겨찾기 블록 (호버 시 토글), 🕒 최근 사용 MRU (`go()` 호출에서 자동 적립, prefs 로 cap), `/` 단독 키로 Spotlight 즉시 호출 — 카테고리 재편 없이 경로만 단축. |
 | **v2.39.0** | ⚡ **Hyper Agent** — 서브 에이전트가 스스로 정교화. 글로벌 쓰기 가능 에이전트 카드마다 토글 제공. 목표·refine 대상(systemPrompt / tools / description)·트리거(manual / interval / after_session / any) 설정 후 메타 LLM(Opus 기본)이 surgical 수정안을 제안 → `.bak.md` 백업과 함께 원자적 적용 → 매 이터레이션 한 번에 롤백 가능. 예산 한도, dry-run 미리보기, 펼치는 diff 뷰어, 히스토리 타임라인. |
 | **v2.38.0** | ⚡ **빠른 설정** — `⌘,` / `Ctrl+,` 하나로 모든 대시보드 파라미터를 토글하는 드로어. UI · AI · Behavior · Workflow 4개 섹션, 33개 키 (effort, temperature, 강조 색, 밀도, 글자 크기, 모션 감소, 텔레메트리 갱신, autoResume, 마스코트…). 스키마 기반 컨트롤(토글 / 세그먼트 / 셀렉트 / 슬라이더 / 텍스트), 서버 측 엄격 검증, `~/.claude-dashboard-prefs.json` 원자적 영속화. |
