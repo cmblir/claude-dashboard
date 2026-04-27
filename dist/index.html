@@ -12728,8 +12728,13 @@ VIEWS.hooks = async () => {
       <div class="grid gap-2" style="grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));">
         ${recentBlocks.items.map(rb => {
           const dt = rb.lastSeen ? new Date(rb.lastSeen).toLocaleString() : '—';
+          // v2.40.5 — keep the id in a data-* attribute and read it from the
+          // handler. JSON.stringify() inline inside an onclick="…" attribute
+          // emitted double-quotes that collided with the attribute quoting,
+          // so the parser cut the onclick short and clicks did nothing.
           return `<button class="rounded-lg p-2 text-left text-xs hover-lift" style="background:rgba(0,0,0,0.2); border:1px solid rgba(239,68,68,0.25); cursor:pointer;"
-            onclick="state.data.hooksFilter=${JSON.stringify(rb.id)};renderView();setTimeout(_pulseHookCard, 200);">
+            data-hook-id="${escapeHtml(rb.id)}"
+            onclick="_jumpToHookCard(this.dataset.hookId)">
             <div class="flex items-center justify-between gap-2 mb-1">
               <span class="font-semibold text-[#fca5a5]" style="font-size:0.92rem;">${rb.count}×</span>
               <span class="text-[10px] text-[var(--text-dim)]">${escapeHtml(dt)}</span>
@@ -12810,13 +12815,32 @@ AFTER.hooks = () => {
       }
       const ids = [...new Set(m)];
       if (detRes) detRes.innerHTML = ids.map(id =>
-        `<button class="chip text-[10px] cursor-pointer" style="background:rgba(59,130,246,0.2);color:#93c5fd;margin-right:4px;" onclick="state.data.hooksFilter=${JSON.stringify(id)};renderView();setTimeout(_pulseHookCard, 200);">${escapeHtml(id)} ▶</button>`
+        `<button class="chip text-[10px] cursor-pointer" style="background:rgba(59,130,246,0.2);color:#93c5fd;margin-right:4px;"
+          data-hook-id="${escapeHtml(id)}" onclick="_jumpToHookCard(this.dataset.hookId)">${escapeHtml(id)} ▶</button>`
       ).join('') + `<span class="ml-2 text-[10px]" style="color:var(--text-dim);">${t('클릭하면 해당 훅 카드로 이동')}</span>`;
     };
     det.addEventListener('input', e => detect(e.target.value));
     det.addEventListener('paste', () => setTimeout(() => detect(det.value), 0));
   }
 };
+
+// v2.40.5 — single entry point for "click a hook id chip → land on its card".
+// Used by both the Recent Blocks panel and the Detective result chips. The
+// previous inline `onclick="state.data.hooksFilter=...;renderView();..."`
+// emitted double-quotes from JSON.stringify which collided with the
+// attribute quoting, so the parser cut the handler short and clicks did
+// nothing. Wrapping the logic here also gives us one place to extend.
+function _jumpToHookCard(id) {
+  if (!id) return;
+  state.data.hooksFilter = String(id);
+  // Clear other filters so the searched id is the sole result and pulse
+  // targets the right (single) card.
+  state.data.hooksScope = 'all';
+  state.data.hooksEvent = '';
+  state.data.hooksRiskOnly = false;
+  renderView();
+  setTimeout(_pulseHookCard, 200);
+}
 
 // v2.40.4 — pulse-highlight the (single) filtered hook card so the user
 // sees exactly which entry was matched, even amid scroll.

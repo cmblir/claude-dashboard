@@ -10,6 +10,47 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.40.5] — 2026-04-27
+
+### 🩹 Hotfix — Recent Blocks / Detective chips were unclickable (HTML quoting bug)
+
+User reported: "Clicking the Recent Blocks card does nothing." Root
+cause: in v2.40.4 the inline onclick attribute embedded
+`JSON.stringify(rb.id)` directly:
+
+```html
+<button onclick="state.data.hooksFilter=${JSON.stringify(rb.id)}; …">
+```
+
+`JSON.stringify` returns a double-quoted string (`"pre:edit-write:..."`),
+which collided with the surrounding `onclick="…"` attribute quotes — the
+HTML parser cut the attribute short at the first inner `"`, dropped the
+remainder onto the element as garbage, and the click handler never ran.
+Same bug in the Detective result chips.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `dist/index.html` Recent Blocks card | Replaced inline onclick payload with `data-hook-id="${escapeHtml(rb.id)}"` + `onclick="_jumpToHookCard(this.dataset.hookId)"`. No more double-quote collisions; the id flows through `dataset` which the browser decodes for us. |
+| 2 | `dist/index.html` Detective chip | Same change — `data-hook-id` + `_jumpToHookCard` handler. The two surfaces now share one entry point. |
+| 3 | `dist/index.html` (new) `_jumpToHookCard(id)` | Single helper used by both call sites: clears scope/event/risk filters so the searched id is the sole result, sets `state.data.hooksFilter`, re-renders, then `setTimeout(_pulseHookCard, 200)`. Centralising the logic also gives one place to extend (e.g. analytics, deep-link). |
+
+#### Live verification
+```
+BEFORE click: { helperFn:true, cards:5, firstId:'pre:edit-write:gateguard-fact-force', filter:'(none)' }
+AFTER  click: { filter:'pre:edit-write:gateguard-fact-force', visibleCards:6 }
+```
+
+Filter applied, target card rendered, pulse fired.
+
+#### Compatibility
+- Frontend-only patch. No backend, schema, or route changes.
+- `_jumpToHookCard` is a new global; existing `_pulseHookCard` and
+  `state.data.hooksFilter` shapes unchanged.
+- e2e regression — **0 failures**:
+  - `e2e-hyper-projects-and-sidebar.mjs` (v2.40)  — 11/11
+  - `e2e-tabs-smoke.mjs`                          — 58/58
+
+---
 ## [2.40.4] — 2026-04-27
 
 ### 🔬 Hook Detective + 🚨 Recent Blocks + 🧬 Dispatcher decoder
