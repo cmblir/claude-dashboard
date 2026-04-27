@@ -9313,6 +9313,20 @@ VIEWS.agents = async () => {
       </div>
     </div>
 
+    <!-- v2.41.0 — Agent Teams: pre-baked rosters of agents to spawn together. -->
+    <div class="card p-4 mb-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-sm font-semibold flex items-center gap-2">👥 ${t('에이전트 팀')}</h3>
+          <p class="text-[11px] text-[var(--text-mute)]">${t('자주 같이 쓰는 에이전트들을 묶어 한 번에 spawn — 예: Frontend Crew = ui-designer + frontend-dev + code-reviewer')}</p>
+        </div>
+        <button class="btn-primary btn text-xs" onclick="openTeamEditor()">＋ ${t('새 팀')}</button>
+      </div>
+      <div id="teamsGrid" class="grid gap-3" style="grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));">
+        <div class="empty text-xs" style="grid-column:1/-1;">${t('로딩…')}</div>
+      </div>
+    </div>
+
     <div class="mb-4 flex items-center gap-2 flex-wrap">
       <input id="agentQ" class="input max-w-[280px]" placeholder="에이전트 검색…" value="${escapeHtml(q)}" />
       <label class="flex items-center gap-1 text-xs text-[var(--text-mute)]">
@@ -9345,7 +9359,185 @@ AFTER.agents = () => {
   }
   const chk = document.getElementById('agentOnlyEnabled');
   if (chk) chk.onchange = e => { state.data.agentOnlyEnabled = e.target.checked; renderView(); };
+  _loadTeams();
 };
+
+// v2.41.0 — Agent Teams: load + render the saved teams grid in the Agents tab.
+async function _loadTeams() {
+  const grid = document.getElementById('teamsGrid');
+  if (!grid) return;
+  try {
+    const r = await api('/api/agent-teams/list');
+    const items = (r && r.items) || [];
+    if (!items.length) {
+      grid.innerHTML = `<div class="empty text-xs" style="grid-column:1/-1;">${escapeHtml(t('아직 팀이 없습니다. 우측 상단 ＋ 새 팀 으로 만들어보세요.'))}</div>`;
+      return;
+    }
+    grid.innerHTML = items.map(team => {
+      const memberChips = (team.agents || []).map(m => {
+        const cls = m.exists ? 'chip' : 'chip chip-warn';
+        const title = m.exists ? '' : t('에이전트가 디스크에 없음');
+        return `<span class="${cls} text-[10px]" title="${escapeHtml(title)}">${escapeHtml(m.name)}${m.scope === 'project' ? ' 📁' : ''}</span>`;
+      }).join(' ');
+      const missing = team.missingCount || 0;
+      return `<div class="card p-3 hover-lift" style="background:rgba(167,139,250,0.05);">
+        <div class="flex items-center justify-between mb-2">
+          <div class="font-semibold text-sm truncate flex-1" title="${escapeHtml(team.name)}">${escapeHtml(team.name)}</div>
+          <span class="text-[10px] text-[var(--text-dim)] mono ml-2">${escapeHtml(team.id)}</span>
+        </div>
+        ${team.description ? `<div class="text-[11px] text-[var(--text-mute)] mb-2 line-clamp-2" style="min-height:2.6em;">${escapeHtml(team.description)}</div>` : '<div class="text-[11px] text-[var(--text-mute)] mb-2" style="min-height:2.6em;">&nbsp;</div>'}
+        <div class="flex flex-wrap gap-1 mb-3" style="min-height:24px;">${memberChips}</div>
+        ${missing ? `<div class="text-[10px] text-[#fca5a5] mb-2">⚠ ${missing} ${t('명 디스크에 없음')}</div>` : ''}
+        <div class="flex gap-1 flex-wrap pt-2 border-t border-[var(--border)]">
+          <button class="btn text-[10px]" data-team-id="${escapeHtml(team.id)}" onclick="_spawnTeam(this.dataset.teamId)">🚀 ${t('Spawn')}</button>
+          <button class="btn text-[10px]" data-team-id="${escapeHtml(team.id)}" onclick="openTeamEditor(this.dataset.teamId)">${t('편집')}</button>
+          <button class="btn text-[10px]" style="color:#fca5a5;" data-team-id="${escapeHtml(team.id)}" onclick="_deleteTeam(this.dataset.teamId)">${t('삭제')}</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    grid.innerHTML = `<div class="empty text-xs" style="grid-column:1/-1;color:#fca5a5;">${escapeHtml(t('팀 로드 실패: ') + (e.message || ''))}</div>`;
+  }
+}
+
+function openTeamEditor(teamId) {
+  // Builds a minimal modal with a name input, description textarea, and a
+  // multi-select of available agents (global + project + builtin). On save,
+  // POSTs to /api/agent-teams/save.
+  const allAgents = (state.data.agents && state.data.agents.agents) || [];
+  // Pre-fill if editing
+  let initial = { id: '', name: '', description: '', agents: [] };
+  if (teamId) {
+    api('/api/agent-teams/get/' + encodeURIComponent(teamId)).then(r => {
+      if (r && r.ok && r.team) {
+        initial = {
+          id: r.team.id,
+          name: r.team.name,
+          description: r.team.description,
+          agents: r.team.agents || [],
+        };
+        _renderTeamEditorModal(initial, allAgents);
+      } else {
+        toast(t('팀 로드 실패'), 'err');
+      }
+    });
+    return;
+  }
+  _renderTeamEditorModal(initial, allAgents);
+}
+
+function _renderTeamEditorModal(initial, allAgents) {
+  const selectedNames = new Set((initial.agents || []).map(a => a.name + '|' + (a.scope || 'global')));
+  const agentOptions = allAgents.map(a => {
+    const key = (a.name || a.id) + '|' + (a.scope || 'global');
+    const checked = selectedNames.has(key);
+    return `<label class="flex items-center gap-2 py-1 px-2 cursor-pointer hover:bg-white/5" style="border-radius:6px;">
+      <input type="checkbox" data-name="${escapeHtml(a.name || a.id)}" data-scope="${escapeHtml(a.scope || 'global')}" ${checked ? 'checked' : ''}/>
+      <span class="text-xs">${escapeHtml(a.name || a.id)}</span>
+      <span class="text-[10px] text-[var(--text-dim)] ml-auto">${escapeHtml(a.scope || 'global')}</span>
+    </label>`;
+  }).join('') || `<div class="empty text-xs">${t('사용 가능한 에이전트가 없습니다')}</div>`;
+  showModal(`
+    <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+      <div>
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">👥 ${t('에이전트 팀')}</div>
+        <h2 class="text-lg font-bold">${initial.id ? t('팀 편집') : t('새 팀')}</h2>
+      </div>
+      <button class="btn-ghost btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="p-5 overflow-y-auto" style="max-height:75vh;">
+      <input type="hidden" id="teamId" value="${escapeHtml(initial.id || '')}">
+      <label class="block mb-3">
+        <div class="text-xs font-semibold mb-1">${t('팀 이름')} *</div>
+        <input id="teamName" class="input w-full" value="${escapeHtml(initial.name || '')}" placeholder="${t('예: Frontend Crew')}">
+      </label>
+      <label class="block mb-3">
+        <div class="text-xs font-semibold mb-1">${t('설명')}</div>
+        <textarea id="teamDesc" class="input w-full" rows="2">${escapeHtml(initial.description || '')}</textarea>
+      </label>
+      <div class="text-xs font-semibold mb-1">${t('멤버')} *</div>
+      <div class="card p-2" style="max-height:300px;overflow-y:auto;">${agentOptions}</div>
+      <div class="flex gap-2 mt-4 pt-3 border-t border-[var(--border)]">
+        <button class="btn-primary btn" onclick="_saveTeamFromModal()">💾 ${t('저장')}</button>
+        <button class="btn" onclick="closeModal()">${t('취소')}</button>
+      </div>
+    </div>
+  `);
+}
+
+async function _saveTeamFromModal() {
+  const id   = (document.getElementById('teamId') || {}).value || '';
+  const name = (document.getElementById('teamName') || {}).value.trim();
+  const desc = (document.getElementById('teamDesc') || {}).value || '';
+  if (!name) { toast(t('팀 이름이 필요합니다'), 'err'); return; }
+  const agents = Array.from(document.querySelectorAll('.modal input[type=checkbox][data-name]'))
+    .filter(c => c.checked)
+    .map(c => ({ name: c.dataset.name, scope: c.dataset.scope || 'global' }));
+  if (!agents.length) { toast(t('최소 한 명의 에이전트가 필요합니다'), 'err'); return; }
+  try {
+    const r = await api('/api/agent-teams/save', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ id: id || undefined, name, description: desc, agents }),
+    });
+    if (r.ok) {
+      toast(r.isNew ? t('팀 생성 완료') : t('팀 업데이트 완료'), 'ok');
+      closeModal();
+      _loadTeams();
+    } else {
+      toast(t('저장 실패: ') + (r.error || ''), 'err');
+    }
+  } catch (e) { toast(t('저장 실패: ') + e.message, 'err'); }
+}
+
+async function _deleteTeam(teamId) {
+  if (!confirm(t('이 팀을 삭제할까요? (멤버 에이전트는 그대로 유지됩니다)'))) return;
+  try {
+    const r = await api('/api/agent-teams/delete', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ id: teamId }),
+    });
+    if (r.ok) { toast(t('삭제 완료'), 'ok'); _loadTeams(); }
+    else      toast(t('삭제 실패: ') + (r.error || ''), 'err');
+  } catch (e) { toast(t('삭제 실패: ') + e.message, 'err'); }
+}
+
+async function _spawnTeam(teamId) {
+  try {
+    const r = await api('/api/agent-teams/spawn', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ id: teamId }),
+    });
+    if (!r.ok) { toast(t('Spawn 실패: ') + (r.error || ''), 'err'); return; }
+    const items = r.spawn || [];
+    const skipped = r.skipped || [];
+    showModal(`
+      <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+        <div>
+          <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">🚀 ${t('팀 Spawn')}</div>
+          <h2 class="text-lg font-bold">${escapeHtml(t('각 멤버를 어떻게 띄울지 복사·실행'))}</h2>
+        </div>
+        <button class="btn-ghost btn" onclick="closeModal()">✕</button>
+      </div>
+      <div class="p-5 overflow-y-auto" style="max-height:75vh;">
+        ${items.length === 0 ? `<div class="empty">${escapeHtml(t('실행 가능한 멤버 없음'))}</div>` : items.map((it, i) => `
+          <div class="card p-3 mb-2">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-semibold text-sm">${escapeHtml(it.name)}</span>
+              <span class="chip text-[10px]">${escapeHtml(it.scope)}</span>
+              ${it.role ? `<span class="text-[10px] text-[var(--text-dim)]">${escapeHtml(it.role)}</span>` : ''}
+            </div>
+            <pre class="mono" style="white-space:pre-wrap;background:rgba(0,0,0,0.3);padding:8px;border-radius:6px;font-size:11px;">${escapeHtml(it.claudeCmd)}</pre>
+          </div>
+        `).join('')}
+        ${skipped.length ? `
+          <div class="card p-3 mt-3" style="background:rgba(239,68,68,0.05);border-color:rgba(239,68,68,0.3);">
+            <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('건너뛴 멤버')}</div>
+            ${skipped.map(s => `<div class="text-xs"><span class="mono">${escapeHtml(s.name)}</span> — ${escapeHtml(s.reason)}</div>`).join('')}
+          </div>` : ''}
+      </div>
+    `);
+  } catch (e) { toast(t('Spawn 실패: ') + e.message, 'err'); }
+}
 
 function aggregateAgentCalls(graph) {
   const counts = {};
@@ -14195,10 +14387,86 @@ function renderProjectDetail(d) {
           ${section('⚙️ .claude/settings.local.json', settingsLocalHtml)}
           ${section('🗂 ~/.claude.json 프로젝트 엔트리', cjEntryHtml)}
           ${section('🕒 세션 히스토리 (점수 포함)', sessionsHtml, sessions.length)}
+          ${section('🤝 ' + t('최근 서브에이전트 활동'),
+            _renderSubagentActivity(d.subagentActivity || [], d.cwd),
+            (d.subagentActivity || []).length
+          )}
         </div>
       </div>
     </div>
   `, { wide: true });
+}
+
+// v2.41.0 — render the "Recent sub-agent activity" timeline inside the
+// project detail modal. Each row groups by source session id so the user
+// sees "session A delegated to {Explore, code-reviewer, ...}" at a glance.
+// Clicking a row spawns a Terminal.app on the source session in this cwd
+// (claude --resume <sessionId>). Clicking a session header expands all of
+// that session's delegations.
+function _renderSubagentActivity(activity, cwd) {
+  if (!activity || !activity.length) {
+    return `<div class="empty text-xs">${escapeHtml(t('이 프로젝트에서 서브에이전트 위임 기록 없음'))}</div>`;
+  }
+  // Group by sessionId, preserving the time-desc order from the server.
+  const bySession = {};
+  const sessionOrder = [];
+  for (const e of activity) {
+    if (!bySession[e.sessionId]) {
+      bySession[e.sessionId] = [];
+      sessionOrder.push(e.sessionId);
+    }
+    bySession[e.sessionId].push(e);
+  }
+  const rows = sessionOrder.map(sid => {
+    const items = bySession[sid];
+    const agents = [...new Set(items.map(it => it.agent))];
+    const errCount = items.filter(it => it.hadError).length;
+    const tokSum = items.reduce((s, it) => s + (it.turnTokens || 0), 0);
+    const lastTs = items[0].ts;
+    const cwdAttr = escapeHtml(cwd || '');
+    const sidAttr = escapeHtml(sid);
+    return `
+      <div class="rounded-lg border border-[var(--border)] mb-2" style="background:rgba(255,255,255,0.02);">
+        <div class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-white/5"
+             onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none';">
+          <span class="text-[10px] mono text-[var(--text-dim)]">${sid.slice(0, 8)}</span>
+          <span class="font-semibold text-xs flex-1 truncate">${items.length}× ${t('위임')} → ${agents.map(a => `<span class="chip chip-accent text-[9px]">${escapeHtml(a)}</span>`).join(' ')}</span>
+          ${errCount ? `<span class="chip chip-err text-[9px]">${errCount} ${t('실패')}</span>` : ''}
+          <span class="text-[10px] text-[var(--text-dim)]">${fmtRel(lastTs)}</span>
+          <span class="text-[10px] text-[var(--text-dim)]">${tokSum.toLocaleString()} tok</span>
+          <button class="btn text-[10px]" data-cwd="${cwdAttr}" data-sid="${sidAttr}"
+            onclick="event.stopPropagation();_spawnSubagentCli(this.dataset.cwd, this.dataset.sid)">🖥 ${t('CLI')}</button>
+        </div>
+        <div style="display:none;" class="px-3 py-2 border-t border-[var(--border)]">
+          ${items.map(it => `
+            <div class="flex items-start gap-2 py-1.5 border-b border-[var(--border)] last:border-b-0">
+              <span class="chip text-[9px]" style="white-space:nowrap;">${escapeHtml(it.agent)}</span>
+              <div class="flex-1 min-w-0">
+                <div class="text-[11px]" style="overflow-wrap:anywhere;color:var(--text);">${escapeHtml(it.inputSummary || '(no preview)')}</div>
+                <div class="text-[10px] text-[var(--text-dim)] mt-0.5">${escapeHtml(it.tool || '')} · ${(it.turnTokens||0).toLocaleString()} tok · ${fmtRel(it.ts)}${it.hadError ? ' · <span style="color:#fca5a5;">⚠ error</span>' : ''}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  });
+  return rows.join('');
+}
+
+// v2.41.0 — spawn a Terminal.app on the source session via the existing
+// /api/session/spawn route (which also handles cwd resolution).
+async function _spawnSubagentCli(cwd, sessionId) {
+  if (!sessionId) return;
+  try {
+    const r = await api('/api/session/spawn', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ sessionId, cwd: cwd || '' }),
+    });
+    if (r.ok) toast(t('Terminal 에서 세션 재개 중…'), 'ok');
+    else      toast(t('CLI 실행 실패: ') + (r.error || ''), 'err');
+  } catch (e) {
+    toast(t('CLI 실행 실패: ') + e.message, 'err');
+  }
 }
 
 function scrollToSessions() {

@@ -257,6 +257,36 @@ def api_project_detail(query: dict) -> dict:
         except Exception: r["subagent_types"] = {}
     avg_score = int(sum(r["score"] or 0 for r in rows) / len(rows)) if rows else 0
 
+    # v2.41.0 — recent sub-agent activity for this cwd. The frontend renders
+    # an interactive timeline in the project detail modal: each row shows
+    # session id + agent type + the prompt preview + token cost; clicking the
+    # row opens the source session (CLI spawn).
+    activity: list = []
+    if rows:
+        session_ids = [r["session_id"] for r in rows[:50] if r.get("session_id")]
+        if session_ids:
+            placeholders = ",".join("?" * len(session_ids))
+            with _db() as c:
+                act_rows = [dict(r) for r in c.execute(
+                    "SELECT session_id, ts, tool, subagent_type, input_summary, "
+                    "had_error, turn_tokens "
+                    f"FROM tool_uses WHERE session_id IN ({placeholders}) "
+                    "AND subagent_type != '' "
+                    "ORDER BY ts DESC LIMIT 60",
+                    tuple(session_ids),
+                ).fetchall()]
+            for ar in act_rows:
+                activity.append({
+                    "sessionId":    ar.get("session_id"),
+                    "ts":           ar.get("ts") or 0,
+                    "tool":         ar.get("tool") or "",
+                    "agent":        ar.get("subagent_type") or "",
+                    "inputSummary": (ar.get("input_summary") or "")[:600],
+                    "hadError":     bool(ar.get("had_error")),
+                    "turnTokens":   ar.get("turn_tokens") or 0,
+                    "cwd":          abs_path,
+                })
+
     return {
         "cwd": abs_path,
         "name": Path(abs_path).name,
@@ -270,6 +300,7 @@ def api_project_detail(query: dict) -> dict:
             "totalErrors": sum(r["error_count"] or 0 for r in rows),
             "totalAgents": sum(r["agent_call_count"] or 0 for r in rows),
         },
+        "subagentActivity": activity,
     }
 
 

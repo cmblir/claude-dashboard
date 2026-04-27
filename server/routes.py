@@ -152,6 +152,10 @@ from .hyper_agent import (
     api_hyper_history_post, api_hyper_list, api_hyper_refine_now,
     api_hyper_rollback, api_hyper_toggle,
 )
+from .agent_teams import (
+    api_agent_teams_delete, api_agent_teams_get, api_agent_teams_list,
+    api_agent_teams_save, api_agent_teams_spawn,
+)
 
 
 def _ai_providers_by_cap(query: dict) -> dict:
@@ -323,6 +327,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/prefs/get": api_prefs_get,
     "/api/hyper-agents/list": api_hyper_list,
     "/api/hooks/recent-blocks": api_recent_blocked_hooks,
+    "/api/agent-teams/list": api_agent_teams_list,
 }
 
 
@@ -465,6 +470,9 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/hyper-agents/rollback": api_hyper_rollback,
     "/api/hyper-agents/get": api_hyper_get_post,
     "/api/hyper-agents/history": api_hyper_history_post,
+    "/api/agent-teams/save":   api_agent_teams_save,
+    "/api/agent-teams/delete": api_agent_teams_delete,
+    "/api/agent-teams/spawn":  api_agent_teams_spawn,
 }
 
 
@@ -665,4 +673,5 @@ _ITEM_GET_ROUTES = [
     (re.compile(r"^/api/workflows/templates/(tpl-[0-9]{10,14}-[a-z0-9]{3,6}|bt-[a-z0-9-]+)$"), api_workflow_template_get),
     (re.compile(r"^/api/hyper-agents/get/([a-z0-9][a-z0-9_-]{0,63})$"), api_hyper_get),
     (re.compile(r"^/api/hyper-agents/history/([a-z0-9][a-z0-9_-]{0,63})$"), api_hyper_history),
+    (re.compile(r"^/api/agent-teams/get/(tm-[a-z0-9]{6,16})$"), api_agent_teams_get),
 ]
