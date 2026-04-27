@@ -479,6 +479,18 @@ On every feature change, update `VERSION` + `CHANGELOG.md` + `git tag -a vX.Y.Z`
 
 ---
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=cmblir/lazyclaude&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=cmblir/lazyclaude&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=cmblir/lazyclaude&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=cmblir/lazyclaude&type=date&legend=top-left" />
+ </picture>
+</a>
+
+---
+
 ## 📝 License
 
 [MIT](./LICENSE) — free for personal and commercial use. Attribution appreciated but not required.
