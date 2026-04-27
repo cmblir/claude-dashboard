@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.39.0] — 2026-04-27
+
+### ⚡ Hyper Agent — sub-agents that self-refine over time
+
+A new opt-in supervisor that periodically asks a meta-LLM (Opus by default)
+to propose surgical refinements to a writeable global agent's **system prompt,
+tool list, and description**, given the user's stated objective and recent
+transcripts that mentioned the agent. Every iteration is applied atomically
+with a `.bak.md` backup, so any refinement is one-click reversible.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/hyper_agent.py` (new, ~530 LoC) | Whitelisted schema, strict per-key validation, atomic JSON persistence at `~/.claude-dashboard-hyper-agents.json`. `apply_proposal()` writes `~/.claude/agents/<name>.md` after copying the prior content to `<name>.<ts>.bak.md`. `refine_agent()` calls `execute_with_assignee()` against a hardened meta-system-prompt that returns a strict JSON proposal `{newSystemPrompt, newTools, newDescription, rationale, scoreBefore, scoreAfter}`. `rollback()` restores from any backup snapshot and is itself reversible. |
+| 2 | `server/hyper_agent_worker.py` (new) | 60-second daemon loop. Honours four trigger modes: `manual` (never auto-fires), `interval` (every N hours; parsed from `cronSpec` of shape `"0 */N * * *"`, defaults to 6h), `after_session` (fires when ≥`minSessionsBetween` recent jsonl transcripts mention the agent via `"subagent_type":"<name>"` or `@<name>`), `any` (interval OR after_session). |
+| 3 | `server/routes.py` | 7 new routes: `GET /api/hyper-agents/list`, `GET /get/<name>`, `GET /history/<name>`, `POST /toggle`, `/configure`, `/refine-now`, `/rollback`. |
+| 4 | `server.py` | Boot order extended with `start_hyper_agent_worker()` after `start_auto_resume()`. |
+| 5 | `dist/index.html` | Agent cards in the Agents tab gain a per-agent **⚡ Hyper / ⚡ ON** chip (color reflects enabled state, fed from `/api/hyper-agents/list`). Clicking opens a dedicated modal with: master toggle · objective textarea · refine-target checkboxes (systemPrompt / tools / description) · trigger select · provider select · min-sessions / budget USD inputs · spent counter · Save / Dry-run / Refine-now / Rollback. History timeline below the controls renders one card per iteration with cost, tokens, score before→after, applied targets, rationale, expandable diff viewer, and a per-row Rollback button. |
+| 6 | `dist/index.html` | `__noReloadPaths` extended with `/api/hyper-agents/` so modal Save/Refine doesn't trigger `_scheduleAutoReload()` (would close the open modal mid-flight). |
+| 7 | `tools/translations_manual_14.py` (new) | KO → EN/ZH for every modal label, hint, button, toast, and confirm. Wired into `tools/translations_manual.py`. `make i18n-refresh` reports 0 missing across 4008 keys × 3 languages. |
+| 8 | `scripts/e2e-hyper-agent.mjs` (new) | Playwright smoke: seeds a real `~/.claude/agents/hyper-test.md`, then verifies UI globals · list · configure round-trip · get reflects state · toggle off · modal renders saved objective · refine endpoint responds gracefully. **All 7 checks pass.** |
+
+#### Triggers (4)
+- **manual** — never auto-fires; only the "⚡ Refine now" button calls `refine_agent`.
+- **interval** — N hours since `lastRefinedAt`. N parsed from `cronSpec` ("0 */N * * *"), defaults to 6h.
+- **after_session** — at least `minSessionsBetween` jsonl transcripts modified after `lastRefinedAt` AND mentioning the agent. Up to 5 transcripts get fed back into the meta-LLM as context for the proposal.
+- **any** — interval OR after_session.
+
+#### Refine targets (3)
+- **systemPrompt** — body of the .md file (most common).
+- **tools** — frontmatter `tools` list. Restricted to the existing palette via the meta-LLM rules.
+- **description** — frontmatter `description`.
+
+#### Safety
+- **Read-only protection**: Hyper Agent only applies to writeable global agents. Builtin (general-purpose / Explore / Plan / statusline-setup) and plugin agents are silently skipped — `_is_writable_agent()` returns false.
+- **Atomic backup**: every apply copies `<name>.md` to `<name>.<ts>.bak.md` before rewriting. Rollback uses these.
+- **Reversible rollback**: rollback itself snapshots the current state to a fresh backup, so a rollback is also reversible.
+- **Budget cap**: `budgetUSD` (default $5) — once `spentUSD ≥ budgetUSD`, refinement is skipped with a clear error in `lastError`.
+- **Schema clamp**: enum / int / float / bool / str all validated and clamped on every read AND write. Unknown keys silently dropped.
+- **History bounded** at 100 entries per agent (FIFO truncation).
+- **Dry-run mode**: "Dry-run preview" button calls the meta-LLM but does not write the file — useful to inspect the proposed diff before committing.
+
+#### Migration / compatibility
+- New file `~/.claude-dashboard-hyper-agents.json` is created on first configure.
+- `~/.claude/agents/<name>.md` is read/written using the same Claude Code-compatible frontmatter shape (`name`, `description`, `model`, `tools`).
+- Override the meta path with env `CLAUDE_DASHBOARD_HYPER_AGENTS=/some/path`.
+- All endpoints / routes / UI controls are additive — no existing behaviour changed.
+
+---
 ## [2.38.0] — 2026-04-27
 
 ### ⚡ Quick Settings — per-user prefs drawer (UI · AI · Behavior · Workflow)

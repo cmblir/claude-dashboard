@@ -147,6 +147,10 @@ from .auto_resume import (
     api_auto_resume_uninstall_hooks,
 )
 from .prefs import api_prefs_get, api_prefs_reset, api_prefs_set
+from .hyper_agent import (
+    api_hyper_configure, api_hyper_get, api_hyper_history, api_hyper_list,
+    api_hyper_refine_now, api_hyper_rollback, api_hyper_toggle,
+)
 
 
 def _ai_providers_by_cap(query: dict) -> dict:
@@ -316,6 +320,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/artifacts/list": api_artifacts_list,
     "/api/artifacts/render": api_artifacts_render,
     "/api/prefs/get": api_prefs_get,
+    "/api/hyper-agents/list": api_hyper_list,
 }
 
 
@@ -452,6 +457,10 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/auto_resume/uninstall_hooks": api_auto_resume_uninstall_hooks,
     "/api/prefs/set": api_prefs_set,
     "/api/prefs/reset": api_prefs_reset,
+    "/api/hyper-agents/toggle": api_hyper_toggle,
+    "/api/hyper-agents/configure": api_hyper_configure,
+    "/api/hyper-agents/refine-now": api_hyper_refine_now,
+    "/api/hyper-agents/rollback": api_hyper_rollback,
 }
 
 
@@ -619,4 +628,6 @@ _ITEM_GET_ROUTES = [
     (re.compile(r"^/api/agents/([A-Za-z0-9_.:-]+)$"), get_agent),
     (re.compile(r"^/api/workflows/(wf-[0-9]{10,14}-[a-z0-9]{3,6})$"), api_workflow_get),
     (re.compile(r"^/api/workflows/templates/(tpl-[0-9]{10,14}-[a-z0-9]{3,6}|bt-[a-z0-9-]+)$"), api_workflow_template_get),
+    (re.compile(r"^/api/hyper-agents/get/([a-z0-9][a-z0-9_-]{0,63})$"), api_hyper_get),
+    (re.compile(r"^/api/hyper-agents/history/([a-z0-9][a-z0-9_-]{0,63})$"), api_hyper_history),
 ]

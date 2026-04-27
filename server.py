@@ -21,6 +21,7 @@ from server.routes import Handler
 from server.sessions import background_index
 from server.workflows import start_scheduler
 from server.auto_resume import start_auto_resume
+from server.hyper_agent_worker import start_hyper_agent_worker
 
 
 # ───────── 중복 서버 방지 ─────────
@@ -105,6 +106,7 @@ def main() -> None:
     warmup_caches()
     start_scheduler()
     start_auto_resume()
+    start_hyper_agent_worker()
     _auto_start_ollama()
     log.info("Serving http://%s:%s (dist=%s, db=%s)", host, port, DIST, DB_PATH)
     ThreadingHTTPServer((host, port), Handler).serve_forever()

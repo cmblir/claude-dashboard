@@ -1378,6 +1378,9 @@ const __noReloadPaths = [
   '/api/obsidian/',
   // Quick Settings prefs — 사이드 드로어 안에서 토글하므로 리로드 시 닫힘
   '/api/prefs/',
+  // Hyper Agent — toggle/configure/refine-now 는 모달 안에서 실행되므로
+  // 자동 리로드 시 모달 닫히고 진행 중 폼 초기화 (v2.39.0)
+  '/api/hyper-agents/',
 ];
 // ── 인메모리 GET 캐시 — 빈번한 GET 호출의 중복 네트워크 비용 제거 ──
 const _apiCache = {};
@@ -9018,11 +9021,15 @@ function drawSessionTimeline(tl) {
 // AGENTS + GRAPH
 // ────────────────────────────────────────────────────────────────
 VIEWS.agents = async () => {
-  const [list, graph, modelRes] = await Promise.all([
+  const [list, graph, modelRes, hyperList] = await Promise.all([
     api('/api/agents'),
     api('/api/agents/graph?days=60'),
     api('/api/subagent/model-choices'),
+    api('/api/hyper-agents/list').catch(() => ({items:[]})),
   ]);
+  // Map agent id -> enabled bool, used by renderAgentCard for the ⚡ chip color.
+  window.__hyperAgentsMap = {};
+  (hyperList.items || []).forEach(h => { window.__hyperAgentsMap[h.name] = !!h.enabled; });
   state.data.agents = list;
   state.data.agentsGraph = graph;
   window.__subModelChoices = modelRes.choices || [];
@@ -9063,7 +9070,12 @@ VIEWS.agents = async () => {
     })();
     const actionButtons = (() => {
       if (a.scope === 'global') {
-        return `<button class="btn text-[9px]" onclick='event.stopPropagation();deleteGlobalAgent("${safeId}")' style="color:#fca5a5">삭제</button>`;
+        const hyperOn = (window.__hyperAgentsMap || {})[a.id];
+        const hyperBtn = `<button class="chip text-[9px] cursor-pointer ${hyperOn?'chip-accent':''}"
+                onclick='event.stopPropagation();openHyperAgent("${safeId}")'
+                title="${t('Hyper Agent — 자동 정교화 토글/설정')}"
+                style="${hyperOn?'background:rgba(244,114,182,0.28);color:#fff;':'background:rgba(244,114,182,0.12);'}">⚡ ${hyperOn?'ON':'Hyper'}</button>`;
+        return hyperBtn + `<button class="btn text-[9px]" onclick='event.stopPropagation();deleteGlobalAgent("${safeId}")' style="color:#fca5a5">삭제</button>`;
       }
       if (a.scope === 'plugin' && a.pluginEnabled) {
         return `<button class="chip text-[9px] cursor-pointer"
@@ -9412,6 +9424,269 @@ async function viewAgent(id) {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raw: v })
     }),
   });
+}
+
+// ────────────────────────────────────────────────────────────────
+// HYPER AGENT — auto-refining sub-agent settings (v2.39.0)
+// ────────────────────────────────────────────────────────────────
+async function openHyperAgent(name) {
+  const safe = encodeURIComponent(name);
+  const [meta, hist] = await Promise.all([
+    api('/api/hyper-agents/get/' + safe).catch(e => ({error: String(e)})),
+    api('/api/hyper-agents/history/' + safe).catch(() => ({history:[]})),
+  ]);
+  if (meta.error) { toast(t('Hyper Agent 로드 실패: ') + meta.error, 'err'); return; }
+  const ag = meta.agent || {};
+  const history = (hist.history || []).slice().reverse();
+  showModal(_hyperModalHTML(name, ag, history));
+  _hyperBindControls(name);
+}
+
+function _hyperEsc(s) { return escapeHtml(s == null ? '' : String(s)); }
+
+function _hyperModalHTML(name, ag, history) {
+  const targets = ag.refineTargets || ['systemPrompt'];
+  const hasTarget = (k) => targets.includes(k) ? 'checked' : '';
+  const triggerOpts = ['manual','after_session','interval','any','cron'].map(opt =>
+    `<option value="${opt}" ${ag.trigger===opt?'selected':''}>${_hyperEsc(opt)}</option>`).join('');
+  const providerOpts = (window.__subModelChoices || []).map(m =>
+    `<option value="claude:${_hyperEsc(m.id)}" ${ag.refineProvider==='claude:'+m.id?'selected':''}>claude:${_hyperEsc(m.id)}</option>`).join('');
+
+  return `
+    <div class="p-5 border-b border-[var(--border)] flex items-center justify-between" style="background:linear-gradient(135deg, rgba(244,114,182,0.1), rgba(167,139,250,0.06));">
+      <div>
+        <div class="text-[11px] uppercase tracking-widest" style="color:#f9a8d4;">⚡ ${t('Hyper Agent')}</div>
+        <h2 class="text-lg font-bold">${_hyperEsc(name)}</h2>
+        <div class="text-xs text-[var(--text-mute)] mt-1">${t('서브 에이전트의 시스템 프롬프트·툴·디스크립션을 메타 LLM이 주기적으로 다듬습니다.')}</div>
+      </div>
+      <button class="btn-ghost btn" onclick="closeModal()" aria-label="닫기">✕</button>
+    </div>
+    <div class="p-5 overflow-y-auto" style="max-height: 70vh;" id="hyperModalBody">
+      <div class="card p-4 mb-3" style="background:rgba(0,0,0,0.15);">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="font-semibold text-sm">${t('자동 정교화 활성화')}</div>
+            <div class="text-[11px] text-[var(--text-dim)] mt-1">${t('OFF 상태에서도 "지금 다듬기" 버튼은 사용 가능합니다.')}</div>
+          </div>
+          <div id="hyperToggle" class="qs-toggle ${ag.enabled?'on':''}" data-enabled="${ag.enabled?'1':'0'}" role="switch" aria-checked="${!!ag.enabled}" tabindex="0"></div>
+        </div>
+      </div>
+
+      <label class="block mb-3">
+        <div class="text-xs font-semibold mb-1">${t('목표 (Objective)')}</div>
+        <textarea id="hyperObjective" class="input w-full" rows="3"
+          placeholder="${t('예: 응답을 더 간결하게, 액션 위주로. 또는 특정 도메인 지식 강조.')}">${_hyperEsc(ag.objective)}</textarea>
+      </label>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+        <label class="card p-2 cursor-pointer flex items-center gap-2">
+          <input type="checkbox" id="hyperTgt_systemPrompt" ${hasTarget('systemPrompt')}/>
+          <span class="text-xs">${t('시스템 프롬프트')}</span>
+        </label>
+        <label class="card p-2 cursor-pointer flex items-center gap-2">
+          <input type="checkbox" id="hyperTgt_tools" ${hasTarget('tools')}/>
+          <span class="text-xs">${t('툴 목록')}</span>
+        </label>
+        <label class="card p-2 cursor-pointer flex items-center gap-2">
+          <input type="checkbox" id="hyperTgt_description" ${hasTarget('description')}/>
+          <span class="text-xs">${t('디스크립션')}</span>
+        </label>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        <label class="block">
+          <div class="text-xs font-semibold mb-1">${t('트리거')}</div>
+          <select id="hyperTrigger" class="input w-full">${triggerOpts}</select>
+          <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('manual=수동만 / after_session=세션 종료 시 / interval=시간 주기 / any=둘 다')}</div>
+        </label>
+        <label class="block">
+          <div class="text-xs font-semibold mb-1">${t('Refine 프로바이더')}</div>
+          <select id="hyperProvider" class="input w-full">${providerOpts}<option value="claude:opus" ${ag.refineProvider==='claude:opus'?'selected':''}>claude:opus</option></select>
+          <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('메타 LLM (Opus 권장)')}</div>
+        </label>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+        <label class="block">
+          <div class="text-xs font-semibold mb-1">${t('최소 세션 간격')}</div>
+          <input id="hyperMinSessions" type="number" class="input w-full" value="${ag.minSessionsBetween||5}" min="0" max="1000"/>
+          <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('after_session 트리거 디바운스')}</div>
+        </label>
+        <label class="block">
+          <div class="text-xs font-semibold mb-1">${t('예산 (USD)')}</div>
+          <input id="hyperBudget" type="number" step="0.5" class="input w-full" value="${ag.budgetUSD||5}" min="0"/>
+          <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('총 누적 비용 한도 (도달 시 정지)')}</div>
+        </label>
+        <div class="block">
+          <div class="text-xs font-semibold mb-1">${t('누적 사용 / 정교화')}</div>
+          <div class="text-sm mono" id="hyperSpent">$${(ag.spentUSD||0).toFixed(4)} · ${ag.totalRefinements||0}회</div>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-2 pt-2" style="border-top:1px solid var(--border);">
+        <button id="hyperSave" class="btn-primary btn">${t('💾 저장')}</button>
+        <button id="hyperRefineDry" class="btn">${t('👁 Dry-run 미리보기')}</button>
+        <button id="hyperRefine" class="btn" style="background:rgba(244,114,182,0.18);">${t('⚡ 지금 다듬기')}</button>
+      </div>
+      <div id="hyperLastError" class="text-[11px] mt-2" style="color:#fca5a5;">${ag.lastError ? '⚠️ ' + _hyperEsc(ag.lastError) : ''}</div>
+
+      <div class="mt-5">
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] mb-2">${t('정교화 이력')} (${history.length})</div>
+        <div id="hyperHistory" class="grid gap-2">
+          ${history.map(h => _hyperHistoryRow(name, h)).join('') || `<div class="empty text-xs">${t('아직 정교화 이력이 없습니다.')}</div>`}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function _hyperHistoryRow(name, h) {
+  const dt = h.ts ? new Date(h.ts).toLocaleString() : '—';
+  const trigger = _hyperEsc(h.trigger || '');
+  const score = (h.scoreBefore != null && h.scoreAfter != null)
+    ? `<span class="chip text-[10px]">${(+h.scoreBefore).toFixed(2)} → ${(+h.scoreAfter).toFixed(2)}</span>`
+    : '';
+  const targets = (h.appliedTargets || []).map(t2 => `<span class="tag-tool">${_hyperEsc(t2)}</span>`).join('');
+  const cost = h.costUSD ? `$${(+h.costUSD).toFixed(4)}` : '—';
+  const tokens = h.tokens ? `${h.tokens} tok` : '—';
+  const error = h.error ? `<div class="text-[11px] mt-1" style="color:#fca5a5;">⚠️ ${_hyperEsc(h.error)}</div>` : '';
+  const dryFlag = h.dryRun ? '<span class="chip chip-warn text-[10px]">dry-run</span>' : '';
+  const rollback = (!h.dryRun && h.backupPath && h.appliedTargets && h.appliedTargets.length)
+    ? `<button class="btn text-[10px]" onclick="_hyperRollback('${_hyperEsc(name)}', ${+h.ts})">↩ ${t('롤백')}</button>`
+    : '';
+  const showDiff = (h.diff && Object.keys(h.diff).length)
+    ? `<button class="btn text-[10px]" onclick="_hyperToggleDiff(this)">📋 diff</button>`
+    : '';
+  const diffData = h.diff ? jsonAttr(h.diff) : '';
+  return `
+    <div class="card p-3" data-diff="${diffData}">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-[11px] mono">${_hyperEsc(dt)}</span>
+        <span class="chip text-[10px]">${trigger}</span>
+        ${dryFlag}
+        ${score}
+        ${targets}
+        <span class="text-[10px] text-[var(--text-dim)] ml-auto">${cost} · ${tokens}</span>
+      </div>
+      ${h.rationale ? `<div class="text-[12px] mt-1.5" style="color:var(--text-mute);">${_hyperEsc(h.rationale)}</div>` : ''}
+      ${error}
+      <div class="mt-2 flex gap-2">
+        ${showDiff}
+        ${rollback}
+      </div>
+      <pre class="hyper-diff" style="display:none;white-space:pre-wrap;font-size:10.5px;background:rgba(0,0,0,0.3);padding:8px;border-radius:6px;margin-top:8px;max-height:300px;overflow:auto;"></pre>
+    </div>
+  `;
+}
+
+function _hyperToggleDiff(btn) {
+  const card = btn.closest('.card');
+  const pre  = card.querySelector('.hyper-diff');
+  if (!pre) return;
+  if (pre.style.display === 'none') {
+    let diff = {};
+    try { diff = JSON.parse(card.getAttribute('data-diff') || '{}'); } catch {}
+    const out = [];
+    for (const k of Object.keys(diff)) {
+      out.push('## ' + k);
+      out.push('--- before ---');
+      out.push(typeof diff[k].before === 'string' ? diff[k].before : JSON.stringify(diff[k].before, null, 2));
+      out.push('+++ after +++');
+      out.push(typeof diff[k].after  === 'string' ? diff[k].after  : JSON.stringify(diff[k].after, null, 2));
+      out.push('');
+    }
+    pre.textContent = out.join('\n');
+    pre.style.display = '';
+  } else {
+    pre.style.display = 'none';
+  }
+}
+
+function _hyperCollectPatch() {
+  const targets = [];
+  if (document.getElementById('hyperTgt_systemPrompt').checked) targets.push('systemPrompt');
+  if (document.getElementById('hyperTgt_tools').checked)        targets.push('tools');
+  if (document.getElementById('hyperTgt_description').checked)  targets.push('description');
+  return {
+    enabled:            document.getElementById('hyperToggle').dataset.enabled === '1',
+    objective:          document.getElementById('hyperObjective').value,
+    refineTargets:      targets.length ? targets : ['systemPrompt'],
+    trigger:            document.getElementById('hyperTrigger').value,
+    refineProvider:     document.getElementById('hyperProvider').value,
+    minSessionsBetween: parseInt(document.getElementById('hyperMinSessions').value, 10) || 5,
+    budgetUSD:          parseFloat(document.getElementById('hyperBudget').value) || 5,
+  };
+}
+
+function _hyperBindControls(name) {
+  const tg = document.getElementById('hyperToggle');
+  if (tg) {
+    const flip = () => {
+      const next = tg.dataset.enabled !== '1';
+      tg.dataset.enabled = next ? '1' : '0';
+      tg.classList.toggle('on', next);
+      tg.setAttribute('aria-checked', String(next));
+    };
+    tg.onclick = flip;
+    tg.onkeydown = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); } };
+  }
+  const save = document.getElementById('hyperSave');
+  if (save) save.onclick = async () => {
+    save.disabled = true; save.textContent = '...';
+    try {
+      const r = await api('/api/hyper-agents/configure', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name, patch: _hyperCollectPatch() }),
+      });
+      if (r.ok) { toast(t('저장됨'), 'ok'); window.__hyperAgentsMap = window.__hyperAgentsMap || {}; window.__hyperAgentsMap[name] = r.agent.enabled; }
+      else toast(t('저장 실패: ') + (r.error || ''), 'err');
+    } catch (e) { toast(t('저장 실패: ') + e.message, 'err'); }
+    finally { save.disabled = false; save.textContent = t('💾 저장'); }
+  };
+  const dry = document.getElementById('hyperRefineDry');
+  if (dry) dry.onclick = () => _hyperRefineNow(name, true);
+  const ref = document.getElementById('hyperRefine');
+  if (ref) ref.onclick = () => _hyperRefineNow(name, false);
+}
+
+async function _hyperRefineNow(name, dryRun) {
+  if (!dryRun && !confirm(t('이 에이전트를 지금 다듬을까요? 메타 LLM 호출 비용이 발생합니다.'))) return;
+  const btn = document.getElementById(dryRun ? 'hyperRefineDry' : 'hyperRefine');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ ' + t('진행 중'); }
+  try {
+    // Save current settings first so the worker uses the latest objective/targets
+    await api('/api/hyper-agents/configure', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, patch: _hyperCollectPatch() }),
+    });
+    const r = await api('/api/hyper-agents/refine-now', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, dryRun }),
+    });
+    if (r.ok) {
+      toast(dryRun ? t('Dry-run 완료 — 제안 확인') : t('정교화 적용 완료'), 'ok');
+      // re-open modal with fresh data
+      openHyperAgent(name);
+    } else {
+      toast(t('실패: ') + (r.error || ''), 'err');
+      if (btn) { btn.disabled = false; btn.textContent = dryRun ? t('👁 Dry-run 미리보기') : t('⚡ 지금 다듬기'); }
+    }
+  } catch (e) {
+    toast(t('실패: ') + e.message, 'err');
+    if (btn) { btn.disabled = false; btn.textContent = dryRun ? t('👁 Dry-run 미리보기') : t('⚡ 지금 다듬기'); }
+  }
+}
+
+async function _hyperRollback(name, ts) {
+  if (!confirm(t('이 시점의 백업으로 에이전트를 되돌릴까요?'))) return;
+  try {
+    const r = await api('/api/hyper-agents/rollback', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, versionTs: ts }),
+    });
+    if (r.ok) { toast(t('롤백 완료'), 'ok'); openHyperAgent(name); }
+    else toast(t('롤백 실패: ') + (r.error || ''), 'err');
+  } catch (e) { toast(t('롤백 실패: ') + e.message, 'err'); }
 }
 
 // ────────────────────────────────────────────────────────────────
