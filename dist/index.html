@@ -63,9 +63,11 @@ tailwind.config = {
   },
 };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked@11.2.0/marked.min.js"></script>
+<!-- v2.40.1 — defer the heavy chart/graph/markdown libs so they don't block first paint.
+     Inline page script doesn't touch them at boot; views call them on demand. -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@11.2.0/marked.min.js" defer></script>
 <style>
   :root, body.theme-dark {
     --bg: #000000;
@@ -1441,18 +1443,33 @@ function cachedApi(path, ttlMs) {
   return api(path).then(d => { _apiCache[path] = { data: d, ts: Date.now() }; return d; });
 }
 
+// v2.40.1 — In-flight GET dedupe. Many views fetch the same endpoint in parallel
+// (e.g. /api/agents from agents tab + chatbot prompt rebuild). Coalescing them
+// halves boot-time concurrent requests with zero behaviour change.
+const _apiInflight = new Map();
+
 async function api(path, opts = {}) {
-  const r = await fetch(path, opts);
-  if (!r.ok && r.status !== 200) {
-    let msg = r.status.toString();
-    try {
-      const j = await r.json();
-      msg = errMsg(j);
-    } catch {}
-    throw new Error(msg);
-  }
-  const data = await r.json();
   const method = ((opts && opts.method) || 'GET').toUpperCase();
+  if (method === 'GET' && !opts.body && _apiInflight.has(path)) {
+    return _apiInflight.get(path);
+  }
+  const promise = (async () => {
+    const r = await fetch(path, opts);
+    if (!r.ok && r.status !== 200) {
+      let msg = r.status.toString();
+      try {
+        const j = await r.json();
+        msg = errMsg(j);
+      } catch {}
+      throw new Error(msg);
+    }
+    return r.json();
+  })();
+  if (method === 'GET') {
+    _apiInflight.set(path, promise);
+    promise.finally(() => _apiInflight.delete(path));
+  }
+  const data = await promise;
   if (method !== 'GET') {
     // POST/PUT/DELETE 성공 시 관련 GET 캐시 무효화
     _apiCacheInvalidate(path.replace(/\/[^/]*$/, ''));
@@ -1801,6 +1818,17 @@ function _isFavoriteTab(id) {
   const f = (window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.favoriteTabs) || [];
   return Array.isArray(f) && f.includes(id);
 }
+// v2.40.1 — coalesce sidebar re-renders into the next animation frame. Without
+// this, rapid ★ toggles (or recent-tab MRU updates from successive go() calls)
+// each trigger a full nav rebuild on the same tick.
+let _renderNavRaf = 0;
+function _scheduleRenderNav() {
+  if (_renderNavRaf) return;
+  _renderNavRaf = requestAnimationFrame(() => {
+    _renderNavRaf = 0;
+    renderNav();
+  });
+}
 function toggleFavoriteTab(id, ev) {
   if (ev) { ev.stopPropagation(); ev.preventDefault(); }
   const cur = ((window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.favoriteTabs) || []).slice();
@@ -1810,7 +1838,7 @@ function toggleFavoriteTab(id, ev) {
   // setPref defined in v2.38 Quick Settings — debounces a POST to /api/prefs/set
   if (typeof setPref === 'function') setPref('ui', 'favoriteTabs', cur, {skipApply: true});
   else if (window.CC_PREFS && window.CC_PREFS.ui) window.CC_PREFS.ui.favoriteTabs = cur;
-  renderNav();
+  _scheduleRenderNav();
 }
 function _tabHistoryBack() {
   if (_tabHistoryIdx <= 0) return;
