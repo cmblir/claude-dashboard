@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.41.0] — 2026-04-27
+
+### 👥 Agent Teams + 🤝 Recent sub-agent activity (with one-click CLI)
+
+Two new affordances on top of the existing Agents tab and Project Detail
+modal — both born from the user's request to (a) "bundle agents that
+go together" and (b) "see what work session A delegated to its sub-agents
+and re-open the matching CLI."
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/agent_teams.py` (new, ~280 LoC) | Whitelisted schema for saved teams. Each team is `{id: tm-<hex>, name, description, agents: [{name, scope, cwd, role, task}], createdAt, updatedAt}`. Atomic JSON persistence at `~/.claude-dashboard-agent-teams.json` (env override `CLAUDE_DASHBOARD_AGENT_TEAMS`). Members reference existing agents — the store doesn't duplicate the agent body, so renaming/deleting an agent reflects immediately on the next list. `_agent_exists()` resolves global / project / builtin / plugin scopes via `get_agent` + filesystem checks; missing members surface as `exists:false` + a per-team `missingCount`. |
+| 2 | `server/agent_teams.py` `api_agent_teams_*` | Five routes wired through `routes.py`: `GET /api/agent-teams/list`, `GET /api/agent-teams/get/<tm-id>`, `POST /api/agent-teams/save` (create or update), `POST /api/agent-teams/delete`, `POST /api/agent-teams/spawn`. The spawn route returns one descriptor per existing member (`{name, scope, role, cwd, prompt, claudeCmd}`) and a `skipped` array for missing agents. The dashboard either drives `api_session_spawn` per descriptor or surfaces the descriptors as copy-pasteable `claude /agents <name> "<prompt>"` strings. |
+| 3 | `server/projects.py::api_project_detail` | Response gains `subagentActivity: [{sessionId, ts, tool, agent, inputSummary, hadError, turnTokens, cwd}, ...]` mined from the existing `tool_uses` SQLite table (last 50 sessions for this cwd, top 60 delegations by recency). No new schema — reuses what `index_all_sessions` already captures, so projects with prior session history light up immediately. |
+| 4 | `dist/index.html` Agents tab — Teams section | New card grid above the search bar: 👥 Agent Teams. Each card lists members as chips (📁 marker for project-scoped), shows a missing count when relevant, and exposes 🚀 Spawn / Edit / Delete. The editor modal pre-fills name + description + multi-select members from `state.data.agents.agents`. |
+| 5 | `dist/index.html` Agents tab — Spawn flow | Clicking 🚀 opens a modal listing every member's resolved `claude /agents <name>` invocation in a copy-friendly `<pre>`, plus a Skipped panel for any member whose underlying agent file is gone. |
+| 6 | `dist/index.html` Project Detail modal — `🤝 Recent sub-agent activity` | New section in the right column. Activity entries are grouped by source `sessionId` so the user sees "session A → 3 agents" at a glance. Each group expands to per-delegation rows (agent chip + input preview + token cost + error flag). Clicking the group's 🖥 CLI button drives `/api/session/spawn` to bring up Terminal.app on that session's resume command. |
+| 7 | `tools/translations_manual_18.py` (new) | KO → EN/ZH for every Teams + activity label/button/toast. `make i18n-refresh` passes 0 missing across 4012+ keys × 3 languages. |
+
+#### Live measurement
+```
+POST /api/agent-teams/save → {ok:true, isNew:true, id:"tm-0b58fbf7", agents:2}
+GET  /api/project/detail   → {subagentActivity:[11 entries],
+                              top: { agent:"Explore", tool:"Agent",
+                                     inputSummary:"Scan codebase for ...",
+                                     sessionId:"2aa992bf..." }}
+```
+
+#### Compatibility
+- Backend additions only. Existing `/api/project/detail` shape strictly
+  extends — every prior key (`cwd`, `name`, `repo`, `claudeJsonEntry`,
+  `sessions`, `stats`) is unchanged; only the new `subagentActivity` key
+  is added.
+- No SQLite migration — the activity panel reads `tool_uses` rows that
+  `server/sessions.py` was already inserting since v2.x.
+- Teams store is brand-new (`~/.claude-dashboard-agent-teams.json`); first
+  write creates it.
+
+#### Verification
+- Live API: agent-teams save/list round-trip; project-detail surfaces
+  11 sub-agent delegations with correct grouping.
+- UI smoke (Playwright eval): teamsGrid renders 1 saved team · all
+  helper globals present · 0 console errors.
+- e2e regression — **0 failures**:
+  - `e2e-hyper-projects-and-sidebar.mjs` (v2.40)  — 11/11
+  - `e2e-tabs-smoke.mjs`                          — 58/58
+
+---
 ## [2.40.5] — 2026-04-27
 
 ### 🩹 Hotfix — Recent Blocks / Detective chips were unclickable (HTML quoting bug)
