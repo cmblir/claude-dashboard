@@ -819,3 +819,318 @@ def api_subagent_set_model(body: dict) -> dict:
     return {"ok": ok, "model": model, "path": str(target)}
 
 
+# ───────── v2.43.0 — project-scope config helpers ─────────
+# Global ↔ Project parity for CLAUDE.md / settings.json / settings.local.json /
+# skills / commands. Every path resolves under $HOME or we refuse the write.
+# Frontend sends `cwd` (absolute path); backend derives `<cwd>/CLAUDE.md` etc.
+
+def _validate_project_cwd(raw: str) -> Optional[Path]:
+    """Resolve `raw` to an absolute Path under $HOME, or None on violation.
+    Same realpath sandbox the rest of the app uses for user-supplied paths."""
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        p = Path(os.path.expanduser(raw)).resolve()
+    except Exception:
+        return None
+    home = str(Path.home())
+    if not (str(p) == home or str(p).startswith(home + os.sep)):
+        return None
+    if not p.exists() or not p.is_dir():
+        return None
+    return p
+
+
+def _qstr(query: dict, key: str) -> str:
+    """Pull a single string value out of `query` whether the dispatcher gave
+    us a flat dict (`{"cwd": "..."}`) or a multi-value mapping
+    (`{"cwd": ["..."]}`)."""
+    if not isinstance(query, dict):
+        return ""
+    v = query.get(key)
+    if isinstance(v, list):
+        v = v[0] if v else ""
+    return v if isinstance(v, str) else ""
+
+
+def api_project_claude_md_get(query: dict) -> dict:
+    """GET /api/project/claude-md?cwd=... — read project CLAUDE.md."""
+    cwd = _validate_project_cwd(_qstr(query, "cwd"))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    md = cwd / "CLAUDE.md"
+    raw = _safe_read(md) if md.exists() else ""
+    return {"ok": True, "raw": raw, "path": str(md), "exists": md.exists()}
+
+
+def api_project_claude_md_put(body: dict) -> dict:
+    """PUT /api/project/claude-md  body: {cwd, raw}."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    cwd = _validate_project_cwd(body.get("cwd", ""))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    raw = body.get("raw", "")
+    if not isinstance(raw, str):
+        return {"ok": False, "error": "raw must be string"}
+    md = cwd / "CLAUDE.md"
+    ok = _safe_write(md, raw)
+    return {"ok": bool(ok), "path": str(md)}
+
+
+def _project_settings_get(cwd: Path, filename: str) -> dict:
+    """Shared: read `<cwd>/.claude/<filename>` as JSON or {} if missing."""
+    p = cwd / ".claude" / filename
+    if not p.exists():
+        return {"ok": True, "raw": "{}", "path": str(p), "exists": False, "data": {}}
+    raw = _safe_read(p) or ""
+    try:
+        data = json.loads(raw) if raw.strip() else {}
+    except Exception as e:
+        return {"ok": True, "raw": raw, "path": str(p), "exists": True,
+                "data": {}, "parseError": str(e)}
+    return {"ok": True, "raw": raw, "path": str(p), "exists": True, "data": data}
+
+
+def _project_settings_put(cwd: Path, filename: str, body: dict) -> dict:
+    """Shared: write `<cwd>/.claude/<filename>` from `body.raw` (string) or
+    `body.data` (object). Sanitises permissions like `put_settings` does."""
+    from .claude_md import sanitize_permissions, validate_permissions
+    raw = body.get("raw")
+    data = body.get("data")
+    if isinstance(raw, str) and raw.strip():
+        try:
+            data_parsed = json.loads(raw)
+        except Exception as e:
+            return {"ok": False, "error": f"invalid JSON: {e}"}
+    elif isinstance(data, dict):
+        data_parsed = data
+    else:
+        return {"ok": False, "error": "raw or data required"}
+
+    fixed: list = []
+    if isinstance(data_parsed.get("permissions"), dict):
+        sanitized, fixed = sanitize_permissions(data_parsed["permissions"])
+        data_parsed["permissions"] = {**data_parsed["permissions"], **sanitized}
+        remaining = validate_permissions(sanitized)
+        if remaining:
+            return {
+                "ok": False,
+                "error": "invalid permission rules: "
+                + "; ".join(f"{i['rule']} ({i['error']})" for i in remaining[:3]),
+            }
+
+    target_dir = cwd / ".claude"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    p = target_dir / filename
+    text = json.dumps(data_parsed, indent=2, ensure_ascii=False)
+    ok = _safe_write(p, text)
+    return {"ok": bool(ok), "path": str(p), "fixed": fixed}
+
+
+def api_project_settings_get(query: dict) -> dict:
+    """GET /api/project/settings?cwd=..."""
+    cwd = _validate_project_cwd(_qstr(query, "cwd"))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    return _project_settings_get(cwd, "settings.json")
+
+
+def api_project_settings_put(body: dict) -> dict:
+    """PUT /api/project/settings  body: {cwd, raw|data}."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    cwd = _validate_project_cwd(body.get("cwd", ""))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    return _project_settings_put(cwd, "settings.json", body)
+
+
+def api_project_settings_local_get(query: dict) -> dict:
+    """GET /api/project/settings-local?cwd=... — gitignored personal overrides."""
+    cwd = _validate_project_cwd(_qstr(query, "cwd"))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    return _project_settings_get(cwd, "settings.local.json")
+
+
+def api_project_settings_local_put(body: dict) -> dict:
+    """PUT /api/project/settings-local  body: {cwd, raw|data}."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    cwd = _validate_project_cwd(body.get("cwd", ""))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    return _project_settings_put(cwd, "settings.local.json", body)
+
+
+# ───────── project-scope skills / commands ─────────
+# `_scan_repo_local_claude` (above) already lists them read-only. These add
+# create / update / delete with cwd sandbox.
+
+_SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
+
+def api_project_skills_list(query: dict) -> dict:
+    """GET /api/project/skills/list?cwd=... — list project-scope skills."""
+    cwd = _validate_project_cwd(_qstr(query, "cwd"))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    repo = _scan_repo_local_claude(str(cwd))
+    return {"ok": True, "skills": repo.get("skills", []), "cwd": str(cwd)}
+
+
+def api_project_commands_list(query: dict) -> dict:
+    """GET /api/project/commands/list?cwd=... — list project-scope commands."""
+    cwd = _validate_project_cwd(_qstr(query, "cwd"))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    repo = _scan_repo_local_claude(str(cwd))
+    return {"ok": True, "commands": repo.get("commands", []), "cwd": str(cwd)}
+
+
+def api_project_skill_get(query: dict) -> dict:
+    """GET /api/project/skill?cwd=...&id=..."""
+    cwd = _validate_project_cwd(_qstr(query, "cwd"))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    sid = _qstr(query, "id")
+    if not _SAFE_NAME_RE.match(sid):
+        return {"ok": False, "error": "invalid skill id"}
+    p = cwd / ".claude" / "skills" / sid / "SKILL.md"
+    if not p.exists():
+        return {"ok": False, "error": "not found", "path": str(p)}
+    raw = _safe_read(p) or ""
+    meta = _parse_frontmatter(raw)
+    return {
+        "ok": True,
+        "id": sid,
+        "name": meta.get("name", sid),
+        "description": meta.get("description", ""),
+        "raw": raw,
+        "content": _strip_frontmatter(raw),
+        "path": str(p),
+        "scope": "project",
+    }
+
+
+def api_project_skill_put(body: dict) -> dict:
+    """PUT /api/project/skill  body: {cwd, id, raw}. Creates the directory if missing."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    cwd = _validate_project_cwd(body.get("cwd", ""))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    sid = body.get("id", "")
+    if not _SAFE_NAME_RE.match(sid):
+        return {"ok": False, "error": "invalid skill id"}
+    raw = body.get("raw", "")
+    if not isinstance(raw, str):
+        return {"ok": False, "error": "raw must be string"}
+    base = cwd / ".claude" / "skills" / sid
+    base.mkdir(parents=True, exist_ok=True)
+    p = base / "SKILL.md"
+    ok = _safe_write(p, raw)
+    return {"ok": bool(ok), "path": str(p)}
+
+
+def api_project_skill_delete(body: dict) -> dict:
+    """POST /api/project/skill/delete  body: {cwd, id}."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    cwd = _validate_project_cwd(body.get("cwd", ""))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    sid = body.get("id", "")
+    if not _SAFE_NAME_RE.match(sid):
+        return {"ok": False, "error": "invalid skill id"}
+    base = cwd / ".claude" / "skills" / sid
+    if not base.exists():
+        return {"ok": False, "error": "not found"}
+    try:
+        # Delete files + the dir; refuse if any unexpected entry.
+        for f in base.iterdir():
+            if f.is_file():
+                f.unlink()
+            else:
+                return {"ok": False, "error": f"refusing to recurse into {f.name}"}
+        base.rmdir()
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True}
+
+
+_CMD_NAME_RE = re.compile(r"^[a-zA-Z0-9_-][a-zA-Z0-9_./-]{0,127}$")
+
+
+def api_project_command_get(query: dict) -> dict:
+    """GET /api/project/command?cwd=...&id=...  (id may use ':' for subdirs)."""
+    cwd = _validate_project_cwd(_qstr(query, "cwd"))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    cid = _qstr(query, "id")
+    rel = cid.replace(":", "/")
+    if not _CMD_NAME_RE.match(rel):
+        return {"ok": False, "error": "invalid command id"}
+    base_dir = (cwd / ".claude" / "commands").resolve()
+    p = (cwd / ".claude" / "commands" / (rel + ".md")).resolve()
+    if not str(p).startswith(str(base_dir) + os.sep):
+        return {"ok": False, "error": "path outside commands dir"}
+    if not p.exists():
+        return {"ok": False, "error": "not found", "path": str(p)}
+    raw = _safe_read(p) or ""
+    meta = _parse_frontmatter(raw)
+    return {
+        "ok": True, "id": cid, "name": meta.get("name", cid),
+        "description": meta.get("description", ""), "raw": raw,
+        "content": _strip_frontmatter(raw), "path": str(p),
+        "scope": "project",
+    }
+
+
+def api_project_command_put(body: dict) -> dict:
+    """PUT /api/project/command  body: {cwd, id, raw}."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    cwd = _validate_project_cwd(body.get("cwd", ""))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    cid = body.get("id", "")
+    rel = cid.replace(":", "/")
+    if not _CMD_NAME_RE.match(rel):
+        return {"ok": False, "error": "invalid command id"}
+    raw = body.get("raw", "")
+    if not isinstance(raw, str):
+        return {"ok": False, "error": "raw must be string"}
+    base_dir = (cwd / ".claude" / "commands").resolve()
+    p = (cwd / ".claude" / "commands" / (rel + ".md")).resolve()
+    if not str(p).startswith(str(base_dir) + os.sep):
+        return {"ok": False, "error": "path outside commands dir"}
+    p.parent.mkdir(parents=True, exist_ok=True)
+    ok = _safe_write(p, raw)
+    return {"ok": bool(ok), "path": str(p)}
+
+
+def api_project_command_delete(body: dict) -> dict:
+    """POST /api/project/command/delete  body: {cwd, id}."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    cwd = _validate_project_cwd(body.get("cwd", ""))
+    if not cwd:
+        return {"ok": False, "error": "invalid or out-of-home cwd"}
+    cid = body.get("id", "")
+    rel = cid.replace(":", "/")
+    if not _CMD_NAME_RE.match(rel):
+        return {"ok": False, "error": "invalid command id"}
+    base_dir = (cwd / ".claude" / "commands").resolve()
+    p = (cwd / ".claude" / "commands" / (rel + ".md")).resolve()
+    if not str(p).startswith(str(base_dir) + os.sep):
+        return {"ok": False, "error": "path outside commands dir"}
+    if not p.exists():
+        return {"ok": False, "error": "not found"}
+    try:
+        p.unlink()
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True}
+

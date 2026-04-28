@@ -10,6 +10,68 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.43.0] — 2026-04-28
+
+### 🛠️ Setup Helpers — global ↔ project scope across the board
+
+User: "지금 세팅을 도와주는 것들이 필요해. 예를 들어서, claude MD도 global,
+프로젝트별로 할 수 있어야해." Followed by "C로 가자." — full package across
+six setup surfaces. Until now most config tabs only edited the global
+`~/.claude/` files; project-scope (`<cwd>/.claude/`) was either read-only
+(CLAUDE.md) or completely missing (settings, settings.local, skills,
+commands). This release ships parity.
+
+**Added — backend (`server/projects.py` + `server/routes.py`)**
+
+| Endpoint | Purpose |
+|---|---|
+| `GET/PUT /api/project/claude-md` | `<cwd>/CLAUDE.md` |
+| `GET/PUT /api/project/settings` | `<cwd>/.claude/settings.json` (committed) |
+| `GET/PUT /api/project/settings-local` | `<cwd>/.claude/settings.local.json` (gitignored personal overrides) |
+| `GET /api/project/skills/list` | list project skills |
+| `GET/PUT /api/project/skill` | one skill (creates `.claude/skills/<id>/SKILL.md`) |
+| `POST /api/project/skill/delete` | remove skill dir |
+| `GET /api/project/commands/list` | list project commands |
+| `GET/PUT /api/project/command` | one command (sub-paths via `:`, e.g. `review:critical`) |
+| `POST /api/project/command/delete` | remove command file |
+
+Every handler resolves `cwd` via `_validate_project_cwd` — must be a real directory under `$HOME` or the call returns `invalid or out-of-home cwd`. Permission rules go through the existing `sanitize_permissions` so an invalid `:*` mid-pattern is auto-fixed exactly like the global `put_settings` path. Path-traversal guard on commands re-resolves the final path and refuses anything outside `<cwd>/.claude/commands/`.
+
+**Added — frontend (`dist/index.html`)**
+
+- Shared `_renderConfigScopeToggle` widget + `state.data.cfgScope`/`cfgCwd`/`cfgSettingsKind` so the user picks scope once and it sticks across tabs.
+- **CLAUDE.md tab**: 🌐 Global / 📁 Project toggle + project picker. Save dispatches to the right endpoint.
+- **Settings tab**: same scope toggle; in project mode adds a sub-toggle for `settings.json` (committed) vs `settings.local.json` (personal). Recommendation profiles only show in global mode.
+- **Skills tab**: project mode lists `<cwd>/.claude/skills/*` only. ＋ New skill creates a directory + seeded `SKILL.md`. Cards open a project-aware editor.
+- **Commands tab**: project mode lists `<cwd>/.claude/commands/**/*.md`. ＋ New command, click-to-edit, delete.
+- **Hooks tab**: project mode shows a header card summarising project hook counts in `settings.json[hooks]` and `settings.local.json[hooks]`, with a one-click jump to the Settings tab for editing (project hooks are stored inside settings.json, so the JSON shape stays authoritative there).
+
+**Verification**
+
+```
+backend smoke (curl)
+  /api/project/claude-md?cwd=$HOME/claude-dashboard   → 200, raw len ≈ 7000
+  /api/project/settings?cwd=...                       → 200, exists=false (no .claude/)
+  /api/project/settings-local?cwd=...                 → 200, parses real allow rules
+  /api/project/claude-md?cwd=/tmp                     → 400 invalid or out-of-home cwd
+  PUT round-trip (CLAUDE.md / settings / skill)       → all atomic, files written
+  path traversal (id="../etc")                        → 400 invalid command id
+
+frontend smoke (Playwright)
+  claudemd / settings / skills / commands / hooks     → all render, 0 console errors
+
+regression
+  e2e-tabs-smoke.mjs                                  → 58/58
+  make i18n-verify                                    → 0 missing across 4135 keys × 3 langs
+```
+
+**Compatibility**
+
+- All new endpoints are additive — old API routes unchanged.
+- Frontend default scope is `global`, preserving existing flows. Existing global-only callers don't need to know about scope.
+- Project paths must resolve under `$HOME` — same sandbox the rest of the app uses.
+
+---
 ## [2.42.3] — 2026-04-28
 
 ### 🩹 Hooks tab — 2 s initial load + delete didn't refresh UI
