@@ -218,12 +218,24 @@ from .system import (
 
 # ───────── 라우트 테이블 ─────────
 
+
+def _q_truthy(q: dict, key: str) -> bool:
+    """v2.43.1 — extract a boolean flag from the dispatcher's parsed query.
+    Handles both flat dicts and parse_qs's list-valued mappings."""
+    if not isinstance(q, dict):
+        return False
+    v = q.get(key)
+    if isinstance(v, list):
+        v = v[0] if v else ""
+    return str(v).lower() in ("1", "true", "yes", "on")
+
+
 ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/claude-md": lambda q: get_claude_md(),
     "/api/system/status": lambda q: get_system_status(),
-    "/api/skills": lambda q: list_skills(),
+    "/api/skills": lambda q: list_skills(force_refresh=_q_truthy(q, "refresh")),
     "/api/agents": lambda q: list_agents(),
-    "/api/commands": lambda q: list_commands(),
+    "/api/commands": lambda q: list_commands(force_refresh=_q_truthy(q, "refresh")),
     "/api/hooks": lambda q: get_hooks(),
     "/api/plugins": lambda q: list_plugins_api(),
     "/api/marketplaces": lambda q: list_marketplaces(),

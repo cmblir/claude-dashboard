@@ -10,6 +10,56 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.43.1] — 2026-04-28
+
+### 🚀 Perf — workflow canvas + skills/commands lists
+
+User: "지금 전체적으로 대시보드가 너무 느려. 특히 워크플로우 부분이 심각하게
+렉이 걸리고 느린데, 이 부분 최적화해줘." Three measured bottlenecks fixed.
+
+**Measured before**
+
+```
+/api/skills      :  816 ms (1.37 MB) — 485 SKILL.md re-parsed every visit
+/api/commands    : 1116 ms (1.44 MB) — 308 plugin command .md re-parsed
+canvas drag      :   ~100 mousemove/s → _wfRenderMinimap fired sync every
+                     event; full canvas redraw + O(N×E) edge lookup
+```
+
+**Measured after**
+
+```
+/api/skills      :   95 ms cold → 36 ms warm  (~22× / cache hit)
+/api/commands    :  535 ms cold → 35 ms warm  (~31× / cache hit)
+canvas drag      :   ≤1 minimap repaint per animation frame; node lookup
+                     O(deg) via cached Map for the duration of a drag
+```
+
+**Changes**
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/skills.py::list_skills` | Wrapped with TTL+mtime cache (60 s). Fingerprint stat()s only the top-level `~/.claude/skills/` and `~/.claude/plugins/marketplaces/*` dirs (cheap), so a freshly edited skill invalidates immediately. New `force_refresh` kw. |
+| 2 | `server/commands.py::list_commands` | Same TTL+mtime cache pattern (60 s). |
+| 3 | `server/routes.py` | New `_q_truthy(q, key)` helper; `/api/skills` and `/api/commands` now forward `?refresh=1` to bypass the cache. |
+| 4 | `dist/index.html::_wfScheduleMinimap` (new) | Coalesces minimap repaints into one rAF tick. Replaces the inline rAF block inside `_wfRenderCanvas`. |
+| 5 | `dist/index.html::onMove` | Drag handler swaps `_wfRenderMinimap()` (sync, ~100/s) for `_wfScheduleMinimap()` (≤60/s). Caches the dragged node reference on `drag._node` (no `nodes.find()` per mousemove). |
+| 6 | `dist/index.html::_wfUpdateNodeTransform` | Builds a `nodeId → node` `Map` and a `nodeId → edges[]` adjacency map once, caches them on `__wf.drag` for the drag lifetime. Per-frame cost: O(N×deg) → O(deg). |
+
+**Verification**
+```
+JS smoke         : 6 script blocks parse OK
+e2e-tabs-smoke   : 58/58 (one flaky AFTER.sessions retry — re-run clean)
+GET /api/skills?refresh=1   : bypasses cache (force re-scan)
+backend cold/warm           : as measured above
+```
+
+**Compatibility**
+- Caches are process-memory only; `force_refresh` defaults to `False` so all existing call sites are unchanged.
+- `_wfScheduleMinimap` is the same idempotent-rAF pattern already used elsewhere; no new minimap behavior.
+- Drag-time Maps are scoped to `__wf.drag` and discarded on drag end; no leaks.
+
+---
 ## [2.43.0] — 2026-04-28
 
 ### 🛠️ Setup Helpers — global ↔ project scope across the board

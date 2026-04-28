@@ -4137,10 +4137,21 @@ function _wfRenderCanvas() {
   // 노드 검색 필터 반영 (검색어 있을 때만)
   if (__wfNodeSearchQuery) _wfApplyNodeSearchHighlight();
   // 미니맵 업데이트 (debounce — 연속 렌더 시 마지막만)
-  if (_wfMinimapTimer) cancelAnimationFrame(_wfMinimapTimer);
-  _wfMinimapTimer = requestAnimationFrame(() => { _wfMinimapTimer = null; _wfRenderMinimap(); });
+  _wfScheduleMinimap();
 }
 let _wfMinimapTimer = null;
+// v2.43.1 — coalesce minimap repaints into one per animation frame so
+// dragging a node (which fires mousemove ~100×/s) doesn't redraw the
+// minimap canvas the same number of times. Prior code called
+// _wfRenderMinimap() synchronously inside onMove → noticeable lag with
+// many nodes/edges because the minimap's own draw loop is O(N+E).
+function _wfScheduleMinimap() {
+  if (_wfMinimapTimer) return;
+  _wfMinimapTimer = requestAnimationFrame(() => {
+    _wfMinimapTimer = null;
+    _wfRenderMinimap();
+  });
+}
 
 // ─── 노드 검색 필터 ────────────────────────────────────────────
 let __wfNodeSearchQuery = '';
@@ -4521,21 +4532,51 @@ function _wfSyncSelectionClasses() {
 // 연관 엣지의 d 속성만 in-place 로 업데이트한다.
 function _wfUpdateNodeTransform(nid) {
   if (!__wf.current) return;
-  const n = __wf.current.nodes.find(x => x.id === nid);
+  // v2.43.1 — build/reuse a nodeId→node Map and a nodeId→edges[] adjacency
+  // map. During a drag this fires every mousemove, so the previous code's
+  // `nodes.find()` per edge made it O(N×deg). The Map is cached on
+  // __wf.drag for the duration of the drag and rebuilt only when missing
+  // or when the underlying arrays change identity.
+  const drag = __wf.drag;
+  let nodeMap, adj;
+  if (drag && drag._nodeMap && drag._nodesRef === __wf.current.nodes
+      && drag._edgesRef === __wf.current.edges) {
+    nodeMap = drag._nodeMap;
+    adj = drag._adj;
+  } else {
+    nodeMap = new Map();
+    __wf.current.nodes.forEach(x => nodeMap.set(x.id, x));
+    adj = new Map();
+    (__wf.current.edges || []).forEach(e => {
+      if (!adj.has(e.from)) adj.set(e.from, []);
+      adj.get(e.from).push(e);
+      if (e.from !== e.to) {
+        if (!adj.has(e.to)) adj.set(e.to, []);
+        adj.get(e.to).push(e);
+      }
+    });
+    if (drag) {
+      drag._nodeMap = nodeMap;
+      drag._adj = adj;
+      drag._nodesRef = __wf.current.nodes;
+      drag._edgesRef = __wf.current.edges;
+    }
+  }
+  const n = nodeMap.get(nid);
   if (!n) return;
   const g = document.querySelector('#wfNodes g.wf-node[data-node="' + nid + '"]');
   if (g) g.setAttribute('transform', `translate(${n.x},${n.y})`);
-  (__wf.current.edges || []).forEach(e => {
-    if (e.from !== nid && e.to !== nid) return;
+  const touched = adj.get(nid) || [];
+  for (const e of touched) {
     const path = document.querySelector('#wfEdges path.wf-edge[data-edge="' + e.id + '"]');
-    if (!path) return;
-    const fromN = __wf.current.nodes.find(x => x.id === e.from);
-    const toN   = __wf.current.nodes.find(x => x.id === e.to);
-    if (!fromN || !toN) return;
+    if (!path) continue;
+    const fromN = nodeMap.get(e.from);
+    const toN   = nodeMap.get(e.to);
+    if (!fromN || !toN) continue;
     const p1 = _wfPortPos(fromN, e.fromPort || 'out');
     const p2 = _wfPortPos(toN, e.toPort || 'in');
     path.setAttribute('d', _wfBezier(p1.x, p1.y, p2.x, p2.y));
-  });
+  }
 }
 
 // ─── Undo 스냅샷 ──────────────────────────────────────────────
@@ -4755,7 +4796,7 @@ function _wfBindCanvas() {
       if (__wfMultiSelected.size > 0) { __wfMultiSelected.clear(); _wfSyncMultiSelectClasses(); }
       __wf.selectedNodeId = nid; __wf.selectedEdgeId = null;
       _wfPushUndo();
-      __wf.drag = { kind: 'node', nodeId: nid, origX: node.x, origY: node.y, startX: pt.x, startY: pt.y };
+      __wf.drag = { kind: 'node', nodeId: nid, origX: node.x, origY: node.y, startX: pt.x, startY: pt.y, _node: node };
       // 전체 re-render 대신 selected 클래스만 토글 (깜빡임 방지)
       _wfSyncSelectionClasses();
       _wfRenderInspector();
@@ -4783,7 +4824,7 @@ function _wfBindCanvas() {
     if (!__wf.drag || !__wf.current) return;
     const pt = svgPt(e);
     if (__wf.drag.kind === 'node') {
-      const n = __wf.current.nodes.find(x => x.id === __wf.drag.nodeId);
+      const n = __wf.drag._node;  // v2.43.1: cached on drag start
       if (!n) return;
       n.x = Math.round(__wf.drag.origX + (pt.x - __wf.drag.startX));
       n.y = Math.round(__wf.drag.origY + (pt.y - __wf.drag.startY));
@@ -4791,7 +4832,7 @@ function _wfBindCanvas() {
       _wfUpdateNodeTransform(__wf.drag.nodeId);
       if (!__wf.dirty) { __wf.dirty = true; _wfUpdateToolbar(); }
       _wfSchedulePatch();
-      _wfRenderMinimap();
+      _wfScheduleMinimap();  // v2.43.1: rAF-coalesced (was sync, ~100/s)
       if (touch) { try{e.preventDefault();}catch(_){} }
     } else if (__wf.drag.kind === 'pan') {
       const dx = e.clientX - __wf.drag.startX;
@@ -4803,7 +4844,7 @@ function _wfBindCanvas() {
       if (vp) vp.setAttribute('transform',
         `translate(${__wf.current.viewport.panX},${__wf.current.viewport.panY}) scale(${__wf.current.viewport.zoom||1})`);
       _wfSchedulePatch();
-      _wfRenderMinimap();
+      _wfScheduleMinimap();  // v2.43.1: rAF-coalesced
     } else if (__wf.drag.kind === 'edge') {
       __wf.edgeDraft.x2 = pt.x; __wf.edgeDraft.y2 = pt.y;
       _wfDraftRender();
