@@ -10,6 +10,43 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.43.2] — 2026-04-28
+
+### 📊 Project / session token usage drill-down
+
+User: "프로젝트 혹은 세션별 토큰 사용량을 보고 싶어. 근데 사용량/비용
+(토큰 중심)에서 지금 TOP20만 볼 수 있는데, 그냥 프로젝트를 눌러서 토큰
+사용량을 보고 싶어." Replaces fixed TOP-20 read-only table with a
+clickable, scrollable list of every project; click → modal with the
+project's session-level breakdown.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/system.py::api_usage_summary` | Drops `LIMIT 20` from the `byProject` SQL so the response carries every project (29 instead of 20 on this machine), still ordered by tokens DESC. |
+| 2 | `server/system.py::api_usage_project` (new) | `GET /api/usage/project?cwd=...` — returns `{totals, sessions[], byTool[], byAgent[], dailyTimeline[]}` for one project. cwd resolved + sandboxed under `$HOME`. Joins `tool_uses` filtered to that project's session_ids for tool/agent distribution. |
+| 3 | `server/routes.py` | Wires `/api/usage/project` into `ROUTES_GET`. |
+| 4 | `dist/index.html::VIEWS.usage` | Project section becomes a scrollable (max 420 px) list of all projects; rows are `link-row` clickable, with cwd as tooltip + truncated subtitle. Header shows total project count instead of "TOP 20". |
+| 5 | `dist/index.html::openProjectUsage` (new) | Modal: 6 stat cards (total / input / output / cacheRead / cacheCreate / sessions), tool-by-tool + agent-by-agent token bars, daily timeline minibar, sessions table sorted by tokens DESC. Each session row links into the existing session-detail modal. |
+| 6 | `tools/translations_manual_22.py` (new) | KO → EN/ZH for 10 new strings (`프로젝트별 토큰`, `세션별 토큰`, `행 클릭 → 상세`, etc.). |
+
+#### Verification
+```
+GET /api/usage/summary               → byProject count: 29 (was 20 cap)
+GET /api/usage/project?cwd=$HOME/lazyclaude
+                                     → ok=True, sessions=1, dailyTimeline len=1
+GET /api/usage/project?cwd=/tmp      → 400 cwd outside home (sandbox)
+GET /api/usage/project (no cwd)      → 400 cwd required
+Headless: usage tab → 29 project rows, click 1st → modal with 81 session
+                       rows for that cwd, 0 console errors
+e2e-tabs-smoke.mjs                   → 58/58
+make i18n-verify                     → 0 missing across EN/ZH
+```
+
+#### Compatibility
+- Backend addition only — `byProject` still ordered the same way; unchanged frontend code keeps working (just sees more rows now).
+- New endpoint `/api/usage/project` is purely additive.
+
+---
 ## [2.43.1] — 2026-04-28
 
 ### 🚀 Perf — workflow canvas + skills/commands lists

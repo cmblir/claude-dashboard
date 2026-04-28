@@ -162,12 +162,14 @@ def api_usage_summary() -> dict:
             "SELECT started_at, total_tokens FROM sessions WHERE started_at >= ? AND total_tokens > 0",
             (thirty,)
         ).fetchall()
+        # v2.43.2 — return ALL projects (no LIMIT 20). Frontend caps the
+        # visible rows but keeps the rest scrollable + clickable for drill-in.
         proj_tok = [dict(r) for r in c.execute(
             "SELECT COALESCE(NULLIF(cwd,''), project_dir) AS key, MAX(cwd) AS cwd, "
             "       COUNT(*) AS sessions, SUM(total_tokens) AS tokens "
             "FROM sessions WHERE total_tokens > 0 "
             "GROUP BY COALESCE(NULLIF(cwd,''), project_dir) "
-            "ORDER BY tokens DESC LIMIT 20"
+            "ORDER BY tokens DESC"
         ).fetchall()]
         # 도구별 토큰 (turn_tokens)
         tool_tok = [dict(r) for r in c.execute(
@@ -212,6 +214,121 @@ def api_usage_summary() -> dict:
             "topSessions": top_sessions,
         },
     }
+
+
+def api_usage_project(query: dict) -> dict:
+    """v2.43.2 — drill-down for one project.
+
+    GET ``/api/usage/project?cwd=<absolute path>`` returns:
+
+        {
+          "ok": True, "cwd": "...",
+          "totals": {total, input, output, cacheRead, cacheCreate, sessions},
+          "sessions": [{session_id, started_at, model, total_tokens, ...}, ...],
+          "byTool":   [{tool, calls, tokens}, ...],
+          "byAgent":  [{name, calls, tokens}, ...],
+          "dailyTimeline": [{date, count}, ...],
+        }
+
+    The ``cwd`` field selects on either ``sessions.cwd`` (preferred) or
+    ``sessions.project_dir`` (when cwd was never resolved). Validates that
+    the resolved path is under ``$HOME`` so we don't leak sessions that
+    happen to share a project_dir slug from outside home.
+    """
+    from collections import defaultdict
+    from datetime import datetime
+    from pathlib import Path
+    import os
+
+    cwd_raw = ""
+    if isinstance(query, dict):
+        v = query.get("cwd")
+        if isinstance(v, list):
+            v = v[0] if v else ""
+        cwd_raw = v if isinstance(v, str) else ""
+    cwd_raw = (cwd_raw or "").strip()
+    if not cwd_raw:
+        return {"ok": False, "error": "cwd required"}
+
+    # Resolve + sandbox under $HOME (same guard the rest of the app uses).
+    try:
+        abs_cwd = str(Path(os.path.expanduser(cwd_raw)).resolve())
+    except Exception:
+        return {"ok": False, "error": "invalid cwd"}
+    home = str(Path.home())
+    if not (abs_cwd == home or abs_cwd.startswith(home + os.sep)):
+        return {"ok": False, "error": "cwd outside home"}
+
+    _db_init()
+    with _db() as c:
+        # Match either resolved cwd or project_dir slug fallback.
+        totals = c.execute(
+            "SELECT COALESCE(SUM(total_tokens),0) AS tot, "
+            "       COALESCE(SUM(input_tokens),0) AS ti, "
+            "       COALESCE(SUM(output_tokens),0) AS to_, "
+            "       COALESCE(SUM(cache_read_tokens),0) AS cr, "
+            "       COALESCE(SUM(cache_creation_tokens),0) AS cc, "
+            "       COUNT(*) AS n "
+            "FROM sessions WHERE cwd = ? OR (cwd = '' AND project_dir = ?)",
+            (abs_cwd, cwd_raw),
+        ).fetchone()
+        rows = [dict(r) for r in c.execute(
+            "SELECT session_id, started_at, ended_at, duration_ms, model, "
+            "       first_user_prompt, total_tokens, input_tokens, output_tokens, "
+            "       cache_read_tokens, cache_creation_tokens, message_count, "
+            "       tool_use_count "
+            "FROM sessions WHERE cwd = ? OR (cwd = '' AND project_dir = ?) "
+            "ORDER BY total_tokens DESC",
+            (abs_cwd, cwd_raw),
+        ).fetchall()]
+        sids = [r["session_id"] for r in rows]
+        by_tool: list = []
+        by_agent: list = []
+        if sids:
+            placeholders = ",".join("?" * len(sids))
+            by_tool = [dict(r) for r in c.execute(
+                f"SELECT tool, COUNT(*) AS calls, SUM(turn_tokens) AS tokens "
+                f"FROM tool_uses WHERE session_id IN ({placeholders}) "
+                f"GROUP BY tool ORDER BY tokens DESC LIMIT 30",
+                sids,
+            ).fetchall()]
+            by_agent = [dict(r) for r in c.execute(
+                f"SELECT subagent_type AS name, COUNT(*) AS calls, "
+                f"       SUM(turn_tokens) AS tokens "
+                f"FROM tool_uses WHERE session_id IN ({placeholders}) "
+                f"      AND subagent_type != '' "
+                f"GROUP BY subagent_type ORDER BY tokens DESC LIMIT 30",
+                sids,
+            ).fetchall()]
+
+    # Daily timeline (last 90 days) bucketed from session start times.
+    daily: dict = defaultdict(int)
+    cutoff = (time.time() - 90 * 86400) * 1000
+    for r in rows:
+        s = r.get("started_at") or 0
+        if not s or s < cutoff:
+            continue
+        try:
+            d = datetime.fromtimestamp(s / 1000).strftime("%Y-%m-%d")
+        except Exception:
+            continue
+        daily[d] += int(r.get("total_tokens") or 0)
+    timeline = [{"date": d, "tokens": daily[d]} for d in sorted(daily)]
+
+    return {
+        "ok": True,
+        "cwd": abs_cwd,
+        "totals": {
+            "total": totals["tot"], "input": totals["ti"], "output": totals["to_"],
+            "cacheRead": totals["cr"], "cacheCreate": totals["cc"],
+            "sessions": totals["n"],
+        },
+        "sessions": rows,
+        "byTool": by_tool,
+        "byAgent": by_agent,
+        "dailyTimeline": timeline,
+    }
+
 
 def api_memory_list(query: dict) -> dict:
     """~/.claude/projects/*/memory/*.md 전부 나열."""
