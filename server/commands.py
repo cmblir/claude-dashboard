@@ -10,6 +10,8 @@ import json
 import re
 import shutil
 import subprocess
+import time
+from threading import Lock
 
 from .config import COMMANDS_DIR, PLUGINS_DIR
 from .translations import _load_translation_cache, _save_translation_cache
@@ -65,7 +67,60 @@ def _categorize_command(cmd: dict) -> tuple[str, str]:
     return "other", "🛠️ 기타 / 범용"
 
 
-def list_commands() -> list:
+# v2.43.1 — TTL+mtime cache. The bare scan rglob's hundreds of plugin
+# command .md files (308 on a power user's machine) and takes ~1.1 s.
+# Invalidate when top-level command/plugin dirs change.
+_COMMANDS_TTL_S = 60
+_commands_cache: dict = {"key": None, "ts": 0.0, "value": None}
+_commands_lock = Lock()
+
+
+def _commands_fingerprint() -> tuple:
+    parts: list[float] = []
+    try:
+        if COMMANDS_DIR.exists():
+            parts.append(COMMANDS_DIR.stat().st_mtime)
+            for p in COMMANDS_DIR.iterdir():
+                try:
+                    parts.append(p.stat().st_mtime)
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    try:
+        markets = PLUGINS_DIR / "marketplaces"
+        if markets.exists():
+            parts.append(markets.stat().st_mtime)
+            for m in markets.iterdir():
+                try:
+                    parts.append(m.stat().st_mtime)
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return tuple(round(x, 3) for x in parts)
+
+
+def list_commands(force_refresh: bool = False) -> list:
+    """Cached wrapper. Pass ``force_refresh=True`` (or hit the endpoint with
+    ``?refresh=1``) to bypass the cache."""
+    fp = _commands_fingerprint()
+    now = time.time()
+    if not force_refresh:
+        with _commands_lock:
+            if (_commands_cache["key"] == fp
+                    and _commands_cache["value"] is not None
+                    and (now - _commands_cache["ts"]) < _COMMANDS_TTL_S):
+                return _commands_cache["value"]
+    value = _list_commands_uncached()
+    with _commands_lock:
+        _commands_cache["key"] = fp
+        _commands_cache["ts"] = now
+        _commands_cache["value"] = value
+    return value
+
+
+def _list_commands_uncached() -> list:
     out: list = []
     # user global commands
     if COMMANDS_DIR.exists():

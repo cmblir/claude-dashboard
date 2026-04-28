@@ -27,6 +27,7 @@ LazyClaude 는 **로컬 퍼스트 커맨드 센터** 입니다. `~/.claude/` 디
 
 | 버전 | 요점 |
 |---|---|
+| **v2.43.1** | 🚀 **퍼포먼스 — 워크플로우 캔버스 + 스킬/명령어 리스트** — 스킬/명령어 탭이 매 진입마다 1.4 MB 스캔+파싱 때문에 첫 페인트가 막혔던 문제(816 ms / 1116 ms). 이제 백엔드 TTL+mtime 캐시로 warm 진입마다 ~22× / ~31× 빨라짐. 워크플로우 캔버스 드래그 시 `_wfRenderMinimap`이 mousemove마다(~100/s) 동기로 호출되며 O(N×E) edge lookup이 돌던 문제 — rAF 1회로 코얼레스, 드래그 동안 캐시한 Map으로 O(deg). |
 | **v2.43.0** | 🛠️ **세팅 도우미 — 글로벌 ↔ 프로젝트 스코프** — CLAUDE.md / Settings / 스킬 / 명령어 / 훅 모든 설정 탭에 🌐 글로벌 / 📁 프로젝트 토글 + 프로젝트 셀렉터 추가. 프로젝트 모드는 `<cwd>/CLAUDE.md` · `<cwd>/.claude/settings.json` · `<cwd>/.claude/settings.local.json` (gitignore 권장 개인 오버라이드) · `<cwd>/.claude/skills/<id>/SKILL.md` · `<cwd>/.claude/commands/**/*.md` 를 읽고 씀. 신규 14 엔드포인트, 모두 `$HOME` 샌드박스, 권한 규칙은 기존 글로벌 sanitize 파이프라인을 통과. |
 | **v2.42.3** | 🩹 **훅 탭 2초 로딩 → 즉시 + 삭제가 실제로 삭제됨** — 첫 페인트가 90 MB jsonl 스캔(1.94 s)에 블록되고 `deleteHook`이 리렌더 호출이 없어서 카드가 안 사라지던 두 버그. 이제 `/api/hooks/recent-blocks` 는 TTL+mtime 캐시(cold 0.97 s → warm 0.026 s, 37×)로 묶고 첫 페인트 이후에 lazy fetch 해서 `_renderRecentBlocksPanel` 로 주입. delete (플러그인/사용자 경로 모두) 성공 시 `renderView()` 호출 → 카드 즉시 사라짐. |
 | **v2.42.2** | 🖥️ **워크플로우 노드 spawn → 해당 AI CLI** — `@gemini:gemini-2.5-pro` 노드의 🖥️ 누르면 **Gemini CLI**, `@ollama:llama3.1` 누르면 **`ollama run llama3.1`**, `@codex:o4-mini` 누르면 **codex** 가 열림. 이전엔 assignee 무시하고 항상 Claude만 떴음. 요청한 CLI 미설치 시 claude 로 폴백 + 경고 토스트. 프롬프트는 배너로 출력되어 인터랙티브 REPL 유지. |

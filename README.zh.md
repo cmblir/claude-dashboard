@@ -27,6 +27,7 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 | 版本 | 重点 |
 |---|---|
+| **v2.43.1** | 🚀 **性能 — 工作流画布 + 技能/命令列表** — 技能/命令标签每次访问都要扫描+解析 1.4 MB（816 ms / 1116 ms），首屏被阻塞。现在后端 TTL+mtime 缓存，warm 访问提速 ~22× / ~31×。工作流画布拖拽时 `_wfRenderMinimap` 在每次 mousemove（~100/s）同步触发并执行 O(N×E) edge 查找 — 现合并到每帧 1 次 rAF，拖拽期间使用缓存 Map 将查找降至 O(deg)。 |
 | **v2.43.0** | 🛠️ **设置助手 — 全局 ↔ 项目范围** — CLAUDE.md / Settings / 技能 / 命令 / 钩子 等所有设置标签新增 🌐 全局 / 📁 项目 切换 + 项目选择器。项目模式读写 `<cwd>/CLAUDE.md` · `<cwd>/.claude/settings.json` · `<cwd>/.claude/settings.local.json` (建议加入 gitignore 的个人覆盖) · `<cwd>/.claude/skills/<id>/SKILL.md` · `<cwd>/.claude/commands/**/*.md`。新增 14 个端点，全部沙箱在 `$HOME` 下，权限规则通过现有全局 sanitize 流程。 |
 | **v2.42.3** | 🩹 **钩子标签 2 秒加载 → 瞬时 + 删除真正生效** — 钩子标签首屏被 90 MB jsonl 扫描（1.94 s）阻塞，且 `deleteHook` 缺少重渲染调用导致卡片不消失，两个 bug 同时出现。现在 `/api/hooks/recent-blocks` 改为 TTL+mtime 缓存（cold 0.97 s → warm 0.026 s，37×）并在首屏后通过 `_renderRecentBlocksPanel` 注入懒加载。删除（插件 + 用户路径）成功时调用 `renderView()`，卡片立即消失。 |
 | **v2.42.2** | 🖥️ **工作流节点 spawn → 对应 AI CLI** — 点击 `@gemini:gemini-2.5-pro` 节点的 🖥️ 现在打开 **Gemini CLI**，`@ollama:llama3.1` 打开 **`ollama run llama3.1`**，`@codex:o4-mini` 打开 **codex**。此前无视 assignee 始终启动 Claude。所请求的 CLI 未安装时回退到 claude 并提示警告 toast。提示词以横幅输出，保持交互式 REPL。 |

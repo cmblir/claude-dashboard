@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import re
+import time
 from pathlib import Path
+from threading import Lock
 from typing import Optional
 
 from .claude_md import get_settings
@@ -89,7 +91,64 @@ def _scan_plugin_skills() -> list:
     return out
 
 
-def list_skills() -> list:
+# v2.43.1 — TTL+mtime cache. The bare scan walks 485 SKILL.md files across
+# user + every installed plugin marketplace and takes ~800 ms on a power
+# user's machine. Invalidate on the newest top-level mtime so a freshly
+# edited skill shows up immediately.
+_SKILLS_TTL_S = 60
+_skills_cache: dict = {"key": None, "ts": 0.0, "value": None}
+_skills_lock = Lock()
+
+
+def _skills_fingerprint() -> tuple:
+    """Cheap fingerprint — only stat the top-level dirs, not every SKILL.md.
+    A new/edited skill always lands inside one of these, so its parent's
+    mtime bumps too on filesystem-level change."""
+    parts: list[float] = []
+    try:
+        if SKILLS_DIR.exists():
+            parts.append(SKILLS_DIR.stat().st_mtime)
+            for p in SKILLS_DIR.iterdir():
+                try:
+                    parts.append(p.stat().st_mtime)
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    try:
+        markets = PLUGINS_DIR / "marketplaces"
+        if markets.exists():
+            parts.append(markets.stat().st_mtime)
+            for m in markets.iterdir():
+                try:
+                    parts.append(m.stat().st_mtime)
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return tuple(round(x, 3) for x in parts)
+
+
+def list_skills(force_refresh: bool = False) -> list:
+    """Cached wrapper. Pass ``force_refresh=True`` (or hit the endpoint with
+    ``?refresh=1``) to bypass the cache."""
+    fp = _skills_fingerprint()
+    now = time.time()
+    if not force_refresh:
+        with _skills_lock:
+            if (_skills_cache["key"] == fp
+                    and _skills_cache["value"] is not None
+                    and (now - _skills_cache["ts"]) < _SKILLS_TTL_S):
+                return _skills_cache["value"]
+    value = _list_skills_uncached()
+    with _skills_lock:
+        _skills_cache["key"] = fp
+        _skills_cache["ts"] = now
+        _skills_cache["value"] = value
+    return value
+
+
+def _list_skills_uncached() -> list:
     out: list = []
     if SKILLS_DIR.exists():
         try:
