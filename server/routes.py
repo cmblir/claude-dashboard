@@ -191,6 +191,13 @@ from .projects import (
     api_project_agent_save, api_project_agents_list, api_project_detail,
     api_project_score_detail, api_project_tool_breakdown,
     api_subagent_model_choices, api_subagent_set_model, list_projects,
+    # v2.43.0 — project-scope config
+    api_project_claude_md_get, api_project_claude_md_put,
+    api_project_settings_get, api_project_settings_put,
+    api_project_settings_local_get, api_project_settings_local_put,
+    api_project_skills_list, api_project_commands_list,
+    api_project_skill_get, api_project_skill_put, api_project_skill_delete,
+    api_project_command_get, api_project_command_put, api_project_command_delete,
 )
 from .sessions import (
     api_agent_graph, api_project_timeline, api_session_detail,
@@ -246,6 +253,14 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/project/score-detail": api_project_score_detail,
     "/api/project/tool-breakdown": api_project_tool_breakdown,
     "/api/project/timeline": api_project_timeline,
+    # v2.43.0 — project-scope config (GET)
+    "/api/project/claude-md": api_project_claude_md_get,
+    "/api/project/settings": api_project_settings_get,
+    "/api/project/settings-local": api_project_settings_local_get,
+    "/api/project/skill": api_project_skill_get,
+    "/api/project/command": api_project_command_get,
+    "/api/project/skills/list": api_project_skills_list,
+    "/api/project/commands/list": api_project_commands_list,
     "/api/mcp/catalog": lambda q: api_mcp_catalog(),
     "/api/mcp/health": api_mcp_health,
     "/api/plugins/browse": lambda q: api_plugins_browse(),
@@ -379,6 +394,9 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/settings/preview": api_settings_preview,
     "/api/project/file": api_project_file_put,
     "/api/project/ai-recommend": api_project_ai_recommend,
+    # v2.43.0 — project-scope config (POST: delete-style ops)
+    "/api/project/skill/delete": api_project_skill_delete,
+    "/api/project/command/delete": api_project_command_delete,
     "/api/global/claude-md-recommend": api_global_claude_md_recommend,
     "/api/feature/recommend": api_feature_recommend,
     "/api/evaluation/ai": api_ai_evaluation,
@@ -510,6 +528,12 @@ ROUTES_PUT: dict[str, Callable[[dict], Any]] = {
     "/api/claude-md": put_claude_md,
     "/api/settings": put_settings,
     "/api/project-agents/save": api_project_agent_save,
+    # v2.43.0 — project-scope config (PUT)
+    "/api/project/claude-md": api_project_claude_md_put,
+    "/api/project/settings": api_project_settings_put,
+    "/api/project/settings-local": api_project_settings_local_put,
+    "/api/project/skill": api_project_skill_put,
+    "/api/project/command": api_project_command_put,
 }
 
 

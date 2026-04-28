@@ -10124,53 +10124,79 @@ async function _hyperRollback(name, ts, cwd) {
 // SKILLS
 // ────────────────────────────────────────────────────────────────
 VIEWS.skills = async () => {
-  const skills = await api('/api/skills');
+  // v2.43.0 — global ↔ project scope. Project mode shows only the current
+  // project's `<cwd>/.claude/skills/*` (no plugin / global mixing).
+  const projects = await _ensureProjectsCache();
+  const cfgScope = state.data.cfgScope || 'global';
+  const cfgCwd = state.data.cfgCwd || (projects[0]?.path || '');
+  const inProject = cfgScope === 'project' && cfgCwd;
+  let skills;
+  if (inProject) {
+    const r = await api('/api/project/skills/list?cwd=' + encodeURIComponent(cfgCwd));
+    skills = (r.skills || []).map(s => ({...s, scope: 'project', source: 'project', pluginEnabled: false}));
+  } else {
+    skills = await api('/api/skills');
+  }
   state.data.skills = skills;
   const q = (state.data.skillsFilter || '').toLowerCase();
   const onlyEnabled = !!state.data.skillsOnlyEnabled;
   let filtered = skills.filter(s => !q || (s.name+s.description+s.id+(_localDesc(s)||'')).toLowerCase().includes(q));
   if (onlyEnabled) filtered = filtered.filter(s => s.scope === 'user');
 
-  const groups = { user: [], plugin: [] };
+  const groups = { user: [], plugin: [], project: [] };
   filtered.forEach(s => { (groups[s.scope] || (groups[s.scope] = [])).push(s); });
 
   const userN = skills.filter(s => s.scope === 'user').length;
   const pluginN = skills.filter(s => s.scope === 'plugin').length;
   const pluginEnabledN = skills.filter(s => s.scope === 'plugin' && s.pluginEnabled).length;
+  const projectN = skills.filter(s => s.scope === 'project').length;
 
   const renderSkillCard = s => {
     const scopeBadge = s.scope === 'plugin'
       ? (s.pluginEnabled
-          ? '<span class="chip text-[9px]" style="background:rgba(217,119,87,0.12);">🔌 플러그인 제공</span>'
-          : `<button class="chip chip-warn text-[9px]" onclick="event.stopPropagation();togglePluginFromAgent('${escapeHtml(s.pluginKey||'')}', true)">비활성 플러그인 ▶ 활성화</button>`)
-      : '<span class="chip chip-ok text-[9px]">✓ 사용자 설정</span>';
+          ? '<span class="chip text-[9px]" style="background:rgba(217,119,87,0.12);">🔌 ' + t('플러그인 제공') + '</span>'
+          : `<button class="chip chip-warn text-[9px]" onclick="event.stopPropagation();togglePluginFromAgent('${escapeHtml(s.pluginKey||'')}', true)">${t('비활성 플러그인 ▶ 활성화')}</button>`)
+      : (s.scope === 'project'
+          ? '<span class="chip text-[9px]" style="background:rgba(125,211,252,0.18);">📁 ' + t('프로젝트') + '</span>'
+          : '<span class="chip chip-ok text-[9px]">✓ ' + t('사용자 설정') + '</span>');
+    const editFn = s.scope === 'project'
+      ? `editProjectSkill('${escapeHtml(s.id)}')`
+      : `editSkill('${escapeHtml(s.id)}')`;
     return `
-      <div class="card p-4 hover-lift cursor-pointer" onclick="editSkill('${escapeHtml(s.id)}')">
+      <div class="card p-4 hover-lift cursor-pointer" onclick="${editFn}">
         <div class="flex items-center gap-2 mb-1">
           <div class="font-semibold text-sm truncate flex-1">${escapeHtml(s.name)}</div>
           ${scopeBadge}
         </div>
         <div class="text-[10px] mono text-[var(--text-dim)] mb-2 truncate" title="${escapeHtml(s.source||'')}">${escapeHtml(s.id)}</div>
         <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(_localDesc(s) || '—')}</div>
-        ${s.scope === 'plugin' && !s.pluginEnabled ? '<div class="text-[10px] text-[var(--warn)] mt-2">⚠️ 이 플러그인은 비활성 — Claude Code 가 호출하지 않습니다.</div>' : ''}
+        ${s.scope === 'plugin' && !s.pluginEnabled ? '<div class="text-[10px] text-[var(--warn)] mt-2">⚠️ ' + t('이 플러그인은 비활성 — Claude Code 가 호출하지 않습니다.') + '</div>' : ''}
       </div>`;
   };
 
-  const groupLabel = { user: '🔧 전역 (~/.claude/skills)', plugin: '🔌 플러그인' };
-  const groupOrder = ['user', 'plugin'];
+  const groupLabel = {
+    user: '🔧 ' + t('전역') + ' (~/.claude/skills)',
+    plugin: '🔌 ' + t('플러그인'),
+    project: '📁 ' + t('프로젝트') + ' (' + (cfgCwd ? cfgCwd + '/.claude/skills' : '') + ')',
+  };
+  const groupOrder = inProject ? ['project'] : ['user', 'plugin'];
+  const subtitle = inProject
+    ? `<b>${t('프로젝트 스킬')} ${projectN}${t('개')}</b>`
+    : `<b>${t('활성(사용자 설정)')} ${userN}${t('개')}</b> · ${t('플러그인 제공')} ${pluginEnabledN}/${pluginN} (${t('별도')}) · ${_localizedDescStatusText(skills)}`;
 
   return `
+    ${_renderConfigScopeToggle({scope: cfgScope, cwd: cfgCwd, projects, label: t('스킬 스코프')})}
     <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
       <div>
-        <h1 class="text-2xl font-bold">스킬</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1"><b>활성(사용자 설정) ${userN}개</b> · 플러그인 제공 ${pluginEnabledN}/${pluginN} (별도) · ${_localizedDescStatusText(skills)}</p>
+        <h1 class="text-2xl font-bold">${t('스킬')}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${subtitle}</p>
       </div>
       <div class="flex gap-2">
-        <input id="skillQ" class="input max-w-[260px]" placeholder="스킬 검색…" value="${escapeHtml(state.data.skillsFilter||'')}" />
-        <label class="flex items-center gap-1 text-xs text-[var(--text-mute)]">
-          <input type="checkbox" id="skillOnlyEnabled" ${onlyEnabled?'checked':''}/> 사용자 설정만
-        </label>
-        ${_localizeBtnHtml('skill', skills)}
+        <input id="skillQ" class="input max-w-[260px]" placeholder="${t('스킬 검색…')}" value="${escapeHtml(state.data.skillsFilter||'')}" />
+        ${inProject ? '' : `<label class="flex items-center gap-1 text-xs text-[var(--text-mute)]">
+          <input type="checkbox" id="skillOnlyEnabled" ${onlyEnabled?'checked':''}/> ${t('사용자 설정만')}
+        </label>`}
+        ${inProject ? `<button class="btn-primary btn text-xs" onclick="newProjectSkill()">＋ ${t('새 스킬')}</button>` : _localizeBtnHtml('skill', skills)}
         <a class="btn text-xs" href="${DOCS_BASE}skills" target="_blank" rel="noopener">📖</a>
       </div>
     </div>
@@ -10179,7 +10205,7 @@ VIEWS.skills = async () => {
         <h3 class="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-2">${groupLabel[g]} · ${groups[g].length}</h3>
         <div class="grid-list">${groups[g].map(renderSkillCard).join('')}</div>
       </div>` : '').join('')}
-    ${filtered.length === 0 ? `<div class="card empty" style="grid-column:1/-1;">스킬 없음</div>` : ''}
+    ${filtered.length === 0 ? `<div class="card empty" style="grid-column:1/-1;">${t('스킬 없음')}</div>` : ''}
   `;
 };
 AFTER.skills = () => {
@@ -10196,10 +10222,10 @@ AFTER.skills = () => {
 };
 async function editSkill(id) {
   const s = await api('/api/skills/' + encodeURIComponent(id));
-  if (s.error) { toast('스킬 로드 실패: ' + s.error, 'err'); return; }
+  if (s.error) { toast(t('스킬 로드 실패') + ': ' + s.error, 'err'); return; }
   const isReadOnly = !!s.readOnly;
   showEditModal({
-    title: (isReadOnly ? '🔒 플러그인 스킬 (read-only) — ' : '스킬 편집 — ') + s.name,
+    title: (isReadOnly ? '🔒 ' + t('플러그인 스킬 (read-only)') + ' — ' : t('스킬 편집') + ' — ') + s.name,
     raw: s.raw,
     readOnly: isReadOnly,
     save: isReadOnly ? null : async (v) => api('/api/skills/' + encodeURIComponent(id), {
@@ -10207,12 +10233,117 @@ async function editSkill(id) {
     }),
   });
 }
+async function editProjectSkill(id) {
+  const cwd = state.data.cfgCwd;
+  if (!cwd) { toast(t('프로젝트가 선택되지 않았습니다'), 'err'); return; }
+  const s = await api('/api/project/skill?cwd=' + encodeURIComponent(cwd) + '&id=' + encodeURIComponent(id));
+  if (!s.ok) { toast(t('스킬 로드 실패') + ': ' + (s.error||''), 'err'); return; }
+  showEditModal({
+    title: '📁 ' + t('프로젝트 스킬 편집') + ' — ' + s.name,
+    raw: s.raw,
+    save: async (v) => api('/api/project/skill', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd, id, raw: v }),
+    }),
+    onAfterSave: () => renderView(),
+  });
+}
+async function newProjectSkill() {
+  const cwd = state.data.cfgCwd;
+  if (!cwd) { toast(t('프로젝트가 선택되지 않았습니다'), 'err'); return; }
+  const id = await promptModal({
+    title: t('새 프로젝트 스킬'),
+    message: t('스킬 ID — 영숫자 / 하이픈 / 언더스코어'),
+    placeholder: 'my-skill',
+    defaultValue: '',
+    confirmLabel: t('생성'),
+  });
+  if (!id || !/^[a-zA-Z0-9_-]{1,64}$/.test(id)) {
+    if (id) toast(t('잘못된 스킬 ID'), 'err');
+    return;
+  }
+  const seed = `---\nname: ${id}\ndescription: \n---\n\n# ${id}\n\n`;
+  const r = await api('/api/project/skill', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cwd, id, raw: seed }),
+  });
+  if (!r.ok) { toast(t('생성 실패') + ': ' + (r.error||''), 'err'); return; }
+  toast(t('생성됨'), 'ok');
+  renderView();
+}
+async function editProjectCommand(id) {
+  const cwd = state.data.cfgCwd;
+  if (!cwd) { toast(t('프로젝트가 선택되지 않았습니다'), 'err'); return; }
+  const c = await api('/api/project/command?cwd=' + encodeURIComponent(cwd) + '&id=' + encodeURIComponent(id));
+  if (!c.ok) { toast(t('명령어 로드 실패') + ': ' + (c.error||''), 'err'); return; }
+  showEditModal({
+    title: '📁 ' + t('프로젝트 명령어 편집') + ' — /' + (c.name || c.id),
+    raw: c.raw,
+    save: async (v) => api('/api/project/command', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd, id, raw: v }),
+    }),
+    onAfterSave: () => renderView(),
+  });
+}
+async function newProjectCommand() {
+  const cwd = state.data.cfgCwd;
+  if (!cwd) { toast(t('프로젝트가 선택되지 않았습니다'), 'err'); return; }
+  const id = await promptModal({
+    title: t('새 프로젝트 명령어'),
+    message: t("명령어 ID — '/' 대신 영숫자 / '-' / '_' / 하위경로는 ':' 사용"),
+    placeholder: 'review',
+    defaultValue: '',
+    confirmLabel: t('생성'),
+  });
+  if (!id) return;
+  const rel = id.replace(/:/g, '/');
+  if (!/^[a-zA-Z0-9_-][a-zA-Z0-9_./-]{0,127}$/.test(rel)) {
+    toast(t('잘못된 명령어 ID'), 'err'); return;
+  }
+  const seed = `---\nname: ${id}\ndescription: \n---\n\n# /${id}\n\n`;
+  const r = await api('/api/project/command', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cwd, id, raw: seed }),
+  });
+  if (!r.ok) { toast(t('생성 실패') + ': ' + (r.error||''), 'err'); return; }
+  toast(t('생성됨'), 'ok');
+  renderView();
+}
+async function deleteProjectCommand(id) {
+  const cwd = state.data.cfgCwd;
+  if (!cwd) return;
+  if (!await confirmModal({
+    title: t('프로젝트 명령어 삭제'),
+    message: '/' + id + ' — ' + t('이 명령어를 삭제할까요?'),
+    confirmLabel: t('삭제'), danger: true,
+  })) return;
+  const r = await api('/api/project/command/delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cwd, id }),
+  });
+  toast(r.ok ? t('삭제됨') : (t('실패') + ': ' + (r.error||'')), r.ok?'ok':'err');
+  if (r.ok) renderView();
+}
 
 // ────────────────────────────────────────────────────────────────
 // COMMANDS
 // ────────────────────────────────────────────────────────────────
 VIEWS.commands = async () => {
-  const cmds = await api('/api/commands');
+  const projects = await _ensureProjectsCache();
+  const cfgScope = state.data.cfgScope || 'global';
+  const cfgCwd = state.data.cfgCwd || (projects[0]?.path || '');
+  const inProject = cfgScope === 'project' && cfgCwd;
+  let cmds;
+  if (inProject) {
+    const r = await api('/api/project/commands/list?cwd=' + encodeURIComponent(cfgCwd));
+    cmds = (r.commands || []).map(c => ({
+      ...c, scope: 'project',
+      category: 'other', categoryLabel: '📁 ' + t('프로젝트'),
+    }));
+  } else {
+    cmds = await api('/api/commands');
+  }
   state.data.commands = cmds;
   const q = (state.data.cmdFilter || '').toLowerCase();
   const selCat = state.data.cmdCat || '';
@@ -10244,24 +10375,25 @@ VIEWS.commands = async () => {
     .join('');
 
   return `
+    ${_renderConfigScopeToggle({scope: cfgScope, cwd: cfgCwd, projects, label: t('명령어 스코프')})}
     <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
       <div>
-        <h1 class="text-2xl font-bold">슬래시 명령어</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">${cmds.length}개 명령어 · ${Object.keys(allCatCounts).length}개 카테고리 · ${_localizedDescStatusText(cmds)}</p>
+        <h1 class="text-2xl font-bold">${t('슬래시 명령어')}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${cmds.length}${t('개 명령어')}${inProject ? '' : ' · ' + Object.keys(allCatCounts).length + t('개 카테고리') + ' · ' + _localizedDescStatusText(cmds)}</p>
       </div>
       <div class="flex gap-2 flex-wrap">
-        <input id="cmdQ" class="input max-w-[260px]" placeholder="검색…" value="${escapeHtml(state.data.cmdFilter||'')}" />
-        <label class="flex items-center gap-1 text-xs text-[var(--text-mute)]">
-          <input type="checkbox" id="cmdOnlyUntr" ${onlyUntranslated?'checked':''}/> 미번역만
+        <input id="cmdQ" class="input max-w-[260px]" placeholder="${t('검색…')}" value="${escapeHtml(state.data.cmdFilter||'')}" />
+        ${inProject ? `<button class="btn-primary btn text-xs" onclick="newProjectCommand()">＋ ${t('새 명령어')}</button>` : `<label class="flex items-center gap-1 text-xs text-[var(--text-mute)]">
+          <input type="checkbox" id="cmdOnlyUntr" ${onlyUntranslated?'checked':''}/> ${t('미번역만')}
         </label>
-        ${_localizeBtnHtml('cmd', cmds)}
+        ${_localizeBtnHtml('cmd', cmds)}`}
         <a class="btn text-xs" href="${DOCS_BASE}slash-commands" target="_blank" rel="noopener">📖</a>
       </div>
     </div>
-    <div class="card p-3 mb-4 flex flex-wrap gap-2">
-      <button class="chip ${!selCat?'chip-accent':''}" onclick="setCmdCat('')">전체 ${cmds.length}</button>
+    ${inProject ? '' : `<div class="card p-3 mb-4 flex flex-wrap gap-2">
+      <button class="chip ${!selCat?'chip-accent':''}" onclick="setCmdCat('')">${t('전체')} ${cmds.length}</button>
       ${catChips}
-    </div>
+    </div>`}
 
     ${catOrder.length ? catOrder.map(cid => `
       <div class="mb-5">
@@ -10273,19 +10405,23 @@ VIEWS.commands = async () => {
             const isEcc = (c.scope === 'plugin') || /\/plugins\/cache\/ecc\//.test(c.path||'') || /^ecc[:/]/i.test(c.id||'');
             const cmdName = c.name || c.id;
             const itemId = isEcc ? `ecc:cmd:${cmdName.replace(/^\//, '')}` : '';
+            const isProj = c.scope === 'project';
+            const editFn = isProj ? `editProjectCommand('${escapeHtml(c.id)}')` : '';
             return `
-            <div class="card p-4 hover-lift">
+            <div class="card p-4 hover-lift ${isProj?'cursor-pointer':''}" ${isProj?`onclick="${editFn}"`:''}>
               <div class="flex items-center gap-2 mb-2 flex-wrap">
                 <span class="chip ${c.scope==='user'?'chip-ok':'chip-accent'}">${c.scope}</span>
                 ${isEcc ? '<span class="chip" style="background:rgba(217,119,87,0.18);border-color:rgba(217,119,87,0.45);color:var(--text);">ECC</span>' : ''}
                 <span class="font-semibold text-sm mono">/${escapeHtml(cmdName)}</span>
-                <button class="btn text-[10px] ml-auto" onclick="_cmdQuickRun('${escapeHtml(itemId || cmdName)}', ${isEcc ? 'true' : 'false'}, '${escapeHtml(cmdName)}')" title="${t('대시보드에서 바로 실행')}">▶ ${t('실행')}</button>
+                ${isProj
+                  ? `<button class="btn text-[10px] ml-auto" onclick="event.stopPropagation();deleteProjectCommand('${escapeHtml(c.id)}')" style="color:#fca5a5;">${t('삭제')}</button>`
+                  : `<button class="btn text-[10px] ml-auto" onclick="_cmdQuickRun('${escapeHtml(itemId || cmdName)}', ${isEcc ? 'true' : 'false'}, '${escapeHtml(cmdName)}')" title="${t('대시보드에서 바로 실행')}">▶ ${t('실행')}</button>`}
               </div>
-              <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(_localDesc(c) || '—')}</div>
+              <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(_localDesc(c) || c.description || '—')}</div>
             </div>`;
           }).join('')}
         </div>
-      </div>`).join('') : `<div class="card empty">명령어 없음</div>`}
+      </div>`).join('') : `<div class="card empty">${t('명령어 없음')}</div>`}
   `;
 };
 AFTER.commands = () => {
@@ -12825,6 +12961,42 @@ let __hooksRecentBlocks = null;
 let __hooksRecentBlocksFetching = false;
 
 VIEWS.hooks = async () => {
+  // v2.43.0 — surface project hooks (which live inside <cwd>/.claude/
+  // settings.json[hooks]) when a project is selected. Editing remains in
+  // the Settings tab to keep the JSON shape authoritative.
+  const projects = await _ensureProjectsCache();
+  const cfgScope = state.data.cfgScope || 'global';
+  const cfgCwd = state.data.cfgCwd || (projects[0]?.path || '');
+  const inProject = cfgScope === 'project' && cfgCwd;
+  let projectHookSummary = null;
+  if (inProject) {
+    try {
+      const [psr, plr] = await Promise.all([
+        api('/api/project/settings?cwd=' + encodeURIComponent(cfgCwd)),
+        api('/api/project/settings-local?cwd=' + encodeURIComponent(cfgCwd)),
+      ]);
+      const countHooks = (data) => {
+        const h = (data && data.hooks) || {};
+        let n = 0;
+        Object.values(h).forEach(items => {
+          if (Array.isArray(items)) {
+            items.forEach(it => {
+              if (it && Array.isArray(it.hooks)) n += it.hooks.length;
+              else if (it) n += 1;
+            });
+          }
+        });
+        return n;
+      };
+      projectHookSummary = {
+        cwd: cfgCwd,
+        projectN: countHooks(psr.data),
+        projectExists: !!psr.exists,
+        projectLocalN: countHooks(plr.data),
+        projectLocalExists: !!plr.exists,
+      };
+    } catch (e) { /* non-fatal */ }
+  }
   const [s, hooksAll] = await Promise.all([
     api('/api/settings'),
     api('/api/hooks'),
@@ -12945,10 +13117,25 @@ VIEWS.hooks = async () => {
   };
 
   return `
+    ${_renderConfigScopeToggle({scope: cfgScope, cwd: cfgCwd, projects, label: t('훅 스코프')})}
+    ${inProject && projectHookSummary ? `
+      <div class="card p-3 mb-3" style="background:rgba(125,211,252,0.08); border-color:rgba(125,211,252,0.3);">
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] mb-1.5 flex items-center gap-2">
+          <span>📁</span> <span>${t('프로젝트 훅')}</span>
+          <span class="text-[10px]" style="text-transform:none;letter-spacing:0;color:var(--text-mute);">${escapeHtml(projectHookSummary.cwd)}/.claude/</span>
+        </div>
+        <div class="text-xs text-[var(--text-mute)]">
+          <span class="mono">settings.json</span>: <b>${projectHookSummary.projectN}</b>${t('개')}${projectHookSummary.projectExists?'':' '+t('(파일 없음)')}
+          · <span class="mono">settings.local.json</span>: <b>${projectHookSummary.projectLocalN}</b>${t('개')}${projectHookSummary.projectLocalExists?'':' '+t('(파일 없음)')}
+          · <button class="btn text-[10px]" onclick="state.data.cfgScope='project';go('settings');">▶ ${t('Settings 탭에서 편집')}</button>
+        </div>
+        <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('아래 목록은 글로벌 + 플러그인 훅. 프로젝트 훅은 settings.json 의 hooks 키로 편집합니다.')}</div>
+      </div>
+    ` : ''}
     <div class="mb-4 flex items-center justify-between gap-2 flex-wrap">
       <div>
-        <h1 class="text-2xl font-bold">훅 (Hooks)</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1"><b>활성(사용자 설정) ${counts.user||userFlat.length}개</b> · 플러그인 제공 ${counts.pluginEnabled||0}/${counts.plugin||pluginFlat.length} (별도) · ${allEvents.length}개 이벤트${riskCount?` · <span style="color:#fca5a5;">🚨 위험 ${riskCount}개</span>`:''}</p>
+        <h1 class="text-2xl font-bold">${t('훅 (Hooks)')}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1"><b>${t('활성(사용자 설정)')} ${counts.user||userFlat.length}${t('개')}</b> · ${t('플러그인 제공')} ${counts.pluginEnabled||0}/${counts.plugin||pluginFlat.length} (${t('별도')}) · ${allEvents.length}${t('개 이벤트')}${riskCount?` · <span style="color:#fca5a5;">🚨 ${t('위험')} ${riskCount}${t('개')}</span>`:''}</p>
       </div>
       <div class="flex gap-2">
         ${riskCount ? `<button class="btn text-xs" style="background:rgba(239,68,68,0.18);color:#fca5a5;border:1px solid rgba(239,68,68,0.4);" onclick="_panicDisableRiskyHooks()" title="${t('PreToolUse + Edit/Write/Bash 매처를 가진 모든 훅을 한 번에 비활성화 (삭제)')}">🚨 ${t('위험 훅 일괄 비활성화')}</button>`:''}
@@ -13993,45 +14180,88 @@ async function togglePlugin(id, enable) {
 // SETTINGS EDITOR
 // ────────────────────────────────────────────────────────────────
 VIEWS.settings = async () => {
-  const [settings, rec] = await Promise.all([api('/api/settings'), api('/api/guide/recommended-settings')]);
-  const raw = JSON.stringify(settings || {}, null, 2);
-  window.__recProfiles = rec.profiles;
+  const projects = await _ensureProjectsCache();
+  const scope = state.data.cfgScope || 'global';
+  const cwd = state.data.cfgCwd || (projects[0]?.path || '');
+  // v2.43.0 — when scope=project, settings.json (committed) and
+  // settings.local.json (gitignored personal overrides) are two separate
+  // files; the user picks which one to edit via `cfgSettingsKind`.
+  const settingsKind = state.data.cfgSettingsKind || 'project';  // 'project' | 'project-local'
+  const isProject = scope === 'project' && cwd;
+  let raw, pathLabel, fixedNote = '', exists = true;
+  if (isProject) {
+    const ep = settingsKind === 'project-local' ? 'settings-local' : 'settings';
+    const r = await api('/api/project/' + ep + '?cwd=' + encodeURIComponent(cwd));
+    raw = r.raw || '{}';
+    pathLabel = r.path || '';
+    exists = !!r.exists;
+  } else {
+    const settings = await api('/api/settings');
+    raw = JSON.stringify(settings || {}, null, 2);
+    pathLabel = '~/.claude/settings.json';
+  }
+  // recommended profiles only apply to global scope.
+  let rec = {profiles: []};
+  if (!isProject) {
+    rec = await api('/api/guide/recommended-settings').catch(() => ({profiles: []}));
+    window.__recProfiles = rec.profiles;
+  }
   return `
+    ${_renderConfigScopeToggle({scope, cwd, projects, label: t('Settings 스코프')})}
+    ${isProject ? `
+      <div class="card p-3 mb-3" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="text-[11px] uppercase tracking-wider text-[var(--text-dim)]">${t('파일')}</span>
+        <button class="chip text-[11px] cursor-pointer" style="${settingsKind==='project'?'background:var(--accent);color:#fff;':''}" onclick="state.data.cfgSettingsKind='project';renderView();">settings.json <span class="text-[10px] opacity-70">${t('(커밋됨)')}</span></button>
+        <button class="chip text-[11px] cursor-pointer" style="${settingsKind==='project-local'?'background:var(--accent);color:#fff;':''}" onclick="state.data.cfgSettingsKind='project-local';renderView();">settings.local.json <span class="text-[10px] opacity-70">${t('(개인, gitignore)')}</span></button>
+        ${!exists ? `<span class="chip chip-warn text-[10px]">${t('파일 없음 — 저장 시 생성됨')}</span>` : ''}
+      </div>
+    ` : ''}
     <div class="mb-4 flex items-center justify-between gap-2 flex-wrap">
       <div>
-        <h1 class="text-2xl font-bold">Settings 편집</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">~/.claude/settings.json — 편집 후 '저장' 하면 파일에 즉시 반영됩니다.</p>
+        <h1 class="text-2xl font-bold">${t('Settings 편집')}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(pathLabel)} — ${t("편집 후 '저장' 하면 파일에 즉시 반영됩니다.")}</p>
       </div>
       <div class="flex gap-2">
-        <button class="btn" onclick="copySettings()">📋 복사</button>
-        <button class="btn-primary btn" onclick="saveSettings()">💾 저장</button>
-        <a class="btn text-xs" href="${DOCS_BASE}settings" target="_blank" rel="noopener">📖 공식 문서 ↗</a>
+        <button class="btn" onclick="copySettings()">📋 ${t('복사')}</button>
+        <button class="btn-primary btn" onclick="saveSettings()">💾 ${t('저장')}</button>
+        <a class="btn text-xs" href="${DOCS_BASE}settings" target="_blank" rel="noopener">📖 ${t('공식 문서')} ↗</a>
       </div>
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div class="lg:col-span-2 card p-4">
         <textarea id="settingsEditor" class="input" style="min-height: 520px;">${escapeHtml(raw)}</textarea>
-        <div class="text-xs text-[var(--text-mute)] mt-2">⚠️ 유효한 JSON 이어야 저장됩니다.</div>
+        <div class="text-xs text-[var(--text-mute)] mt-2">⚠️ ${t('유효한 JSON 이어야 저장됩니다.')}</div>
       </div>
       <div class="space-y-3">
-        <div class="text-[11px] uppercase text-[var(--text-dim)]">추천 프로파일</div>
-        <div class="text-xs text-[var(--text-mute)]">클릭 시 Auth 확인 → 변경 미리보기 → 적용까지 안내됩니다.</div>
-        ${rec.profiles.map((p,i) => `
-          <div class="card p-4 hover-lift cursor-pointer" onclick="startProfileFlow(${i})">
-            <div class="flex items-center justify-between mb-1">
-              <div class="font-semibold text-sm">${escapeHtml(p.name)}</div>
-              <span class="text-[10px] text-[var(--text-dim)]">→ 적용하기</span>
-            </div>
-            <div class="text-xs text-[var(--text-mute)]">${escapeHtml(p.description)}</div>
+        ${isProject ? `
+          <div class="card p-4 text-xs text-[var(--text-mute)]">
+            <div class="font-semibold text-[var(--text)] mb-2">📁 ${t('프로젝트 스코프')}</div>
+            <ul class="space-y-1">
+              <li>• <code>settings.json</code>: ${t('팀과 공유 — git에 커밋')}</li>
+              <li>• <code>settings.local.json</code>: ${t('개인 오버라이드 — gitignore 권장')}</li>
+              <li>• ${t('Claude Code는 프로젝트 ▶ 글로벌 순서로 머지합니다.')}</li>
+            </ul>
           </div>
-        `).join('')}
+        ` : `
+          <div class="text-[11px] uppercase text-[var(--text-dim)]">${t('추천 프로파일')}</div>
+          <div class="text-xs text-[var(--text-mute)]">${t('클릭 시 Auth 확인 → 변경 미리보기 → 적용까지 안내됩니다.')}</div>
+          ${(rec.profiles||[]).map((p,i) => `
+            <div class="card p-4 hover-lift cursor-pointer" onclick="startProfileFlow(${i})">
+              <div class="flex items-center justify-between mb-1">
+                <div class="font-semibold text-sm">${escapeHtml(p.name)}</div>
+                <span class="text-[10px] text-[var(--text-dim)]">→ ${t('적용하기')}</span>
+              </div>
+              <div class="text-xs text-[var(--text-mute)]">${escapeHtml(p.description)}</div>
+            </div>
+          `).join('')}
+        `}
         <div class="card p-4 text-xs text-[var(--text-mute)]">
-          <div class="font-semibold text-[var(--text)] mb-2">💡 팁</div>
+          <div class="font-semibold text-[var(--text)] mb-2">💡 ${t('팁')}</div>
           <ul class="space-y-1">
-            <li>• <code>permissions.allow</code>: 자동 승인 규칙</li>
-            <li>• <code>permissions.deny</code>: 절대 금지 규칙</li>
-            <li>• <code>hooks</code>: 이벤트 기반 자동 스크립트</li>
-            <li>• <code>enabledPlugins</code>: 활성화 플러그인</li>
+            <li>• <code>permissions.allow</code>: ${t('자동 승인 규칙')}</li>
+            <li>• <code>permissions.deny</code>: ${t('절대 금지 규칙')}</li>
+            <li>• <code>hooks</code>: ${t('이벤트 기반 자동 스크립트')}</li>
+            <li>• <code>enabledPlugins</code>: ${t('활성화 플러그인')}</li>
           </ul>
         </div>
       </div>
@@ -14043,11 +14273,26 @@ function copySettings() {
   navigator.clipboard.writeText(t).then(() => toast('복사됨', 'ok'));
 }
 async function saveSettings() {
-  const t = document.getElementById('settingsEditor').value;
+  const txt = document.getElementById('settingsEditor').value;
   let parsed;
-  try { parsed = JSON.parse(t); } catch (e) { toast('JSON 오류: ' + e.message, 'err'); return; }
-  const r = await api('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsed) });
-  toast(r.ok ? '저장됨' : '저장 실패', r.ok ? 'ok' : 'err');
+  try { parsed = JSON.parse(txt); } catch (e) { toast(t('JSON 오류') + ': ' + e.message, 'err'); return; }
+  const scope = state.data.cfgScope || 'global';
+  const cwd = state.data.cfgCwd || '';
+  const kind = state.data.cfgSettingsKind || 'project';
+  let r;
+  if (scope === 'project' && cwd) {
+    const ep = kind === 'project-local' ? '/api/project/settings-local' : '/api/project/settings';
+    r = await api(ep, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ cwd, data: parsed }),
+    });
+  } else {
+    r = await api('/api/settings', {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(parsed),
+    });
+  }
+  toast(r.ok ? t('저장됨') : (t('저장 실패') + (r.error ? ': ' + r.error : '')), r.ok ? 'ok' : 'err');
 }
 function applyProfile(i) {
   // 구 버전 호환용 — editor에 직접 머지만 (저장 클릭 필요)
@@ -14185,35 +14430,85 @@ async function startProfileFlow(i) {
 // ────────────────────────────────────────────────────────────────
 // CLAUDE.md EDITOR
 // ────────────────────────────────────────────────────────────────
+// v2.43.0 — global ↔ project scope toggle for setup helpers (CLAUDE.md /
+// settings / settings.local / skills / commands / hooks). One shared state
+// (`state.data.cfgScope`, `state.data.cfgCwd`) keeps the user's pick across
+// tabs so they don't re-pick a project on every navigation.
+async function _ensureProjectsCache() {
+  if (window.__cfgProjects) return window.__cfgProjects;
+  const r = await api('/api/projects').catch(() => ({projects: []}));
+  window.__cfgProjects = (r.projects || []).filter(p => p.cwdResolved && p.path);
+  return window.__cfgProjects;
+}
+function _renderConfigScopeToggle({scope, cwd, projects, label}) {
+  const opts = projects.map(p => `<option value="${escapeHtml(p.path)}" ${p.path===cwd?'selected':''}>${escapeHtml(p.name)} — ${escapeHtml(p.path)}</option>`).join('');
+  const noProjects = projects.length === 0;
+  return `
+    <div class="card p-3 mb-3" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span class="text-[11px] uppercase tracking-wider text-[var(--text-dim)]">${escapeHtml(label || t('스코프'))}</span>
+      <div class="flex gap-1">
+        <button class="chip text-[11px] cursor-pointer" style="${scope==='global'?'background:var(--accent);color:#fff;':''}" onclick="setConfigScope('global')">🌐 ${t('글로벌')}</button>
+        <button class="chip text-[11px] cursor-pointer" style="${scope==='project'?'background:var(--accent);color:#fff;':''}" onclick="setConfigScope('project')" ${noProjects?'disabled':''}>📁 ${t('프로젝트')}</button>
+      </div>
+      ${scope==='project' ? `
+        <select class="input text-xs" style="min-width:280px;" onchange="setConfigScope('project', this.value)">
+          ${noProjects ? `<option value="">${t('인덱스된 프로젝트 없음')}</option>` : opts}
+        </select>
+      ` : `<span class="text-[11px] text-[var(--text-dim)]">~/.claude/</span>`}
+    </div>`;
+}
+function setConfigScope(scope, cwd) {
+  state.data.cfgScope = scope;
+  if (scope === 'project') {
+    if (cwd) {
+      state.data.cfgCwd = cwd;
+    } else if (!state.data.cfgCwd && window.__cfgProjects?.length) {
+      state.data.cfgCwd = window.__cfgProjects[0].path;
+    }
+  }
+  renderView();
+}
+
 VIEWS.claudemd = async () => {
-  const d = await api('/api/claude-md');
+  const projects = await _ensureProjectsCache();
+  const scope = state.data.cfgScope || 'global';
+  const cwd = state.data.cfgCwd || (projects[0]?.path || '');
+  const isProject = scope === 'project' && cwd;
+  const d = isProject
+    ? await api('/api/project/claude-md?cwd=' + encodeURIComponent(cwd))
+    : await api('/api/claude-md');
   const raw = d.raw || '';
   const isEmpty = !raw.trim();
+  const pathLabel = isProject ? (cwd + '/CLAUDE.md') : '~/.claude/CLAUDE.md';
+  const blurb = isProject
+    ? t('이 프로젝트에서 작업할 때만 로드되는 지침.')
+    : t('모든 세션에 로드되는 글로벌 지침.');
   return `
+    ${_renderConfigScopeToggle({scope, cwd, projects, label: t('CLAUDE.md 스코프')})}
     <div class="mb-4 flex items-center justify-between flex-wrap gap-2">
       <div>
         <h1 class="text-2xl font-bold">CLAUDE.md</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">~/.claude/CLAUDE.md — 글로벌 지침. 모든 세션에 로드됩니다.${isEmpty?' <span class="chip chip-warn ml-2">파일 없음</span>':''}</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(pathLabel)} — ${blurb}${isEmpty?' <span class="chip chip-warn ml-2">'+t('파일 없음')+'</span>':''}</p>
       </div>
       <div class="flex gap-2">
-        <button class="btn" onclick="startGlobalClaudeMdRecommend()">🤖 AI 에게 추천</button>
-        <button class="btn-primary btn" onclick="saveClaudeMd()">💾 저장</button>
+        ${isProject ? '' : '<button class="btn" onclick="startGlobalClaudeMdRecommend()">🤖 AI 에게 추천</button>'}
+        <button class="btn-primary btn" onclick="saveClaudeMd()">💾 ${t('저장')}</button>
         <a class="btn text-xs" href="${DOCS_BASE}memory" target="_blank" rel="noopener">📖</a>
       </div>
     </div>
     ${isEmpty ? `
       <div class="card p-5 mb-4" style="background: linear-gradient(135deg, rgba(217,119,87,0.08), transparent);">
-        <div class="font-semibold text-sm mb-1">아직 글로벌 CLAUDE.md 가 없습니다</div>
-        <div class="text-xs text-[var(--text-mute)]">여기에 적은 지침(기억·규칙·선호)은 <b>모든 세션 시작 시 자동 로드</b>됩니다. 직접 쓰거나, 위의 "AI 에게 추천 받기"로 현재 작업 패턴 기반 초안을 받아보세요.</div>
+        <div class="font-semibold text-sm mb-1">${isProject ? t('아직 프로젝트 CLAUDE.md 가 없습니다') : t('아직 글로벌 CLAUDE.md 가 없습니다')}</div>
+        <div class="text-xs text-[var(--text-mute)]">${isProject ? t('이 프로젝트에서 작업할 때만 로드되는 지침을 작성하세요. 저장하면 즉시 ' + cwd + '/CLAUDE.md 로 기록됩니다.') : t('여기에 적은 지침(기억·규칙·선호)은 모든 세션 시작 시 자동 로드됩니다. 직접 쓰거나, 위의 "AI 에게 추천 받기"로 현재 작업 패턴 기반 초안을 받아보세요.')}</div>
       </div>` : ''}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="card p-4">
-        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">소스</div>
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('소스')}</div>
         <textarea id="claudeMdEditor" class="input" style="min-height: 560px;">${escapeHtml(raw)}</textarea>
       </div>
       <div class="card p-5 overflow-y-auto" style="max-height: 620px;">
-        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">미리보기</div>
-        <div id="claudeMdPreview" class="prose-claude">${isEmpty ? '<div class="empty">소스가 비어있습니다</div>' : marked.parse(raw)}</div>
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('미리보기')}</div>
+        <div id="claudeMdPreview" class="prose-claude">${isEmpty ? '<div class="empty">'+t('소스가 비어있습니다')+'</div>' : marked.parse(raw)}</div>
       </div>
     </div>
   `;
@@ -14250,8 +14545,18 @@ AFTER.claudemd = () => {
 };
 async function saveClaudeMd() {
   const raw = document.getElementById('claudeMdEditor').value;
-  const r = await api('/api/claude-md', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raw }) });
-  toast(r.ok ? '저장됨' : '저장 실패', r.ok ? 'ok' : 'err');
+  const scope = state.data.cfgScope || 'global';
+  const cwd = state.data.cfgCwd || '';
+  const r = (scope === 'project' && cwd)
+    ? await api('/api/project/claude-md', {
+        method: 'PUT', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ cwd, raw }),
+      })
+    : await api('/api/claude-md', {
+        method: 'PUT', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ raw }),
+      });
+  toast(r.ok ? t('저장됨') : (t('저장 실패') + (r.error ? ': ' + r.error : '')), r.ok ? 'ok' : 'err');
 }
 
 // ────────────────────────────────────────────────────────────────
