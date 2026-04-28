@@ -19195,20 +19195,31 @@ VIEWS.usage = async () => {
       </div>
     </div>
 
-    <!-- 프로젝트별 토큰 -->
+    <!-- 프로젝트별 토큰 — v2.43.2: 전체 프로젝트, 클릭 시 상세 모달 -->
     <div class="card p-5 mb-4">
-      <h3 class="font-semibold text-sm mb-3">📁 프로젝트별 토큰 TOP 20</h3>
-      <table class="data">
-        <thead><tr><th>프로젝트</th><th class="text-right">세션</th><th class="text-right">토큰</th></tr></thead>
-        <tbody>
-          ${(tk.byProject||[]).map(p => `
-            <tr>
-              <td class="text-xs">${escapeHtml(p.name||'—')}</td>
-              <td class="text-right mono text-xs">${p.sessions}</td>
-              <td class="text-right mono" style="color:#d97757">${fmtTokens(p.tokens||0)}</td>
-            </tr>`).join('') || `<tr><td colspan="3" class="empty">데이터 없음</td></tr>`}
-        </tbody>
-      </table>
+      <h3 class="font-semibold text-sm mb-3">📁 ${t('프로젝트별 토큰')} <span class="text-[10px] text-[var(--text-dim)] font-normal">(${(tk.byProject||[]).length} ${t('프로젝트')} · ${t('행 클릭 → 세션별 상세')})</span></h3>
+      <div class="max-h-[420px] overflow-y-auto">
+        <table class="data">
+          <thead><tr><th>${t('프로젝트')}</th><th class="text-right">${t('세션')}</th><th class="text-right">${t('토큰')}</th><th class="w-[10px]"></th></tr></thead>
+          <tbody>
+            ${(tk.byProject||[]).map(p => {
+              const cwd = p.cwd || p.key || '';
+              const name = p.name || cwd.split('/').pop() || cwd || '—';
+              const safeCwd = cwd.replace(/'/g, "\\'");
+              return `
+              <tr class="link-row" onclick="openProjectUsage('${escapeHtml(safeCwd)}')" title="${escapeHtml(cwd)}">
+                <td class="text-xs">
+                  <div class="font-semibold">${escapeHtml(name)}</div>
+                  <div class="mono text-[10px] text-[var(--text-dim)] truncate" style="max-width:520px;">${escapeHtml(cwd)}</div>
+                </td>
+                <td class="text-right mono text-xs">${p.sessions}</td>
+                <td class="text-right mono" style="color:#d97757">${fmtTokens(p.tokens||0)}</td>
+                <td class="text-right text-xs text-[var(--text-dim)]">▶</td>
+              </tr>`;
+            }).join('') || `<tr><td colspan="4" class="empty">${t('데이터 없음')}</td></tr>`}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- 토큰 많이 쓴 세션 -->
@@ -19272,6 +19283,135 @@ AFTER.usage = () => {
     });
   }
 };
+
+// v2.43.2 — drill into one project's token usage. Opens a modal with the
+// project's totals + daily timeline + tool/agent breakdown + every session
+// (sortable by tokens), each row links to the session detail modal.
+async function openProjectUsage(cwd) {
+  if (!cwd) return;
+  showModalLoading(t('프로젝트 사용량 로드 중…'));
+  let r;
+  try {
+    r = await api('/api/usage/project?cwd=' + encodeURIComponent(cwd));
+  } catch (e) {
+    closeModal();
+    toast(t('로드 실패') + ': ' + e.message, 'err');
+    return;
+  }
+  if (!r || !r.ok) {
+    closeModal();
+    toast(t('로드 실패') + ': ' + (r && r.error || 'unknown'), 'err');
+    return;
+  }
+  const totals = r.totals || {};
+  const sessions = r.sessions || [];
+  const byTool = r.byTool || [];
+  const byAgent = r.byAgent || [];
+  const timeline = r.dailyTimeline || [];
+  const cwdShort = (r.cwd || cwd).split('/').pop() || (r.cwd || cwd);
+
+  const sumCard = (label, value, color) => `
+    <div class="card p-3">
+      <div class="text-[10px] uppercase text-[var(--text-dim)]">${escapeHtml(label)}</div>
+      <div class="text-xl font-bold mono mt-1" style="color:${color || '#d97757'}">${value}</div>
+    </div>`;
+
+  const distRows = (rows, color) => rows.length ? rows.map(x => {
+    const max = (rows[0] || {}).tokens || 1;
+    const pct = Math.max(2, Math.round((x.tokens || 0) / max * 100));
+    return `
+      <div class="mb-2">
+        <div class="flex justify-between text-xs mb-1">
+          <span class="mono">${escapeHtml(x.tool || x.name || '—')} <span class="text-[var(--text-dim)]">×${x.calls}</span></span>
+          <span class="mono font-bold" style="color:${color}">${fmtTokens(x.tokens || 0)}</span>
+        </div>
+        <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:${color};"></div></div>
+      </div>`;
+  }).join('') : `<div class="empty text-xs">${t('데이터 없음')}</div>`;
+
+  const sessionRows = sessions.length ? sessions.map(s => {
+    const startedStr = s.started_at ? new Date(s.started_at).toLocaleString() : '—';
+    const prompt = (s.first_user_prompt || '').slice(0, 80);
+    const sid = (s.session_id || '').replace(/'/g, "\\'");
+    return `
+      <tr class="link-row" onclick="closeModal();openSessionDetail('${escapeHtml(sid)}')">
+        <td class="text-xs">
+          <div class="font-medium" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px;">${escapeHtml(prompt) || '—'}</div>
+          <div class="mono text-[10px] text-[var(--text-dim)]">${escapeHtml(s.session_id || '')}</div>
+        </td>
+        <td class="text-xs mono text-[var(--text-dim)]">${escapeHtml(s.model || '')}</td>
+        <td class="text-right mono text-xs">${s.message_count || 0}</td>
+        <td class="text-right mono text-xs">${s.tool_use_count || 0}</td>
+        <td class="text-right mono" style="color:#d97757">${fmtTokens(s.total_tokens || 0)}</td>
+        <td class="text-right text-[10px] text-[var(--text-dim)]">${escapeHtml(startedStr)}</td>
+      </tr>`;
+  }).join('') : `<tr><td colspan="6" class="empty">${t('세션 없음')}</td></tr>`;
+
+  closeModal();
+  showModal(`
+    <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+      <div class="min-w-0">
+        <h2 class="font-semibold text-base truncate">📁 ${escapeHtml(cwdShort)}</h2>
+        <div class="mono text-[10px] text-[var(--text-dim)] truncate">${escapeHtml(r.cwd || cwd)}</div>
+      </div>
+      <button class="btn-ghost btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="p-5 flex-1 overflow-y-auto space-y-4">
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-2">
+        ${sumCard(t('전체 토큰'), fmtTokens(totals.total || 0), '#d97757')}
+        ${sumCard(t('입력'), fmtTokens(totals.input || 0), '#86efac')}
+        ${sumCard(t('출력'), fmtTokens(totals.output || 0), '#7dd3fc')}
+        ${sumCard(t('캐시 read'), fmtTokens(totals.cacheRead || 0), '#a78bfa')}
+        ${sumCard(t('캐시 create'), fmtTokens(totals.cacheCreate || 0), '#fcd34d')}
+        ${sumCard(t('세션'), totals.sessions || 0, '#94a3b8')}
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="card p-4">
+          <h3 class="font-semibold text-sm mb-3">🛠 ${t('도구별 토큰')}</h3>
+          <div class="max-h-[260px] overflow-y-auto">${distRows(byTool, '#d97757')}</div>
+        </div>
+        <div class="card p-4">
+          <h3 class="font-semibold text-sm mb-3">🤝 ${t('에이전트별 토큰')}</h3>
+          <div class="max-h-[260px] overflow-y-auto">${distRows(byAgent, '#a78bfa')}</div>
+        </div>
+      </div>
+
+      ${timeline.length ? `
+        <div class="card p-4">
+          <h3 class="font-semibold text-sm mb-3">🕒 ${t('일자별 토큰')} <span class="text-[10px] text-[var(--text-dim)] font-normal">(${timeline.length} ${t('일')})</span></h3>
+          <div class="flex items-end gap-1" style="height:80px;">
+            ${(() => {
+              const maxV = Math.max(1, ...timeline.map(x => x.tokens || 0));
+              return timeline.map(x => {
+                const h = Math.max(2, Math.round((x.tokens || 0) / maxV * 78));
+                return `<div title="${escapeHtml(x.date)} · ${fmtTokens(x.tokens || 0)}" style="flex:1;background:#d97757;height:${h}px;border-radius:2px 2px 0 0;opacity:0.75;"></div>`;
+              }).join('');
+            })()}
+          </div>
+        </div>` : ''}
+
+      <div class="card p-4">
+        <h3 class="font-semibold text-sm mb-3">🏆 ${t('세션별 토큰')} <span class="text-[10px] text-[var(--text-dim)] font-normal">(${sessions.length} ${t('세션')} · ${t('행 클릭 → 상세')})</span></h3>
+        <div class="max-h-[420px] overflow-y-auto">
+          <table class="data">
+            <thead>
+              <tr>
+                <th>${t('첫 요청')}</th>
+                <th>${t('모델')}</th>
+                <th class="text-right">${t('메시지')}</th>
+                <th class="text-right">${t('도구')}</th>
+                <th class="text-right">${t('토큰')}</th>
+                <th class="text-right">${t('시작')}</th>
+              </tr>
+            </thead>
+            <tbody>${sessionRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `);
+}
 
 // ────────────────────────────────────────────────────────────────
 // MEMORY
