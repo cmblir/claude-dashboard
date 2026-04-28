@@ -27,6 +27,7 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 | 版本 | 重点 |
 |---|---|
+| **v2.42.3** | 🩹 **钩子标签 2 秒加载 → 瞬时 + 删除真正生效** — 钩子标签首屏被 90 MB jsonl 扫描（1.94 s）阻塞，且 `deleteHook` 缺少重渲染调用导致卡片不消失，两个 bug 同时出现。现在 `/api/hooks/recent-blocks` 改为 TTL+mtime 缓存（cold 0.97 s → warm 0.026 s，37×）并在首屏后通过 `_renderRecentBlocksPanel` 注入懒加载。删除（插件 + 用户路径）成功时调用 `renderView()`，卡片立即消失。 |
 | **v2.42.2** | 🖥️ **工作流节点 spawn → 对应 AI CLI** — 点击 `@gemini:gemini-2.5-pro` 节点的 🖥️ 现在打开 **Gemini CLI**，`@ollama:llama3.1` 打开 **`ollama run llama3.1`**，`@codex:o4-mini` 打开 **codex**。此前无视 assignee 始终启动 Claude。所请求的 CLI 未安装时回退到 claude 并提示警告 toast。提示词以横幅输出，保持交互式 REPL。 |
 | **v2.42.1** | 🔄 **工作流运行可视化** — 列表卡片内联展示最近 3 次运行状态芯片（✅/❌/⏳）、进行中脉冲徽章（`● 运行中`）、`(N 次)` 总运行次数。重新打开画布时自动恢复最近一次运行状态 — 进行中则启动实时轮询，已结束则一次性 hydrate 节点颜色。后端 `api_workflows_list` 新增 `lastRuns`/`runningCount`/`activeRunId`/`totalRuns`。 |
 | **v2.42.0** | 🖱️🧩🧭🔁 **Anthropic 4 项功能一次发布** — Computer Use Lab (`computer-use-2025-01-24` beta · 仅计划), Memory Lab (`memory-2025-08-18` beta · 服务器端 memory blocks), Advisor Lab (Executor + Advisor 配对 · 成本/质量差异), Claude Code Routines 完整 CRUD + 立即运行。14 个新端点，4 个新 playground 标签页。 |

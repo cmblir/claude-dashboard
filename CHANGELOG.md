@@ -10,6 +10,51 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.42.3] — 2026-04-28
+
+### 🩹 Hooks tab — 2 s initial load + delete didn't refresh UI
+
+User: "훅 부분이 처음에 로딩이 너무 많이 걸려. 그리고 삭제해도 삭제가 안되는
+것 같아." Two distinct bugs in the Hooks tab — both confirmed end-to-end.
+
+**Root causes**
+
+1. `VIEWS.hooks` blocked initial paint on `/api/hooks/recent-blocks`, which
+   walks up to 60 jsonl transcripts (~90 MB on a power user's machine) and
+   took 1.94 s. Cold cost was paid on every visit, even on filter
+   re-renders.
+2. `deleteHook()` fired the API call, showed a success toast, then did
+   nothing — no `renderView()` call. The deleted hook stayed visible
+   until the user navigated away, looking like delete was broken.
+
+**Changes**
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/hooks.py::recent_blocked_hooks` | TTL+mtime cache (5 min). Fingerprint is just the newest jsonl mtime, so a single `stat()` invalidates correctly without rescanning. New `force_refresh` param + `?refresh=1` on `api_recent_blocked_hooks`. Cold 0.97 s → warm 0.026 s (~37×). |
+| 2 | `dist/index.html::VIEWS.hooks` | Drop `/api/hooks/recent-blocks` from the initial `Promise.all`. Module-level `__hooksRecentBlocks` cache survives filter re-renders; the panel renders into a `#hooksRecentBlocksHost` placeholder that fills in after first paint. |
+| 3 | `dist/index.html::AFTER.hooks` | Lazy fetch `/api/hooks/recent-blocks` once per page session and inject HTML via the new `_renderRecentBlocksPanel(data)` helper (extracted from the inline template). |
+| 4 | `dist/index.html::deleteHook` | Call `renderView()` on success for both plugin and user delete paths so the deleted hook actually disappears. Toast strings now go through `t()`. |
+
+**Verification**
+
+```
+Cold blocking work:  1.94 s   →  0.05 s   (Hooks tab feels instant)
+Recent-blocks cold:  0.97 s   (deferred — happens after first paint)
+Recent-blocks warm:  0.026 s  (cache hit, 37× faster)
+e2e-tabs-smoke.mjs:  58/58
+Headless DOM probe:  __hooksRecentBlocks populates within 2 s, host
+                     div fills with 5 items, 0 console errors.
+make i18n-verify:    0 missing across EN/ZH
+```
+
+**Compatibility**
+
+- `recent_blocked_hooks(force_refresh=False)` keeps the previous default;
+  callers passing only `max_files` / `top_n` are unchanged.
+- The cache is per-process (in-memory only); restarting the server clears it.
+
+---
 ## [2.42.2] — 2026-04-27
 
 ### 🖥️ Workflow node spawn → matching provider CLI

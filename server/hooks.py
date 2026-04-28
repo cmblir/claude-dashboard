@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from pathlib import Path
+from threading import Lock
 from typing import Optional
 
 from .claude_md import get_settings
@@ -318,22 +320,37 @@ def _scan_jsonl_for_hook_blocks(file: Path) -> list[tuple[str, int]]:
     return out
 
 
-def recent_blocked_hooks(*, max_files: int = 60, top_n: int = 20) -> dict:
-    """Aggregate the most recent hook-block events across recent session
-    transcripts. Returns a frequency-ranked list with the latest mtime per id.
+# In-process cache for recent_blocked_hooks. The bare scan walks up to
+# 60 jsonl files (~90 MB total on a power user's machine) and takes ~2 s,
+# which made the Hooks tab feel laggy on every visit. We cache by the
+# fingerprint of the (top-of-mtime, max_files, top_n) tuple, refreshing
+# only when a newer transcript appears or the 5-minute TTL expires.
+_RECENT_BLOCKS_TTL_S = 300
+_recent_blocks_cache: dict = {"key": None, "ts": 0.0, "value": None}
+_recent_blocks_lock = Lock()
 
-    Output shape::
 
-        {
-          "items": [
-            {"id": "pre:edit-write:gateguard-fact-force",
-             "count": 14, "lastSeen": 1777270000000},
-             ...
-          ],
-          "scanned": <files scanned>,
-          "totalEvents": <sum of counts>
-        }
-    """
+def _recent_blocks_fingerprint(max_files: int, top_n: int) -> tuple:
+    """Cheap fingerprint — only stat()s the newest jsonl, not all 60.
+    A new hook-block event always lands in the most-recently-touched
+    transcript, so a single mtime is enough to invalidate."""
+    if not PROJECTS_DIR.exists():
+        return ("none", 0.0, max_files, top_n)
+    newest = 0.0
+    for proj in PROJECTS_DIR.iterdir():
+        if not proj.is_dir():
+            continue
+        for jl in proj.glob("*.jsonl"):
+            try:
+                m = jl.stat().st_mtime
+                if m > newest:
+                    newest = m
+            except Exception:
+                continue
+    return ("ok", newest, max_files, top_n)
+
+
+def _compute_recent_blocked_hooks(max_files: int, top_n: int) -> dict:
     if not PROJECTS_DIR.exists():
         return {"items": [], "scanned": 0, "totalEvents": 0}
     files: list[tuple[float, Path]] = []
@@ -362,5 +379,53 @@ def recent_blocked_hooks(*, max_files: int = 60, top_n: int = 20) -> dict:
     return {"items": items, "scanned": len(files), "totalEvents": total}
 
 
+def recent_blocked_hooks(*, max_files: int = 60, top_n: int = 20,
+                         force_refresh: bool = False) -> dict:
+    """Aggregate the most recent hook-block events across recent session
+    transcripts. Returns a frequency-ranked list with the latest mtime per id.
+
+    Cached for ``_RECENT_BLOCKS_TTL_S`` (5 min) and invalidated when a
+    newer jsonl appears. Pass ``force_refresh=True`` to bypass the cache.
+
+    Output shape::
+
+        {
+          "items": [
+            {"id": "pre:edit-write:gateguard-fact-force",
+             "count": 14, "lastSeen": 1777270000000},
+             ...
+          ],
+          "scanned": <files scanned>,
+          "totalEvents": <sum of counts>,
+          "cached": <bool>
+        }
+    """
+    fp = _recent_blocks_fingerprint(max_files, top_n)
+    now = time.time()
+    if not force_refresh:
+        with _recent_blocks_lock:
+            if (_recent_blocks_cache["key"] == fp
+                    and _recent_blocks_cache["value"] is not None
+                    and (now - _recent_blocks_cache["ts"]) < _RECENT_BLOCKS_TTL_S):
+                v = dict(_recent_blocks_cache["value"])
+                v["cached"] = True
+                return v
+    value = _compute_recent_blocked_hooks(max_files, top_n)
+    with _recent_blocks_lock:
+        _recent_blocks_cache["key"] = fp
+        _recent_blocks_cache["ts"] = now
+        _recent_blocks_cache["value"] = value
+    out = dict(value)
+    out["cached"] = False
+    return out
+
+
 def api_recent_blocked_hooks(query: dict) -> dict:
-    return {"ok": True, **recent_blocked_hooks()}
+    force = False
+    if isinstance(query, dict):
+        v = query.get("refresh")
+        if isinstance(v, list):
+            v = v[0] if v else ""
+        if str(v).lower() in ("1", "true", "yes"):
+            force = True
+    return {"ok": True, **recent_blocked_hooks(force_refresh=force)}

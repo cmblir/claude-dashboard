@@ -12817,12 +12817,19 @@ async function _fwdRemove(event, groupIdx, subIdx) {
   } catch (e) { toast(String(e), 'err'); }
 }
 
+// v2.42.3 — `/api/hooks/recent-blocks` walks ~90 MB of jsonl transcripts,
+// adding ~1 s to the first Hooks tab paint. Cache the result in JS memory
+// so re-renders (filter changes, deletes) reuse it; the initial fetch is
+// deferred to AFTER.hooks so the page paints immediately.
+let __hooksRecentBlocks = null;
+let __hooksRecentBlocksFetching = false;
+
 VIEWS.hooks = async () => {
-  const [s, hooksAll, recentBlocks] = await Promise.all([
+  const [s, hooksAll] = await Promise.all([
     api('/api/settings'),
     api('/api/hooks'),
-    api('/api/hooks/recent-blocks').catch(() => ({items:[], totalEvents:0, scanned:0})),
   ]);
+  const recentBlocks = __hooksRecentBlocks || {items: [], totalEvents: 0, scanned: 0};
   window.__settingsSnapshot = s;
   const rawHooks = s.hooks || {};
   // 사용자 훅(편집 가능): settings.json 에서 인덱스 보존하며 평탄화
@@ -12963,35 +12970,10 @@ VIEWS.hooks = async () => {
       <div id="hookDetectiveResult" class="text-[11px] mt-1.5" style="min-height:18px;color:var(--text-dim);"></div>
     </div>
 
-    <!-- v2.40.4 — Recent Blocks: top-N hook ids that recently blocked work. -->
-    ${recentBlocks.items && recentBlocks.items.length ? `
-    <div class="card p-3 mb-3" style="background:rgba(239,68,68,0.05); border-color:rgba(239,68,68,0.3);">
-      <div class="flex items-center justify-between mb-2">
-        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] flex items-center gap-2">
-          <span>🚨</span> <span>${t('최근 차단된 훅')}</span>
-          <span class="text-[10px]" style="text-transform:none;letter-spacing:0;color:#fca5a5;">${recentBlocks.totalEvents} ${t('차단 이벤트')} · ${recentBlocks.scanned} ${t('파일 스캔')}</span>
-        </div>
-        <span class="text-[10px] text-[var(--text-dim)]">${t('카드를 클릭하면 검색 자동 적용')}</span>
-      </div>
-      <div class="grid gap-2" style="grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));">
-        ${recentBlocks.items.map(rb => {
-          const dt = rb.lastSeen ? new Date(rb.lastSeen).toLocaleString() : '—';
-          // v2.40.5 — keep the id in a data-* attribute and read it from the
-          // handler. JSON.stringify() inline inside an onclick="…" attribute
-          // emitted double-quotes that collided with the attribute quoting,
-          // so the parser cut the onclick short and clicks did nothing.
-          return `<button class="rounded-lg p-2 text-left text-xs hover-lift" style="background:rgba(0,0,0,0.2); border:1px solid rgba(239,68,68,0.25); cursor:pointer;"
-            data-hook-id="${escapeHtml(rb.id)}"
-            onclick="_jumpToHookCard(this.dataset.hookId)">
-            <div class="flex items-center justify-between gap-2 mb-1">
-              <span class="font-semibold text-[#fca5a5]" style="font-size:0.92rem;">${rb.count}×</span>
-              <span class="text-[10px] text-[var(--text-dim)]">${escapeHtml(dt)}</span>
-            </div>
-            <div class="mono truncate" style="font-size:0.78rem;color:var(--text);">${escapeHtml(rb.id)}</div>
-          </button>`;
-        }).join('')}
-      </div>
-    </div>` : ''}
+    <!-- v2.40.4 — Recent Blocks: top-N hook ids that recently blocked work.
+         v2.42.3 — wrapped in a host div so the lazy-loaded data can be
+         injected after first paint without rebuilding the whole view. -->
+    <div id="hooksRecentBlocksHost">${_renderRecentBlocksPanel(recentBlocks)}</div>
 
     <!-- v2.40.2 — search + filter bar (always visible, no flyout). -->
     <div class="card p-3 mb-3" style="display:flex;flex-direction:column;gap:8px;">
@@ -13035,6 +13017,38 @@ VIEWS.hooks = async () => {
   `;
 };
 
+// v2.42.3 — extracted from VIEWS.hooks template literal so the lazy
+// recent-blocks fetcher can re-render only this panel without rebuilding
+// the rest of the page. Returns '' when there are no events to render.
+function _renderRecentBlocksPanel(data) {
+  const items = (data && data.items) || [];
+  if (!items.length) return '';
+  return `
+    <div class="card p-3 mb-3" style="background:rgba(239,68,68,0.05); border-color:rgba(239,68,68,0.3);">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] flex items-center gap-2">
+          <span>🚨</span> <span>${t('최근 차단된 훅')}</span>
+          <span class="text-[10px]" style="text-transform:none;letter-spacing:0;color:#fca5a5;">${data.totalEvents} ${t('차단 이벤트')} · ${data.scanned} ${t('파일 스캔')}</span>
+        </div>
+        <span class="text-[10px] text-[var(--text-dim)]">${t('카드를 클릭하면 검색 자동 적용')}</span>
+      </div>
+      <div class="grid gap-2" style="grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));">
+        ${items.map(rb => {
+          const dt = rb.lastSeen ? new Date(rb.lastSeen).toLocaleString() : '—';
+          return `<button class="rounded-lg p-2 text-left text-xs hover-lift" style="background:rgba(0,0,0,0.2); border:1px solid rgba(239,68,68,0.25); cursor:pointer;"
+            data-hook-id="${escapeHtml(rb.id)}"
+            onclick="_jumpToHookCard(this.dataset.hookId)">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <span class="font-semibold text-[#fca5a5]" style="font-size:0.92rem;">${rb.count}×</span>
+              <span class="text-[10px] text-[var(--text-dim)]">${escapeHtml(dt)}</span>
+            </div>
+            <div class="mono truncate" style="font-size:0.78rem;color:var(--text);">${escapeHtml(rb.id)}</div>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
 AFTER.hooks = () => {
   const inp = document.getElementById('hookSearch');
   if (inp) {
@@ -13046,6 +13060,21 @@ AFTER.hooks = () => {
   }
   const ro = document.getElementById('hooksRiskOnly');
   if (ro) ro.onchange = e => { state.data.hooksRiskOnly = e.target.checked; renderView(); };
+
+  // v2.42.3 — lazy-fetch Recent Blocks once per page session. The scan reads
+  // ~90 MB of jsonl, so doing it inline blocks first paint by ~1 s. Fire
+  // after AFTER.hooks runs and inject into the host div when it returns.
+  if (!__hooksRecentBlocks && !__hooksRecentBlocksFetching) {
+    __hooksRecentBlocksFetching = true;
+    api('/api/hooks/recent-blocks')
+      .catch(() => ({items: [], totalEvents: 0, scanned: 0}))
+      .then(data => {
+        __hooksRecentBlocks = data || {items: [], totalEvents: 0, scanned: 0};
+        __hooksRecentBlocksFetching = false;
+        const host = document.getElementById('hooksRecentBlocksHost');
+        if (host) host.innerHTML = _renderRecentBlocksPanel(__hooksRecentBlocks);
+      });
+  }
 
   // v2.40.4 — Detective: paste a block error → extract hook id → search + pulse.
   const det = document.getElementById('hookDetectiveInput');
@@ -13478,7 +13507,11 @@ async function deleteHook(payload) {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ pluginKey, event, groupIdx, subIdx, op:'delete' }),
     });
-    toast(r.ok ? '플러그인 훅 삭제됨' : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
+    toast(r.ok ? t('플러그인 훅 삭제됨') : (t('실패')+': '+(r.error||'unknown')), r.ok?'ok':'err');
+    // v2.42.3 — re-render so the deleted hook actually disappears. Without
+    // this the toast fires but the card stays on screen until the user
+    // navigates away, making it look like delete didn't work.
+    if (r.ok) renderView();
     return;
   }
   if (!await confirmModal({ title: t('훅 삭제'), message: t('이 훅을 삭제할까요?'), confirmLabel: t('삭제'), danger: true })) return;
@@ -13494,7 +13527,8 @@ async function deleteHook(payload) {
   }
   if (!s.hooks[event].length) delete s.hooks[event];
   const r = await api('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(s) });
-  toast(r.ok ? '삭제됨' : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
+  toast(r.ok ? t('삭제됨') : (t('실패')+': '+(r.error||'unknown')), r.ok?'ok':'err');
+  if (r.ok) renderView();
 }
 
 VIEWS.permissions = async () => {
