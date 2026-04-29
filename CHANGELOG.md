@@ -10,6 +10,45 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.45.0] — 2026-04-29
+
+### 🛣️ Claude Code Router (zclaude) setup wizard
+
+User: "claudecode를 zclaude로 사용할 수 있게 세팅하는 기능도 추가해줘.
+claude-code-router를 이용해서." Adds a new `config`-group tab that walks
+the user through configuring `@musistudio/claude-code-router` (CCR) so
+Claude Code can be routed through Z.AI / DeepSeek / OpenRouter / Ollama /
+Gemini and invoked as `zclaude`. Per user choice (option B), the shell
+alias is shown for **copy-paste** — the dashboard never edits `~/.zshrc`.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/ccr_setup.py` (new, 432 lines, stdlib-only) | Status probes (`node --version`, `ccr --version`, `claude --version`, port-3456 listen check), atomic config CRUD via `_safe_write` + `chmod 600`, schema validation against the verified CCR v2.0.0 schema (top-level `APIKEY/PROXY_URL/LOG/LOG_LEVEL/HOST/PORT/NON_INTERACTIVE_MODE/API_TIMEOUT_MS/Providers/Router`; provider keys `name/api_base_url/api_key/models/transformer`; router keys `default/background/think/longContext/longContextThreshold/webSearch/image`). All paths sandboxed under `$HOME` via `_under_home`. Unknown top-level keys stripped with warnings; provider-level transformer customizations preserved. |
+| 2 | `server/ccr_setup.py::api_ccr_install_command` | Returns the npm command string for the UI to display — the dashboard NEVER runs `npm install -g` autonomously. User runs it themselves. |
+| 3 | `server/ccr_setup.py::api_ccr_service` | Runs `ccr start | stop | restart` (15s timeout). |
+| 4 | `server/ccr_setup.py::api_ccr_alias_snippet` | Generates a copy-paste block (`# >>> zclaude (lazyclaude) >>>` … `# <<<`) with `alias zclaude='ccr code'` and the `eval "$(ccr activate)" && claude` alternative. Detects `$SHELL`, returns the corresponding `~/.zshrc` / `~/.bashrc` path and `already_present` (substring match — read-only). **Never writes to any rc file.** |
+| 5 | `server/ccr_setup.py::api_ccr_presets` | Returns 5 provider presets the UI can one-click insert: Z.AI (via `aihubmix` shape with `Z/glm-4.5`, `Z/glm-4.6`), DeepSeek, OpenRouter, Ollama, Gemini — all mirrored verbatim from the upstream `config.example.json`. |
+| 6 | `server/routes.py` | Registers 5 GET routes (`/api/ccr/status`, `/config`, `/install-command`, `/alias-snippet`, `/presets`) + 2 POST routes (`/api/ccr/config`, `/service`). |
+| 7 | `server/nav_catalog.py` + `dist/index.html` `VIEWS.zclaude` | New tab `🛣️ zclaude (CCR)` under the `config` group. |
+| 8 | `dist/index.html` 5-step wizard | (1) Status pills + npm install command in copy-able `<code>` when ccr missing. (2) Providers — preset chips + editable rows (name/url/key/models/transformer JSON). (3) Router rules — 5 selects populated from configured provider×model pairs + `longContextThreshold`. (4) Service Start/Stop/Restart + live output. (5) Shell alias `<pre>` + Copy button + current-shell + rc-path + muted note that the user must paste it themselves. |
+| 9 | `tools/translations_manual_25.py` (new) | KO → EN/ZH for 65 new strings. |
+
+### Verified facts used in implementation
+Source: `https://raw.githubusercontent.com/musistudio/claude-code-router/main/{package.json,README.md}` fetched 2026-04-29.
+- npm: `@musistudio/claude-code-router` v2.0.0, bin `ccr`, node ≥20.0.0
+- Config: `~/.claude-code-router/config.json`, env interpolation `$VAR` / `${VAR}`
+- CLI: `ccr code | start | stop | restart | status | ui | model | activate | preset`
+- `eval "$(ccr activate)"` exports `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL=http://127.0.0.1:3456`, `NO_PROXY=127.0.0.1`, `DISABLE_TELEMETRY`, `DISABLE_COST_WARNINGS`, `API_TIMEOUT_MS`
+
+### Smoke
+```
+$ python3 -c "from server.ccr_setup import api_ccr_status, api_ccr_presets; s=api_ccr_status({}); print(s['ok'], s['node_version'], 'presets=', len(api_ccr_presets({})['presets']))"
+True v24.13.0 presets= 5
+$ make i18n-verify
+✓ 모든 검증 통과
+```
+
+---
 ## [2.44.1] — 2026-04-29
 
 ### 🪢 multiAssignee parallel fan-out + keyed canvas SVG diff

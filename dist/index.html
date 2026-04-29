@@ -1328,6 +1328,8 @@ const NAV = [
     group: 'config', desc: '플러그인 마켓 추가/삭제 (git URL)', docUrl: DOCS_BASE+'plugins' },
   { id: 'settings',    icon: '⚙️', label: 'Settings 편집',
     group: 'config', desc: '~/.claude/settings.json 직접 편집 + 추천 프로파일 원클릭', docUrl: DOCS_BASE+'settings' },
+  { id: 'zclaude',     icon: '🛣️', label: 'zclaude (CCR)',
+    group: 'config', desc: 'Claude Code를 GLM/Z.AI/DeepSeek 등 다른 LLM으로 라우팅 + zclaude 별칭 안내' },
   { id: 'claudemd',    icon: '📜', label: 'CLAUDE.md',
     group: 'config', desc: '모든 세션 시작 시 로드되는 글로벌 지침(기억·규칙·취향)', docUrl: DOCS_BASE+'memory' },
   { id: 'envConfig',   icon: '🌿', label: '환경 변수',
@@ -20222,6 +20224,320 @@ VIEWS.memoryManager = async () => {
         </table>
       </div>
     </div>`;
+};
+
+// ────────────────────────────────────────────────────────────────
+// v2.45.0 — Claude Code Router (CCR / zclaude) setup wizard
+// ────────────────────────────────────────────────────────────────
+window.__ccr = window.__ccr || { config: null, presets: [], status: null, alias: null };
+
+function _ccrPill(ok, label) {
+  const color = ok ? 'var(--ok, #5cc97a)' : 'var(--err, #e16060)';
+  const icon = ok ? '✓' : '✗';
+  return `<span class="mono text-xs" style="color:${color};">${icon}</span>
+          <span class="text-xs ml-1">${escapeHtml(label)}</span>`;
+}
+
+function _ccrEsc(s) { return escapeHtml(s == null ? '' : String(s)); }
+
+async function _ccrLoadAll() {
+  const [st, cfg, pre, alias] = await Promise.all([
+    api('/api/ccr/status'),
+    api('/api/ccr/config'),
+    api('/api/ccr/presets'),
+    api('/api/ccr/alias-snippet'),
+  ]);
+  window.__ccr.status = st || {};
+  window.__ccr.config = (cfg && cfg.config) ? cfg.config : { LOG: true, HOST: '127.0.0.1', PORT: 3456, Providers: [], Router: {} };
+  if (!Array.isArray(window.__ccr.config.Providers)) window.__ccr.config.Providers = [];
+  if (!window.__ccr.config.Router || typeof window.__ccr.config.Router !== 'object') window.__ccr.config.Router = {};
+  window.__ccr.presets = (pre && pre.presets) ? pre.presets : [];
+  window.__ccr.alias = alias || {};
+}
+
+function _ccrRenderStatus() {
+  const s = window.__ccr.status || {};
+  const installCmd = 'npm install -g @musistudio/claude-code-router';
+  const ccrLine = s.ccr_installed
+    ? _ccrPill(true, 'ccr ' + (s.ccr_version || ''))
+    : `${_ccrPill(false, t('ccr 설치됨') + ' — ' + t('설치되지 않음'))}
+       <div class="mt-2"><div class="text-[11px] text-[var(--text-mute)] mb-1">${t('설치 명령')}</div>
+       <code class="mono text-xs block p-2 rounded" style="background:var(--code-bg);">${_ccrEsc(installCmd)}</code>
+       <button class="btn text-xs mt-1" onclick="_ccrCopy('${_ccrEsc(installCmd)}', this)">${t('복사')}</button>
+       <div class="text-[11px] text-[var(--text-dim)] mt-1">${t('이 명령을 직접 터미널에서 실행하세요')}</div></div>`;
+  const nodeLine = s.node_ok
+    ? _ccrPill(true, 'Node ' + (s.node_version || ''))
+    : _ccrPill(false, t('Node.js 20 이상이 필요합니다') + (s.node_version ? ' (' + s.node_version + ')' : ''));
+  const claudeLine = s.claude_installed
+    ? _ccrPill(true, 'claude ' + (s.claude_version || ''))
+    : _ccrPill(false, t('claude CLI 설치됨') + ' — ' + t('설치되지 않음'));
+  const cfgLine = s.config_exists
+    ? _ccrPill(true, t('config.json 존재'))
+    : _ccrPill(false, t('config.json 존재') + ' — ' + (s.config_path || ''));
+  const svc = s.service_running
+    ? _ccrPill(true, t('ccr 서비스 실행 중') + ` · ${t('포트')} ${s.service_port}` + (s.service_pid ? ` · PID ${s.service_pid}` : ''))
+    : _ccrPill(false, t('ccr 서비스 실행 중') + ' — ' + (s.service_port ? `${t('포트')} ${s.service_port}` : ''));
+  return `
+    <div class="card p-5 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-sm">① ${t('단계 1 · 환경 점검')}</h3>
+        <button class="btn text-xs" onclick="_ccrRefreshStatus()">🔄 ${t('서비스 상태 새로고침')}</button>
+      </div>
+      <ul class="space-y-2">
+        <li>${nodeLine}</li>
+        <li>${ccrLine}</li>
+        <li>${claudeLine}</li>
+        <li>${cfgLine} <span class="text-[11px] text-[var(--text-dim)] ml-2 mono">${_ccrEsc(s.config_path || '')}</span></li>
+        <li>${svc}</li>
+      </ul>
+    </div>`;
+}
+
+function _ccrRenderProviders() {
+  const cfg = window.__ccr.config || {};
+  const list = cfg.Providers || [];
+  const presets = window.__ccr.presets || [];
+  const presetBtns = presets.map((p, i) =>
+    `<button class="btn text-xs" onclick="_ccrInsertPreset(${i})">+ ${_ccrEsc(p.label)}</button>`
+  ).join(' ');
+  const rows = list.map((p, i) => {
+    const transformerJson = p.transformer ? JSON.stringify(p.transformer, null, 2) : '';
+    return `
+      <div class="card p-4 mb-3" data-ccr-row="${i}">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label class="text-xs">${t('프로바이더 이름')}
+            <input class="input w-full mt-1" data-ccr-field="name" data-idx="${i}" value="${_ccrEsc(p.name || '')}" oninput="_ccrFieldEdit(${i},'name',this.value)">
+          </label>
+          <label class="text-xs">${t('API base URL')}
+            <input class="input w-full mt-1" data-ccr-field="api_base_url" data-idx="${i}" value="${_ccrEsc(p.api_base_url || '')}" oninput="_ccrFieldEdit(${i},'api_base_url',this.value)">
+          </label>
+          <label class="text-xs">${t('API 키')}
+            <input class="input w-full mt-1" type="password" data-idx="${i}" value="${_ccrEsc(p.api_key || '')}" oninput="_ccrFieldEdit(${i},'api_key',this.value)">
+          </label>
+          <label class="text-xs">${t('모델 (한 줄에 하나씩)')}
+            <textarea class="input w-full mt-1 mono text-xs" rows="3" oninput="_ccrModelsEdit(${i}, this.value)">${_ccrEsc((p.models || []).join('\n'))}</textarea>
+          </label>
+        </div>
+        <details class="mt-2">
+          <summary class="text-xs text-[var(--text-mute)] cursor-pointer">${t('고급: transformer (JSON)')}</summary>
+          <textarea class="input w-full mt-2 mono text-xs" rows="4" oninput="_ccrTransformerEdit(${i}, this.value)" placeholder='{"use":["openrouter"]}'>${_ccrEsc(transformerJson)}</textarea>
+        </details>
+        <div class="flex justify-end mt-2">
+          <button class="btn text-xs" onclick="_ccrRemoveRow(${i})">🗑 ${t('프로바이더 행 제거')}</button>
+        </div>
+      </div>`;
+  }).join('');
+  const empty = list.length === 0
+    ? `<div class="text-xs text-[var(--text-mute)] italic mb-3">${t('프로바이더가 없습니다. 프리셋을 사용해 시작하세요.')}</div>`
+    : '';
+  return `
+    <div class="card p-5 mb-4">
+      <h3 class="font-semibold text-sm mb-3">② ${t('단계 2 · 프로바이더')}</h3>
+      <div class="text-[11px] text-[var(--text-mute)] mb-2">${t('주의: API 키는 클라이언트 메모리에만 보관되며 ~/.claude-code-router/config.json 에 저장됩니다.')}</div>
+      <div class="flex flex-wrap gap-2 mb-3">${presetBtns}<button class="btn text-xs" onclick="_ccrAddBlank()">+ ${t('프로바이더 추가')}</button></div>
+      ${empty}
+      ${rows}
+      <div class="flex justify-end mt-2">
+        <button class="btn-primary btn text-xs" onclick="_ccrSaveConfig()">💾 ${t('프로바이더 저장')}</button>
+      </div>
+    </div>`;
+}
+
+function _ccrRouterChoices(selected) {
+  const list = (window.__ccr.config && window.__ccr.config.Providers) || [];
+  const cur = selected || '';
+  const opts = [`<option value="" ${cur === '' ? 'selected' : ''}>${t('선택 안 함')}</option>`];
+  list.forEach(p => {
+    (p.models || []).forEach(m => {
+      const v = `${p.name},${m}`;
+      const sel = v === cur ? ' selected' : '';
+      opts.push(`<option value="${_ccrEsc(v)}"${sel}>${_ccrEsc(v)}</option>`);
+    });
+  });
+  return opts.join('');
+}
+
+function _ccrRenderRouter() {
+  const r = (window.__ccr.config && window.__ccr.config.Router) || {};
+  const sel = (key, label) => `
+    <label class="text-xs">${label}
+      <select class="input w-full mt-1" onchange="_ccrRouterEdit('${key}', this.value)">
+        ${_ccrRouterChoices(r[key] || '')}
+      </select>
+    </label>`;
+  return `
+    <div class="card p-5 mb-4">
+      <h3 class="font-semibold text-sm mb-3">③ ${t('단계 3 · 라우팅 규칙')}</h3>
+      <div class="text-[11px] text-[var(--text-mute)] mb-3">${t('프로바이더와 모델을 먼저 설정한 뒤 라우팅 규칙을 지정하세요.')}</div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        ${sel('default', t('기본 (default)'))}
+        ${sel('background', t('백그라운드 (background)'))}
+        ${sel('think', t('Think (think)'))}
+        ${sel('longContext', t('롱컨텍스트 (longContext)'))}
+        ${sel('webSearch', t('웹 검색 (webSearch)'))}
+        <label class="text-xs">${t('롱컨텍스트 임계값 (토큰)')}
+          <input class="input w-full mt-1" type="number" min="0" value="${_ccrEsc(r.longContextThreshold || '')}" oninput="_ccrRouterEdit('longContextThreshold', this.value)">
+        </label>
+      </div>
+      <div class="flex justify-end mt-3">
+        <button class="btn-primary btn text-xs" onclick="_ccrSaveConfig()">💾 ${t('라우팅 규칙 저장')}</button>
+      </div>
+    </div>`;
+}
+
+function _ccrRenderService() {
+  const s = window.__ccr.status || {};
+  const disabled = !s.ccr_installed ? 'disabled' : '';
+  return `
+    <div class="card p-5 mb-4">
+      <h3 class="font-semibold text-sm mb-3">④ ${t('단계 4 · 서비스 제어')}</h3>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn-primary btn text-xs" onclick="_ccrSvc('start')" ${disabled}>▶ ${t('서비스 시작')}</button>
+        <button class="btn text-xs" onclick="_ccrSvc('stop')" ${disabled}>⏹ ${t('서비스 중지')}</button>
+        <button class="btn text-xs" onclick="_ccrSvc('restart')" ${disabled}>🔄 ${t('서비스 재시작')}</button>
+      </div>
+      ${!s.ccr_installed ? `<div class="text-xs mt-3" style="color:var(--err);">${t('ccr 가 설치되어 있지 않습니다')}</div>` : ''}
+      <div id="ccrSvcOut" class="mono text-[11px] mt-3 whitespace-pre-wrap" style="color:var(--text-mute);"></div>
+    </div>`;
+}
+
+function _ccrRenderAlias() {
+  const a = window.__ccr.alias || {};
+  const present = a.already_present;
+  const snippet = a.zshrc_snippet || '';
+  const alt = a.alternate_command || '';
+  return `
+    <div class="card p-5 mb-4">
+      <h3 class="font-semibold text-sm mb-3">⑤ ${t('단계 5 · zclaude 별칭')}</h3>
+      <div class="text-xs mb-1">${t('현재 셸')}: <b class="mono">${_ccrEsc(a.current_shell || '')}</b></div>
+      <div class="text-xs mb-2">${t('RC 파일')}: <code class="mono">${_ccrEsc(a.rc_path || '')}</code>
+        ${present ? `<span class="ml-2" style="color:var(--ok);">✓ ${t('이미 적용됨')}</span>` : `<span class="ml-2" style="color:var(--text-mute);">${t('아직 적용되지 않음')}</span>`}
+      </div>
+      <pre class="mono text-xs p-3 rounded whitespace-pre-wrap" style="background:var(--code-bg);">${_ccrEsc(snippet)}</pre>
+      <button class="btn text-xs mt-2" onclick="_ccrCopy(${JSON.stringify(snippet)}, this)">📋 ${t('복사')}</button>
+      <div class="text-[11px] text-[var(--text-mute)] mt-3">${t('위 블록을 RC 파일에 추가한 뒤 새 터미널을 여세요.')}</div>
+      <div class="text-[11px] text-[var(--text-mute)] mt-2">${t('다른 옵션')}: <code class="mono">${_ccrEsc(alt)}</code></div>
+    </div>`;
+}
+
+VIEWS.zclaude = async () => {
+  try {
+    await _ccrLoadAll();
+  } catch (e) {
+    return `${viewHeader('Claude Code Router (zclaude)', 'Claude Code를 GLM/Z.AI/DeepSeek 등 다른 LLM으로 라우팅', 'zclaude')}
+      <div class="card p-6 text-sm text-[var(--text-mute)]">${t('환경 정보를 불러오지 못했습니다')}: ${escapeHtml(e.message || '')}</div>`;
+  }
+  return `
+    ${viewHeader('Claude Code Router (zclaude)', 'Claude Code를 GLM/Z.AI/DeepSeek 등 다른 LLM으로 라우팅', 'zclaude')}
+    ${_ccrRenderStatus()}
+    ${_ccrRenderProviders()}
+    ${_ccrRenderRouter()}
+    ${_ccrRenderService()}
+    ${_ccrRenderAlias()}`;
+};
+
+AFTER.zclaude = () => { /* event handlers attached inline via onclick */ };
+
+// ── helpers (window-scoped so inline handlers can call them) ──
+window._ccrCopy = (text, btn) => {
+  try {
+    navigator.clipboard.writeText(text);
+    if (btn) { const old = btn.textContent; btn.textContent = '✓ ' + t('복사됨'); setTimeout(() => { btn.textContent = old; }, 1200); }
+  } catch (e) { toast(String(e), 'err'); }
+};
+
+window._ccrFieldEdit = (i, field, value) => {
+  const list = window.__ccr.config.Providers;
+  if (!list[i]) return;
+  list[i][field] = value;
+};
+
+window._ccrModelsEdit = (i, value) => {
+  const list = window.__ccr.config.Providers;
+  if (!list[i]) return;
+  list[i].models = String(value || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+};
+
+window._ccrTransformerEdit = (i, value) => {
+  const list = window.__ccr.config.Providers;
+  if (!list[i]) return;
+  const v = String(value || '').trim();
+  if (!v) { delete list[i].transformer; return; }
+  try { list[i].transformer = JSON.parse(v); } catch (e) { /* keep typing */ }
+};
+
+window._ccrRouterEdit = (key, value) => {
+  const r = window.__ccr.config.Router || (window.__ccr.config.Router = {});
+  if (key === 'longContextThreshold') {
+    const n = parseInt(value, 10);
+    if (Number.isFinite(n)) r[key] = n; else delete r[key];
+  } else {
+    if (value) r[key] = value; else delete r[key];
+  }
+};
+
+window._ccrAddBlank = () => {
+  window.__ccr.config.Providers.push({ name: '', api_base_url: '', api_key: '', models: [] });
+  renderView && renderView();
+};
+
+window._ccrInsertPreset = (i) => {
+  const p = window.__ccr.presets[i];
+  if (!p) return;
+  const row = { name: p.name, api_base_url: p.api_base_url, api_key: '', models: (p.models || []).slice() };
+  if (p.transformer) row.transformer = JSON.parse(JSON.stringify(p.transformer));
+  window.__ccr.config.Providers.push(row);
+  renderView && renderView();
+};
+
+window._ccrRemoveRow = (i) => {
+  window.__ccr.config.Providers.splice(i, 1);
+  renderView && renderView();
+};
+
+window._ccrSaveConfig = async () => {
+  try {
+    const r = await api('/api/ccr/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: window.__ccr.config }),
+    });
+    if (r && r.ok) {
+      toast(t('프로바이더 저장 완료'), 'ok');
+      if (Array.isArray(r.warnings) && r.warnings.length) {
+        toast(r.warnings.join(' · '), 'info');
+      }
+      window.__ccr.config = r.config || window.__ccr.config;
+    } else {
+      toast(t('저장 실패') + ': ' + ((r && r.error) || 'unknown'), 'err');
+    }
+  } catch (e) { toast(t('저장 실패') + ': ' + e.message, 'err'); }
+};
+
+window._ccrSvc = async (action) => {
+  const out = document.getElementById('ccrSvcOut');
+  if (out) out.textContent = '… ' + action;
+  try {
+    const r = await api('/api/ccr/service', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    if (out) out.textContent = (r && r.output) ? r.output : (r && r.error) ? r.error : '';
+    if (!r || !r.ok) toast(t('서비스 명령 실패') + ': ' + ((r && r.error) || ''), 'err');
+    setTimeout(() => _ccrRefreshStatus(), 400);
+  } catch (e) {
+    if (out) out.textContent = e.message;
+    toast(t('서비스 명령 실패') + ': ' + e.message, 'err');
+  }
+};
+
+window._ccrRefreshStatus = async () => {
+  try {
+    const s = await api('/api/ccr/status');
+    window.__ccr.status = s || {};
+    renderView && renderView();
+  } catch (e) { toast(e.message, 'err'); }
 };
 
 // ────────────────────────────────────────────────────────────────
