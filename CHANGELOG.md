@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.44.1] — 2026-04-29
+
+### 🪢 multiAssignee parallel fan-out + keyed canvas SVG diff
+
+User: "자율모드 시작." Picks up the two items v2.44.0 explicitly deferred:
+the UI surface for `ProviderRegistry.execute_parallel` (openclaw-style
+multi-provider fan-out) and the keyed-diff renderer for the workflow
+canvas.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `dist/index.html` `_wfInspectorBody` | Session/subagent inspector replaces the single assignee `<select>` with a repeating row builder. `+ 어시니 추가` appends, `−` per row removes. When `length ≥ 2` a "병렬 (N)" chip renders next to the section label. |
+| 2 | `dist/index.html` `_wfMultiAssignee*` helpers | `_wfMultiAssigneeRows / Set / Add / Remove / RowHtml`. Stored as `node.data.multiAssignee = ['claude:opus', 'openai:gpt-4.1', …]`. Back-compat: `assignee = rows[0]`; `multiAssignee = rows.length ≥ 2 ? rows : []`, so single-assignee nodes keep behaving exactly as before. |
+| 3 | `server/workflows.py::_sanitize_node` | New `multiAssignee` field on `session`/`subagent` types — same length cap as `assignee`, dedupe preserving order, hard cap at 8 (matches `execute_parallel` pool). |
+| 4 | `server/workflows.py::_execute_node` session/subagent branch | Dispatch decision: `len(multi_assignees) ≥ 2` → `get_registry().execute_parallel(...)`; else existing `execute_with_assignee(...)`. Same `AIResponse` shape downstream — cost tracking, output writing, error handling all unchanged. |
+| 5 | `dist/index.html` `_wfRenderCanvas` | Rewrote as keyed-diff renderer. New `__wf._nodeEls: Map<id, <g>>` + `__wf._nodeSnapshot: Map<id, json>`. Per render: add new ids, replace changed ids (snapshot-keyed), remove stale ids. Edges still rebuild via `innerHTML` — fewer of them and they reference live node positions. |
+| 6 | `dist/index.html` `_wfBuildNodeEl` (new) | Parses `_wfRenderNode(n)` HTML through `DOMParser` (image/svg+xml, wrapped in `<svg xmlns>` for namespace), `document.importNode`, returns the `<g.wf-node>`. |
+| 7 | `dist/index.html` `_wfNodeSnapKey` (new) | `JSON.stringify({type, title, x, y, data.assignee, data.multiAssignee})`. Selection state intentionally excluded — `_wfSyncSelectionClasses` toggles classes in-place. |
+| 8 | `dist/index.html` `_wfOpen` / `_wfUndo` | Set `__wf._forceFullCanvasRebuild = true` so the first render after load and any wholesale array swap falls back to the old `innerHTML` path. Flag self-clears after the rebuild. |
+| 9 | `tools/translations_manual_24.py` (new) | KO → EN/ZH for the 5 new inspector strings. |
+
+### Verification — handler delegation
+
+All node-level events (`mousedown`, `dblclick`, `touchstart`, `wheel`)
+are attached to the parent `<svg>#wfSvg` and resolve targets via
+`querySelector('[data-node="…"]')` / `.wf-node`. No per-element
+`addEventListener` calls on `wf-node`. Diff-rebuilt elements retain
+the `data-node` attribute set inside `_wfRenderNode`, so all
+interactions continue without re-binding. `_wfApplyRunStatus`,
+`_wfSyncSelectionClasses`, `_wfSyncMultiSelectClasses`, search
+highlight, and group collapse all use the same selector pattern.
+
+### Smoke
+```
+$ python3 -c "from server.workflows import _sanitize_node; from server.ai_providers import ProviderRegistry, get_registry; print('parallel=', hasattr(ProviderRegistry, 'execute_parallel'), 'reg=', type(get_registry()).__name__)"
+parallel= True reg= ProviderRegistry
+$ python3 -m py_compile server/workflows.py server/ai_providers.py
+$ make i18n-verify
+✓ 모든 검증 통과
+```
+
+---
 ## [2.44.0] — 2026-04-29
 
 ### 🖥️ Open ports / CLI sessions / memory monitors + workflow perf
