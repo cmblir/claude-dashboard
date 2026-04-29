@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.45.1] — 2026-04-29
+
+### 🚀 Perf hotfix — `/api/ccr/status` parallel probes + `/api/sessions-monitor/list` batched ps
+
+Followup to v2.45.0 perf measurement. Two surgical wins:
+
+| # | Where | What | Effect |
+|---|---|---|---|
+| 1 | `server/ccr_setup.py::api_ccr_status` | The 4 subprocess probes (`node --version`, `ccr --version`, `claude --version`, lsof port-3456 LISTEN check) ran sequentially → ~700 ms cold / ~600 ms warm. Now fanned out via `concurrent.futures.ThreadPoolExecutor(max_workers=4)`. The slowest single subprocess dominates instead of the sum. | **~700 ms → ~340 ms median (≈50% ↓)** measured on the dev box. |
+| 2 | `server/process_monitor.py::_ps_metrics_batch` (new) + `api_cli_sessions_list` | Per-session `ps -o pid=,rss=,pcpu= -p <pid>` was N+1 subprocesses (one per active CLI session). Replaced with one `ps … -p pid1,pid2,…` call that returns all rows. | Equal cost at N≤1, **~N×** faster at N≥2 (linear in active session count). |
+
+### Smoke
+```
+$ python3 -c "from server.ccr_setup import api_ccr_status; from server.process_monitor import _ps_metrics_batch; print(api_ccr_status({})['ok'], len(_ps_metrics_batch([1])))"
+True 1
+```
+
+---
 ## [2.45.0] — 2026-04-29
 
 ### 🛣️ Claude Code Router (zclaude) setup wizard

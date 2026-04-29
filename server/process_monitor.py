@@ -80,6 +80,33 @@ def _ps_metrics(pid: int) -> dict:
     return {"rss_bytes": rss_kb * 1024, "cpu_pct": cpu}
 
 
+def _ps_metrics_batch(pids: list) -> dict:
+    """Return {pid: {rss_bytes, cpu_pct}} for many pids via ONE ps call.
+
+    perf(v2.45.1): replaces N+1 per-pid `ps` subprocesses in
+    api_cli_sessions_list with a single comma-separated `-p` call.
+    """
+    if not pids:
+        return {}
+    arg = ",".join(str(p) for p in pids)
+    rc, out, _ = _run(["ps", "-o", "pid=,rss=,pcpu=", "-p", arg], _PS_TIMEOUT)
+    result = {}
+    if rc != 0 or not out.strip():
+        return result
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        try:
+            pid_i = int(parts[0])
+            rss_kb = int(parts[1])
+            cpu = float(parts[2])
+        except ValueError:
+            continue
+        result[pid_i] = {"rss_bytes": rss_kb * 1024, "cpu_pct": cpu}
+    return result
+
+
 def _pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
@@ -197,12 +224,14 @@ def api_cli_sessions_list(query: dict | None = None) -> dict:
     else:
         base = _scan_sessions_fallback()
     now = time.time()
+    pids = [s.get("pid") for s in base if isinstance(s.get("pid"), int)]
+    metrics_map = _ps_metrics_batch(pids)
     out = []
     for s in base:
         pid = s.get("pid")
         if not isinstance(pid, int):
             continue
-        metrics = _ps_metrics(pid)
+        metrics = metrics_map.get(pid, {"rss_bytes": 0, "cpu_pct": 0.0})
         last = _session_last_activity(s.get("sessionId"), s.get("startedAt"))
         idle = max(0, int(now - last)) if last > 0 else 0
         try:
