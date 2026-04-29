@@ -1365,6 +1365,13 @@ const NAV = [
   { id: 'team',        icon: '👨‍👩‍👧', label: '팀 / 조직',
     group: 'observe', desc: '워크스페이스 / 조직 정보 (claude.ai)', docUrl: 'https://claude.ai/settings/organization' },
   { id: 'system',      icon: '🖥️', label: '시스템 상태',       group: 'observe', docUrl: DOCS_BASE+'troubleshooting' },
+  // v2.44.0 — process / port / memory monitors
+  { id: 'openPorts',     icon: '🔌', label: '열린 포트 모니터',
+    group: 'observe', desc: 'TCP/UDP listening 소켓 + PID/Command/User · 한 번 클릭으로 프로세스 종료' },
+  { id: 'cliSessions',   icon: '🧑‍💻', label: '활성 CLI 세션',
+    group: 'observe', desc: 'Claude Code CLI 세션의 PID·RSS·CPU·idle 시간 + 터미널 포커스 / SIGTERM' },
+  { id: 'memoryManager', icon: '🧮', label: '메모리 관리',
+    group: 'observe', desc: 'vm_stat 기반 시스템 메모리 + 상위 30 프로세스 + idle Claude Code 일괄 종료' },
   { id: 'securityScan', icon: '🛡️', label: 'Security Scan',
     group: 'observe', desc: '~/.claude 정적 검사 — 시크릿 / 위험 훅 / 과도한 권한 / 신뢰 불가 MCP',
     docUrl: DOCS_BASE+'security' },
@@ -2613,6 +2620,10 @@ const __wf = {
   lastRunResults: null,
   _clipboard: [],      // 복사된 노드 배열
   _undoStack: [],      // undo 스냅샷 (최대 30)
+  // v2.44.0 — perf caches
+  _webhookSecretCache: {},     // wfId → secret (refreshed only on load/save/rotate)
+  _lastInspectedId: null,      // last selectedNodeId rendered into the inspector
+  _inspectorDirty: false,      // any inspector-relevant data changed since last render
 };
 
 const WF_NODE_TYPES = [
@@ -2855,7 +2866,9 @@ AFTER.workflows = async () => {
     await _wfOpen(__wf.workflows[0].id);
   } else if (__wf.current) {
     _wfRenderCanvas();
-    _wfRenderInspector();
+    // v2.44.0 — tab re-entry wiped the DOM; force a full render bypassing
+    // the early-exit guard.
+    _wfRenderInspector({ force: true });
     _wfUpdateToolbar();
   }
 };
@@ -4022,6 +4035,14 @@ async function _wfOpen(wfId) {
   __wf.selectedNodeId = null;
   __wf.selectedEdgeId = null;
   __wf.dirty = false;
+  // v2.44.0 — invalidate webhook-secret cache for this id on workflow load
+  // so we always fetch a fresh value on first inspector render.
+  if (__wf._webhookSecretCache) {
+    delete __wf._webhookSecretCache[wfId];
+  }
+  // v2.44.0 — reset inspector early-exit guards since selection is fresh.
+  __wf._lastInspectedId = null;
+  __wf._inspectorDirty = true;
   _wfRenderList();
   _wfRenderCanvas();
   _wfRenderInspector();
@@ -4059,7 +4080,10 @@ function _wfRepeatSet(field, value) {
   __wf.dirty = true;
   _wfUpdateToolbar();
   // 체크박스 토글 시 하위 필드가 바뀌므로 인스펙터 부분만 재렌더
-  if (field === 'enabled' || field === 'scheduleEnabled') _wfRenderInspector();
+  if (field === 'enabled' || field === 'scheduleEnabled') {
+    __wf._inspectorDirty = true;
+    _wfRenderInspector();
+  }
 }
 
 async function _wfSaveCronSchedule() {
@@ -5050,13 +5074,27 @@ function _wfSchedulePatch() {
 }
 
 // ─── 인스펙터 (우측 패널) ──────────────────────────────────
-function _wfRenderInspector() {
+// v2.44.0 — early-exit guard. The inspector is re-rendered on every
+// canvas/selection change and on every keystroke through _wfNodeSetData.
+// When neither the selected node nor any inspector-relevant data has
+// changed, repaint is wasted work. Callers that mutate node fields set
+// __wf._inspectorDirty = true before the call. Pass {force:true} to bypass.
+function _wfRenderInspector(opts) {
   const host = document.getElementById('wfInspectorBody');
   if (!host) return;
   if (!__wf.current) {
     host.innerHTML = `<div class="text-xs text-[var(--text-dim)] text-center py-8">${t('워크플로우를 선택하세요')}</div>`;
+    __wf._lastInspectedId = null;
+    __wf._inspectorDirty = false;
     return;
   }
+  if (!(opts && opts.force)
+      && __wf._lastInspectedId === __wf.selectedNodeId
+      && !__wf._inspectorDirty) {
+    return;
+  }
+  __wf._lastInspectedId = __wf.selectedNodeId;
+  __wf._inspectorDirty = false;
   // 워크플로우 메타 섹션 + 반복 실행 설정
   const rp = __wf.current.repeat || { enabled:false, maxIterations:5, intervalSeconds:0, scheduleEnabled:false, scheduleStart:'09:00', scheduleEnd:'18:00', feedbackNote:'', feedbackNodeId:'' };
   // 세션/서브에이전트 노드 목록 — 피드백 대상 선택지
@@ -5156,7 +5194,7 @@ function _wfRenderInspector() {
         const sched = __wf.current.schedule || { enabled: false, cron: '' };
         return `
           <label class="flex items-center gap-2 text-[11px] cursor-pointer select-none mb-2">
-            <input type="checkbox" ${sched.enabled?'checked':''} onchange="__wf.current.schedule = __wf.current.schedule || {enabled:false,cron:''}; __wf.current.schedule.enabled=this.checked; __wf.dirty=true; _wfRenderInspector();">
+            <input type="checkbox" ${sched.enabled?'checked':''} onchange="__wf.current.schedule = __wf.current.schedule || {enabled:false,cron:''}; __wf.current.schedule.enabled=this.checked; __wf.dirty=true; __wf._inspectorDirty=true; _wfRenderInspector();">
             <span>${t('스케줄 활성')}</span>
           </label>
           ${sched.enabled ? `
@@ -5289,23 +5327,35 @@ function _wfRenderInspector() {
 }
 
 // ─── Webhook secret 패널 (v2.23.0) ────────────────────────
+// v2.44.0 — _wfRenderInspector calls this on every keystroke. Cache the
+// secret per workflow id so we hit the server only once per load. The cache
+// is invalidated when the workflow is loaded or saved.
 async function _wfRefreshWebhookSecret() {
   if (!__wf.current) return;
   const body = document.getElementById('wfWebhookSecretBody');
   const curl = document.getElementById('wfWebhookCurl');
   if (!body) return;
+  __wf._webhookSecretCache = __wf._webhookSecretCache || {};
+  const wfId = __wf.current.id;
+  if (Object.prototype.hasOwnProperty.call(__wf._webhookSecretCache, wfId)) {
+    const cachedSec = __wf._webhookSecretCache[wfId] || '';
+    _wfRenderWebhookSecret(cachedSec);
+    if (curl) curl.textContent = _wfBuildCurlExample(wfId, cachedSec);
+    return;
+  }
   try {
     const r = await api('/api/workflows/webhook-secret', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: __wf.current.id, action: 'get' }),
+      body: JSON.stringify({ id: wfId, action: 'get' }),
     });
     if (!r || !r.ok) {
       body.innerHTML = `<span style="color:var(--danger);">${escapeHtml(r && r.error || t('오류'))}</span>`;
       return;
     }
     const sec = r.secret || '';
+    __wf._webhookSecretCache[wfId] = sec;
     _wfRenderWebhookSecret(sec);
-    if (curl) curl.textContent = _wfBuildCurlExample(__wf.current.id, sec);
+    if (curl) curl.textContent = _wfBuildCurlExample(wfId, sec);
   } catch (e) {
     body.innerHTML = `<span style="color:var(--danger);">${escapeHtml(String(e))}</span>`;
   }
@@ -5360,6 +5410,10 @@ async function _wfWebhookSecretAction(action) {
       return;
     }
     const sec = r.secret || '';
+    // v2.44.0 — keep the per-wf cache in sync so the next inspector render
+    // does not refetch.
+    __wf._webhookSecretCache = __wf._webhookSecretCache || {};
+    __wf._webhookSecretCache[__wf.current.id] = sec;
     _wfRenderWebhookSecret(sec);
     const curl = document.getElementById('wfWebhookCurl');
     if (curl) curl.textContent = _wfBuildCurlExample(__wf.current.id, sec);
@@ -5972,6 +6026,7 @@ function _wfSaveNodeEditor(winId) {
     toast(t('저장됨'), 'ok');
   }
   __wf.dirty = true;
+  __wf._inspectorDirty = true;
   _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
   _wfCloseNodeEditor(winId);
 }
@@ -6174,6 +6229,11 @@ function _wfNodeSetData(nid, field, value) {
   n.data = n.data || {};
   n.data[field] = value;
   __wf.dirty = true;
+  // v2.44.0 — inspector data changed; the early-exit guard must let the
+  // next render through. Most _wfNodeSetData callers do NOT immediately
+  // re-render the inspector (they mutate via oninput on an already-mounted
+  // input), but a handful do — guard them by marking dirty here.
+  __wf._inspectorDirty = true;
   _wfUpdateToolbar();
   if (field === 'assignee') _wfRenderCanvas();
 }
@@ -6195,6 +6255,11 @@ async function _wfSave() {
   });
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
   __wf.dirty = false;
+  // v2.44.0 — invalidate cached webhook secret for this wf so the next
+  // inspector render fetches a fresh value if it was rotated server-side.
+  if (__wf._webhookSecretCache && __wf.current && __wf.current.id) {
+    delete __wf._webhookSecretCache[__wf.current.id];
+  }
   toast(t('저장됨'), 'ok');
   // 목록 refresh
   const list = await api('/api/workflows/list');
@@ -6680,6 +6745,7 @@ async function _wfUseAsResume(sourceNid, sessionId) {
   closeModal();
   // 인스펙터 오픈
   __wf.selectedNodeId = target.id;
+  __wf._inspectorDirty = true;
   _wfRenderInspector();
 }
 
@@ -19708,6 +19774,235 @@ VIEWS.team = async () => {
       ${t('팀 멤버 목록·사용량·결제는')} <a href="https://claude.ai/settings/organization" target="_blank" style="color:var(--accent); text-decoration:underline;">claude.ai/settings/organization</a> ${t('에서 직접 관리합니다')}.
     </div>
   `;
+};
+
+// ────────────────────────────────────────────────────────────────
+// v2.44.0 — OPEN PORTS / CLI SESSIONS / MEMORY MANAGER
+// ────────────────────────────────────────────────────────────────
+
+// Shared formatter — bytes → human-readable. Local to this region; no global leak.
+function _pmFmtBytes(b) {
+  if (!b || b < 0) return '—';
+  if (b < 1024) return b + ' B';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1024 * 1024 * 1024) return (b / (1024 * 1024)).toFixed(1) + ' MB';
+  return (b / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+function _pmFmtIdle(sec) {
+  if (sec == null || sec < 0) return '—';
+  if (sec < 60) return sec + 's';
+  if (sec < 3600) return Math.floor(sec / 60) + 'm';
+  return Math.floor(sec / 3600) + 'h ' + Math.floor((sec % 3600) / 60) + 'm';
+}
+async function _pmKillPid(pid, sigName) {
+  if (!confirm(t('정말 이 프로세스를 종료하시겠습니까?') + ' PID ' + pid + ' (' + sigName + ')')) return;
+  try {
+    const r = await api('/api/process/kill', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pid: pid, signal: sigName }),
+    });
+    if (r && r.ok) {
+      toast(t('프로세스를 종료했습니다') + ' · PID ' + pid, 'ok');
+      setTimeout(() => renderView && renderView(), 600);
+    } else {
+      toast(t('종료 실패') + ': ' + (r && r.error ? r.error : 'unknown'), 'err');
+    }
+  } catch (e) { toast(t('종료 실패') + ': ' + e.message, 'err'); }
+}
+
+VIEWS.openPorts = async () => {
+  const r = await api('/api/ports/list');
+  if (!r || !r.ok) {
+    return `
+      ${viewHeader('열린 포트 모니터', 'TCP/UDP listening 소켓 모니터링', 'openPorts')}
+      <div class="card p-6 text-sm text-[var(--text-mute)]">
+        ${t('포트 정보를 불러올 수 없습니다')}: ${escapeHtml((r && r.error) || 'unknown')}
+      </div>`;
+  }
+  const ports = r.ports || [];
+  return `
+    ${viewHeader('열린 포트 모니터', 'TCP/UDP listening 소켓 모니터링', 'openPorts')}
+    <div class="card p-5">
+      <h3 class="font-semibold text-sm mb-3">🔌 ${t('열린 포트')} (${ports.length})</h3>
+      ${ports.length ? `
+        <div style="overflow-x:auto;">
+          <table class="data">
+            <thead><tr>
+              <th>${t('포트')}</th><th>${t('프로토콜')}</th><th>PID</th>
+              <th>${t('명령')}</th><th>${t('사용자')}</th><th>${t('상태')}</th>
+              <th class="text-right">${t('작업')}</th>
+            </tr></thead>
+            <tbody>
+              ${ports.map(p => `
+                <tr>
+                  <td class="mono text-xs">${escapeHtml(p.local_addr || '*')}:${p.local_port}</td>
+                  <td class="text-xs"><span class="chip">${escapeHtml((p.proto || '').toUpperCase())}</span></td>
+                  <td class="mono text-xs">${p.pid}</td>
+                  <td class="text-xs">${escapeHtml(p.command || '')}</td>
+                  <td class="text-xs text-[var(--text-mute)]">${escapeHtml(p.user || '')}</td>
+                  <td class="text-xs text-[var(--text-mute)]">${escapeHtml(p.state || '')}</td>
+                  <td class="text-right"><button class="btn text-xs" onclick="_pmKillPid(${p.pid}, 'SIGTERM')">${t('종료')}</button></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : `<div class="empty text-sm">${t('열린 포트가 없습니다')}</div>`}
+    </div>`;
+};
+
+VIEWS.cliSessions = async () => {
+  const r = await api('/api/sessions-monitor/list');
+  if (!r || !r.ok) {
+    return `
+      ${viewHeader('활성 CLI 세션', 'Claude Code CLI 세션 모니터링', 'cliSessions')}
+      <div class="card p-6 text-sm text-[var(--text-mute)]">
+        ${t('세션 정보를 불러올 수 없습니다')}
+      </div>`;
+  }
+  const sess = r.sessions || [];
+  return `
+    ${viewHeader('활성 CLI 세션', 'Claude Code CLI 세션 모니터링', 'cliSessions')}
+    <div class="card p-5">
+      <h3 class="font-semibold text-sm mb-3">🧑‍💻 ${t('활성 CLI 세션')} (${sess.length})</h3>
+      ${sess.length ? `
+        <div style="overflow-x:auto;">
+          <table class="data">
+            <thead><tr>
+              <th>${t('세션')}</th><th>PID</th><th>cwd</th>
+              <th>RSS</th><th>${t('유휴')}</th><th>${t('터미널')}</th>
+              <th class="text-right">${t('작업')}</th>
+            </tr></thead>
+            <tbody>
+              ${sess.map(s => `
+                <tr>
+                  <td class="mono text-[10px]">${escapeHtml((s.sessionId || '').slice(0, 8))}</td>
+                  <td class="mono text-xs">${s.pid}</td>
+                  <td class="mono text-[10px] text-[var(--text-mute)] truncate" style="max-width:280px;">${escapeHtml(s.cwd || '')}</td>
+                  <td class="mono text-xs">${_pmFmtBytes(s.rss_bytes)}</td>
+                  <td class="text-xs">${_pmFmtIdle(s.idle_seconds)}</td>
+                  <td class="text-xs text-[var(--text-mute)]">${escapeHtml(s.terminal_app || '—')}</td>
+                  <td class="text-right">
+                    <button class="btn text-xs" onclick="_pmOpenSessTerm('${escapeHtml(s.sessionId || '')}')">${t('터미널 열기')}</button>
+                    <button class="btn text-xs" onclick="_pmKillPid(${s.pid}, 'SIGTERM')">${t('종료')}</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : `<div class="empty text-sm">${t('활성 CLI 세션이 없습니다')}</div>`}
+    </div>`;
+};
+
+async function _pmOpenSessTerm(sid) {
+  try {
+    const r = await api('/api/sessions-monitor/open-terminal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid }),
+    });
+    if (r && r.ok) toast(t('터미널을 활성화했습니다'), 'ok');
+    else toast(t('터미널 열기 실패') + ': ' + (r && r.error ? r.error : 'unknown'), 'err');
+  } catch (e) { toast(t('터미널 열기 실패') + ': ' + e.message, 'err'); }
+}
+
+async function _pmKillIdle() {
+  if (!confirm(t('idle 상태인 모든 Claude Code 세션을 종료하시겠습니까?'))) return;
+  try {
+    const r = await api('/api/memory/kill-idle-claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ thresholdSec: 600 }),
+    });
+    if (r && r.ok) {
+      toast(t('일괄 종료 완료') + ': ' + (r.killed || []).length + ' / ' + t('건'), 'ok');
+      setTimeout(() => renderView && renderView(), 600);
+    } else {
+      toast(t('일괄 종료 실패') + ': ' + (r && r.error ? r.error : 'unknown'), 'err');
+    }
+  } catch (e) { toast(t('일괄 종료 실패') + ': ' + e.message, 'err'); }
+}
+
+VIEWS.memoryManager = async () => {
+  const r = await api('/api/memory/snapshot');
+  if (!r || !r.ok) {
+    return `
+      ${viewHeader('메모리 관리', '시스템 메모리 + 상위 프로세스', 'memoryManager')}
+      <div class="card p-6 text-sm text-[var(--text-mute)]">${t('메모리 정보를 불러올 수 없습니다')}</div>`;
+  }
+  const m = r.memory || {};
+  const top = r.topProcesses || [];
+  const idleCount = r.idleClaudeCodeCount || 0;
+  const total = m.total_bytes || 1;
+  const used = m.used_bytes || 0;
+  const free = m.free_bytes || 0;
+  const usedPct = Math.min(100, Math.round((used / total) * 100));
+  const freePct = Math.min(100, Math.round((free / total) * 100));
+  const swapTotal = m.swap_total_bytes || 0;
+  const swapUsed = m.swap_used_bytes || 0;
+  const swapPct = swapTotal > 0 ? Math.round((swapUsed / swapTotal) * 100) : 0;
+  const bar = (label, valueText, pct, color) => `
+    <div class="mb-3">
+      <div class="flex items-center justify-between text-xs mb-1">
+        <span class="text-[var(--text-mute)]">${escapeHtml(label)}</span>
+        <span class="mono">${escapeHtml(valueText)} · ${pct}%</span>
+      </div>
+      <div style="height:8px;background:var(--card-2,rgba(255,255,255,0.06));border-radius:4px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:${color};transition:width 200ms;"></div>
+      </div>
+    </div>`;
+  return `
+    ${viewHeader('메모리 관리', '시스템 메모리 + 상위 프로세스', 'memoryManager')}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div class="card p-5">
+        <h3 class="font-semibold text-sm mb-3">🧮 ${t('시스템 메모리')}</h3>
+        ${bar(t('사용 중'), _pmFmtBytes(used) + ' / ' + _pmFmtBytes(total), usedPct, 'var(--accent, #6aa6ff)')}
+        ${bar(t('여유'), _pmFmtBytes(free), freePct, 'var(--ok, #5cc97a)')}
+        ${swapTotal > 0 ? bar(t('스왑'), _pmFmtBytes(swapUsed) + ' / ' + _pmFmtBytes(swapTotal), swapPct, 'var(--warn, #d6a45c)') : ''}
+        <div class="text-[10px] text-[var(--text-dim)] mt-2 mono">
+          active=${_pmFmtBytes(m.active_bytes)} · wired=${_pmFmtBytes(m.wired_bytes)} · compressed=${_pmFmtBytes(m.compressed_bytes)}
+        </div>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-semibold text-sm mb-3">🧹 ${t('idle Claude Code 정리')}</h3>
+        <div class="text-sm mb-3">
+          ${t('idle 600초 이상 세션')}: <b class="mono">${idleCount}</b>
+        </div>
+        <button class="btn-primary btn text-xs" style="padding:0.5rem 0.9rem;" onclick="_pmKillIdle()">
+          🧹 ${t('idle Claude Code 일괄 종료')}
+        </button>
+        <div class="text-[10px] text-[var(--text-dim)] mt-2">
+          ${t('SIGTERM 으로 안전하게 종료합니다. 시스템 PID(<500) 는 보호됩니다.')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-5">
+      <h3 class="font-semibold text-sm mb-3">📊 ${t('상위 30 프로세스')}</h3>
+      <div style="overflow-x:auto;">
+        <table class="data">
+          <thead><tr>
+            <th>PID</th><th>${t('명령')}</th>
+            <th class="text-right">RSS</th><th class="text-right">CPU%</th>
+            <th class="text-right">${t('작업')}</th>
+          </tr></thead>
+          <tbody>
+            ${top.map(p => `
+              <tr ${p.isClaudeCode ? 'style="background:rgba(106,166,255,0.08);"' : ''}>
+                <td class="mono text-xs">${p.pid}</td>
+                <td class="text-xs">${p.isClaudeCode ? '🟦 ' : ''}${escapeHtml(p.command || '')}</td>
+                <td class="mono text-xs text-right">${_pmFmtBytes(p.rss_bytes)}</td>
+                <td class="mono text-xs text-right">${(p.cpu_pct || 0).toFixed(1)}</td>
+                <td class="text-right"><button class="btn text-xs" onclick="_pmKillPid(${p.pid}, 'SIGTERM')">${t('종료')}</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
 };
 
 // ────────────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -1595,6 +1596,79 @@ class ProviderRegistry:
             "available": [p.provider_id for p in self.available_providers()],
             "fallbackChain": self._fallback_chain,
         }
+
+    def execute_parallel(
+        self,
+        assignees: list[str],
+        prompt: str,
+        **kwargs,
+    ) -> AIResponse:
+        """Race the same prompt across multiple assignees and return the
+        first successful response.
+
+        v2.44.0 — backend-only skeleton. Wired into workflow nodes in a later
+        release (v2.44.1); for now this is a public API that callers can use
+        ad hoc.
+
+        Each assignee follows the same ``provider:model`` syntax accepted by
+        :func:`execute_with_assignee` (e.g. ``"claude:opus"``,
+        ``"openai:gpt-4.1"``). Submissions run on a dedicated
+        ``ThreadPoolExecutor`` sized to ``min(len(assignees), 8)``. The first
+        future whose result has ``status == "ok"`` wins; the remaining
+        futures are cancelled (already-running ones cannot be interrupted but
+        their results are discarded).
+
+        Returns an :class:`AIResponse` shaped exactly like the value returned
+        by :func:`execute_with_assignee`, so call sites can swap one for the
+        other transparently.
+
+        Behavior:
+            - Empty/invalid ``assignees`` → an err AIResponse, no providers
+              tried.
+            - All assignees fail → the most recently observed err response
+              is returned.
+            - Per-task ``**kwargs`` are forwarded to
+              :func:`execute_with_assignee` (``system_prompt``, ``cwd``,
+              ``timeout``, ``extra``, ``fallback``).
+        """
+        clean = [a for a in (assignees or []) if isinstance(a, str) and a.strip()]
+        if not clean:
+            return AIResponse(
+                status="err",
+                error="execute_parallel: no assignees provided",
+                provider="",
+            )
+        max_w = min(len(clean), 8)
+        last_err: Optional[AIResponse] = None
+        with ThreadPoolExecutor(max_workers=max_w) as pool:
+            futures = {
+                pool.submit(execute_with_assignee, a, prompt, **kwargs): a
+                for a in clean
+            }
+            for fut in as_completed(futures):
+                try:
+                    resp = fut.result()
+                except Exception as e:
+                    resp = AIResponse(
+                        status="err",
+                        error=f"execute_parallel: {e}",
+                        provider=futures[fut],
+                    )
+                if getattr(resp, "status", "err") == "ok":
+                    # Cancel any in-flight siblings; ones already running
+                    # cannot be interrupted but their results are dropped.
+                    for other in futures:
+                        if other is not fut and not other.done():
+                            other.cancel()
+                    return resp
+                last_err = resp
+        if last_err is not None:
+            return last_err
+        return AIResponse(
+            status="err",
+            error="execute_parallel: all assignees failed",
+            provider="",
+        )
 
 
 # ───────── 글로벌 레지스트리 (lazy init) ─────────

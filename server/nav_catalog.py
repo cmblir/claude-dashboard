@@ -247,6 +247,14 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         ["팀", "조직"]),
     ("system",        "system",   "시스템 상태 · 디바이스 정보",
         ["시스템 상태", "디바이스"]),
+
+    # v2.44.0 — process / port / memory monitors
+    ("openPorts",     "system",   "열린 포트 모니터 — TCP/UDP listening 소켓 + PID/Command/User · 한 번 클릭으로 프로세스 종료",
+        ["포트", "port", "lsof", "listening", "tcp", "udp", "열린 포트"]),
+    ("cliSessions",   "system",   "활성 CLI 세션 — Claude Code CLI 세션의 PID·RSS·CPU·idle 시간 + 터미널 포커스 / SIGTERM",
+        ["cli 세션", "active session", "claude cli", "활성 세션", "rss", "idle", "유휴"]),
+    ("memoryManager", "system",   "메모리 관리 — vm_stat 기반 시스템 메모리 + 상위 30 프로세스 + idle Claude Code 일괄 종료",
+        ["메모리", "memory", "vm_stat", "swap", "스왑", "메모리 관리", "kill idle"]),
 ]
 
 
@@ -330,6 +338,12 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
     "homunculus": {"en": "Homunculus project tracker", "zh": "Homunculus 项目追踪"},
     "team": {"en": "Team / Organization info", "zh": "团队 / 组织信息"},
     "system": {"en": "System status / Device info", "zh": "系统状态 / 设备信息"},
+    "openPorts": {"en": "Open Ports Monitor — TCP/UDP listening sockets with PID/command/user; one-click kill",
+                  "zh": "开放端口监控 — TCP/UDP 监听套接字（含 PID/命令/用户），一键终止进程"},
+    "cliSessions": {"en": "Active CLI Sessions — Claude Code CLI session PID/RSS/CPU/idle; focus terminal or SIGTERM",
+                    "zh": "活跃 CLI 会话 — Claude Code CLI 会话 PID/RSS/CPU/空闲；聚焦终端或 SIGTERM"},
+    "memoryManager": {"en": "Memory Manager — system memory via vm_stat + top 30 processes + bulk-kill idle Claude Code",
+                      "zh": "内存管理 — 基于 vm_stat 的系统内存 + 前 30 进程 + 批量终止空闲 Claude Code"},
 }
 
 
