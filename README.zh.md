@@ -27,6 +27,7 @@ LazyClaude 是一款**本地优先的指挥中心**，统一管理你的整个 `
 
 | 版本 | 重点 |
 |---|---|
+| **v2.44.0** | 🖥️ **开放端口 / CLI 会话 / 内存监视器 + 工作流性能** — `observe` 分组新增 3 个标签：基于 `lsof` 的 TCP/UDP 监听端口 + 绑定进程 + 一键终止（`pid<500` / 自身 pid 守卫）；活动 Claude Code/CLI 会话 + RSS/空闲时间 + "打开终端" + 终止；内存快照（总/用/空闲/交换进度条）+ Top-30 RSS 表 + "批量终止空闲 Claude Code" 扫描。工作流引擎：并行 worker 4 → `min(32, cpu*2)`，拖拽补丁绕过完整 sanitize，拓扑排序记忆化，per-node 状态写入移至内存 `_RUNS_CACHE`（仅在边界写盘）。新增 openclaw 风格的后端 `execute_parallel`（首个成功），UI 接线留至 v2.44.1。检查器在选择未变更时 early-exit，webhook secret 按工作流缓存。 |
 | **v2.43.2** | 📊 **按项目/会话的 token 钻取** — 使用量标签的"按项目统计 token"原本仅显示 TOP 20 只读行。现在所有项目都以可滚动、**可点击**的列表呈现。点击行 → 弹窗显示该项目的 token 总计（输入/输出/缓存分项）、按 token 排序的会话表格、工具/代理分布条、按日期的时间线。每行会话点击跳转到现有的会话详情弹窗。新增 `GET /api/usage/project?cwd=...`（`$HOME` 沙箱）。 |
 | **v2.43.1** | 🚀 **性能 — 工作流画布 + 技能/命令列表** — 技能/命令标签每次访问都要扫描+解析 1.4 MB（816 ms / 1116 ms），首屏被阻塞。现在后端 TTL+mtime 缓存，warm 访问提速 ~22× / ~31×。工作流画布拖拽时 `_wfRenderMinimap` 在每次 mousemove（~100/s）同步触发并执行 O(N×E) edge 查找 — 现合并到每帧 1 次 rAF，拖拽期间使用缓存 Map 将查找降至 O(deg)。 |
 | **v2.43.0** | 🛠️ **设置助手 — 全局 ↔ 项目范围** — CLAUDE.md / Settings / 技能 / 命令 / 钩子 等所有设置标签新增 🌐 全局 / 📁 项目 切换 + 项目选择器。项目模式读写 `<cwd>/CLAUDE.md` · `<cwd>/.claude/settings.json` · `<cwd>/.claude/settings.local.json` (建议加入 gitignore 的个人覆盖) · `<cwd>/.claude/skills/<id>/SKILL.md` · `<cwd>/.claude/commands/**/*.md`。新增 14 个端点，全部沙箱在 `$HOME` 下，权限规则通过现有全局 sanitize 流程。 |

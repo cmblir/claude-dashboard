@@ -10,6 +10,45 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.44.0] — 2026-04-29
+
+### 🖥️ Open ports / CLI sessions / memory monitors + workflow perf
+
+User: "현재 PC에 열려있는 포트 / 열려있는 CLI 세션 / 메모리를 보고 필요하면
+바로 kill하고 싶어. 그리고 워크플로우가 너무 느리고 다중 AI를 openclaw처럼
+병렬로 못 돌리고 있어 — 최적화해줘." Three new `observe` tabs to surface
+host-process state, plus a sweep of workflow-engine and canvas optimizations.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/process_monitor.py` (new) | Stdlib-only module. `lsof -nP -iTCP -sTCP:LISTEN` + `lsof -nP -iUDP` parser; `~/.claude/sessions/*.json` + `os.kill(pid,0)` liveness; macOS `vm_stat` / `sysctl hw.memsize` / `sysctl vm.swapusage` snapshot; `ps -axo` for top-30 RSS with Claude-Code detection. |
+| 2 | `server/process_monitor.py::api_process_kill` | Hard guards: `pid != os.getpid()`, `pid >= 500`, signal whitelist `{SIGTERM, SIGKILL}`, alive-check, `PermissionError` surfaced as 403. |
+| 3 | `server/process_monitor.py::api_kill_idle_claude` | Bulk SIGTERM all CLI sessions whose `idle_seconds > thresholdSec` (default 600). Same guards per pid. |
+| 4 | `server/process_monitor.py::api_session_open_terminal` | Wraps existing `actions.open_session_action` (Terminal.app / iTerm2 / Warp focus). |
+| 5 | `server/routes.py` | Registers 6 endpoints: `GET /api/ports/list`, `/api/sessions-monitor/list`, `/api/memory/snapshot`; `POST /api/process/kill`, `/api/sessions-monitor/open-terminal`, `/api/memory/kill-idle-claude`. |
+| 6 | `server/nav_catalog.py` + `dist/index.html` `VIEWS.openPorts` / `cliSessions` / `memoryManager` | Three new tabs under `observe`. Style mirrored from `VIEWS.system`. Memory tab shows total/used/free/swap progress bars, "Idle Claude Code 일괄 종료" button, top-30 RSS table with Claude-Code rows highlighted. |
+| 7 | `server/workflows.py` `_MAX_PARALLEL_WORKERS` | 4 → `max(8, min(32, cpu_count()*2))` (16 on 8-core). Env override (`WORKFLOW_MAX_PARALLEL`) preserved. |
+| 8 | `server/workflows.py::api_workflow_patch` + `_is_position_only_patch` | Drag-debounced position/viewport patches no longer re-run full `_sanitize_workflow`; `math.isfinite` whitelist + in-place node mutation only. |
+| 9 | `server/workflows.py` `_TOPO_ORDER_CACHE` / `_TOPO_LEVELS_CACHE` | Memoized topological sort keyed by graph shape. FIFO 256-entry soft cap. |
+| 10 | `server/workflows.py` `_RUNS_CACHE` + `_persist_run` | Per-node status updates inside `_run_one_iteration` mutate an in-memory cache under `_RUNS_LOCK`; disk-write only at iteration boundary / terminal failure / completion. SSE `_run_status_snapshot` reads cache first. Drops per-run JSON round-trips from O(N) to O(L). |
+| 11 | `server/ai_providers.py::ProviderRegistry.execute_parallel` (new) | Backend-only openclaw-style fan-out: `ThreadPoolExecutor(min(len, 8))` + `as_completed` first-ok with `future.cancel()` on the rest. UI wiring deferred to v2.44.1. |
+| 12 | `dist/index.html` `__wf._webhookSecretCache` | Webhook secret cached per-`workflowId`; `_wfRefreshWebhookSecret` no longer POSTs on every node click. |
+| 13 | `dist/index.html::_wfRenderInspector` | Early-exit guard when `selectedNodeId` unchanged and `_inspectorDirty === false`. All node-data mutators set the dirty flag before re-rendering. |
+| 14 | `tools/translations_manual_23.py` (new) | KO → EN/ZH for 30+ new strings (port headers, CLI columns, memory bars, kill confirms, idle threshold). |
+
+### Skipped / deferred
+- **Keyed canvas SVG patch**: full DOM-element diff for `_wfRenderCanvas` exceeded the low-risk budget — would require re-attaching every drag/connect/double-click handler. B4/B7 already remove the dominant cost.
+- **`execute_parallel` UI wiring**: needs a `multiAssignee[]` field in the inspector + form — landing in v2.44.1.
+
+### Smoke
+```
+$ python3 -c "from server.workflows import _MAX_PARALLEL_WORKERS; from server.process_monitor import api_ports_list, api_memory_snapshot, api_cli_sessions_list; from server.ai_providers import ProviderRegistry; print(_MAX_PARALLEL_WORKERS, api_ports_list({}).get('ok'), api_memory_snapshot({}).get('ok'), api_cli_sessions_list({}).get('ok'), hasattr(ProviderRegistry, 'execute_parallel'))"
+16 True True True True
+$ make i18n-verify
+✓ 모든 검증 통과
+```
+
+---
 ## [2.43.2] — 2026-04-28
 
 ### 📊 Project / session token usage drill-down

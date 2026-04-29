@@ -52,6 +52,81 @@ _DEFAULT_TOTAL_TIMEOUT = int(os.environ.get("WORKFLOW_TOTAL_TIMEOUT", "1800"))
 # Run 엔진용 동시성 — 서버 프로세스 안에서 run 을 돌려야 하므로 lock 필요
 _LOCK = threading.Lock()
 
+# v2.44.0 — In-memory cache of live run state. Per-node status/result updates
+# during a run mutate this dict instead of rewriting the entire
+# ~/.claude-dashboard-workflows.json on every transition. We persist to disk
+# only at iteration boundaries, on full-run completion, and on explicit
+# cancel. SSE/poll snapshots read from this cache first; on process restart
+# the cache is empty (no live runs survive restart anyway), so reads
+# transparently fall back to the on-disk store.
+_RUNS_CACHE: dict[str, dict] = {}
+_RUNS_LOCK = threading.Lock()
+
+
+def _runs_cache_set(runId: str, run: dict) -> None:
+    """Insert/replace the in-memory run entry."""
+    with _RUNS_LOCK:
+        _RUNS_CACHE[runId] = run
+
+
+def _runs_cache_get(runId: str) -> Optional[dict]:
+    """Return a defensive copy of the cached run entry, or None."""
+    with _RUNS_LOCK:
+        r = _RUNS_CACHE.get(runId)
+        if r is None:
+            return None
+        # Shallow copy + copy nodeResults dict so callers can serialize
+        # without holding the lock.
+        out = dict(r)
+        nr = r.get("nodeResults")
+        if isinstance(nr, dict):
+            out["nodeResults"] = dict(nr)
+        return out
+
+
+def _runs_cache_update(runId: str, mutator) -> Optional[dict]:
+    """Apply `mutator(run_dict)` under _RUNS_LOCK. Returns the post-mutation
+    snapshot (defensive copy) or None if runId not cached."""
+    with _RUNS_LOCK:
+        r = _RUNS_CACHE.get(runId)
+        if r is None:
+            return None
+        mutator(r)
+        out = dict(r)
+        nr = r.get("nodeResults")
+        if isinstance(nr, dict):
+            out["nodeResults"] = dict(nr)
+        return out
+
+
+def _runs_cache_pop(runId: str) -> Optional[dict]:
+    """Remove and return the cached run entry. Used after persisting on
+    completion so memory is reclaimed."""
+    with _RUNS_LOCK:
+        return _RUNS_CACHE.pop(runId, None)
+
+
+def _persist_run(runId: str) -> None:
+    """Flush the cached run dict to the on-disk store under _LOCK.
+
+    Safe to call repeatedly; no-op if the run is not in cache. We deliberately
+    take _RUNS_LOCK only briefly to copy, then take _LOCK for the file I/O,
+    to avoid holding both locks across a synchronous fsync.
+    """
+    with _RUNS_LOCK:
+        cached = _RUNS_CACHE.get(runId)
+        if cached is None:
+            return
+        snap = dict(cached)
+        nr = cached.get("nodeResults")
+        if isinstance(nr, dict):
+            snap["nodeResults"] = dict(nr)
+    with _LOCK:
+        store = _load_all()
+        store.setdefault("runs", {})
+        store["runs"][runId] = snap
+        _dump_all(store)
+
 
 # ───────── 영속 ─────────
 
@@ -490,8 +565,40 @@ def _check_dag(nodes: list[dict], edges: list[dict]) -> list[str]:
     return []
 
 
+# v2.44.0 — memoize topological sort. The same workflow's DAG is sorted on
+# every iteration of every run; for repeating workflows this is wasted work.
+# Cache key is graph-shape based, so any node/edge mutation invalidates
+# automatically. Soft cap at 256 with FIFO eviction to bound memory.
+_TOPO_CACHE_MAX = 256
+_TOPO_ORDER_CACHE: dict[tuple, tuple[str, ...]] = {}
+_TOPO_LEVELS_CACHE: dict[tuple, tuple[tuple[str, ...], ...]] = {}
+_TOPO_CACHE_LOCK = threading.Lock()
+
+
+def _topo_cache_key(nodes: list[dict], edges: list[dict]) -> tuple:
+    return (
+        tuple(sorted(n["id"] for n in nodes)),
+        tuple(sorted((e["from"], e["to"]) for e in edges)),
+    )
+
+
+def _topo_cache_evict(cache: dict) -> None:
+    # FIFO: drop oldest insertion(s) until under the cap.
+    while len(cache) > _TOPO_CACHE_MAX:
+        try:
+            first_key = next(iter(cache))
+        except StopIteration:
+            return
+        cache.pop(first_key, None)
+
+
 def _topological_order(nodes: list[dict], edges: list[dict]) -> list[str]:
     """사이클 없다고 가정. Kahn's 결과 순서 반환."""
+    key = _topo_cache_key(nodes, edges)
+    with _TOPO_CACHE_LOCK:
+        cached = _TOPO_ORDER_CACHE.get(key)
+    if cached is not None:
+        return list(cached)
     ids = [n["id"] for n in nodes]
     adj: dict[str, list[str]] = defaultdict(list)
     indeg: dict[str, int] = {nid: 0 for nid in ids}
@@ -507,6 +614,9 @@ def _topological_order(nodes: list[dict], edges: list[dict]) -> list[str]:
             indeg[v] -= 1
             if indeg[v] == 0:
                 q.append(v)
+    with _TOPO_CACHE_LOCK:
+        _TOPO_ORDER_CACHE[key] = tuple(order)
+        _topo_cache_evict(_TOPO_ORDER_CACHE)
     return order
 
 
@@ -515,6 +625,11 @@ def _topological_levels(nodes: list[dict], edges: list[dict]) -> list[list[str]]
 
     반환: [[level0_ids], [level1_ids], ...] 각 level 내 노드는 서로 의존 없음.
     """
+    key = _topo_cache_key(nodes, edges)
+    with _TOPO_CACHE_LOCK:
+        cached = _TOPO_LEVELS_CACHE.get(key)
+    if cached is not None:
+        return [list(level) for level in cached]
     ids = [n["id"] for n in nodes]
     adj: dict[str, list[str]] = defaultdict(list)
     indeg: dict[str, int] = {nid: 0 for nid in ids}
@@ -534,6 +649,9 @@ def _topological_levels(nodes: list[dict], edges: list[dict]) -> list[list[str]]
                 if indeg[v] == 0:
                     next_q.append(v)
         q = next_q
+    with _TOPO_CACHE_LOCK:
+        _TOPO_LEVELS_CACHE[key] = tuple(tuple(lv) for lv in levels)
+        _topo_cache_evict(_TOPO_LEVELS_CACHE)
     return levels
 
 
@@ -652,8 +770,50 @@ def api_workflow_save(body: dict) -> dict:
     return {"ok": True, "id": wfId, "updatedAt": now, "created": is_new}
 
 
+def _is_position_only_patch(patch: dict) -> bool:
+    """True if `patch` only mutates node coordinates and/or viewport.
+
+    Position/viewport-only patches are the high-frequency case (drag, pan,
+    zoom). They take a fast path that touches existing in-memory nodes by id
+    instead of re-running the full _sanitize_workflow over every field.
+    """
+    if not isinstance(patch, dict):
+        return False
+    allowed_top = {"nodes", "viewport"}
+    if not patch:
+        return False
+    if any(k not in allowed_top for k in patch.keys()):
+        return False
+    nodes = patch.get("nodes")
+    if nodes is not None:
+        if not isinstance(nodes, list):
+            return False
+        for pn in nodes:
+            if not isinstance(pn, dict):
+                return False
+            # Only id + x/y allowed in position-only mode.
+            if any(k not in ("id", "x", "y") for k in pn.keys()):
+                return False
+            if "id" not in pn:
+                return False
+    vp = patch.get("viewport")
+    if vp is not None:
+        if not isinstance(vp, dict):
+            return False
+        if any(k not in ("panX", "panY", "zoom") for k in vp.keys()):
+            return False
+    return True
+
+
 def api_workflow_patch(body: dict) -> dict:
-    """부분 업데이트 — 노드 좌표 드래그 같은 고빈도 호출용. patch 는 키 단위 덮어쓰기."""
+    """부분 업데이트 — 노드 좌표 드래그 같은 고빈도 호출용. patch 는 키 단위 덮어쓰기.
+
+    v2.44.0 — fast path for position/viewport-only patches: validate with
+    isfinite checks and apply in place by id. We never re-run the full
+    `_sanitize_workflow` here, since drag/pan dispatches dozens of these per
+    second. Other patch shapes (name/description/etc.) keep the existing
+    in-place merge path below.
+    """
     if not isinstance(body, dict):
         return {"ok": False, "error": "bad body"}
     wfId = body.get("id")
@@ -663,6 +823,58 @@ def api_workflow_patch(body: dict) -> dict:
     if not isinstance(patch, dict):
         return {"ok": False, "error": "invalid patch"}
     now = int(time.time() * 1000)
+
+    # Position/viewport-only fast path: skip full sanitize, validate finite numbers.
+    if _is_position_only_patch(patch):
+        import math
+        with _LOCK:
+            store = _load_all()
+            wf = store["workflows"].get(wfId)
+            if not wf:
+                return {"ok": False, "error": "not found"}
+            existing = {n["id"]: n for n in wf.get("nodes", []) if isinstance(n, dict)}
+            for pn in patch.get("nodes") or []:
+                nid = pn.get("id")
+                if not isinstance(nid, str) or nid not in existing:
+                    continue
+                if "x" in pn:
+                    try:
+                        xv = float(pn["x"])
+                        if math.isfinite(xv):
+                            existing[nid]["x"] = xv
+                    except (TypeError, ValueError):
+                        pass
+                if "y" in pn:
+                    try:
+                        yv = float(pn["y"])
+                        if math.isfinite(yv):
+                            existing[nid]["y"] = yv
+                    except (TypeError, ValueError):
+                        pass
+            if "viewport" in patch and isinstance(patch["viewport"], dict):
+                vp = wf.get("viewport") or {"panX": 0, "panY": 0, "zoom": 1}
+                pvp = patch["viewport"]
+                for k in ("panX", "panY"):
+                    if k in pvp:
+                        try:
+                            v = float(pvp[k])
+                            if math.isfinite(v):
+                                vp[k] = v
+                        except (TypeError, ValueError):
+                            pass
+                if "zoom" in pvp:
+                    try:
+                        z = float(pvp["zoom"])
+                        if math.isfinite(z):
+                            vp["zoom"] = max(0.25, min(3.0, z))
+                    except (TypeError, ValueError):
+                        pass
+                wf["viewport"] = vp
+            wf["updatedAt"] = now
+            _dump_all(store)
+        return {"ok": True, "id": wfId, "updatedAt": now}
+
+    # Generic patch path (data field changes, name/description, etc.).
     with _LOCK:
         store = _load_all()
         wf = store["workflows"].get(wfId)
@@ -810,6 +1022,13 @@ def api_workflow_node_clipboard(body: dict) -> dict:
 # ───────── Run 엔진 ─────────
 
 def _run_status_snapshot(runId: str) -> dict:
+    # v2.44.0 — prefer the in-memory cache (live runs) to avoid rereading
+    # ~/.claude-dashboard-workflows.json on every SSE/poll tick. Falls back
+    # to disk for completed runs (cache is dropped on completion) and for
+    # any run that started before a process restart.
+    cached = _runs_cache_get(runId)
+    if cached is not None:
+        return {"ok": True, "run": cached}
     store = _load_all()
     r = store["runs"].get(runId)
     if not r:
@@ -1528,27 +1747,29 @@ def _execute_subworkflow_node(data: dict, inputs: list[str], _elapsed) -> dict:
 
     # 동기 실행 (별도 runId 없이 inline)
     sub_run_id = _new_run_id()
+    sub_entry = {
+        "id": sub_run_id, "workflowId": wf_id,
+        "status": "running", "startedAt": int(time.time() * 1000),
+        "finishedAt": 0, "currentNodeId": None,
+        "nodeResults": {}, "iteration": 0, "error": None,
+        "isSubworkflow": True,
+    }
     with _LOCK:
         store = _load_all()
-        store["runs"][sub_run_id] = {
-            "id": sub_run_id, "workflowId": wf_id,
-            "status": "running", "startedAt": int(time.time() * 1000),
-            "finishedAt": 0, "currentNodeId": None,
-            "nodeResults": {}, "iteration": 0, "error": None,
-            "isSubworkflow": True,
-        }
+        store["runs"][sub_run_id] = sub_entry
         _dump_all(store)
+    _runs_cache_set(sub_run_id, dict(sub_entry))
 
     ok, _results, final_out = _run_one_iteration(
         sub_wf, sub_run_id, 0, extra_inputs)
 
-    # 완료 기록
-    with _LOCK:
-        store = _load_all()
-        if sub_run_id in store["runs"]:
-            store["runs"][sub_run_id]["status"] = "ok" if ok else "err"
-            store["runs"][sub_run_id]["finishedAt"] = int(time.time() * 1000)
-            _dump_all(store)
+    # 완료 기록 — flush cache and drop.
+    def _finalize_sub(r: dict) -> None:
+        r["status"] = "ok" if ok else "err"
+        r["finishedAt"] = int(time.time() * 1000)
+    _runs_cache_update(sub_run_id, _finalize_sub)
+    _persist_run(sub_run_id)
+    _runs_cache_pop(sub_run_id)
 
     if not ok:
         return {"status": "err", "output": "", "durationMs": _elapsed(),
@@ -1786,7 +2007,23 @@ def _find_feedback_target(nodes: list[dict], edges: list[dict]) -> str:
     return ""
 
 
-_MAX_PARALLEL_WORKERS = int(os.environ.get("WORKFLOW_MAX_PARALLEL", "4"))
+# v2.44.0 — default parallel worker cap was 4, which throttled wide DAGs on
+# multi-core hosts. Default now scales with CPU count (min 8, max 32) so
+# fan-out levels execute closer to actual hardware capacity. The
+# WORKFLOW_MAX_PARALLEL env var still wins for explicit override.
+def _default_max_parallel_workers() -> int:
+    cpu = os.cpu_count() or 4
+    return max(8, min(32, cpu * 2))
+
+
+_MAX_PARALLEL_WORKERS = int(
+    os.environ.get("WORKFLOW_MAX_PARALLEL") or _default_max_parallel_workers()
+)
+# Hard cap upper bound regardless of source, to prevent runaway thread counts.
+if _MAX_PARALLEL_WORKERS > 32:
+    _MAX_PARALLEL_WORKERS = 32
+if _MAX_PARALLEL_WORKERS < 1:
+    _MAX_PARALLEL_WORKERS = 1
 
 
 def _record_workflow_cost(run_id: str, workflow_id: str, node_id: str, res: dict) -> None:
@@ -1843,12 +2080,24 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
         total_t0 = time.time()
 
     # 이 iteration 시작 시 nodeResults 초기화 + iter_idx 기록
-    with _LOCK:
-        s = _load_all()
-        if runId in s["runs"]:
-            s["runs"][runId]["nodeResults"] = {}
-            s["runs"][runId]["iteration"] = iter_idx
-            _dump_all(s)
+    # v2.44.0 — write through the in-memory cache. We only persist to disk
+    # at iteration boundaries, on completion, on cancel, and on terminal
+    # failures. Per-node running/done updates stay in memory.
+    def _cache_reset_iter(r: dict) -> None:
+        r["nodeResults"] = {}
+        r["iteration"] = iter_idx
+
+    if _runs_cache_update(runId, _cache_reset_iter) is None:
+        # Run not yet seeded in cache (e.g., started by an older code path
+        # that wrote directly to disk). Hydrate from disk so subsequent
+        # cache updates have something to mutate.
+        with _LOCK:
+            s = _load_all()
+            disk_run = s.get("runs", {}).get(runId)
+        if disk_run is not None:
+            disk_run["nodeResults"] = {}
+            disk_run["iteration"] = iter_idx
+            _runs_cache_set(runId, disk_run)
 
     def _collect_inputs(nid: str) -> list[str]:
         """노드의 입력 텍스트 수집 (이전 노드 결과에서)."""
@@ -1891,13 +2140,12 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
     for level in levels:
         # 전체 timeout 체크
         if time.time() - total_t0 > _DEFAULT_TOTAL_TIMEOUT:
-            with _LOCK:
-                s = _load_all()
-                if runId in s["runs"]:
-                    s["runs"][runId]["status"] = "err"
-                    s["runs"][runId]["error"] = "total workflow timeout"
-                    s["runs"][runId]["finishedAt"] = int(time.time()*1000)
-                    _dump_all(s)
+            def _mark_timeout(r: dict) -> None:
+                r["status"] = "err"
+                r["error"] = "total workflow timeout"
+                r["finishedAt"] = int(time.time() * 1000)
+            _runs_cache_update(runId, _mark_timeout)
+            _persist_run(runId)  # terminal failure: flush before returning
             return (False, results, "")
 
         # 토큰 예산 체크 — 초과 시 이후 모든 노드를 budget_exceeded 로 마크하고 종료
@@ -1907,19 +2155,19 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                 for r in results.values() if isinstance(r, dict)
             )
             if total_tokens >= token_budget:
-                with _LOCK:
-                    s = _load_all()
-                    if runId in s["runs"]:
-                        for nid in order:
-                            if nid not in s["runs"][runId].get("nodeResults", {}):
-                                s["runs"][runId]["nodeResults"][nid] = {
-                                    "status": "budget_exceeded",
-                                    "output": "",
-                                    "durationMs": 0,
-                                }
-                        s["runs"][runId]["budgetExceeded"] = True
-                        s["runs"][runId]["totalTokens"] = total_tokens
-                        _dump_all(s)
+                def _mark_budget(r: dict) -> None:
+                    nr = r.setdefault("nodeResults", {})
+                    for nid in order:
+                        if nid not in nr:
+                            nr[nid] = {
+                                "status": "budget_exceeded",
+                                "output": "",
+                                "durationMs": 0,
+                            }
+                    r["budgetExceeded"] = True
+                    r["totalTokens"] = total_tokens
+                _runs_cache_update(runId, _mark_budget)
+                _persist_run(runId)  # iteration-boundary equivalent
                 log.info("workflow %s run %s stopped — token budget %d exceeded (%d)",
                          wf.get("id"), runId, token_budget, total_tokens)
                 # ok=True (부분 완료) 로 종료, 마지막 노드 결과를 final_out 으로
@@ -1932,28 +2180,26 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
         active_nodes = [nid for nid in level if nid not in disabled]
         skipped_nodes = [nid for nid in level if nid in disabled]
 
-        # skip 기록
-        for nid in skipped_nodes:
-            with _LOCK:
-                s = _load_all()
-                if runId in s["runs"]:
-                    s["runs"][runId]["nodeResults"][nid] = {"status": "skipped"}
-                    _dump_all(s)
+        # skip 기록 — cache only.
+        if skipped_nodes:
+            def _mark_skipped(r: dict) -> None:
+                nr = r.setdefault("nodeResults", {})
+                for nid in skipped_nodes:
+                    nr[nid] = {"status": "skipped"}
+            _runs_cache_update(runId, _mark_skipped)
 
         if not active_nodes:
             continue
 
         # 진행 상황: running 표시 (프론트에서 elapsed 계산을 위해 startedAt 포함)
-        with _LOCK:
-            s = _load_all()
-            if runId in s["runs"]:
-                now_ms = int(time.time() * 1000)
-                for nid in active_nodes:
-                    s["runs"][runId]["nodeResults"][nid] = {
-                        "status": "running", "startedAt": now_ms,
-                    }
-                s["runs"][runId]["currentNodeId"] = active_nodes[0]
-                _dump_all(s)
+        # cache only — SSE/poll reads via _runs_cache_get.
+        now_ms = int(time.time() * 1000)
+        def _mark_running(r: dict) -> None:
+            nr = r.setdefault("nodeResults", {})
+            for nid in active_nodes:
+                nr[nid] = {"status": "running", "startedAt": now_ms}
+            r["currentNodeId"] = active_nodes[0]
+        _runs_cache_update(runId, _mark_running)
 
         # ── 병렬 실행: 같은 level 의 노드들 ──
         level_results: dict[str, dict] = {}
@@ -1990,39 +2236,48 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                         disabled.add(e["to"])
 
             if res.get("status") == "err":
-                with _LOCK:
-                    s = _load_all()
-                    if runId in s["runs"]:
-                        s["runs"][runId]["nodeResults"][nid] = {
-                            "status": "err",
-                            "error": res.get("error", ""),
-                            "durationMs": res.get("durationMs", 0),
-                        }
-                        s["runs"][runId]["status"] = "err"
-                        s["runs"][runId]["error"] = f"node {nid}: {res.get('error','')}"
-                        s["runs"][runId]["finishedAt"] = int(time.time()*1000)
-                        _dump_all(s)
+                err_nid = nid
+                err_msg = res.get("error", "")
+                err_dur = res.get("durationMs", 0)
+                def _mark_err(r: dict) -> None:
+                    nr = r.setdefault("nodeResults", {})
+                    nr[err_nid] = {
+                        "status": "err",
+                        "error": err_msg,
+                        "durationMs": err_dur,
+                    }
+                    r["status"] = "err"
+                    r["error"] = f"node {err_nid}: {err_msg}"
+                    r["finishedAt"] = int(time.time() * 1000)
+                _runs_cache_update(runId, _mark_err)
+                _persist_run(runId)  # terminal failure: flush before returning
                 had_error = True
                 break
             else:
-                with _LOCK:
-                    s = _load_all()
-                    if runId in s["runs"]:
-                        s["runs"][runId]["nodeResults"][nid] = {
-                            "status": "ok",
-                            "output": (res.get("output") or "")[:4000],
-                            "sessionId": res.get("sessionId") or "",
-                            "durationMs": res.get("durationMs", 0),
-                            "provider": res.get("provider", ""),
-                            "model": res.get("model", ""),
-                        }
-                        _dump_all(s)
-                # 비용 추적 DB 기록
+                ok_nid = nid
+                ok_payload = {
+                    "status": "ok",
+                    "output": (res.get("output") or "")[:4000],
+                    "sessionId": res.get("sessionId") or "",
+                    "durationMs": res.get("durationMs", 0),
+                    "provider": res.get("provider", ""),
+                    "model": res.get("model", ""),
+                }
+                def _mark_ok(r: dict) -> None:
+                    nr = r.setdefault("nodeResults", {})
+                    nr[ok_nid] = ok_payload
+                _runs_cache_update(runId, _mark_ok)
+                # 비용 추적 DB 기록 (separate DB; not part of JSON store)
                 _record_workflow_cost(
                     runId, wf.get("id", ""), nid, res)
 
         if had_error:
             return (False, results, "")
+
+    # Iteration boundary — flush accumulated cache state to disk so completed
+    # runs and visible progress survive restart, and so cost/timeline readers
+    # that read from disk still see fresh data at iteration granularity.
+    _persist_run(runId)
 
     # iteration 최종 output 찾기: 마지막 output 노드 → 없으면 DAG 마지막 노드
     final_output = ""
@@ -2045,24 +2300,22 @@ def _run_workflow_background(wfId: str, runId: str) -> None:
         store = _load_all()
         wf = store["workflows"].get(wfId)
         if not wf:
-            with _LOCK:
-                s = _load_all()
-                if runId in s["runs"]:
-                    s["runs"][runId]["status"] = "err"
-                    s["runs"][runId]["error"] = "workflow not found"
-                    s["runs"][runId]["finishedAt"] = int(time.time()*1000)
-                    _dump_all(s)
+            def _err_notfound(r: dict) -> None:
+                r["status"] = "err"
+                r["error"] = "workflow not found"
+                r["finishedAt"] = int(time.time() * 1000)
+            _runs_cache_update(runId, _err_notfound)
+            _persist_run(runId)
             return
 
         cyc = _check_dag(wf.get("nodes", []), wf.get("edges", []))
         if cyc:
-            with _LOCK:
-                s = _load_all()
-                if runId in s["runs"]:
-                    s["runs"][runId]["status"] = "err"
-                    s["runs"][runId]["error"] = cyc[0]
-                    s["runs"][runId]["finishedAt"] = int(time.time()*1000)
-                    _dump_all(s)
+            def _err_cycle(r: dict) -> None:
+                r["status"] = "err"
+                r["error"] = cyc[0]
+                r["finishedAt"] = int(time.time() * 1000)
+            _runs_cache_update(runId, _err_cycle)
+            _persist_run(runId)
             return
 
         repeat = wf.get("repeat") or {"enabled": False}
@@ -2100,24 +2353,24 @@ def _run_workflow_background(wfId: str, runId: str) -> None:
             if it + 1 < max_iter and interval > 0:
                 time.sleep(interval)
 
-        # 전체 완료
-        with _LOCK:
-            s = _load_all()
-            if runId in s["runs"]:
-                s["runs"][runId]["status"] = "ok"
-                s["runs"][runId]["finishedAt"] = int(time.time()*1000)
-                s["runs"][runId]["currentNodeId"] = None
-                _dump_all(s)
+        # 전체 완료 — flush cache to disk and drop the in-memory entry.
+        def _mark_done(r: dict) -> None:
+            r["status"] = "ok"
+            r["finishedAt"] = int(time.time() * 1000)
+            r["currentNodeId"] = None
+        _runs_cache_update(runId, _mark_done)
+        _persist_run(runId)
+        _runs_cache_pop(runId)
         _notify_run_completion(wfId, runId, "ok", prev_output)
     except Exception as e:
         log.exception("workflow run failed: %s", e)
-        with _LOCK:
-            s = _load_all()
-            if runId in s["runs"]:
-                s["runs"][runId]["status"] = "err"
-                s["runs"][runId]["error"] = f"internal: {e}"
-                s["runs"][runId]["finishedAt"] = int(time.time()*1000)
-                _dump_all(s)
+        def _mark_internal(r: dict) -> None:
+            r["status"] = "err"
+            r["error"] = f"internal: {e}"
+            r["finishedAt"] = int(time.time() * 1000)
+        _runs_cache_update(runId, _mark_internal)
+        _persist_run(runId)
+        _runs_cache_pop(runId)
         _notify_run_completion(wfId, runId, "err", str(e))
 
 
@@ -2249,7 +2502,7 @@ def api_workflow_run(body: dict) -> dict:
         if cyc:
             return {"ok": False, "error": cyc[0]}
         runId = _new_run_id()
-        store["runs"][runId] = {
+        run_entry = {
             "id": runId,
             "workflowId": wfId,
             "status": "running",
@@ -2260,7 +2513,10 @@ def api_workflow_run(body: dict) -> dict:
             "iteration": 0,
             "error": None,
         }
+        store["runs"][runId] = run_entry
         _dump_all(store)
+    # v2.44.0 — seed in-memory cache so per-node updates avoid disk I/O.
+    _runs_cache_set(runId, dict(run_entry))
     # 백그라운드 시작
     th = threading.Thread(target=_run_workflow_background, args=(wfId, runId), daemon=True)
     th.start()
@@ -2340,7 +2596,7 @@ def api_workflow_webhook(wfId: str, body: dict | None = None, secret_header: str
         if cyc:
             return {"ok": False, "error": cyc[0], "error_key": "err_workflow_cycle"}
         runId = _new_run_id()
-        store["runs"][runId] = {
+        run_entry = {
             "id": runId,
             "workflowId": wfId,
             "status": "running",
@@ -2353,7 +2609,10 @@ def api_workflow_webhook(wfId: str, body: dict | None = None, secret_header: str
             "trigger": "webhook",
             "webhookInput": (body or {}).get("input", "") if isinstance(body, dict) else "",
         }
+        store["runs"][runId] = run_entry
         _dump_all(store)
+    # v2.44.0 — seed in-memory run cache.
+    _runs_cache_set(runId, dict(run_entry))
 
     # webhook 입력을 start 다음 노드에 주입
     webhook_input = ((body or {}).get("input") or "") if isinstance(body, dict) else ""
@@ -2365,24 +2624,22 @@ def api_workflow_webhook(wfId: str, body: dict | None = None, secret_header: str
 
     def _run():
         try:
-            nodes = wf.get("nodes", [])
-            edges = wf.get("edges", [])
             ok, _results, _out = _run_one_iteration(wf, runId, 0, extra_inputs)
-            with _LOCK:
-                s = _load_all()
-                if runId in s["runs"]:
-                    s["runs"][runId]["status"] = "ok" if ok else "err"
-                    s["runs"][runId]["finishedAt"] = int(time.time() * 1000)
-                    _dump_all(s)
+            def _finalize(r: dict) -> None:
+                r["status"] = "ok" if ok else "err"
+                r["finishedAt"] = int(time.time() * 1000)
+            _runs_cache_update(runId, _finalize)
+            _persist_run(runId)
+            _runs_cache_pop(runId)
         except Exception as e:
             log.exception("webhook run failed: %s", e)
-            with _LOCK:
-                s = _load_all()
-                if runId in s["runs"]:
-                    s["runs"][runId]["status"] = "err"
-                    s["runs"][runId]["error"] = str(e)
-                    s["runs"][runId]["finishedAt"] = int(time.time() * 1000)
-                    _dump_all(s)
+            def _finalize_err(r: dict) -> None:
+                r["status"] = "err"
+                r["error"] = str(e)
+                r["finishedAt"] = int(time.time() * 1000)
+            _runs_cache_update(runId, _finalize_err)
+            _persist_run(runId)
+            _runs_cache_pop(runId)
 
     threading.Thread(target=_run, daemon=True).start()
     return {"ok": True, "runId": runId, "workflowId": wfId, "trigger": "webhook"}

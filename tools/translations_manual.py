@@ -133,6 +133,12 @@ try:
 except Exception:
     _NEW_EN_22, _NEW_ZH_22 = {}, {}
 
+# v2.44.0 — Process / Port / Memory monitors
+try:
+    from translations_manual_23 import NEW_EN as _NEW_EN_23, NEW_ZH as _NEW_ZH_23
+except Exception:
+    _NEW_EN_23, _NEW_ZH_23 = {}, {}
+
 # ── 구조화 키 → 한국어 라벨 ──
 MANUAL_KO: dict[str, str] = {
     "settings.theme": "테마",
@@ -618,6 +624,12 @@ for _k, _v in _NEW_ZH_21.items():
 for _k, _v in _NEW_EN_22.items():
     MANUAL_EN.setdefault(_k, _v)
 for _k, _v in _NEW_ZH_22.items():
+    MANUAL_ZH.setdefault(_k, _v)
+
+# v2.44.0 — Process / Port / Memory monitors
+for _k, _v in _NEW_EN_23.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH_23.items():
     MANUAL_ZH.setdefault(_k, _v)
 
 # extractor 오탐(코드/주석)이 초기 MANUAL_EN/ZH 에 한글 원문으로 등록돼 있는 경우 덮어쓰기

@@ -171,6 +171,10 @@ from .advisor_lab import (
     api_advisor_lab_examples, api_advisor_lab_history, api_advisor_lab_models,
     api_advisor_lab_run,
 )
+from .process_monitor import (
+    api_cli_sessions_list, api_kill_idle_claude, api_memory_snapshot,
+    api_ports_list, api_process_kill, api_session_open_terminal,
+)
 
 
 def _ai_providers_by_cap(query: dict) -> dict:
@@ -380,6 +384,10 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/advisor-lab/examples":      api_advisor_lab_examples,
     "/api/advisor-lab/history":       api_advisor_lab_history,
     "/api/advisor-lab/models":        api_advisor_lab_models,
+    # v2.44.0 — process / port / memory monitors
+    "/api/ports/list":                api_ports_list,
+    "/api/sessions-monitor/list":     api_cli_sessions_list,
+    "/api/memory/snapshot":           api_memory_snapshot,
 }
 
 
@@ -534,6 +542,10 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/routines/delete":      api_routines_delete,
     "/api/routines/run":         api_routines_run,
     "/api/advisor-lab/run":      api_advisor_lab_run,
+    # v2.44.0 — process / port / memory monitors (mutating)
+    "/api/process/kill":                  api_process_kill,
+    "/api/sessions-monitor/open-terminal": api_session_open_terminal,
+    "/api/memory/kill-idle-claude":       api_kill_idle_claude,
 }
 
 
