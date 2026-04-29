@@ -2624,6 +2624,10 @@ const __wf = {
   _webhookSecretCache: {},     // wfId → secret (refreshed only on load/save/rotate)
   _lastInspectedId: null,      // last selectedNodeId rendered into the inspector
   _inspectorDirty: false,      // any inspector-relevant data changed since last render
+  // v2.44.1 — keyed-diff canvas renderer (perf): see _wfRenderCanvas comment.
+  _nodeEls: new Map(),         // node id → live <g.wf-node> element in #wfNodes
+  _nodeSnapshot: new Map(),    // node id → JSON of fields that affect rendering
+  _forceFullCanvasRebuild: true, // when true, _wfRenderCanvas falls back to innerHTML rebuild
 };
 
 const WF_NODE_TYPES = [
@@ -4043,6 +4047,8 @@ async function _wfOpen(wfId) {
   // v2.44.0 — reset inspector early-exit guards since selection is fresh.
   __wf._lastInspectedId = null;
   __wf._inspectorDirty = true;
+  // v2.44.1 — drop keyed-diff caches so the new workflow renders fresh.
+  __wf._forceFullCanvasRebuild = true;
   _wfRenderList();
   _wfRenderCanvas();
   _wfRenderInspector();
@@ -4144,24 +4150,132 @@ function _wfUpdateToolbar() {
 }
 
 // ─── 캔버스 렌더링 ─────────────────────────────────────────────
+// perf (v2.44.1): keyed-diff renderer for nodes.
+//   - Nodes are keyed-diffed against `__wf._nodeEls` (id → live <g> element)
+//     and `__wf._nodeSnapshot` (id → JSON of render-affecting fields).
+//     Only added/changed/removed nodes touch the DOM; unchanged nodes are
+//     left alone, preserving any in-place attribute mutations from
+//     `_wfApplyRunStatus` (data-status), drag transforms, search-highlight
+//     opacity, group-collapse display, and selection classes.
+//   - Edges are still rebuilt via edgesG.innerHTML — they have far fewer
+//     handlers (delegated through the parent SVG) and lookup is acyclic, so
+//     diffing them is not worth the complexity.
+//   - Set `__wf._forceFullCanvasRebuild = true` to fall back to the legacy
+//     full innerHTML rebuild on the next call (auto-cleared after fallback).
+//     Used on workflow load / undo where the safest path is to drop the
+//     element cache.
+//   - All node-level events are delegated from #wfSvg via `data-node`
+//     selector queries (see svg.addEventListener handlers around line 4900),
+//     so re-creating an element preserves interactivity as long as the
+//     `data-node` attribute survives — `_wfRenderNode` always emits it.
 function _wfRenderCanvas() {
   const nodesG = document.getElementById('wfNodes');
   const edgesG = document.getElementById('wfEdges');
   const vp = document.getElementById('wfViewport');
   if (!nodesG || !edgesG || !vp) return;
   if (!__wf.current) {
-    nodesG.innerHTML = ''; edgesG.innerHTML = ''; _wfRenderMinimap(); return;
+    nodesG.innerHTML = ''; edgesG.innerHTML = '';
+    __wf._nodeEls.clear(); __wf._nodeSnapshot.clear();
+    _wfRenderMinimap(); return;
   }
   const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
   vp.setAttribute('transform', `translate(${view.panX},${view.panY}) scale(${view.zoom||1})`);
-  // 노드
-  nodesG.innerHTML = (__wf.current.nodes || []).map(n => _wfRenderNode(n)).join('');
-  // 엣지
-  edgesG.innerHTML = (__wf.current.edges || []).map(e => _wfRenderEdge(e)).join('');
+
+  const nodes = __wf.current.nodes || [];
+  const edges = __wf.current.edges || [];
+
+  // Full-rebuild fallback (workflow load, undo, or any caller that needs
+  // a fresh element pool). Cheaper than diffing when the cache is stale
+  // and guaranteed-correct.
+  if (__wf._forceFullCanvasRebuild) {
+    nodesG.innerHTML = nodes.map(n => _wfRenderNode(n)).join('');
+    __wf._nodeEls.clear();
+    __wf._nodeSnapshot.clear();
+    nodesG.querySelectorAll('g.wf-node').forEach(el => {
+      const nid = el.getAttribute('data-node');
+      if (nid) __wf._nodeEls.set(nid, el);
+    });
+    nodes.forEach(n => __wf._nodeSnapshot.set(n.id, _wfNodeSnapKey(n)));
+    __wf._forceFullCanvasRebuild = false;
+  } else {
+    // Keyed diff — nodes only.
+    const desired = new Set(nodes.map(n => n.id));
+    // 1) Remove stale nodes.
+    for (const [nid, el] of __wf._nodeEls) {
+      if (!desired.has(nid)) {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+        __wf._nodeEls.delete(nid);
+        __wf._nodeSnapshot.delete(nid);
+      }
+    }
+    // 2) Add new + replace changed.
+    nodes.forEach(n => {
+      const snap = _wfNodeSnapKey(n);
+      const existing = __wf._nodeEls.get(n.id);
+      if (!existing) {
+        const el = _wfBuildNodeEl(n);
+        if (el) {
+          nodesG.appendChild(el);
+          __wf._nodeEls.set(n.id, el);
+          __wf._nodeSnapshot.set(n.id, snap);
+        }
+      } else if (__wf._nodeSnapshot.get(n.id) !== snap) {
+        const el = _wfBuildNodeEl(n);
+        if (el) {
+          // Preserve any runtime attributes that selection / run-status
+          // helpers may have set on the old element.
+          const prevStatus = existing.getAttribute('data-status');
+          if (prevStatus) el.setAttribute('data-status', prevStatus);
+          existing.parentNode.replaceChild(el, existing);
+          __wf._nodeEls.set(n.id, el);
+          __wf._nodeSnapshot.set(n.id, snap);
+        }
+      }
+    });
+    // 3) Reset display so group-collapse logic (which sets display:'none')
+    //    can re-apply cleanly on uncollapse paths.
+    for (const el of __wf._nodeEls.values()) el.style.display = '';
+  }
+
+  // Edges — full innerHTML rebuild (see comment above).
+  edgesG.innerHTML = edges.map(e => _wfRenderEdge(e)).join('');
+
+  // 선택 상태 동기화 (재생성된 노드의 .selected class 반영)
+  _wfSyncSelectionClasses();
   // 노드 검색 필터 반영 (검색어 있을 때만)
   if (__wfNodeSearchQuery) _wfApplyNodeSearchHighlight();
   // 미니맵 업데이트 (debounce — 연속 렌더 시 마지막만)
   _wfScheduleMinimap();
+}
+
+// Build a single <g.wf-node> SVG element from the existing string template.
+// Wrapping in <svg xmlns=...> so DOMParser assigns the correct SVG namespace
+// to the children — otherwise they render as inert HTML elements.
+function _wfBuildNodeEl(n) {
+  const svgString = '<svg xmlns="http://www.w3.org/2000/svg">' + _wfRenderNode(n) + '</svg>';
+  try {
+    const parsed = new DOMParser().parseFromString(svgString, 'image/svg+xml');
+    const root = parsed.documentElement;
+    if (!root || root.querySelector('parsererror')) return null;
+    const g = root.querySelector('g.wf-node');
+    if (!g) return null;
+    return document.importNode(g, true);
+  } catch (e) {
+    return null;
+  }
+}
+
+// Snapshot of fields that affect node rendering. If any change, the node
+// element is rebuilt; otherwise it is left untouched.
+function _wfNodeSnapKey(n) {
+  const d = n.data || {};
+  return JSON.stringify({
+    t: n.type,
+    ti: n.title || '',
+    x: n.x, y: n.y,
+    a: d.assignee || '',
+    ma: d.multiAssignee || null,
+  });
 }
 let _wfMinimapTimer = null;
 // v2.43.1 — coalesce minimap repaints into one per animation frame so
@@ -4626,6 +4740,8 @@ function _wfUndo() {
   __wf.selectedNodeId = null;
   __wf.selectedEdgeId = null;
   __wf.dirty = true;
+  // Undo replaces nodes/edges arrays wholesale; safest to drop the cache.
+  __wf._forceFullCanvasRebuild = true;
   _wfRenderCanvas();
   _wfRenderInspector();
   _wfUpdateToolbar();
@@ -6047,15 +6163,27 @@ function _wfDeleteFromEditor(winId) {
 function _wfInspectorBody(n) {
   const d = n.data || {};
   if (n.type === 'session' || n.type === 'subagent') {
+    // v2.44.1 — multi-assignee block. Always one row minimum (back-compat with
+    // single `assignee`); chip shows when length >= 2 to signal parallel
+    // fan-out is active.
+    const maRows = _wfMultiAssigneeRows(n);
+    const maRemovable = maRows.length >= 2;
+    const maRowsHtml = maRows.map((v, i) => _wfMultiAssigneeRowHtml(n.id, i, v, maRemovable)).join('');
+    const maAddDisabled = maRows.length >= 8 ? 'disabled' : '';
+    const maChip = maRows.length >= 2
+      ? `<span class="ml-2 px-1.5 py-0.5 rounded text-[9px]" style="background:var(--accent);color:#fff">${t('병렬')} (${maRows.length})</span>`
+      : '';
     return `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('업무 (subject)')}</label>
       <input class="input w-full mt-1" value="${escapeHtml(d.subject||'')}" oninput="_wfNodeSetData('${n.id}','subject',this.value)" placeholder="${t('이 세션이 수행할 업무 한 줄')}">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('설명 (description)')}</label>
       <textarea class="input w-full mt-1" rows="4" oninput="_wfNodeSetData('${n.id}','description',this.value)" placeholder="${t('상세 지시·제약·출력 형식')}">${escapeHtml(d.description||'')}</textarea>
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('AI 프로바이더 : 모델')}</label>
-      <select class="input w-full mt-1" onchange="if(this.value==='__custom__'){const v=prompt('provider:model 입력 (예: openai:gpt-4.1)');if(v){_wfNodeSetData('${n.id}','assignee',v);}else{this.value='${escapeHtml(d.assignee||'sonnet-4.6')}';}}else{_wfNodeSetData('${n.id}','assignee',this.value);}">
-        ${_wfAssigneeOptions(d.assignee||'sonnet-4.6')}
-      </select>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">
+        ${t('다중 어시니 (병렬 fan-out)')}${maChip}
+      </label>
+      ${maRowsHtml}
+      <button class="btn text-xs mt-2" ${maAddDisabled} onclick="_wfMultiAssigneeAdd('${n.id}')">+ ${t('어시니 추가')}</button>
+      <div class="text-[10px] mt-1" style="color:var(--text-dim)">${t('두 개 이상 지정 시 병렬 실행 후 가장 먼저 성공한 응답을 채택합니다.')}</div>
       ${n.type==='subagent' ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('에이전트 역할')}</label>
         <input class="input w-full mt-1" value="${escapeHtml(d.agentRole||'')}" oninput="_wfNodeSetData('${n.id}','agentRole',this.value)" placeholder="researcher / writer / reviewer …">
@@ -6235,7 +6363,98 @@ function _wfNodeSetData(nid, field, value) {
   // input), but a handful do — guard them by marking dirty here.
   __wf._inspectorDirty = true;
   _wfUpdateToolbar();
-  if (field === 'assignee') _wfRenderCanvas();
+  if (field === 'assignee' || field === 'multiAssignee') _wfRenderCanvas();
+}
+
+// v2.44.1 — multi-assignee parallel fan-out helpers.
+// Storage shape: node.data.multiAssignee = ['claude:opus', 'openai:gpt-4.1', …]
+// Back-compat: if the array has 0 or 1 entries, the single `assignee` field is
+// authoritative. When length >= 2, ProviderRegistry.execute_parallel races them
+// and returns the first ok response.
+function _wfMultiAssigneeRows(n) {
+  const d = n.data || {};
+  const arr = Array.isArray(d.multiAssignee) ? d.multiAssignee.slice() : [];
+  // Row 0 is always the canonical single-assignee dropdown so empty/legacy
+  // workflows render exactly as before.
+  if (arr.length === 0) return [d.assignee || 'sonnet-4.6'];
+  return arr;
+}
+function _wfMultiAssigneeSet(nid, idx, val) {
+  if (!__wf.current) return;
+  const n = __wf.current.nodes.find(x => x.id === nid);
+  if (!n) return;
+  n.data = n.data || {};
+  const rows = _wfMultiAssigneeRows(n);
+  rows[idx] = val;
+  // Drop empties + dedupe preserving order.
+  const seen = new Set();
+  const cleaned = [];
+  for (const r of rows) {
+    const v = (r || '').trim();
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    cleaned.push(v);
+  }
+  n.data.assignee = cleaned[0] || '';
+  n.data.multiAssignee = cleaned.length >= 2 ? cleaned : [];
+  __wf.dirty = true;
+  __wf._inspectorDirty = true;
+  _wfUpdateToolbar();
+  _wfRenderCanvas();
+  _wfRenderInspector();
+}
+function _wfMultiAssigneeAdd(nid) {
+  if (!__wf.current) return;
+  const n = __wf.current.nodes.find(x => x.id === nid);
+  if (!n) return;
+  n.data = n.data || {};
+  const rows = _wfMultiAssigneeRows(n);
+  if (rows.length >= 8) return; // matches execute_parallel pool cap
+  // Pick a default that isn't already present so the new row is meaningful.
+  const candidates = ['claude:opus', 'claude:sonnet', 'claude:haiku',
+                       'openai:gpt-4.1', 'gemini:2.5-pro'];
+  const already = new Set(rows);
+  const pick = candidates.find(c => !already.has(c)) || 'claude:opus';
+  rows.push(pick);
+  n.data.assignee = rows[0] || '';
+  n.data.multiAssignee = rows.length >= 2 ? rows : [];
+  __wf.dirty = true;
+  __wf._inspectorDirty = true;
+  _wfUpdateToolbar();
+  _wfRenderCanvas();
+  _wfRenderInspector();
+}
+function _wfMultiAssigneeRemove(nid, idx) {
+  if (!__wf.current) return;
+  const n = __wf.current.nodes.find(x => x.id === nid);
+  if (!n) return;
+  n.data = n.data || {};
+  const rows = _wfMultiAssigneeRows(n);
+  if (rows.length <= 1) return; // never remove the last one
+  rows.splice(idx, 1);
+  n.data.assignee = rows[0] || '';
+  n.data.multiAssignee = rows.length >= 2 ? rows : [];
+  __wf.dirty = true;
+  __wf._inspectorDirty = true;
+  _wfUpdateToolbar();
+  _wfRenderCanvas();
+  _wfRenderInspector();
+}
+function _wfMultiAssigneeRowHtml(nid, idx, val, removable) {
+  // The inline `__custom__` handler mirrors the existing single-assignee
+  // dropdown — picking "직접 입력..." prompts for a custom provider:model.
+  const safe = escapeHtml(val || 'sonnet-4.6');
+  const removeBtn = removable
+    ? `<button class="btn text-xs px-2" title="${t('행 제거')}" onclick="_wfMultiAssigneeRemove('${nid}', ${idx})">−</button>`
+    : '';
+  return `
+    <div class="flex gap-1 items-center mt-1">
+      <select class="input flex-1" onchange="if(this.value==='__custom__'){const v=prompt('provider:model 입력 (예: openai:gpt-4.1)');if(v){_wfMultiAssigneeSet('${nid}', ${idx}, v);}else{this.value='${safe}';}}else{_wfMultiAssigneeSet('${nid}', ${idx}, this.value);}">
+        ${_wfAssigneeOptions(val || 'sonnet-4.6')}
+      </select>
+      ${removeBtn}
+    </div>
+  `;
 }
 
 // ─── 저장 / 실행 / spawn ───────────────────────────────────

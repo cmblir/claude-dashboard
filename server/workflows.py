@@ -264,10 +264,28 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
     if not isinstance(d, dict):
         d = {}
     if ntype in ("session", "subagent"):
+        # v2.44.1 — multiAssignee: list of "provider:model" strings for parallel
+        # fan-out. Reuses the same string clamp as `assignee`. Dedupe while
+        # preserving order. Cap at 8 to mirror execute_parallel's pool size.
+        raw_multi = d.get("multiAssignee")
+        clean_multi: list[str] = []
+        if isinstance(raw_multi, list):
+            seen: set[str] = set()
+            for item in raw_multi:
+                if not isinstance(item, str):
+                    continue
+                v = _clamp_str(item, 40).strip()
+                if not v or v in seen:
+                    continue
+                seen.add(v)
+                clean_multi.append(v)
+                if len(clean_multi) >= 8:
+                    break
         out["data"] = {
             "subject":     _clamp_str(d.get("subject"), 200),
             "description": _clamp_str(d.get("description"), 4000),
             "assignee":    _clamp_str(d.get("assignee"), 40),
+            "multiAssignee": clean_multi,
             # v2.25.0 — modelHint: assignee 가 비어있을 때 프롬프트 길이/키워드 기반
             # 자동 모델 선택. "auto" · "fast" · "deep" · "" (비활성)
             "modelHint":   (d.get("modelHint") or "") if (d.get("modelHint") or "") in ("", "auto", "fast", "deep") else "",
@@ -1253,17 +1271,46 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
             "fallbackUsed": fallback_used,  # 비어있으면 원래 assignee 로 성공/실패
         }
 
+    # v2.44.1 — multiAssignee fan-out. If the inspector configured >= 2
+    # assignees, race them in parallel via ProviderRegistry.execute_parallel
+    # and return the first ok response. The single-assignee path is preserved
+    # untouched when multiAssignee is empty or has 1 entry.
+    raw_multi = data.get("multiAssignee") or []
+    multi_assignees: list[str] = []
+    if isinstance(raw_multi, list):
+        seen_ma: set[str] = set()
+        for item in raw_multi:
+            if not isinstance(item, str):
+                continue
+            v = item.strip()
+            if not v or v in seen_ma:
+                continue
+            seen_ma.add(v)
+            multi_assignees.append(v)
+    use_parallel = len(multi_assignees) >= 2
+
     try:
-        from .ai_providers import execute_with_assignee
-        resp = execute_with_assignee(
-            assignee or "claude-cli",
-            prompt,
-            system_prompt=sys_prompt,
-            cwd=cwd_safe,
-            timeout=_DEFAULT_NODE_TIMEOUT,
-            extra=extra,
-            fallback=True,
-        )
+        from .ai_providers import execute_with_assignee, get_registry
+        if use_parallel:
+            resp = get_registry().execute_parallel(
+                multi_assignees,
+                prompt,
+                system_prompt=sys_prompt,
+                cwd=cwd_safe,
+                timeout=_DEFAULT_NODE_TIMEOUT,
+                extra=extra,
+                fallback=True,
+            )
+        else:
+            resp = execute_with_assignee(
+                assignee or "claude-cli",
+                prompt,
+                system_prompt=sys_prompt,
+                cwd=cwd_safe,
+                timeout=_DEFAULT_NODE_TIMEOUT,
+                extra=extra,
+                fallback=True,
+            )
         # 실패 + policy.fallbackProvider 설정 → 해당 provider 로 1회 재시도
         if resp.status == "err" and fallback_provider and fallback_provider != (assignee or "claude-cli"):
             try:
