@@ -175,6 +175,10 @@ from .process_monitor import (
     api_cli_sessions_list, api_kill_idle_claude, api_memory_snapshot,
     api_ports_list, api_process_kill, api_session_open_terminal,
 )
+from .ccr_setup import (
+    api_ccr_alias_snippet, api_ccr_config_load, api_ccr_config_save,
+    api_ccr_install_command, api_ccr_presets, api_ccr_service, api_ccr_status,
+)
 
 
 def _ai_providers_by_cap(query: dict) -> dict:
@@ -388,6 +392,12 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/ports/list":                api_ports_list,
     "/api/sessions-monitor/list":     api_cli_sessions_list,
     "/api/memory/snapshot":           api_memory_snapshot,
+    # v2.45.0 — Claude Code Router (CCR / zclaude) wizard
+    "/api/ccr/status":                api_ccr_status,
+    "/api/ccr/config":                api_ccr_config_load,
+    "/api/ccr/install-command":       api_ccr_install_command,
+    "/api/ccr/alias-snippet":         api_ccr_alias_snippet,
+    "/api/ccr/presets":               api_ccr_presets,
 }
 
 
@@ -546,6 +556,9 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/process/kill":                  api_process_kill,
     "/api/sessions-monitor/open-terminal": api_session_open_terminal,
     "/api/memory/kill-idle-claude":       api_kill_idle_claude,
+    # v2.45.0 — Claude Code Router (CCR / zclaude) wizard
+    "/api/ccr/config":                    api_ccr_config_save,
+    "/api/ccr/service":                   api_ccr_service,
 }
 
 

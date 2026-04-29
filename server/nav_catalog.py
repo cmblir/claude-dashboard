@@ -201,6 +201,10 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         ["settings", "세팅"]),
     ("claudemd",      "config",   "CLAUDE.md 편집 (마크다운 프리뷰)",
         ["CLAUDE.md"]),
+    ("zclaude",       "config",
+        "🛣️ Claude Code Router — Claude Code를 GLM/Z.AI/DeepSeek 등 다른 LLM으로 라우팅하고 zclaude 별칭 안내",
+        ["zclaude", "ccr", "claude-code-router", "router", "z.ai", "glm",
+         "deepseek", "openrouter"]),
 
     # ── 고급 ───────────────────────────────────────
     ("outputStyles",  "advanced", "출력 스타일 커스터마이즈",
@@ -318,6 +322,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
     "plugins": {"en": "Plugin management", "zh": "插件管理"},
     "settings": {"en": "settings.json editor", "zh": "settings.json 编辑"},
     "claudemd": {"en": "CLAUDE.md editor", "zh": "CLAUDE.md 编辑"},
+    "zclaude": {"en": "Claude Code Router — route Claude Code through GLM/Z.AI/DeepSeek/etc., plus the zclaude shell alias",
+                "zh": "Claude Code Router — 将 Claude Code 路由到 GLM/Z.AI/DeepSeek 等其他 LLM，并提供 zclaude 别名指引"},
     "outputStyles": {"en": "Output style customization", "zh": "输出样式自定义"},
     "statusline": {"en": "Status line / Key bindings", "zh": "状态栏 / 快捷键"},
     "plans": {"en": "Plan archive", "zh": "计划存档"},
