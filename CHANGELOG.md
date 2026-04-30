@@ -10,6 +10,57 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.50.0] — 2026-04-30
+
+### 📊 Observability + reliability — telemetry, cost recommendations, expanded test coverage
+
+User: "다음 라운드 자율모드 시작." Three parallel agents on independent
+domains. Surfaces the data v2.46.0–v2.49.0 quietly built up.
+
+### 📊 Workflow execution telemetry (A)
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/workflows.py` | `_telemetry_compute(window_hours)` reads `workflow_runs` SQLite (v2.47.0). Per-workflow stats: total/success/failed/cancelled, success rate, duration p50/p95/p99 (sec), avgIterations, totalCost. Global summary across all workflows. Status mapping accepts both `ok`/`err` and legacy `done`/`error` for back-compat. |
+| 2 | `server/workflows.py::api_workflow_telemetry` | Public wrapper. `?window=1h\|24h\|7d\|30d` (default 7d). |
+| 3 | `server/routes.py` | `GET /api/workflows/telemetry`. |
+| 4 | `dist/index.html` | New `📊 실행 텔레메트리` panel inside `VIEWS.workflows` (NOT a separate tab). Window selector + global summary row + per-workflow table (top 50, others aggregated). 30s auto-refresh with `document.hidden` guard. Hidden when 0 runs. Uses `cachedApi`. |
+
+### 💡 Cost-aware routing recommendations (B)
+
+| # | Where | What |
+|---|---|---|
+| 5 | `server/cost_timeline.py` | `_recommendations()` aggregates last-30d costs across all 9 cost stores via existing `_gather_all()`. Generates rule-based suggestions:<br>**R1** (priority 3): sonnet/opus calls with `avg_tokens_in < 500` and `≥10 calls` → swap to Haiku, est. savings 85%.<br>**R2** (priority 2): `avg_tokens_in > 5000` and `≥5 calls` → enable prompt caching, est. savings 50%.<br>**R3** (priority 1): `≥100 calls` and `>$1` → try ollama (local), est. savings 100%.<br>**R4** (priority 4): stale model in `_MODEL_SUCCESSORS` table → quality upgrade, savings 0. |
+| 6 | `server/cost_timeline.py::api_cost_recommendations` | Public wrapper. `?window=30d` default. Returns up to 20 recs sorted by `(priority DESC, estimatedSavings DESC)`. |
+| 7 | `server/routes.py` | `GET /api/costs/recommendations`. |
+| 8 | `dist/index.html` | `💡 비용 절감 추천` card inside `VIEWS.costsTimeline`. Header line `최근 30일 총 $N \| 예상 절감 $M`. Each rec as a row with rule chip + current → suggested + savings + rationale. "추천 새로고침" button. Hidden when 0 recs. |
+| 9 | **Data adaptation** (truthful): spec referenced a `workflow_costs` SQLite table; actual data lives in JSON cost stores via `_gather_all()`. Implementation uses the real source — recommendations cover all sources, not just workflows. |
+
+### 🧪 Pytest coverage expansion (C)
+
+| # | Where | Cases |
+|---|---|---|
+| 10 | `tests/test_db.py` (new, 121 lines) | 8 cases — `_db_init` idempotent, all expected tables exist, all 12 expected indexes exist (v2.46.0+v2.48.0), WAL mode set, `_INITIALIZED` flag. Stub `run_history` table fixture so cross-module index DDL doesn't silently fail. |
+| 11 | `tests/test_prefs.py` (new, 132 lines) | 16 cases — schema returns 4 sections, round-trip set/get/reset (single + batch), enum validation (`ui.theme`), int range validation (`behavior.telemetryRefresh`), graceful invalid-section. |
+| 12 | `tests/test_process_monitor.py` (new, 139 lines) | 17 cases — `_parse_lsof_line` various formats, `_ps_metrics_batch` empty + valid, `_pid_alive` (uses `os.getpid()` instead of pid 1 to avoid macOS unprivileged `EPERM`), kill guards (self pid, pid<500, signal whitelist). |
+
+**Test totals: 27 → 68 (+41), runtime 0.06s → 0.23s.**
+
+### Smoke
+```
+$ make test                                             68 passed in 0.23s
+$ make i18n-verify                                      ✓ 모든 검증 통과
+$ /api/workflows/telemetry?window=7d  200  3.6 ms       global_keys: p50_sec, p95_sec, p99_sec, successRate, totalRuns
+$ /api/costs/recommendations          200  1.8 ms       totalCost30d, estimatedSavingsTotal, recommendations[]
+$ /api/auto_resume/status             200  1.1 ms
+$ /api/version                        200  4.6 ms
+```
+
+### Files
+- 5 modified: `server/workflows.py`, `server/cost_timeline.py`, `server/routes.py`, `dist/index.html`, `tools/translations_manual.py`
+- 5 new: `tools/translations_manual_29.py`, `tests/test_db.py`, `tests/test_prefs.py`, `tests/test_process_monitor.py`
+
+---
 ## [2.49.0] — 2026-04-30
 
 ### 🔄 Auto-Resume hardening — mgmt tab + email/telegram + Haiku direct + pytest

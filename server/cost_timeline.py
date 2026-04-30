@@ -168,6 +168,199 @@ def _group_by_model(entries: list[dict]) -> list[dict]:
     return sorted(buckets.values(), key=lambda x: x["usd"], reverse=True)
 
 
+# --- Recommendations -----------------------------------------------------
+
+# Map of stale model id substrings to their successor.
+# Quality-only (not cost-based). Match is substring on the recorded model string.
+_MODEL_SUCCESSORS = {
+    "claude-3-sonnet": "claude-sonnet-4-6",
+    "claude-3-haiku": "claude-haiku-4-5",
+    "claude-3-opus": "claude-opus-4-7",
+    "claude-3-5-sonnet": "claude-sonnet-4-6",
+    "claude-3.5-sonnet": "claude-sonnet-4-6",
+    "claude-sonnet-3-5": "claude-sonnet-4-6",
+    "gpt-4-turbo": "gpt-4.1",
+    "gpt-4-0": "gpt-4.1",
+    "gpt-4 ": "gpt-4.1",
+}
+
+
+def _infer_provider(model: str) -> str:
+    """Recover a provider hint from a bare model id when entries don't carry one."""
+    m = (model or "").lower()
+    if not m:
+        return ""
+    if "claude" in m:
+        return "claude"
+    if m.startswith("gpt") or "openai" in m:
+        return "openai"
+    if "gemini" in m:
+        return "gemini"
+    if "llama" in m or "mistral" in m or "ollama" in m or "qwen" in m:
+        return "ollama"
+    return ""
+
+
+def _aggregate_by_model(entries: list[dict], window_days: int) -> dict[tuple, dict]:
+    """Aggregate entries by (provider, model) over the trailing window."""
+    import time
+    cutoff = int(time.time()) - window_days * 86400
+    agg: dict[tuple, dict] = {}
+    for e in entries:
+        if e.get("ts", 0) < cutoff:
+            continue
+        model = e.get("model") or ""
+        if not model:
+            continue
+        provider = e.get("provider") or _infer_provider(model)
+        key = (provider, model)
+        b = agg.setdefault(key, {
+            "provider": provider, "model": model,
+            "total_cost": 0.0, "call_count": 0,
+            "tokens_in_sum": 0, "tokens_out_sum": 0,
+        })
+        b["total_cost"] += float(e.get("usd") or 0.0)
+        b["call_count"] += 1
+        b["tokens_in_sum"] += int(e.get("tokensIn") or 0)
+        b["tokens_out_sum"] += int(e.get("tokensOut") or 0)
+    for b in agg.values():
+        n = max(1, b["call_count"])
+        b["avg_cost_per_call"] = round(b["total_cost"] / n, 6)
+        b["avg_tokens_in"] = b["tokens_in_sum"] // n
+        b["avg_tokens_out"] = b["tokens_out_sum"] // n
+        b["total_cost"] = round(b["total_cost"], 6)
+    return agg
+
+
+def _recommendations(window_days: int = 30) -> dict:
+    """Analyze last `window_days` of usage and return concrete swap recommendations.
+
+    Rules:
+      1. Sonnet/Opus + avg_tokens_in < 500 + call_count >= 10 → swap to Haiku (~85% saving)
+      2. avg_tokens_in > 5000 + call_count >= 5 → enable prompt caching (~50% saving)
+      3. call_count >= 100 + total_cost > $1 → try ollama local (~100% saving)
+      4. Stale model in _MODEL_SUCCESSORS → upgrade for quality (no $ saving)
+    """
+    import time
+    entries = _gather_all()
+    agg = _aggregate_by_model(entries, window_days)
+
+    total_cost = round(sum(b["total_cost"] for b in agg.values()), 6)
+    recs: list[dict] = []
+
+    for (provider, model), b in agg.items():
+        mlow = model.lower()
+        cc = b["call_count"]
+        tcost = b["total_cost"]
+        ati = b["avg_tokens_in"]
+
+        # Rule 1 — Haiku for short prompts
+        is_premium = ("sonnet" in mlow) or ("opus" in mlow)
+        is_haiku_already = "haiku" in mlow
+        if is_premium and not is_haiku_already and ati < 500 and cc >= 10:
+            saving = round(tcost * 0.85, 6)
+            recs.append({
+                "ruleId": "haiku_for_short_prompts",
+                "priority": 3,
+                "currentModel": model,
+                "currentProvider": provider,
+                "currentCost": tcost,
+                "suggestedModel": "claude-haiku-4-5",
+                "estimatedSavings": saving,
+                "callCount": cc,
+                "rationale": (
+                    f"평균 입력 토큰 {ati} (<500). 짧은 프롬프트에는 Haiku가 "
+                    f"~15% 비용으로 충분합니다."
+                ),
+            })
+
+        # Rule 2 — Cache long context
+        if ati > 5000 and cc >= 5:
+            saving = round(tcost * 0.5, 6)
+            recs.append({
+                "ruleId": "enable_prompt_caching",
+                "priority": 2,
+                "currentModel": model,
+                "currentProvider": provider,
+                "currentCost": tcost,
+                "suggestedModel": model,  # same model, different config
+                "estimatedSavings": saving,
+                "callCount": cc,
+                "rationale": (
+                    f"평균 입력 토큰 {ati} (>5000). 프롬프트 캐싱을 활성화하면 "
+                    f"캐시 워밍 후 입력 비용이 ~50% 감소합니다."
+                ),
+            })
+
+        # Rule 3 — Local model for repetitive batch tasks
+        is_ollama_already = (provider == "ollama") or ("ollama" in mlow) or ("llama" in mlow)
+        if cc >= 100 and tcost > 1.0 and not is_ollama_already:
+            saving = round(tcost * 1.0, 6)
+            recs.append({
+                "ruleId": "local_model_for_batch",
+                "priority": 1,
+                "currentModel": model,
+                "currentProvider": provider,
+                "currentCost": tcost,
+                "suggestedModel": "ollama:llama3.1",
+                "estimatedSavings": saving,
+                "callCount": cc,
+                "rationale": (
+                    f"호출 {cc}회, 누적 ${tcost:.2f}. 반복적/배치성 작업이면 "
+                    f"로컬 ollama 모델을 시도해보세요 (비용 $0)."
+                ),
+            })
+
+        # Rule 4 — Stale model (quality, not cost)
+        for stale_key, successor in _MODEL_SUCCESSORS.items():
+            if stale_key in mlow:
+                recs.append({
+                    "ruleId": "stale_model_upgrade",
+                    "priority": 4,
+                    "currentModel": model,
+                    "currentProvider": provider,
+                    "currentCost": tcost,
+                    "suggestedModel": successor,
+                    "estimatedSavings": 0.0,
+                    "callCount": cc,
+                    "rationale": (
+                        f"구버전 모델 사용 중. 품질 향상을 위해 {successor}로 "
+                        f"업그레이드를 권장합니다."
+                    ),
+                })
+                break
+
+    # Sort by priority DESC then estimatedSavings DESC, cap at 20
+    recs.sort(key=lambda r: (r["priority"], r["estimatedSavings"]), reverse=True)
+    recs = recs[:20]
+
+    est_total = round(sum(r["estimatedSavings"] for r in recs), 6)
+
+    return {
+        "ok": True,
+        "windowDays": window_days,
+        "computedAt": int(time.time() * 1000),
+        "recommendations": recs,
+        "totalCost30d": total_cost,
+        "estimatedSavingsTotal": est_total,
+    }
+
+
+def api_cost_recommendations(query: dict | None = None) -> dict:
+    """Public wrapper. Optional query.window (days, default 30, clamped 1..365)."""
+    q = query or {}
+    try:
+        window = int(q.get("window") or 30)
+    except (TypeError, ValueError):
+        window = 30
+    window = max(1, min(365, window))
+    try:
+        return _recommendations(window)
+    except Exception as e:
+        log.warning("cost recommendations failed: %s", e)
+        return {"ok": False, "error": str(e)}
+
+
 def api_cost_timeline_summary(_q: dict | None = None) -> dict:
     entries = _gather_all()
     days = _group_by_day(entries)
