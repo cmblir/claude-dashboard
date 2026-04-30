@@ -20624,6 +20624,7 @@ VIEWS.autoResumeManager = async () => {
         <td class="mono text-xs">${escapeHtml(eta)}</td>
         <td class="text-right">
           <button class="btn text-xs" onclick="_armOpenDetail('${escapeHtml(sid)}')">${t('상세')}</button>
+          <button class="btn text-xs" onclick="_armAdvise('${escapeHtml(sid)}')" title="${t('Hyper Advisor')}">🧠 ${t('Hyper Advisor')}</button>
           <button class="btn text-xs" onclick="_armCancelOne('${escapeHtml(sid)}')">${t('취소')}</button>
         </td>
       </tr>`;
@@ -20708,6 +20709,92 @@ window._armOpenDetail = (sid) => {
       console.log('[auto-resume detail]', r.entry);
     })
     .catch(e => toast(e.message, 'err'));
+};
+
+// Hyper Advisor — opt-in meta-LLM call to suggest retry-policy adjustments.
+// Results are advisory only; user clicks Apply to push them via /api/auto_resume/set.
+window._armAdvise = async (sid) => {
+  if (!sid) return;
+  showModalLoading(t('재시도 분석') + '…');
+  let r;
+  try {
+    r = await api('/api/auto_resume/advise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid }),
+    });
+  } catch (e) {
+    closeModal();
+    return toast(e.message, 'err');
+  }
+  if (!r || !r.ok || !r.advice) {
+    closeModal();
+    const err = (r && r.error) || 'unknown';
+    if (/Not enough failure history/i.test(err)) {
+      return toast(t('분석할 실패 이력이 부족함'), 'err');
+    }
+    return toast(t('Hyper Advisor') + ': ' + err, 'err');
+  }
+  const a = r.advice;
+  const adviceJson = JSON.stringify({
+    sessionId: sid,
+    pollInterval: a.pollIntervalSec,
+    maxAttempts: a.maxAttempts,
+  });
+  const promptHintHtml = a.promptHint
+    ? `<div class="mb-2"><div class="text-xs text-[var(--text-mute)] mb-1">${t('프롬프트 힌트')}</div>
+        <div class="mono text-xs p-2 rounded" style="background:rgba(148,163,184,.08);">${escapeHtml(a.promptHint)}</div></div>`
+    : '';
+  showModal(`
+    <div class="p-5">
+      <h3 class="font-semibold text-base mb-3">🧠 ${t('Hyper Advisor')} — ${t('권장 조정')}</h3>
+      <div class="grid grid-cols-2 gap-3 mb-3 text-sm">
+        <div>
+          <div class="text-xs text-[var(--text-mute)]">${t('권장 폴링 간격(초)')}</div>
+          <div class="mono">${a.pollIntervalSec} <span class="text-[var(--text-mute)] text-xs">(${t('현재')}: ${r.currentPollInterval})</span></div>
+        </div>
+        <div>
+          <div class="text-xs text-[var(--text-mute)]">${t('권장 최대 시도')}</div>
+          <div class="mono">${a.maxAttempts} <span class="text-[var(--text-mute)] text-xs">(${t('현재')}: ${r.currentMaxAttempts})</span></div>
+        </div>
+      </div>
+      ${promptHintHtml}
+      <div class="mb-3">
+        <div class="text-xs text-[var(--text-mute)] mb-1">${t('근거')}</div>
+        <div class="text-sm">${escapeHtml(a.rationale || '')}</div>
+      </div>
+      <div class="text-[10px] text-[var(--text-mute)] mb-3 mono">
+        ${escapeHtml(a.provider || '')} ${escapeHtml(a.model || '')} · cost $${(r.cost_usd || 0).toFixed(4)}
+      </div>
+      <div class="flex justify-end gap-2">
+        <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+        <button class="btn primary text-xs" onclick='_armApplyAdvice(${JSON.stringify(adviceJson).replace(/</g, "\\u003c")})'>${t('적용')}</button>
+      </div>
+    </div>
+  `);
+};
+
+window._armApplyAdvice = async (payloadJson) => {
+  let payload;
+  try { payload = JSON.parse(payloadJson); } catch { return toast('bad payload', 'err'); }
+  try {
+    const r = await api('/api/auto_resume/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId:    payload.sessionId,
+        pollInterval: payload.pollInterval,
+        maxAttempts:  payload.maxAttempts,
+      }),
+    });
+    if (r && r.ok) {
+      closeModal();
+      toast(t('적용') + ' ✓', 'ok');
+      setTimeout(() => renderView && renderView(), 400);
+    } else {
+      toast(t('Hyper Advisor') + ': ' + ((r && r.error) || 'unknown'), 'err');
+    }
+  } catch (e) { toast(e.message, 'err'); }
 };
 
 window._armCancelOne = async (sid) => {

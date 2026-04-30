@@ -142,6 +142,7 @@ from .ollama_hub import (
     api_ollama_create_model,
 )
 from .auto_resume import (
+    api_auto_resume_advise,
     api_auto_resume_cancel, api_auto_resume_get,
     api_auto_resume_hook_status, api_auto_resume_install_hooks,
     api_auto_resume_set, api_auto_resume_status,
@@ -536,6 +537,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/prompt-library/to-workflow": api_prompt_library_to_workflow,
     "/api/auto_resume/set": api_auto_resume_set,
     "/api/auto_resume/cancel": api_auto_resume_cancel,
+    "/api/auto_resume/advise": api_auto_resume_advise,
     "/api/auto_resume/install_hooks": api_auto_resume_install_hooks,
     "/api/auto_resume/uninstall_hooks": api_auto_resume_uninstall_hooks,
     "/api/prefs/set": api_prefs_set,

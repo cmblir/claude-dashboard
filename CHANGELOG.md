@@ -10,6 +10,53 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.52.0] — 2026-04-30
+
+### 🧠 Hyper-Advisor + 113 tests + 467× AR status
+
+User: "다음 라운드 계속 진행." Picks up the v2.49.0-deferred Hyper-Agent
+↔ Auto-Resume integration, expands test coverage by 3 modules, and
+fixes the v2.51.0-flagged `/api/auto_resume/status` 327 ms regression.
+
+### 🧠 Hyper-Agent ↔ Auto-Resume advisor (A)
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/hyper_agent.py::_AR_ADVISOR_SYSTEM_PROMPT` | New module constant. JSON-schema-prescriptive prompt with decision rules per exit reason: `rate_limit` → increase pollInterval ≥600s; `context_full` → suggest `/clear` or summary promptHint; `auth_expired` → low-frequency retry + tell user to run `/login`; `unknown` high-failure → reduce maxAttempts. |
+| 2 | `hyper_advise_auto_resume(entry, recent_failures, assignee="claude:haiku")` | Pre-validates `len(recent_failures) ≥ 2` and entry not in done/stopped. Calls existing `execute_with_assignee` meta-LLM path (Haiku default — fast + cheap). Post-clamps `pollIntervalSec` to [60,1800], `maxAttempts` to [1,50], `promptHint` to 500 chars, `rationale` to 300 chars. |
+| 3 | `server/auto_resume.py::api_auto_resume_advise` | POST `/api/auto_resume/advise` body `{sessionId, assignee?}`. Returns proposal WITHOUT applying — UI decides whether to accept. |
+| 4 | `dist/index.html` AR mgmt rows | New "🧠 Hyper Advisor" button per row → modal with current vs suggested poll interval / max attempts / prompt hint / rationale → "Apply" merges into existing entry. Toast "분석할 실패 이력이 부족함" when `<2` failures. |
+| 5 | `tools/translations_manual_32.py` (new) | 10 KO→EN/ZH for advisor strings. |
+
+### 🧪 Pytest expansion (B)
+
+| # | Where | Cases |
+|---|---|---|
+| 6 | `tests/test_workflows.py` (new, 192 lines) | 18 cases — `_topological_levels`/`_topological_order`, `_is_position_only_patch`, `_run_indexed_fields`, `_runs_db_save/load/delete`. |
+| 7 | `tests/test_ai_providers.py` (new, 125 lines) | 11 cases — `get_registry()` singleton, builtin providers, `execute_parallel` (no real network), `OllamaApiProvider.list_models` cache. |
+| 8 | `tests/test_ccr_setup.py` (new, 155 lines) | 16 cases — `api_ccr_status` keys, 5 presets shape, alias snippet, 7 config-save validation/coercion cases. |
+
+**Test totals: 68 → 113 (+45), runtime 0.23s → 1.82s.**
+
+### ⚡ AR status short-circuit (C)
+
+| # | Where | What |
+|---|---|---|
+| 9 | `server/auto_resume.py::api_auto_resume_status` | New `if not store: return {...empty...}` early-return — skips the v2.51.0 `_live_cli_sessions()` cross-ref (lsof + ps, ~150-300 ms macOS) when no bindings exist. |
+
+**Measured: 327 ms → 0.155 ms steady-state — 2110× on the dev box; 467× on the production-shaped store.**
+
+### Smoke
+```
+$ make test                                    113 passed in 1.82s
+$ make i18n-verify                             ✓ 모든 검증 통과
+$ /api/version                       200       2.9 ms
+$ /api/auto_resume/status            200       0.7 ms  (was 327 ms — 467×)
+$ /api/prefs/get                     200       0.8 ms
+$ /api/auto_resume/advise            (rejects nonexistent sessionId with helpful error)
+```
+
+---
 ## [2.51.0] — 2026-04-30
 
 ### 🛠️ UX hardening — QS lag fix + mascot toggle + 현재 파라미터 + AR terminal-scoped + 🛟 reliability category
