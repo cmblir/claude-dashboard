@@ -457,6 +457,23 @@ def _sanitize_notify(raw: dict) -> dict:
         v = (raw.get(k) or "").strip()
         if v:
             out[k] = v[:500]
+    # v2.49.0: email/telegram channels — pass-through dicts with key whitelist
+    em = raw.get("email")
+    if isinstance(em, dict):
+        clean_em = {}
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_password", "from", "to"):
+            if k in em:
+                clean_em[k] = em[k]
+        if clean_em:
+            out["email"] = clean_em
+    tg = raw.get("telegram")
+    if isinstance(tg, dict):
+        clean_tg = {}
+        for k in ("bot_token", "chat_id"):
+            if k in tg:
+                clean_tg[k] = tg[k]
+        if clean_tg:
+            out["telegram"] = clean_tg
     return out
 
 
@@ -466,10 +483,12 @@ def _send_notify(entry: dict, kind: str, summary: str) -> None:
     notify = entry.get("notify") or {}
     slack = (notify.get("slack") or "").strip()
     discord = (notify.get("discord") or "").strip()
-    if not slack and not discord:
+    email_cfg = notify.get("email") if isinstance(notify.get("email"), dict) else None
+    telegram_cfg = notify.get("telegram") if isinstance(notify.get("telegram"), dict) else None
+    if not slack and not discord and not email_cfg and not telegram_cfg:
         return
     try:
-        from .notify import send_slack, send_discord
+        from .notify import send_slack, send_discord, send_email, send_telegram
         emoji = {
             "succeeded": "✅",
             "failed":    "🚫",
@@ -486,6 +505,18 @@ def _send_notify(entry: dict, kind: str, summary: str) -> None:
         if discord:
             try: send_discord(discord, title, body)
             except Exception as e: log.warning("auto_resume notify discord: %s", e)
+        if email_cfg:
+            try:
+                r = send_email(email_cfg, title, body)
+                if not r.get("ok"):
+                    log.warning("auto_resume notify email: %s", r.get("error"))
+            except Exception as e: log.warning("auto_resume notify email: %s", e)
+        if telegram_cfg:
+            try:
+                r = send_telegram(telegram_cfg, title, body)
+                if not r.get("ok"):
+                    log.warning("auto_resume notify telegram: %s", r.get("error"))
+            except Exception as e: log.warning("auto_resume notify telegram: %s", e)
     except Exception as e:
         log.warning("auto_resume notify failed: %s", e)
 

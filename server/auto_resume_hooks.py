@@ -139,6 +139,58 @@ fi
 exit 0
 """
 
+# Haiku-summarised variant — direct Anthropic Messages API. Calls the
+# stdlib helper at scripts/ar-haiku-summary.py instead of spawning the
+# `claude` CLI. Faster (no CLI startup) and avoids the tool-use surface.
+# Falls back to the raw tail if the helper exits non-zero (no key,
+# network failure, etc.).
+SNAPSHOT_SH_BODY_HAIKU_DIRECT = r"""#!/usr/bin/env bash
+# {sig}
+# Stop hook — Haiku-summarised snapshot variant (direct Messages API).
+set -e
+cwd="{cwd}"
+helper="{helper}"
+out_dir="$cwd/.claude/auto-resume"
+out_file="$out_dir/snapshot.md"
+mkdir -p "$out_dir"
+
+slug="-$(echo "$cwd" | sed 's,^/,,;s,/,-,g')"
+proj_dir="$HOME/.claude/projects/$slug"
+[ -d "$proj_dir" ] || exit 0
+
+jsonl=$(ls -t "$proj_dir"/*.jsonl 2>/dev/null | head -n1 || true)
+[ -n "$jsonl" ] || exit 0
+
+tail_blob=$(tail -c 204800 "$jsonl")
+brief=""
+if [ -f "$helper" ]; then
+  brief=$(python3 "$helper" --jsonl-path "$jsonl" --tail-bytes 16384 2>/dev/null || true)
+fi
+
+{{
+  echo "# Auto-Resume snapshot (Haiku-summarised, direct API)"
+  echo
+  echo "_Source: \\\`$jsonl\\\`_  "
+  echo "_Captured: $(date -u +%Y-%m-%dT%H:%M:%SZ)_"
+  echo
+  if [ -n "$brief" ]; then
+    echo "## Summary (Haiku 4.5)"
+    echo
+    echo "$brief"
+    echo
+  else
+    echo "_Haiku summary unavailable — falling back to raw tail._"
+    echo
+  fi
+  echo "## Tail of session transcript (most recent ~6 KB)"
+  echo
+  echo '```'
+  printf '%s\\n' "$tail_blob" | tail -c 6000
+  echo '```'
+}} > "$out_file.tmp" && mv "$out_file.tmp" "$out_file"
+exit 0
+"""
+
 INJECT_SH_BODY = r"""#!/usr/bin/env bash
 # {sig}
 # SessionStart hook — feed the most recent snapshot to Claude.
@@ -246,7 +298,43 @@ def _remove_hook(settings: dict, hook_name: str, command: str) -> int:
     return before - len(keep)
 
 
-def install(cwd: str, *, use_haiku_summary: bool = False) -> dict:
+# Prompt reinjection mechanism
+# ────────────────────────────
+# When a Claude Code session ends (Stop hook), this module captures the
+# tail of the active jsonl transcript into `<cwd>/.claude/auto-resume/
+# snapshot.md`. When a new session starts (SessionStart hook), the inject
+# script `cat`s that snapshot to stdout — Claude Code's hook contract
+# feeds SessionStart stdout straight into the new session's context, so
+# the resumed session naturally knows where it left off.
+#
+# Two reinjection paths
+# ─────────────────────
+#   1. Raw tail (default, use_haiku_summary=False)
+#      → snapshot.sh writes the last ~200 KB of the jsonl, then trims to
+#        ~6 KB markdown fence. Cheap, no network, always works.
+#
+#   2. Haiku-summarised (use_haiku_summary=True)
+#      → snapshot.sh additionally runs a Haiku 4.5 summarisation pass
+#        over the tail before writing snapshot.md, producing a tight
+#        "where you left off" brief plus the raw tail as fallback context.
+#
+# Haiku invocation backends (when use_haiku_summary=True)
+# ───────────────────────────────────────────────────────
+#   - Default (CLI, use_direct_api=False):
+#        `claude --print --model haiku-4.5` subprocess. Convenient —
+#        reuses the user's Claude Code login — but pays full CLI startup
+#        cost (~1-2s) and exposes the tool-use surface unnecessarily.
+#
+#   - Direct API (use_direct_api=True):
+#        invokes scripts/ar-haiku-summary.py, which POSTs straight to the
+#        Anthropic Messages API (~300-500ms typical, no subprocess spawn
+#        beyond a single python3 process, no tool-use surface). Reads
+#        ANTHROPIC_API_KEY from env or falls back to the lazyclaude
+#        ~/.claude-dashboard-ai-providers.json store.
+#
+# Both Haiku paths fall back to raw-tail-only if summarisation fails
+# (no key, network error, etc.) — the snapshot is always produced.
+def install(cwd: str, *, use_haiku_summary: bool = False, use_direct_api: bool = False) -> dict:
     cwd_p = Path(cwd).expanduser().resolve()
     if not cwd_p.is_dir():
         return {"ok": False, "error": f"cwd is not a directory: {cwd_p}"}
@@ -257,8 +345,21 @@ def install(cwd: str, *, use_haiku_summary: bool = False) -> dict:
     snapshot_sh = _snapshot_sh_path(str(cwd_p))
     inject_sh = _inject_sh_path(str(cwd_p))
 
-    body_template = SNAPSHOT_SH_BODY_HAIKU if use_haiku_summary else SNAPSHOT_SH_BODY
-    snapshot_body = body_template.format(sig=HOOK_SIGNATURE, cwd=str(cwd_p))
+    # Resolve the Anthropic Messages API helper path at install time so
+    # the generated shell script carries an absolute reference and does
+    # not depend on the runtime CWD. Layout: <repo_root>/server/this.py
+    # → <repo_root>/scripts/ar-haiku-summary.py.
+    repo_root = Path(__file__).resolve().parent.parent
+    helper_path = repo_root / "scripts" / "ar-haiku-summary.py"
+
+    if use_haiku_summary and use_direct_api:
+        snapshot_body = SNAPSHOT_SH_BODY_HAIKU_DIRECT.format(
+            sig=HOOK_SIGNATURE, cwd=str(cwd_p), helper=str(helper_path),
+        )
+    elif use_haiku_summary:
+        snapshot_body = SNAPSHOT_SH_BODY_HAIKU.format(sig=HOOK_SIGNATURE, cwd=str(cwd_p))
+    else:
+        snapshot_body = SNAPSHOT_SH_BODY.format(sig=HOOK_SIGNATURE, cwd=str(cwd_p))
     inject_body = INJECT_SH_BODY.format(sig=HOOK_SIGNATURE, cwd=str(cwd_p))
     if not _safe_write(snapshot_sh, snapshot_body):
         return {"ok": False, "error": "failed to write snapshot.sh"}
@@ -285,8 +386,8 @@ def install(cwd: str, *, use_haiku_summary: bool = False) -> dict:
         return {"ok": False, "error": "failed to write settings.json"}
 
     log.info(
-        "auto_resume_hooks: installed for %s (stop+%s start+%s haiku=%s)",
-        cwd_p, int(added_stop), int(added_start), use_haiku_summary,
+        "auto_resume_hooks: installed for %s (stop+%s start+%s haiku=%s direct_api=%s)",
+        cwd_p, int(added_stop), int(added_start), use_haiku_summary, use_direct_api,
     )
     return {
         "ok": True,
@@ -298,6 +399,7 @@ def install(cwd: str, *, use_haiku_summary: bool = False) -> dict:
         "addedSessionStart": added_start,
         "backupPath": str(bak) if bak.exists() else "",
         "useHaikuSummary": use_haiku_summary,
+        "useDirectApi": use_direct_api,
     }
 
 
