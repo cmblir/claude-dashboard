@@ -10,6 +10,73 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.47.0] — 2026-04-30
+
+### 🚀 Phase-2 perf — workflows runs → SQLite + 27× RSS drop + frontend consolidation
+
+User: "계속 진행해. 자율모드. 더 큰 factory." Phase 2 of the comprehensive
+optimization sweep — the items v2.46.0 explicitly deferred as "high blast
+radius". Three parallel agents handled separate domains.
+
+### 💾 workflows.runs → SQLite migration (the big one)
+
+`~/.claude-dashboard-workflows.json` previously stored both definitions
+AND runs in one JSON blob. Every per-node status update went through
+`_LOCK` → `_load_all` → mutate → `_dump_all` (full file serialize +
+fsync). Concurrent workflow saves serialized on this lock.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/db.py::_db_init` | New `workflow_runs(run_id PK, workflow_id, status, started_at, ended_at, iteration, total_iterations, cost_total, tokens_in, tokens_out, payload_json TEXT)` table + `idx_runs_workflow(workflow_id, started_at DESC)` + `idx_runs_status(status, started_at DESC)`. |
+| 2 | `server/workflows.py` | New helpers: `_runs_db_save / load / delete / list_recent / summaries` + `_run_indexed_fields`. Per-node updates still go through `_RUNS_CACHE` (live state) but persistence is now `INSERT OR REPLACE` into the table — no JSON round-trip. |
+| 3 | `server/workflows.py` | One-time `_migrate_runs_to_db()` flagged by `migration_v2_47_runs_done` in the JSON store. Legacy `runs` dict is preserved (defensive rollback). |
+| 4 | `server/workflows.py::_LOCK` | Now covers definitions only (workflows array, history, customTemplates, schedule). `_RUNS_LOCK` still guards in-flight `_RUNS_CACHE`. SQLite handles run persistence concurrency itself. |
+| 5 | `_run_status_snapshot / api_workflows_list / api_workflow_run_diff / api_workflow_runs_list / api_workflow_stats / _notify_run_completion` | All updated to read via cache → DB fallback. `api_workflows_list` uses one batched `GROUP BY workflow_id` for `totalRuns`. |
+
+### 🧠 RSS — measured 1577 MB → 57.5 MB (~27× ↓)
+
+`tracemalloc` profile showed Python's heap was only ~10 MB. The OS-level RSS came from transient allocations during session indexing that weren't released back to the kernel.
+
+| # | Where | What |
+|---|---|---|
+| 6 | `server/sessions.py::_index_jsonl` | Was `read_text()` + `splitlines()` + materialized `lines: list[dict]` + 3 separate iterations to compute `first_user_prompt / model / cwd`. Rewrote as single-pass streaming line-by-line; replaced helpers with `_extract_*_from_msg(msg)` per-line. |
+| 7 | `server/notify.py` | `import ssl` + eager `_NO_REDIRECT_OPENER = build_opener(...)` deferred. Now `_get_opener()` cached on first use. ~3-6 MB at boot when no notification fires. |
+| 8 | `scripts/profile-boot-rss.py` (new) | Reusable tracemalloc + ps regression harness. |
+
+**Measured impact:**
+- Steady-state boot: ~700 MB peak / 522 MB current → **124 MB peak / 42 MB current** (16×)
+- Force re-index (161 sessions / 501 MB jsonl): 1947 MB peak / 1920 MB current → **102 MB peak / ~80 MB current** (19×)
+- Live server (`/api/version` 200): **57.5 MB RSS**
+
+DB integrity verified: 168 sessions, 10633 tool_use rows, 6.8B tokens — unchanged.
+
+### 🎨 Frontend consolidation
+
+| # | Where | What |
+|---|---|---|
+| 9 | `dist/index.html` `VIEWS.sessions` | 100-row `tbody.innerHTML` rebuild → 50-row initial paint + `IntersectionObserver` sentinel that appends 50 at a time. Sort/filter naturally resets via renderView innerHTML swap. |
+| 10 | `dist/index.html` 8 Chart.js sites | New `_chartInstances: Map` + `_renderChart(canvas, cfg)` helper. `chart.destroy() + new Chart()` → in-place `data.datasets[0].data = ...; chart.update('none')` when type+dataset count match. Stale-canvas sweep on each call. |
+| 11 | `dist/index.html` keydown | 9 module-level `document.addEventListener('keydown')` → single dispatcher with `_KEYDOWN_HANDLERS` array. Each former handler returns truthy to consume + stop propagation. Bonus: caught `_wfBindCanvas` re-attaching its keydown on every visit (latent leak). |
+| 12 | `dist/index.html` `_makeDraggable` | Stored bound move/up handlers on the dragged element → `_detachDragListeners(el)` called in `closeFeatureWindow` and `_wfCloseNodeEditor`. Plugged document-listener leak that accumulated over a session. |
+
+### 🌐 i18n hotfix
+- `tools/translations_manual.py` — restored missing `_26` import block (v2.46.0's "duplicate cleanup" agent removed the import too aggressively, leaving `_NEW_EN_26` references undefined). Added `_27` import + merge.
+- `tools/translations_manual_27.py` (new) — KO→EN/ZH for the new sentinel string `'더 불러오는 중…'`.
+
+### Smoke
+```
+=== boot log ===
+Serving http://… BEFORE indexing/ollama (v2.46.0 daemonization preserved)
+=== RSS ===                          57,504 KB  (was 1,577,072 KB → 27.4× ↓)
+=== /api/workflows/list ===          3.6 ms
+=== workflow_runs DB ===
+  table: workflow_runs ✓
+  indexes: idx_runs_workflow, idx_runs_status ✓
+  row_count: 2 (migration ok)
+=== make i18n-verify ===            ✓ 모든 검증 통과
+```
+
+---
 ## [2.46.0] — 2026-04-30
 
 ### 🚀 Comprehensive perf sweep (33 surgical fixes across backend / frontend / boot)

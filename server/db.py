@@ -136,6 +136,31 @@ def _db_init() -> None:
                 CREATE INDEX IF NOT EXISTS idx_wfcost_run ON workflow_costs(run_id);
                 CREATE INDEX IF NOT EXISTS idx_wfcost_provider ON workflow_costs(provider);
                 """)
+
+                # v2.47.0 — workflow runs migrated out of the JSON store.
+                # Per-iteration node status updates previously rewrote the
+                # whole ~/.claude-dashboard-workflows.json under a single
+                # global lock; runs now live in their own table so save and
+                # run paths no longer serialize on the same lock.
+                # Indexed columns are hoisted from the run payload; the rest
+                # stays as a single TEXT json blob for read-as-a-unit access.
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS workflow_runs (
+                  run_id TEXT PRIMARY KEY,
+                  workflow_id TEXT NOT NULL,
+                  status TEXT NOT NULL,
+                  started_at REAL NOT NULL,
+                  ended_at REAL,
+                  iteration INTEGER DEFAULT 0,
+                  total_iterations INTEGER DEFAULT 1,
+                  cost_total REAL DEFAULT 0.0,
+                  tokens_in INTEGER DEFAULT 0,
+                  tokens_out INTEGER DEFAULT 0,
+                  payload_json TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_runs_workflow ON workflow_runs(workflow_id, started_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_runs_status ON workflow_runs(status, started_at DESC);
+                """)
             except Exception:
                 pass
         _INITIALIZED = True
