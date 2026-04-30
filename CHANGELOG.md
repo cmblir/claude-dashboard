@@ -10,6 +10,63 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.54.0] — 2026-05-01
+
+### 🧹 Housekeeping + 264 tests + perf regression suite
+
+User: "다름 라운드 계속 진행." Three parallel agents on independent
+domains.
+
+### 🧹 Housekeeping (A)
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/backup.py::api_backup_prune` | `{retentionDays=30, keepLast=5, dryRun=false}`. Keeps `keepLast` newest + anything younger than `retentionDays`. Safety: never leaves 0 backups. Manifest verified before unlink. |
+| 2 | `server/auto_resume.py::api_auto_resume_prune_stale` | `{thresholdDays=30, dryRun=false}`. Only purges entries in terminal states (done/failed/exhausted/stopped/error) past threshold. Active states never touched. |
+| 3 | `server/housekeeping.py` (NEW, ~165 lines) | Disk-usage reporter + orchestrator. `_disk_usage` walks DB + json files + backups dir + sessions dir. `api_housekeeping_report` returns combined report. `api_housekeeping_run` calls both prunes based on flags. |
+| 4 | Endpoints | `GET /api/housekeeping/report`, `POST /api/housekeeping/run`, `POST /api/backup/prune`, `POST /api/auto_resume/prune-stale`. |
+| 5 | `dist/index.html` `VIEWS.backupRestore` | New "🧹 정리" card below backup table. Disk-usage summary line. Two action buttons (오래된 백업 정리, 유휴 AR 바인딩 정리) with dry-run preview → confirm → real run flow. |
+| 6 | `tools/translations_manual_35.py` (new) | 20 KO→EN/ZH for housekeeping strings. |
+
+### 🧪 Pytest expansion (B)
+
+| # | Where | Cases |
+|---|---|---|
+| 7 | `tests/test_backup.py` (199 lines) | 16 — list/create/delete/restore round-trip, manifest verification, path-traversal rejection, isolated_home redirection. |
+| 8 | `tests/test_learner.py` (133 lines) | 12 — `api_learner_patterns` shape, SQL-driven aggregation against synthetic data. |
+| 9 | `tests/test_hyper_agent.py` (233 lines) | 24 — `_empty_meta`, `_default_agent_meta`, `_coerce_agent_meta`, `_cwd_hash`, `_agent_key`, `hyper_advise_auto_resume` pre-validation + post-clamping (mocked execute_with_assignee). |
+| 10 | `tests/test_briefing.py` (128 lines) | 10 — `briefing_overview`, `briefing_projects_summary`, `briefing_activity` shapes; empty DB defaults. |
+| 11 | `tests/test_system.py` (185 lines) | 14 — `api_usage_summary`, `api_usage_project` cwd validation, `_running_sessions`, `api_sessions_stats` (v2.46.0 daily-timeline bug regression). |
+
+### ⚡ Perf regression suite (C)
+
+| # | Where | What |
+|---|---|---|
+| 12 | `tests/test_perf.py` (340 lines, 17 cases) | Each test sets a budget 10-100× current measured time, fails on regression. Covered: `_db_init` <5ms, `api_auto_resume_status` empty <10ms, `api_ports_list` <500ms, `_scan_plugin_hooks` warm <5ms, `_telemetry_compute` <50ms, `api_cost_recommendations` <100ms, `api_backup_list` <50ms, `_topological_levels` cached <1ms, `_runs_db_save` <20ms, cold imports (workflows <500ms, routes <1000ms, db <300ms), translation cache warm <10ms, `_exponential_backoff` 1000 calls <50ms, `_classify_exit` 1000 calls <100ms, `_safe_write` JSON <20ms. |
+
+`shutil.which("lsof")` skipif guard for the `api_ports_list` test on hosts without lsof.
+
+**Test totals: 171 → 264 (+93 = 17 perf + 76 module-coverage), runtime 1.80s → 2.71s.**
+
+### Smoke
+```
+$ make test                                    264 passed in 2.71s
+$ make i18n-verify                             ✓ 모든 검증 통과
+$ /api/version                       200       2.6 ms
+$ /api/housekeeping/report           200       1.5 ms
+$ /api/backup/list                   200       0.9 ms
+$ /api/auto_resume/status            200       0.9 ms
+$ housekeeping report shape          ok totalBytes=2693904 backups=0 arEntries=0
+```
+
+### Cumulative tests
+- v2.49.0: 0 → 26 (auto_resume)
+- v2.50.0: 26 → 68 (+41 db, prefs, process_monitor)
+- v2.52.0: 68 → 113 (+45 workflows, ai_providers, ccr_setup)
+- v2.53.0: 113 → 171 (+58 hooks, mcp, cost_timeline, notify)
+- v2.54.0: 171 → **264** (+93 backup, learner, hyper_agent, briefing, system, **+ perf regression suite**)
+
+---
 ## [2.53.0] — 2026-05-01
 
 ### 💾 Backup/restore + 🔍 session search + 171 tests
