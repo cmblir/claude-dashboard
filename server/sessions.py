@@ -214,8 +214,9 @@ def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
          message_count,user_msg_count,assistant_msg_count,tool_use_count,error_count,
          agent_call_count,subagent_types,model,first_user_prompt,last_summary,
          score,score_breakdown,indexed_at,
-         input_tokens,output_tokens,cache_read_tokens,cache_creation_tokens,total_tokens)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         input_tokens,output_tokens,cache_read_tokens,cache_creation_tokens,total_tokens,
+         mtime)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             session_id, project_name, project_dir, cwd, str(jsonl),
             started, ended, duration,
@@ -223,6 +224,7 @@ def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
             json.dumps(dict(subagent_counter)), model, first_prompt, "",
             score, json.dumps(breakdown), int(time.time() * 1000),
             tok_in, tok_out, tok_cache_read, tok_cache_create, tok_total,
+            int(jsonl.stat().st_mtime * 1000) if jsonl.exists() else 0,
         ))
         c.execute("INSERT INTO scores_history (session_id,ts,score,breakdown) VALUES (?,?,?,?)",
                   (session_id, int(time.time() * 1000), score, json.dumps(breakdown)))
@@ -244,7 +246,12 @@ def index_all_sessions(force: bool = False) -> dict:
         return {"indexed": 0, "skipped": 0, "total": 0}
 
     with _db() as c:
-        existing = {r["jsonl_path"]: r["indexed_at"] for r in c.execute("SELECT jsonl_path, indexed_at FROM sessions")}
+        # Prefer stored mtime (added v2.46) for skip checks; fall back to
+        # indexed_at when mtime is 0 (legacy rows that pre-date the column).
+        existing = {
+            r["jsonl_path"]: (r["mtime"] or 0, r["indexed_at"] or 0)
+            for r in c.execute("SELECT jsonl_path, mtime, indexed_at FROM sessions")
+        }
 
     for project_dir_path in sorted(PROJECTS_DIR.iterdir()):
         if not project_dir_path.is_dir():
@@ -257,9 +264,16 @@ def index_all_sessions(force: bool = False) -> dict:
                 mtime_ms = 0
             if not force:
                 prev = existing.get(str(jsonl))
-                if prev and prev >= mtime_ms:
-                    skipped += 1
-                    continue
+                if prev:
+                    prev_mtime, prev_indexed = prev
+                    # Cheap skip: file mtime hasn't changed since last index.
+                    if prev_mtime and prev_mtime >= mtime_ms:
+                        skipped += 1
+                        continue
+                    # Legacy fallback for rows lacking mtime.
+                    if not prev_mtime and prev_indexed >= mtime_ms:
+                        skipped += 1
+                        continue
             if _index_jsonl(jsonl, project_dir):
                 indexed += 1
             else:
@@ -654,17 +668,19 @@ def api_sessions_stats() -> dict:
                ORDER BY sessions DESC""",
             (SCORE_MIN_TOOLS, SCORE_MIN_TOOLS),
         ).fetchall()]
-    # name = cwd 의 basename (없으면 슬러그)
-    for r in proj_rows:
-        cwd = r.get("cwd") or ""
-        r["name"] = Path(cwd).name if cwd else (r.get("project_dir") or "")
-
-        # daily timeline (last 30 days)
+        # daily timeline (last 30 days) — single global query (was previously
+        # mis-indented INSIDE the per-project loop AND outside the `with _db()`
+        # block, which used a closed cursor and caused an N+1 of the same
+        # global query per project).
         thirty_days_ago = int((time.time() - 30 * 86400) * 1000)
         daily_rows = c.execute(
             "SELECT started_at, score, tool_use_count, error_count FROM sessions WHERE started_at >= ? ORDER BY started_at",
-            (thirty_days_ago,)
+            (thirty_days_ago,),
         ).fetchall()
+    # name = cwd basename (fallback to slug)
+    for r in proj_rows:
+        cwd = r.get("cwd") or ""
+        r["name"] = Path(cwd).name if cwd else (r.get("project_dir") or "")
 
     # bucket by day — 점수 평균은 도구≥기준 세션만 포함
     buckets: dict = defaultdict(lambda: {"sessions": 0, "tools": 0, "errors": 0, "score_sum": 0, "scored": 0})

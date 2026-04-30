@@ -20,6 +20,13 @@ from .config import PLUGINS_DIR, PROJECTS_DIR
 from .utils import _safe_read, _safe_write
 
 
+# 30s mtime-aware cache for plugin hook scan — directory tree walk +
+# JSON parsing is otherwise repeated on every /api/hooks call.
+_HOOKS_CACHE: list | None = None
+_HOOKS_CACHE_AT: float = 0.0
+_HOOKS_DIR_MTIME: float = 0.0
+
+
 def _plugin_hooks_file(plugin_key: str) -> Optional[Path]:
     """pluginKey ('<plugin>@<market>') → hooks.json 경로 (없으면 None)."""
     if "@" not in (plugin_key or ""):
@@ -43,12 +50,25 @@ def _scan_plugin_hooks() -> list:
 
     각 항목에 (pluginKey, event, groupIdx, subIdx) 인덱스 포함 → 수정/삭제 가능.
     """
+    global _HOOKS_CACHE, _HOOKS_CACHE_AT, _HOOKS_DIR_MTIME
     out: list = []
     if not PLUGINS_DIR.exists():
         return out
     markets_dir = PLUGINS_DIR / "marketplaces"
     if not markets_dir.exists():
         return out
+    # 30s TTL + mtime guard — invalidate when the marketplaces dir changes.
+    try:
+        dir_mtime = markets_dir.stat().st_mtime
+    except OSError:
+        dir_mtime = 0.0
+    now = time.time()
+    if (
+        _HOOKS_CACHE is not None
+        and dir_mtime == _HOOKS_DIR_MTIME
+        and (now - _HOOKS_CACHE_AT) < 30.0
+    ):
+        return _HOOKS_CACHE
     settings = get_settings()
     enabled_map = (settings.get("enabledPlugins") or {}) if isinstance(settings, dict) else {}
 
@@ -124,6 +144,9 @@ def _scan_plugin_hooks() -> list:
                 f"{market.name}",
                 f"{market.name}@{market.name}",
             )
+    _HOOKS_CACHE = out
+    _HOOKS_CACHE_AT = now
+    _HOOKS_DIR_MTIME = dir_mtime
     return out
 
 

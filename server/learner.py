@@ -19,6 +19,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from .db import _db, _db_init
 from .logger import log
 
 _PROJECTS = Path.home() / ".claude" / "projects"
@@ -95,29 +96,60 @@ def _parse_session(path: Path) -> dict:
 
 
 def _collect_sessions() -> list[dict]:
-    """최근 N 일 세션 메타 + 지표."""
-    if not _PROJECTS.exists():
+    """Recent-N-days session metadata + tool sequences from the SQLite index.
+
+    Replaces the previous JSONL walk; the DB already holds everything we need
+    (sessions table for metadata + tool_uses for the tool sequence).
+    """
+    _db_init()
+    cutoff_ms = int((datetime.now() - timedelta(days=_RECENT_DAYS)).timestamp() * 1000)
+    try:
+        with _db() as c:
+            rows = c.execute(
+                """SELECT session_id, jsonl_path, project_dir, started_at,
+                          first_user_prompt, message_count, total_tokens, mtime
+                     FROM sessions
+                    WHERE COALESCE(NULLIF(mtime,0), started_at) >= ?
+                 ORDER BY COALESCE(NULLIF(mtime,0), started_at) DESC
+                    LIMIT ?""",
+                (cutoff_ms, _MAX_SESSIONS),
+            ).fetchall()
+            if not rows:
+                return []
+            sids = [r["session_id"] for r in rows]
+            placeholders = ",".join(["?"] * len(sids))
+            tool_rows = c.execute(
+                f"""SELECT session_id, tool FROM tool_uses
+                     WHERE session_id IN ({placeholders})
+                  ORDER BY session_id, ts, id""",
+                sids,
+            ).fetchall()
+    except Exception as e:
+        log.warning("learner _collect_sessions DB query failed: %s", e)
         return []
-    cutoff = (datetime.now() - timedelta(days=_RECENT_DAYS)).timestamp()
-    files = []
-    for jsonl in _PROJECTS.glob("*/*.jsonl"):
+
+    tools_by_sid: dict[str, list[str]] = defaultdict(list)
+    for tr in tool_rows:
+        if tr["tool"]:
+            tools_by_sid[tr["session_id"]].append(tr["tool"])
+
+    sessions: list[dict] = []
+    for r in rows:
+        sid = r["session_id"]
+        jpath = r["jsonl_path"] or ""
+        # Best-effort path/project — strip the projects-root prefix if present.
         try:
-            st = jsonl.stat()
-            if st.st_mtime < cutoff:
-                continue
-            files.append((jsonl, st.st_mtime))
+            rel = str(Path(jpath).relative_to(_PROJECTS)) if jpath else sid
         except Exception:
-            continue
-    files.sort(key=lambda x: x[1], reverse=True)
-    files = files[:_MAX_SESSIONS]
-    sessions = []
-    for jsonl, mtime in files:
-        parsed = _parse_session(jsonl)
+            rel = jpath or sid
         sessions.append({
-            "path": str(jsonl.relative_to(_PROJECTS)),
-            "mtime": int(mtime * 1000),
-            "project": jsonl.parent.name,
-            **parsed,
+            "path": rel,
+            "mtime": int(r["mtime"] or r["started_at"] or 0),
+            "project": r["project_dir"] or "",
+            "tools": tools_by_sid.get(sid, []),
+            "firstPrompt": r["first_user_prompt"] or "",
+            "lineCount": int(r["message_count"] or 0),
+            "totalTokens": int(r["total_tokens"] or 0),
         })
     return sessions
 

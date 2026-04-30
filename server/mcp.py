@@ -244,16 +244,21 @@ _MCP_LIST_TTL = 300.0  # 5분 — 거의 안 바뀜
 _MCP_LIST_LOCK = threading.Lock()
 _MCP_LIST_REFRESH_LOCK = threading.Lock()  # 단일 in-flight refresh
 
-# 디스크 캐시 로드 (서버 재시작해도 즉시 사용 가능)
-try:
-    if _MCP_LIST_CACHE_FILE.exists():
-        _disk = json.loads(_MCP_LIST_CACHE_FILE.read_text(encoding="utf-8"))
-        if isinstance(_disk, dict):
-            _MCP_LIST_CACHE["status"] = _disk.get("status", {}) or {}
-            _MCP_LIST_CACHE["url"] = _disk.get("url", {}) or {}
-            _MCP_LIST_CACHE["ts"] = float(_disk.get("ts", 0) or 0)
-except Exception:
-    pass
+def _load_disk_cache() -> None:
+    """Load persisted MCP list cache from disk into the in-memory dict.
+
+    Deferred to warmup_caches() so import time stays fast; first cache miss
+    before warmup falls back to a live subprocess refresh.
+    """
+    try:
+        if _MCP_LIST_CACHE_FILE.exists():
+            _disk = json.loads(_MCP_LIST_CACHE_FILE.read_text(encoding="utf-8"))
+            if isinstance(_disk, dict):
+                _MCP_LIST_CACHE["status"] = _disk.get("status", {}) or {}
+                _MCP_LIST_CACHE["url"] = _disk.get("url", {}) or {}
+                _MCP_LIST_CACHE["ts"] = float(_disk.get("ts", 0) or 0)
+    except Exception:
+        pass
 
 
 def _refresh_mcp_list_blocking() -> tuple[dict, dict]:
@@ -324,6 +329,7 @@ def warmup_caches() -> None:
     """부팅 시 호출 — 첫 요청의 6초 지연을 제거한다."""
     def _run():
         try:
+            _load_disk_cache()
             t0 = time.time()
             _claude_mcp_list_cached()
             from .logger import log
