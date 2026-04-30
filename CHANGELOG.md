@@ -10,6 +10,62 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.49.0] — 2026-04-30
+
+### 🔄 Auto-Resume hardening — mgmt tab + email/telegram + Haiku direct + pytest
+
+User: "누락/약한 부분 먼저 보완." Picks up the v2.49.0-deferred items from
+v2.48.1 (worker concurrency landed first; rest blocked on rate limit).
+
+### 🖥️ Mgmt tab + notification channels (B)
+
+| # | Where | What |
+|---|---|---|
+| 1 | `dist/index.html` `VIEWS.autoResumeManager` | New `🔄 Auto-Resume 관리` tab under `observe` group. Header with total + per-state count chips. Active bindings table (session / cwd / state / attempts / next ETA / actions). Row checkboxes + "선택 취소" iterates POST `/api/auto_resume/cancel`. State chips colored by status. 10s auto-refresh with `document.hidden` guard. Mobile-stack at <640px. |
+| 2 | `server/nav_catalog.py` | New `autoResumeManager` entry in `TAB_CATALOG` + EN/ZH descriptions in `TAB_DESC_I18N`. |
+| 3 | `server/notify.py::send_email` | New SMTP+STARTTLS sender. cfg keys `{smtp_host, smtp_port, smtp_user, smtp_password, from, to}` (to as str/list). 10s timeout. Aborts if STARTTLS unsupported (no plaintext creds). Returns `{ok, error?}`, never raises. |
+| 4 | `server/notify.py::send_telegram` | New Telegram Bot API sender. cfg `{bot_token, chat_id}`. POST `https://api.telegram.org/bot<token>/sendMessage` with Markdown. Uses dedicated `_NoRedirect` opener (host outside `_ALLOWED_HOSTS` whitelist). |
+| 5 | `server/notify.py::_send_notify` | New multi-channel dispatcher (slack/discord/email/telegram). Iterates configured channels, accumulates per-channel results. |
+| 6 | `server/auto_resume.py::_sanitize_notify` | Extended to pass-through `email` and `telegram` config dicts with key whitelist. Existing slack/discord behavior unchanged. |
+| 7 | `server/auto_resume.py::_send_notify` | Wired `send_email` and `send_telegram` calls alongside existing slack/discord. Fully back-compat — entries without email/telegram config skip the new paths. |
+| 8 | `tools/translations_manual_28.py` (new) + wiring | KO → EN/ZH for 31 new mgmt-tab strings. |
+
+### 🦙 Haiku direct API + reinject docs (C)
+
+| # | Where | What |
+|---|---|---|
+| 9 | `server/auto_resume_hooks.py::install` | Signature now `install(cwd, *, use_haiku_summary=False, use_direct_api=False)`. Return dict carries `useDirectApi`. Existing call sites in `auto_resume.py` keep working — flag defaults to False. |
+| 10 | `server/auto_resume_hooks.py` | 36-line module-level docstring above `install()` documenting the snapshot+inject mechanism + both Haiku backends (CLI vs direct API) with relative cost notes. |
+| 11 | `scripts/ar-haiku-summary.py` (new, executable, 198 lines, stdlib only) | Direct Anthropic Messages API helper bypassing the `claude -p` subprocess. Reads key from `ANTHROPIC_API_KEY` env or `~/.claude-dashboard-ai-providers.json`. POSTs `claude-haiku-4-5-20251001`, max_tokens 200, 10s timeout. Six distinct exit codes (1 missing, 2 no-key, 3 HTTP, 4 network, 5 parse, 6 unexpected). `--dry-run` redacts the API key in headers. Empty stdout on any failure → shell falls back to no-summary mode. |
+
+### 🧪 pytest harness (D)
+
+| # | Where | What |
+|---|---|---|
+| 12 | `tests/__init__.py` (new, empty) | Marks `tests/` as a package. |
+| 13 | `tests/conftest.py` (new) | Shared fixtures: `isolated_home` (HOME → tmp_path) and `fixed_now` (stable epoch 1777982400.0 = 2026-04-30T12:00:00Z). |
+| 14 | `tests/test_auto_resume.py` (new, 26 cases) | Unit tests covering `_classify_exit` (6 cases), `_parse_reset_time` (5), `_exponential_backoff` (5), `_push_hash_and_check_stall` (5), `_jsonl_idle_seconds` + `_looks_rate_limited` (5). Uses `tmp_path` for filesystem isolation. |
+| 15 | `Makefile::test` | New target `make test` — checks pytest installed, runs `pytest tests/ -v`. |
+
+### Smoke
+```
+$ make test
+... 26 passed in 0.03s
+$ python3 scripts/ar-haiku-summary.py --help
+usage: ar-haiku-summary.py [-h] --jsonl-path JSONL_PATH ...
+$ python3 -c "from server.notify import send_email, send_telegram, _send_notify; print('notify_ok')"
+notify_ok
+$ make i18n-verify
+✓ 모든 검증 통과
+$ /api/auto_resume/status         200  1.3 ms
+$ /api/version                    200  4.1 ms
+$ /api/workflows/list             200  3.3 ms
+```
+
+### Deferred
+- **Hyper Agent integration** — auto-resume retry policy learned by hyper-agent meta-LLM. Bigger refactor; tracked as separate v2.50.x item.
+
+---
 ## [2.48.1] — 2026-04-30
 
 ### 🔄 Auto-Resume worker — concurrent retry (4-way ThreadPool)

@@ -259,6 +259,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         ["cli 세션", "active session", "claude cli", "활성 세션", "rss", "idle", "유휴"]),
     ("memoryManager", "system",   "메모리 관리 — vm_stat 기반 시스템 메모리 + 상위 30 프로세스 + idle Claude Code 일괄 종료",
         ["메모리", "memory", "vm_stat", "swap", "스왑", "메모리 관리", "kill idle"]),
+
+    # v2.49.0 — Auto-Resume management
+    ("autoResumeManager", "observe",
+        "🔄 Auto-Resume 관리 — 활성 바인딩 리스트 + 일괄 취소",
+        ["auto-resume", "auto resume", "재개", "바인딩", "session"]),
 ]
 
 
@@ -350,6 +355,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                     "zh": "活跃 CLI 会话 — Claude Code CLI 会话 PID/RSS/CPU/空闲；聚焦终端或 SIGTERM"},
     "memoryManager": {"en": "Memory Manager — system memory via vm_stat + top 30 processes + bulk-kill idle Claude Code",
                       "zh": "内存管理 — 基于 vm_stat 的系统内存 + 前 30 进程 + 批量终止空闲 Claude Code"},
+    "autoResumeManager": {"en": "Auto-Resume Manager — active binding list + bulk cancel",
+                          "zh": "Auto-Resume 管理 — 活动绑定列表 + 批量取消"},
 }
 
 

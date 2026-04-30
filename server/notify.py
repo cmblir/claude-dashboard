@@ -110,6 +110,120 @@ def notify_workflow_completion(
     return result
 
 
+def send_email(cfg: dict, title: str, body: str) -> dict:
+    """Send via SMTP+STARTTLS using stdlib only.
+    cfg keys: smtp_host, smtp_port, smtp_user, smtp_password, from, to (str|list).
+    Never raises; returns {ok, error?}."""
+    if not isinstance(cfg, dict):
+        return {"ok": False, "error": "config must be object"}
+    host = (cfg.get("smtp_host") or "").strip()
+    port = int(cfg.get("smtp_port") or 587)
+    user = (cfg.get("smtp_user") or "").strip()
+    pwd = cfg.get("smtp_password") or ""
+    sender = (cfg.get("from") or user).strip()
+    to_raw = cfg.get("to")
+    if isinstance(to_raw, str):
+        recipients = [r.strip() for r in to_raw.replace(";", ",").split(",") if r.strip()]
+    elif isinstance(to_raw, list):
+        recipients = [str(r).strip() for r in to_raw if str(r).strip()]
+    else:
+        recipients = []
+    if not host or not user or not pwd or not sender or not recipients:
+        return {"ok": False, "error": "missing smtp credentials or recipients"}
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.utils import formatdate
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["Subject"] = f"[LazyClaude] {title[:60]}"
+        msg["From"] = sender
+        msg["To"] = ", ".join(recipients)
+        msg["Date"] = formatdate(localtime=True)
+        with smtplib.SMTP(host, port, timeout=10) as smtp:
+            smtp.ehlo()
+            try:
+                smtp.starttls()
+                smtp.ehlo()
+            except Exception as e:
+                # STARTTLS not supported; abort rather than send plaintext creds
+                log.warning("notify email: starttls failed on %s:%s — %s", host, port, e)
+                return {"ok": False, "error": f"starttls failed: {e}"}
+            smtp.login(user, pwd)
+            smtp.sendmail(sender, recipients, msg.as_string())
+        return {"ok": True}
+    except Exception as e:
+        log.warning("notify email send failed: %s", e)
+        return {"ok": False, "error": str(e)}
+
+
+def send_telegram(cfg: dict, title: str, body: str) -> dict:
+    """Send via Telegram Bot API sendMessage.
+    cfg keys: bot_token, chat_id. Never raises; returns {ok, error?}."""
+    if not isinstance(cfg, dict):
+        return {"ok": False, "error": "config must be object"}
+    token = (cfg.get("bot_token") or "").strip()
+    chat_id = cfg.get("chat_id")
+    if isinstance(chat_id, str):
+        chat_id = chat_id.strip()
+    if not token or chat_id in (None, ""):
+        return {"ok": False, "error": "missing bot_token or chat_id"}
+    try:
+        import ssl  # noqa: F401
+        text = f"*{title}*\n```\n{body[:3500]}\n```"
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        data = json.dumps({
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "Markdown",
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            url, data=data, method="POST",
+            headers={"Content-Type": "application/json", "User-Agent": "LazyClaude/2.49"},
+        )
+        # Telegram is not in webhook whitelist; use a dedicated no-redirect opener
+        opener = urllib.request.build_opener(_NoRedirect())
+        with opener.open(req, timeout=10) as resp:
+            ok = 200 <= resp.status < 300
+            return {"ok": ok} if ok else {"ok": False, "error": f"http {resp.status}"}
+    except Exception as e:
+        log.warning("notify telegram send failed: %s", e)
+        return {"ok": False, "error": str(e)}
+
+
+def _send_notify(config: dict, kind: str, summary: str) -> dict:
+    """Multi-channel dispatcher used by auto_resume and tests.
+
+    `config` shape (all keys optional):
+        {
+            "slack":    "https://hooks.slack.com/...",
+            "discord":  "https://discord.com/api/webhooks/...",
+            "email":    {smtp_host, smtp_port, smtp_user, smtp_password, from, to},
+            "telegram": {bot_token, chat_id},
+        }
+    Returns per-channel results; never raises. Empty config is a no-op.
+    """
+    results: dict = {}
+    if not isinstance(config, dict):
+        return results
+    title = f"LazyClaude · {kind}"
+    body = summary or ""
+    slack_url = config.get("slack") if isinstance(config.get("slack"), str) else ""
+    slack_url = (slack_url or "").strip()
+    if slack_url:
+        results["slack"] = {"ok": send_slack(slack_url, title, body)}
+    discord_url = config.get("discord") if isinstance(config.get("discord"), str) else ""
+    discord_url = (discord_url or "").strip()
+    if discord_url:
+        results["discord"] = {"ok": send_discord(discord_url, title, body)}
+    email_cfg = config.get("email")
+    if isinstance(email_cfg, dict) and email_cfg:
+        results["email"] = send_email(email_cfg, title, body)
+    tg_cfg = config.get("telegram")
+    if isinstance(tg_cfg, dict) and tg_cfg:
+        results["telegram"] = send_telegram(tg_cfg, title, body)
+    return results
+
+
 def api_notify_test(body: dict) -> dict:
     """UI 테스트 버튼용 — 지정된 채널에 test 메시지 1건 전송."""
     if not isinstance(body, dict):

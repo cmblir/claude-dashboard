@@ -1371,6 +1371,8 @@ const NAV = [
     group: 'observe', desc: 'Claude Code CLI 세션의 PID·RSS·CPU·idle 시간 + 터미널 포커스 / SIGTERM' },
   { id: 'memoryManager', icon: '🧮', label: '메모리 관리',
     group: 'observe', desc: 'vm_stat 기반 시스템 메모리 + 상위 30 프로세스 + idle Claude Code 일괄 종료' },
+  { id: 'autoResumeManager', icon: '🔄', label: 'Auto-Resume 관리',
+    group: 'observe', desc: '활성 바인딩 리스트 + 일괄 취소' },
   { id: 'securityScan', icon: '🛡️', label: 'Security Scan',
     group: 'observe', desc: '~/.claude 정적 검사 — 시크릿 / 위험 훅 / 과도한 권한 / 신뢰 불가 MCP',
     docUrl: DOCS_BASE+'security' },
@@ -20342,6 +20344,211 @@ window._ccrRefreshStatus = async () => {
     window.__ccr.status = s || {};
     renderView && renderView();
   } catch (e) { toast(e.message, 'err'); }
+};
+
+// ────────────────────────────────────────────────────────────────
+// AUTO-RESUME MANAGER (v2.49.0)
+// ────────────────────────────────────────────────────────────────
+const _ARM_STATE_LABEL = {
+  running:   '실행 중',
+  waiting:   '대기 중',
+  watching:  '감시 중',
+  done:      '정상 종료',
+  failed:    '실패',
+  exhausted: '소진',
+  stopped:   '중지',
+  error:     '오류',
+};
+const _ARM_STATE_COLOR = {
+  running:   { bg: 'rgba(34,197,94,.15)',  fg: '#22c55e' },
+  waiting:   { bg: 'rgba(234,179,8,.18)',  fg: '#eab308' },
+  watching:  { bg: 'rgba(59,130,246,.15)', fg: '#3b82f6' },
+  done:      { bg: 'rgba(34,197,94,.15)',  fg: '#22c55e' },
+  failed:    { bg: 'rgba(239,68,68,.18)',  fg: '#ef4444' },
+  exhausted: { bg: 'rgba(148,163,184,.20)',fg: '#94a3b8' },
+  stopped:   { bg: 'rgba(148,163,184,.20)',fg: '#94a3b8' },
+  error:     { bg: 'rgba(239,68,68,.18)',  fg: '#ef4444' },
+};
+
+function _armEtaText(nextAttemptAt) {
+  if (!nextAttemptAt) return '—';
+  const now = Math.floor(Date.now() / 1000);
+  const dt = nextAttemptAt - now;
+  if (dt <= 0) return t('방금');
+  if (dt < 60) return dt + 's';
+  if (dt < 3600) return Math.floor(dt / 60) + 'm ' + (dt % 60) + 's';
+  return Math.floor(dt / 3600) + 'h ' + Math.floor((dt % 3600) / 60) + 'm';
+}
+
+function _armStateChip(state) {
+  const lbl = _ARM_STATE_LABEL[state] || state || '—';
+  const c = _ARM_STATE_COLOR[state] || { bg: 'rgba(148,163,184,.20)', fg: '#94a3b8' };
+  return `<span class="mono text-[10px]" style="display:inline-block;padding:2px 8px;border-radius:9999px;background:${c.bg};color:${c.fg};">${escapeHtml(t(lbl))}</span>`;
+}
+
+VIEWS.autoResumeManager = async () => {
+  const r = await api('/api/auto_resume/status').catch(() => null);
+  if (!r || !r.ok) {
+    return `
+      ${viewHeader('Auto-Resume 관리', 'Auto-Resume 바인딩 상태 모니터링', 'autoResumeManager')}
+      <div class="card p-6 text-sm text-[var(--text-mute)]">
+        ${t('세션 정보를 불러올 수 없습니다')}
+      </div>`;
+  }
+  const active = r.active || [];
+  // count by state
+  const byState = {};
+  for (const e of active) {
+    const k = e.state || 'unknown';
+    byState[k] = (byState[k] || 0) + 1;
+  }
+  const breakdownHtml = Object.keys(byState).length
+    ? Object.entries(byState).map(([s, n]) =>
+        `<span class="mr-2 mb-1 inline-block">${_armStateChip(s)} <span class="mono text-xs">${n}</span></span>`
+      ).join('')
+    : `<span class="text-xs text-[var(--text-mute)]">${t('활성 바인딩 없음')}</span>`;
+
+  const rowsHtml = active.length ? active.map(e => {
+    const sid = e.sessionId || '';
+    const sidShort = sid.slice(0, 8);
+    const cwd = e.cwd || '';
+    const attempts = e.attempts ?? 0;
+    const maxA = e.maxAttempts ?? 0;
+    const eta = _armEtaText(e.nextAttemptAt || 0);
+    return `
+      <tr data-sid="${escapeHtml(sid)}">
+        <td><input type="checkbox" class="arm-row-chk" data-sid="${escapeHtml(sid)}" /></td>
+        <td class="mono text-[10px]" title="${escapeHtml(sid)}">${escapeHtml(sidShort)}</td>
+        <td class="mono text-[10px] text-[var(--text-mute)] truncate" style="max-width:280px;" title="${escapeHtml(cwd)}">${escapeHtml(cwd)}</td>
+        <td>${_armStateChip(e.state)}</td>
+        <td class="mono text-xs">${attempts}/${maxA}</td>
+        <td class="mono text-xs">${escapeHtml(eta)}</td>
+        <td class="text-right">
+          <button class="btn text-xs" onclick="_armOpenDetail('${escapeHtml(sid)}')">${t('상세')}</button>
+          <button class="btn text-xs" onclick="_armCancelOne('${escapeHtml(sid)}')">${t('취소')}</button>
+        </td>
+      </tr>`;
+  }).join('') : '';
+
+  return `
+    ${viewHeader('Auto-Resume 관리', 'Auto-Resume 바인딩 상태 모니터링', 'autoResumeManager')}
+
+    <div class="card p-5 mb-4">
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <h3 class="font-semibold text-sm">🔄 ${t('활성 바인딩')}
+          <span class="text-[var(--text-mute)] mono text-xs ml-2">${t('총')} ${active.length} ${t('건')}</span>
+        </h3>
+      </div>
+      <div>${breakdownHtml}</div>
+    </div>
+
+    <div class="card p-5">
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <h3 class="font-semibold text-sm">${t('활성 바인딩')}</h3>
+        <button class="btn text-xs" onclick="_armCancelSelected()">${t('선택 취소')}</button>
+      </div>
+      ${active.length ? `
+        <div style="overflow-x:auto;">
+          <table class="data">
+            <thead><tr>
+              <th style="width:30px;"><input type="checkbox" id="arm-chk-all" /></th>
+              <th>${t('세션')}</th>
+              <th>cwd</th>
+              <th>${t('상태')}</th>
+              <th>${t('시도 수')}</th>
+              <th>${t('다음 시도까지')}</th>
+              <th class="text-right">${t('작업')}</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      ` : `<div class="empty text-sm">${t('활성 바인딩 없음')}</div>`}
+    </div>
+    <style>
+      @media (max-width: 640px) {
+        #view table.data thead { display: none; }
+        #view table.data, #view table.data tbody, #view table.data tr, #view table.data td { display: block; width: 100%; }
+        #view table.data tr { border-bottom: 1px solid var(--border, rgba(148,163,184,.2)); padding: 6px 0; }
+        #view table.data td { padding: 3px 4px; max-width: 100% !important; white-space: normal; }
+      }
+    </style>
+  `;
+};
+
+AFTER.autoResumeManager = () => {
+  const all = document.getElementById('arm-chk-all');
+  if (all) {
+    all.addEventListener('change', () => {
+      document.querySelectorAll('.arm-row-chk').forEach(cb => { cb.checked = all.checked; });
+    });
+  }
+  // auto-refresh every 10s; pause when tab hidden
+  if (window.__armTimer) { clearInterval(window.__armTimer); }
+  window.__armTimer = setInterval(() => {
+    if (document.hidden) return;
+    if (state.view !== 'autoResumeManager') {
+      clearInterval(window.__armTimer); window.__armTimer = null; return;
+    }
+    renderView && renderView();
+  }, 10000);
+};
+
+window._armOpenDetail = (sid) => {
+  // Reuse existing session detail flow if available; otherwise show binding json.
+  if (typeof showAutoResumeDetail === 'function') {
+    try { showAutoResumeDetail(sid); return; } catch {}
+  }
+  api('/api/auto_resume/get?sessionId=' + encodeURIComponent(sid))
+    .then(r => {
+      if (!r || !r.ok) return toast(t('세션 정보를 불러올 수 없습니다'), 'err');
+      const txt = JSON.stringify(r.entry || {}, null, 2);
+      // best-effort: log to console + clipboard so user can inspect
+      try { navigator.clipboard.writeText(txt); } catch {}
+      toast(t('상세') + ': ' + sid.slice(0, 8), 'ok');
+      console.log('[auto-resume detail]', r.entry);
+    })
+    .catch(e => toast(e.message, 'err'));
+};
+
+window._armCancelOne = async (sid) => {
+  if (!sid) return;
+  if (!confirm(t('선택한 바인딩을 취소하시겠습니까?'))) return;
+  try {
+    const r = await api('/api/auto_resume/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid }),
+    });
+    if (r && r.ok) toast(t('취소 완료'), 'ok');
+    else toast(t('취소 실패') + ': ' + (r && r.error ? r.error : 'unknown'), 'err');
+  } catch (e) { toast(t('취소 실패') + ': ' + e.message, 'err'); }
+  setTimeout(() => renderView && renderView(), 400);
+};
+
+window._armCancelSelected = async () => {
+  const checked = Array.from(document.querySelectorAll('.arm-row-chk'))
+    .filter(cb => cb.checked)
+    .map(cb => cb.getAttribute('data-sid'))
+    .filter(Boolean);
+  if (!checked.length) {
+    toast(t('선택할 항목이 없습니다'), 'err');
+    return;
+  }
+  if (!confirm(t('선택한 바인딩을 취소하시겠습니까?'))) return;
+  let okN = 0, failN = 0;
+  for (const sid of checked) {
+    try {
+      const r = await api('/api/auto_resume/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sid }),
+      });
+      if (r && r.ok) okN++; else failN++;
+    } catch { failN++; }
+  }
+  if (failN === 0) toast(t('취소 완료') + ': ' + okN + ' ' + t('건'), 'ok');
+  else toast(t('취소 실패') + ': ' + failN + ' / ' + (okN + failN), 'err');
+  setTimeout(() => renderView && renderView(), 400);
 };
 
 // ────────────────────────────────────────────────────────────────

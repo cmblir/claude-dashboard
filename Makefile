@@ -45,3 +45,11 @@ install-mac: app
 uninstall-mac:
 	rm -rf /Applications/LazyClaude.app
 	@echo "🗑  removed /Applications/LazyClaude.app"
+
+test:  ## Run pytest unit tests (auto_resume coverage)
+	@which pytest >/dev/null 2>&1 || { echo "pytest not installed — pip install pytest"; exit 1; }
+	pytest tests/ -v
+
+test:  ## Run pytest unit tests (auto_resume coverage)
+	@which pytest >/dev/null 2>&1 || { echo "pytest not installed — pip install pytest"; exit 1; }
+	pytest tests/ -v
