@@ -2887,6 +2887,26 @@ VIEWS.workflows = async () => {
       <span class="text-[10px] ml-auto" style="color:var(--text-dim);">${t('클릭 → 목표 입력 → 즉시 실행')}</span>
     </div>
 
+    <!-- v2.50.0 — Execution telemetry: success rate · p50/p95/p99 · cost -->
+    <div id="wfTelemetryPanel" class="card mb-3" style="padding:12px 16px;display:none;">
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <div class="text-sm font-semibold" style="color:var(--text);">📊 ${t('실행 텔레메트리')}</div>
+        <div class="flex items-center gap-2">
+          <span class="text-[10px]" style="color:var(--text-dim);">${t('기간')}</span>
+          <select id="wfTelemetryWindow" class="input text-xs" style="padding:2px 6px;font-size:11px;">
+            <option value="1h">${t('1시간')}</option>
+            <option value="24h">${t('24시간')}</option>
+            <option value="7d" selected>${t('7일')}</option>
+            <option value="30d">${t('30일')}</option>
+          </select>
+        </div>
+      </div>
+      <div class="text-[10px] mb-2" style="color:var(--text-dim);">${t('최근 실행 건강 상태 (성공률 · p50/p95/p99 · 비용)')}</div>
+      <div id="wfTelemetryBody">
+        <div class="text-xs" style="color:var(--text-dim);text-align:center;padding:8px 0;">${t('통계 로딩 중...')}</div>
+      </div>
+    </div>
+
     <details id="wfStatsPanel" class="card mb-3" style="padding:12px 16px;">
       <summary class="cursor-pointer text-sm font-semibold" style="color:var(--text);user-select:none;">📊 ${t('워크플로우 통계')}</summary>
       <div id="wfStatsBody" class="mt-3" style="border-top:1px solid var(--border);padding-top:12px;">
@@ -2965,6 +2985,9 @@ AFTER.workflows = async () => {
   _wfApplyInspectorState();
   // 워크플로우 통계 로드
   _wfLoadStats();
+  // v2.50.0 — Execution telemetry (auto-hides if no runs)
+  _wfLoadTelemetry();
+  _wfStartTelemetryAutoRefresh();
   // 검색 바인딩
   const se = document.getElementById('wfSearch');
   if (se) se.oninput = (e) => { __wf.search = e.target.value.toLowerCase(); _wfRenderList(); };
@@ -4431,6 +4454,95 @@ function _wfApplyNodeSearchHighlight() {
 }
 
 // ─── 워크플로우 통계 ────────────────────────────────────────────
+// v2.50.0 — Execution telemetry panel loader. Hides itself when no runs.
+let __wfTelemetryTimer = null;
+async function _wfLoadTelemetry() {
+  const panel = document.getElementById('wfTelemetryPanel');
+  const body = document.getElementById('wfTelemetryBody');
+  if (!panel || !body) return;
+  const sel = document.getElementById('wfTelemetryWindow');
+  const win = (sel && sel.value) || '7d';
+  let r = null;
+  try {
+    r = await cachedApi('/api/workflows/telemetry?window=' + encodeURIComponent(win), 30000);
+  } catch (e) {
+    body.innerHTML = `<div class="text-xs text-[var(--text-dim)] text-center py-2">${t('텔레메트리 데이터를 불러올 수 없습니다')}</div>`;
+    panel.style.display = '';
+    return;
+  }
+  const g = (r && r.global) || {};
+  const rows = (r && r.byWorkflow) || [];
+  if (!g.totalRuns) {
+    // Hide on empty installs to avoid clutter.
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = '';
+  const successColor = g.successRate >= 90 ? 'var(--ok)' : (g.successRate >= 70 ? 'var(--warn)' : 'var(--err, #f87171)');
+  const summary = `
+    <div class="grid gap-3 mb-3" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:var(--accent);">${g.totalRuns}</div><div class="text-[10px] text-[var(--text-dim)]">${t('전체 실행')}</div></div>
+      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:${successColor};">${(g.successRate||0).toFixed(1)}%</div><div class="text-[10px] text-[var(--text-dim)]">${t('전체 성공률')}</div></div>
+      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:var(--cyan);">${(g.p50_sec||0).toFixed(2)}</div><div class="text-[10px] text-[var(--text-dim)]">${t('p50 (초)')}</div></div>
+      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:var(--cyan);">${(g.p95_sec||0).toFixed(2)}</div><div class="text-[10px] text-[var(--text-dim)]">${t('p95 (초)')}</div></div>
+      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:var(--cyan);">${(g.p99_sec||0).toFixed(2)}</div><div class="text-[10px] text-[var(--text-dim)]">${t('p99 (초)')}</div></div>
+    </div>`;
+  let table = '';
+  if (rows.length === 0) {
+    table = `<div class="text-xs text-[var(--text-dim)] text-center py-2">${t('최근 기간 내 실행 기록이 없습니다')}</div>`;
+  } else {
+    const head = `<tr style="text-align:left;color:var(--text-dim);font-size:10px;text-transform:uppercase;">
+      <th style="padding:4px 6px;">${t('워크플로우')}</th>
+      <th style="padding:4px 6px;">${t('총 실행')}</th>
+      <th style="padding:4px 6px;">${t('성공')}</th>
+      <th style="padding:4px 6px;">${t('실패 수')}</th>
+      <th style="padding:4px 6px;">${t('취소 수')}</th>
+      <th style="padding:4px 6px;">${t('성공률 %')}</th>
+      <th style="padding:4px 6px;">${t('p50 (초)')}</th>
+      <th style="padding:4px 6px;">${t('p95 (초)')}</th>
+      <th style="padding:4px 6px;">${t('p99 (초)')}</th>
+      <th style="padding:4px 6px;">${t('비용 (USD)')}</th>
+    </tr>`;
+    const trs = rows.map(w => {
+      const isOthers = w.workflowId === '__others__';
+      const label = isOthers ? t('기타 (집계)') : escapeHtml(w.name || w.workflowId || '?');
+      const sr = (w.successRate||0).toFixed(1);
+      const srColor = w.successRate >= 90 ? 'var(--ok)' : (w.successRate >= 70 ? 'var(--warn)' : 'var(--err, #f87171)');
+      return `<tr style="border-top:1px solid var(--border);font-size:11px;">
+        <td style="padding:4px 6px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</td>
+        <td style="padding:4px 6px;">${w.totalRuns}</td>
+        <td style="padding:4px 6px;color:var(--ok);">${w.successCount}</td>
+        <td style="padding:4px 6px;color:var(--err, #f87171);">${w.failedCount}</td>
+        <td style="padding:4px 6px;color:var(--text-dim);">${w.cancelledCount}</td>
+        <td style="padding:4px 6px;color:${srColor};">${sr}%</td>
+        <td style="padding:4px 6px;">${(w.p50_sec||0).toFixed(2)}</td>
+        <td style="padding:4px 6px;">${(w.p95_sec||0).toFixed(2)}</td>
+        <td style="padding:4px 6px;">${(w.p99_sec||0).toFixed(2)}</td>
+        <td style="padding:4px 6px;">$${(w.totalCost||0).toFixed(4)}</td>
+      </tr>`;
+    }).join('');
+    table = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead>${head}</thead><tbody>${trs}</tbody></table></div>`;
+  }
+  body.innerHTML = summary + table;
+  // Bind window selector once.
+  if (sel && !sel.__bound) {
+    sel.__bound = true;
+    sel.onchange = () => _wfLoadTelemetry();
+  }
+}
+
+function _wfStartTelemetryAutoRefresh() {
+  if (__wfTelemetryTimer) { clearInterval(__wfTelemetryTimer); __wfTelemetryTimer = null; }
+  __wfTelemetryTimer = setInterval(() => {
+    if (document.hidden) return;
+    if (!document.getElementById('wfTelemetryPanel')) {
+      // Tab no longer mounted; stop polling.
+      clearInterval(__wfTelemetryTimer); __wfTelemetryTimer = null; return;
+    }
+    _wfLoadTelemetry();
+  }, 30000);
+}
+
 async function _wfLoadStats() {
   const host = document.getElementById('wfStatsBody');
   if (!host) return;
@@ -19035,9 +19147,77 @@ function _costsBucket(days, mode) {
   return [...buckets.values()].sort((a, b) => a.day.localeCompare(b.day));
 }
 
+// Render the cost-savings recommendations card.
+// Hidden when there are 0 recommendations. All strings via t('...').
+// i18n strings added: '비용 절감 추천', '최근 N일 총', '예상 절감', '추천 새로고침',
+//   '데이터 부족', 'Haiku 전환', '캐싱', '로컬 모델', '모델 업그레이드'.
+function _renderCostRecommendations(rec) {
+  if (!rec || !rec.ok) return '';
+  const recs = rec.recommendations || [];
+  if (!recs.length) return '';
+  const fmtUsd = (v) => '$' + (Number(v)||0).toFixed(2);
+  const ruleLabel = (id) => ({
+    haiku_for_short_prompts: t('Haiku 전환'),
+    enable_prompt_caching: t('프롬프트 캐싱'),
+    local_model_for_batch: t('로컬 모델'),
+    stale_model_upgrade: t('모델 업그레이드'),
+  }[id] || id);
+  const ruleColor = (id) => ({
+    haiku_for_short_prompts: '#f97316',
+    enable_prompt_caching: '#a78bfa',
+    local_model_for_batch: '#22d3ee',
+    stale_model_upgrade: '#4ade80',
+  }[id] || '#888');
+  const rows = recs.map(r => `
+    <div class="flex items-start gap-2 py-2 border-b border-[var(--border)]">
+      <span class="text-[10px] font-mono px-2 py-0.5 rounded" style="background:${ruleColor(r.ruleId)};color:#000;flex-shrink:0;">
+        ${escapeHtml(ruleLabel(r.ruleId))}
+      </span>
+      <div class="flex-1 min-w-0">
+        <div class="text-[12px]">
+          <span class="font-mono text-[var(--text-dim)]">${escapeHtml(r.currentModel)}</span>
+          <span class="mx-1">→</span>
+          <span class="font-mono font-semibold">${escapeHtml(r.suggestedModel)}</span>
+          <span class="ml-2 text-[10px] text-[var(--text-dim)]">${r.callCount} ${t('회')}</span>
+        </div>
+        <div class="text-[11px] text-[var(--text-mute)] mt-0.5">${escapeHtml(r.rationale || '')}</div>
+      </div>
+      <div class="text-right flex-shrink-0">
+        <div class="text-[10px] text-[var(--text-dim)]">${t('예상 절감')}</div>
+        <div class="text-[12px] font-mono font-semibold" style="color:var(--accent);">${fmtUsd(r.estimatedSavings)}</div>
+      </div>
+    </div>
+  `).join('');
+  return `
+    <div class="card p-4 mb-4" style="border-left:3px solid var(--accent);">
+      <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
+        <div class="text-[14px] font-semibold">💡 ${t('비용 절감 추천')}</div>
+        <button class="btn text-[10px]" onclick="_costsRefreshRecs()">${t('추천 새로고침')}</button>
+      </div>
+      <div class="text-[11px] text-[var(--text-dim)] mb-2">
+        ${t('최근')} ${rec.windowDays || 30}${t('일 총')} <span class="font-mono">${fmtUsd(rec.totalCost30d)}</span>
+        · ${t('예상 절감')} <span class="font-mono" style="color:var(--accent);">${fmtUsd(rec.estimatedSavingsTotal)}</span>
+      </div>
+      ${rows}
+    </div>
+  `;
+}
+
+async function _costsRefreshRecs() {
+  try {
+    const rec = await api('/api/costs/recommendations');
+    const host = document.getElementById('costs-recs-host');
+    if (host) host.innerHTML = _renderCostRecommendations(rec);
+  } catch (e) { /* noop */ }
+}
+
 VIEWS.costsTimeline = async () => {
-  const d = await api('/api/cost-timeline/summary');
+  const [d, rec] = await Promise.all([
+    api('/api/cost-timeline/summary'),
+    api('/api/costs/recommendations').catch(() => ({ ok: false })),
+  ]);
   if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml(d.error||'')}</div>`;
+  const recsHtml = _renderCostRecommendations(rec);
 
   const fmtUsd = (v) => '$' + (v||0).toFixed(4);
   const bucketMode = state.data._costsBucket || 'day';
@@ -19120,6 +19300,8 @@ VIEWS.costsTimeline = async () => {
         ${t('Claude API 플레이그라운드 + 워크플로우 실행의 모든 비용을 통합 조회. 로컬 히스토리 JSON 파일들에서 자동 수집.')}
       </p>
     </div>
+
+    <div id="costs-recs-host">${recsHtml}</div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
       <div class="card p-4">

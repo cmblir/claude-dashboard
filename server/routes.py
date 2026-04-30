@@ -77,7 +77,7 @@ from .prompt_library import (
     api_prompt_library_list, api_prompt_library_save,
     api_prompt_library_to_workflow,
 )
-from .cost_timeline import api_cost_timeline_summary
+from .cost_timeline import api_cost_timeline_summary, api_cost_recommendations
 from .rtk_lab import (
     api_rtk_status, api_rtk_install, api_rtk_init,
     api_rtk_config, api_rtk_gain, api_rtk_session,
@@ -119,6 +119,7 @@ from .workflows import (
     api_workflow_runs_list, api_workflow_save,
     api_workflow_schedule_list, api_workflow_schedule_set,
     api_workflow_stats,
+    api_workflow_telemetry,
     api_workflow_template_delete, api_workflow_template_get,
     api_workflow_template_save, api_workflow_templates_list,
     api_workflow_webhook, api_workflow_webhook_secret,
@@ -318,6 +319,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/workflows/templates/list": lambda q: api_workflow_templates_list(q),
     "/api/workflows/schedules": lambda q: api_workflow_schedule_list(),
     "/api/workflows/stats": lambda q: api_workflow_stats(),
+    "/api/workflows/telemetry": api_workflow_telemetry,
     "/api/workflows/history": api_workflow_history,
     "/api/version": lambda q: api_version_info(),
     "/api/ai-providers/list": lambda q: api_providers_list(),
@@ -358,6 +360,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/embedding-lab/examples": api_embedding_examples,
     "/api/prompt-library/list": api_prompt_library_list,
     "/api/cost-timeline/summary": api_cost_timeline_summary,
+    "/api/costs/recommendations": api_cost_recommendations,
     "/api/auto_resume/status": api_auto_resume_status,
     "/api/auto_resume/get": api_auto_resume_get,
     "/api/auto_resume/hook_status": api_auto_resume_hook_status,

@@ -3784,6 +3784,188 @@ def api_workflow_stats() -> dict:
     }
 
 
+# ═══════════════════════════════════════════
+#  v2.50.0 — Workflow execution telemetry
+# ═══════════════════════════════════════════
+
+# Status mapping for workflow_runs.status values currently written by the
+# engine. The public API exposes the canonical names (done/error/cancelled)
+# but the underlying column stores the legacy short codes.
+_TELEMETRY_SUCCESS_STATUSES = ("ok", "done")
+_TELEMETRY_FAILED_STATUSES = ("err", "error")
+_TELEMETRY_CANCELLED_STATUSES = ("cancelled", "canceled")
+
+_TELEMETRY_WINDOW_MAP = {
+    "1h":  3600,
+    "24h": 24 * 3600,
+    "7d":  7 * 24 * 3600,
+    "30d": 30 * 24 * 3600,
+}
+
+
+def _percentile(sorted_values: list[float], p: float) -> float:
+    """Nearest-rank percentile on a pre-sorted list. Returns 0 for empty."""
+    n = len(sorted_values)
+    if n == 0:
+        return 0.0
+    if n == 1:
+        return float(sorted_values[0])
+    k = max(0, min(n - 1, int(round(p * (n - 1)))))
+    return float(sorted_values[k])
+
+
+def _telemetry_compute(window_hours: int = 168) -> dict:
+    """Aggregate workflow_runs into per-workflow + global health stats over
+    the given rolling window. Cheap: single SQL scan over started_at range.
+    """
+    window_hours = max(1, int(window_hours))
+    now_ms = int(time.time() * 1000)
+    cutoff_ms = now_ms - window_hours * 3600 * 1000
+
+    # Workflow-name lookup for label hydration; soft-fail to id-only labels.
+    try:
+        store = _load_all()
+        wf_names = {wid: (wf.get("name") or "Untitled")
+                    for wid, wf in (store.get("workflows") or {}).items()}
+    except Exception:
+        wf_names = {}
+
+    rows: list = []
+    try:
+        _db_init()
+        with _db() as c:
+            cur = c.execute(
+                "SELECT workflow_id, status, started_at, ended_at, "
+                "iteration, total_iterations, cost_total "
+                "FROM workflow_runs WHERE started_at >= ?",
+                (cutoff_ms,),
+            )
+            rows = cur.fetchall()
+    except Exception as e:
+        log.warning("telemetry compute failed: %s", e)
+        rows = []
+
+    per_wf: dict[str, dict] = {}
+    global_durations: list[float] = []
+    global_total = 0
+    global_success = 0
+
+    for r in rows:
+        wid = r["workflow_id"] or ""
+        status = (r["status"] or "").lower()
+        started = float(r["started_at"] or 0)
+        ended = r["ended_at"]
+        iteration = int(r["iteration"] or 0)
+        cost = float(r["cost_total"] or 0.0)
+
+        bucket = per_wf.setdefault(wid, {
+            "workflowId": wid,
+            "totalRuns": 0,
+            "successCount": 0,
+            "failedCount": 0,
+            "cancelledCount": 0,
+            "_durations": [],
+            "_iterations": [],
+            "totalCost": 0.0,
+        })
+        bucket["totalRuns"] += 1
+        bucket["totalCost"] += cost
+        bucket["_iterations"].append(iteration)
+        global_total += 1
+
+        if status in _TELEMETRY_SUCCESS_STATUSES:
+            bucket["successCount"] += 1
+            global_success += 1
+            if ended is not None and started > 0:
+                dur_sec = max(0.0, (float(ended) - started) / 1000.0)
+                bucket["_durations"].append(dur_sec)
+                global_durations.append(dur_sec)
+        elif status in _TELEMETRY_FAILED_STATUSES:
+            bucket["failedCount"] += 1
+        elif status in _TELEMETRY_CANCELLED_STATUSES:
+            bucket["cancelledCount"] += 1
+
+    by_workflow: list[dict] = []
+    for wid, b in per_wf.items():
+        durations = sorted(b.pop("_durations"))
+        iterations = b.pop("_iterations")
+        total = b["totalRuns"]
+        successes = b["successCount"]
+        b["name"] = wf_names.get(wid, wid or "(unknown)")
+        b["successRate"] = round((successes / total) * 100, 1) if total else 0.0
+        b["p50_sec"] = round(_percentile(durations, 0.50), 2)
+        b["p95_sec"] = round(_percentile(durations, 0.95), 2)
+        b["p99_sec"] = round(_percentile(durations, 0.99), 2)
+        b["avgIterations"] = round(sum(iterations) / len(iterations), 2) if iterations else 0.0
+        b["totalCost"] = round(b["totalCost"], 6)
+        by_workflow.append(b)
+
+    by_workflow.sort(key=lambda x: x["totalRuns"], reverse=True)
+    if len(by_workflow) > 50:
+        head = by_workflow[:50]
+        tail = by_workflow[50:]
+        tail_total = sum(x["totalRuns"] for x in tail)
+        tail_success = sum(x["successCount"] for x in tail)
+        tail_failed = sum(x["failedCount"] for x in tail)
+        tail_cancel = sum(x["cancelledCount"] for x in tail)
+        tail_cost = sum(x["totalCost"] for x in tail)
+        head.append({
+            "workflowId": "__others__",
+            "name": f"others ({len(tail)})",
+            "totalRuns": tail_total,
+            "successCount": tail_success,
+            "failedCount": tail_failed,
+            "cancelledCount": tail_cancel,
+            "successRate": round((tail_success / tail_total) * 100, 1) if tail_total else 0.0,
+            "p50_sec": 0.0,
+            "p95_sec": 0.0,
+            "p99_sec": 0.0,
+            "avgIterations": 0.0,
+            "totalCost": round(tail_cost, 6),
+        })
+        by_workflow = head
+
+    sorted_global = sorted(global_durations)
+    global_block = {
+        "totalRuns":   global_total,
+        "successRate": round((global_success / global_total) * 100, 1) if global_total else 0.0,
+        "p50_sec":     round(_percentile(sorted_global, 0.50), 2),
+        "p95_sec":     round(_percentile(sorted_global, 0.95), 2),
+        "p99_sec":     round(_percentile(sorted_global, 0.99), 2),
+    }
+
+    return {
+        "ok": True,
+        "windowHours": window_hours,
+        "computedAt": now_ms,
+        "byWorkflow": by_workflow,
+        "global": global_block,
+    }
+
+
+def api_workflow_telemetry(query: dict | None = None) -> dict:
+    """GET /api/workflows/telemetry — execution health over a rolling window.
+
+    Query: window=1h|24h|7d|30d (default 7d).
+    """
+    window_hours = 168
+    if isinstance(query, dict):
+        v = query.get("window")
+        if isinstance(v, list) and v:
+            v = v[0]
+        if isinstance(v, str):
+            secs = _TELEMETRY_WINDOW_MAP.get(v.strip().lower())
+            if secs:
+                window_hours = max(1, secs // 3600)
+    try:
+        return _telemetry_compute(window_hours=window_hours)
+    except Exception as e:
+        log.warning("api_workflow_telemetry failed: %s", e)
+        return {"ok": False, "error": "telemetry compute failed",
+                "windowHours": window_hours,
+                "byWorkflow": [], "global": {}}
+
+
 def api_workflow_schedule_list() -> dict:
     """스케줄이 설정된 워크플로우 목록."""
     store = _load_all()
