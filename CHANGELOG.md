@@ -10,6 +10,39 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.48.1] — 2026-04-30
+
+### 🔄 Auto-Resume worker — concurrent retry (4-way ThreadPool)
+
+User: "누락/약한 부분 먼저 보완." Patch-level pickup of one piece from the
+v2.49.0 plan that completed before agents hit the API rate limit.
+Remaining items (mgmt tab, email/telegram channels, pytest harness,
+Haiku direct API) are deferred to v2.49.0 proper.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/auto_resume.py::_worker_loop` | Single-threaded serial `for sid in due: _process_one(sid)` → `ThreadPoolExecutor(max_workers=4)` parallel fan-out per tick. Lock discipline preserved: `_process_one` takes `_LOCK` for JSON IO and uses `_RUNNING_PROCS` to block same-sid re-entry. Per-tick batch capped at pool size; overflow waits for next tick. |
+| 2 | `server/auto_resume.py` | New `nextAttemptAt` filter — only entries whose retry time has elapsed are scheduled. Saves cycles on idle entries. |
+| 3 | `server/auto_resume.py::stop_auto_resume` | `_RETRY_POOL.shutdown(wait=False, cancel_futures=True)` on worker shutdown — drains queued submissions cleanly. |
+
+Effect: with N pending sessions previously waiting N×retry-time serially, up to 4 process concurrently. No-op when N=0 or 1.
+
+### Smoke
+```
+$ python3 -c "from server.auto_resume import _RETRY_POOL, _RETRY_POOL_MAX_WORKERS; print(_RETRY_POOL_MAX_WORKERS)"
+4
+$ python3 -m py_compile server/auto_resume.py
+compile_ok
+```
+
+### Deferred to v2.49.0 (rate-limited mid-execution)
+- pytest harness for `_classify_exit / _parse_reset_time / _exponential_backoff / _push_hash_and_check_stall`
+- Dedicated Auto-Resume management tab + bulk-cancel
+- Email (SMTP) and Telegram notification channels
+- `useDirectApi` option for Haiku summary (skips CLI subprocess)
+- Prompt reinjection mechanism docstring
+
+---
 ## [2.48.0] — 2026-04-30
 
 ### 🧹 Phase-3 perf — dead code purge + 7 new DB indexes + CSS prune
