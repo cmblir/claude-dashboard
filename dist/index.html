@@ -21001,6 +21001,17 @@ VIEWS.backupRestore = async () => {
         </div>
       ` : `<div class="empty text-sm">${t('백업 없음')}</div>`}
     </div>
+
+    <div class="card p-5 mt-4" id="hk-card">
+      <h3 class="font-semibold text-sm mb-3">🧹 ${t('정리')}</h3>
+      <div id="hk-summary" class="text-sm text-[var(--text-mute)] mb-3">${t('디스크 사용량 불러오는 중…')}</div>
+      <div class="flex gap-2 flex-wrap">
+        <button class="btn text-xs" onclick="_hkPruneBackups()">🗄 ${t('오래된 백업 정리')}</button>
+        <button class="btn text-xs" onclick="_hkPruneAR()">♻ ${t('유휴 AR 바인딩 정리')}</button>
+      </div>
+      <div class="text-[11px] text-[var(--text-mute)] mt-2">${t('보관 기간 (일)')}: 30 · ${t('최근 N개 보존')}: 5</div>
+    </div>
+
     <style>
       @media (max-width: 640px) {
         #view table.data thead { display: none; }
@@ -21014,6 +21025,59 @@ VIEWS.backupRestore = async () => {
 
 AFTER.backupRestore = () => {
   // No timer — backups change only on user action; refresh manually via re-render.
+  _hkLoadSummary();
+};
+
+window._hkLoadSummary = async () => {
+  const el = document.getElementById('hk-summary');
+  if (!el) return;
+  try {
+    const r = await api('/api/housekeeping/report').catch(() => null);
+    if (!r || !r.ok) { el.textContent = t('디스크 사용량 불러오기 실패'); return; }
+    const total = (r.diskUsage && r.diskUsage.totalBytes) || 0;
+    const bk = r.backupCount || 0;
+    const ar = r.autoResumeEntries || 0;
+    el.innerHTML = `${t('대시보드 데이터')}: <strong class="mono">${_bkFmtSize(total)}</strong>
+      · ${t('백업')}: <strong class="mono">${bk}</strong>
+      · ${t('AR 바인딩')}: <strong class="mono">${ar}</strong>`;
+  } catch (e) {
+    el.textContent = t('디스크 사용량 불러오기 실패') + ': ' + e.message;
+  }
+};
+
+window._hkPruneBackups = async () => {
+  try {
+    const dry = await api('/api/backup/prune', { retentionDays: 30, keepLast: 5, dryRun: true });
+    if (!dry || !dry.ok) { toast(t('미리보기 실패') + ': ' + (dry && dry.error || 'unknown'), 'err'); return; }
+    const willDelete = (dry.deleted || []).length;
+    if (willDelete === 0) { toast(t('정리할 백업 없음'), 'ok'); return; }
+    const msg = t('미리보기') + ': ' + willDelete + ' ' + t('항목 삭제 예정') + '\n\n' + t('확정하시겠습니까?');
+    if (!confirm(msg)) return;
+    const r = await api('/api/backup/prune', { retentionDays: 30, keepLast: 5, dryRun: false });
+    if (!r || !r.ok) { toast(t('정리 실패') + ': ' + (r && r.error || 'unknown'), 'err'); return; }
+    toast(t('정리 완료') + ': ' + (r.deleted || []).length + ' ' + t('항목'), 'ok');
+    _hkLoadSummary();
+    setTimeout(() => renderView && renderView(), 200);
+  } catch (e) {
+    toast(t('정리 실패') + ': ' + e.message, 'err');
+  }
+};
+
+window._hkPruneAR = async () => {
+  try {
+    const dry = await api('/api/auto_resume/prune-stale', { thresholdDays: 30, dryRun: true });
+    if (!dry || !dry.ok) { toast(t('미리보기 실패') + ': ' + (dry && dry.error || 'unknown'), 'err'); return; }
+    const willDelete = (dry.deleted || []).length;
+    if (willDelete === 0) { toast(t('정리할 AR 바인딩 없음'), 'ok'); return; }
+    const msg = t('미리보기') + ': ' + willDelete + ' ' + t('항목 삭제 예정') + '\n\n' + t('확정하시겠습니까?');
+    if (!confirm(msg)) return;
+    const r = await api('/api/auto_resume/prune-stale', { thresholdDays: 30, dryRun: false });
+    if (!r || !r.ok) { toast(t('정리 실패') + ': ' + (r && r.error || 'unknown'), 'err'); return; }
+    toast(t('정리 완료') + ': ' + (r.deleted || []).length + ' ' + t('항목'), 'ok');
+    _hkLoadSummary();
+  } catch (e) {
+    toast(t('정리 실패') + ': ' + e.message, 'err');
+  }
 };
 
 window._backupCreate = async () => {

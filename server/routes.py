@@ -145,12 +145,16 @@ from .auto_resume import (
     api_auto_resume_advise,
     api_auto_resume_cancel, api_auto_resume_get,
     api_auto_resume_hook_status, api_auto_resume_install_hooks,
+    api_auto_resume_prune_stale,
     api_auto_resume_set, api_auto_resume_status,
     api_auto_resume_uninstall_hooks,
 )
 from .backup import (
     api_backup_create, api_backup_delete,
-    api_backup_list, api_backup_restore,
+    api_backup_list, api_backup_prune, api_backup_restore,
+)
+from .housekeeping import (
+    api_housekeeping_report, api_housekeeping_run,
 )
 from .prefs import api_prefs_get, api_prefs_reset, api_prefs_set
 from .hyper_agent import (
@@ -371,6 +375,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/auto_resume/get": api_auto_resume_get,
     "/api/auto_resume/hook_status": api_auto_resume_hook_status,
     "/api/backup/list": api_backup_list,
+    "/api/housekeeping/report": api_housekeeping_report,
     "/api/rtk/status": api_rtk_status,
     "/api/rtk/config": api_rtk_config,
     "/api/rtk/gain": api_rtk_gain,
@@ -549,6 +554,9 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/backup/create": api_backup_create,
     "/api/backup/restore": api_backup_restore,
     "/api/backup/delete": api_backup_delete,
+    "/api/backup/prune": api_backup_prune,
+    "/api/auto_resume/prune-stale": api_auto_resume_prune_stale,
+    "/api/housekeeping/run": api_housekeeping_run,
     "/api/prefs/set": api_prefs_set,
     "/api/prefs/reset": api_prefs_reset,
     "/api/hyper-agents/toggle": api_hyper_toggle,

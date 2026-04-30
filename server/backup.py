@@ -124,8 +124,21 @@ def _archive_has_manifest(path: Path) -> bool:
 # ── API handlers ────────────────────────────────────────────────────────
 
 
-def api_backup_list(query: dict) -> dict:
-    """List backups in ~/.claude-dashboard-backups, mtime desc."""
+def _backup_age_days(path: Path) -> float:
+    """Return age in days based on file mtime (now - mtime). 0 if unavailable."""
+    try:
+        st = path.stat()
+    except OSError:
+        return 0.0
+    return max(0.0, (time.time() - st.st_mtime) / 86400.0)
+
+
+def _list_backups_meta(*, with_files: bool = False) -> list[dict[str, Any]]:
+    """Return backup archive metadata sorted by mtime desc.
+
+    Factored out so prune can reuse the same listing logic. When
+    ``with_files`` is True the inner-tar file count is computed (slower).
+    """
     root = _backup_root()
     items: list[dict[str, Any]] = []
     for p in root.glob("*.tar.gz"):
@@ -138,18 +151,100 @@ def api_backup_list(query: dict) -> dict:
             "path": str(p),
             "sizeBytes": st.st_size,
             "createdAt": int(st.st_mtime * 1000),
-            "files": 0,  # filled lazily below
+            "ageDays": (time.time() - st.st_mtime) / 86400.0,
+            "files": 0,
         })
     items.sort(key=lambda x: x["createdAt"], reverse=True)
-    # Lazy file count via tar inspection; small tarballs make this cheap.
+    if with_files:
+        for it in items:
+            try:
+                with tarfile.open(it["path"], "r:gz") as tf:
+                    names = [m.name for m in tf.getmembers() if m.isfile()]
+                    it["files"] = max(0, len([n for n in names if not n.endswith("manifest.json")]))
+            except Exception:
+                it["files"] = 0
+    return items
+
+
+def api_backup_list(query: dict) -> dict:
+    """List backups in ~/.claude-dashboard-backups, mtime desc."""
+    items = _list_backups_meta(with_files=True)
+    # Strip internal-only fields for response stability.
     for it in items:
-        try:
-            with tarfile.open(it["path"], "r:gz") as tf:
-                names = [m.name for m in tf.getmembers() if m.isfile()]
-                it["files"] = max(0, len([n for n in names if not n.endswith("manifest.json")]))
-        except Exception:
-            it["files"] = 0
+        it.pop("ageDays", None)
     return {"ok": True, "backups": items}
+
+
+def api_backup_prune(body: dict) -> dict:
+    """Prune backups older than ``retentionDays`` while keeping the most recent ``keepLast``.
+
+    Body: ``{retentionDays: int = 30, keepLast: int = 5, dryRun: bool = false}``.
+    Safety: refuses to leave zero backups behind.
+    """
+    try:
+        retention_days = int(body.get("retentionDays", 30))
+    except Exception:
+        retention_days = 30
+    try:
+        keep_last = int(body.get("keepLast", 5))
+    except Exception:
+        keep_last = 5
+    dry_run = bool(body.get("dryRun", False))
+    retention_days = max(0, retention_days)
+    keep_last = max(0, keep_last)
+
+    items = _list_backups_meta(with_files=False)
+    if not items:
+        return {"ok": True, "kept": [], "deleted": [], "freedBytes": 0, "dryRun": dry_run}
+
+    keep_names: set[str] = set()
+    delete_candidates: list[dict[str, Any]] = []
+    # ``items`` already sorted newest-first.
+    for idx, it in enumerate(items):
+        if idx < keep_last:
+            keep_names.add(it["name"])
+            continue
+        if it.get("ageDays", 0.0) < retention_days:
+            keep_names.add(it["name"])
+            continue
+        delete_candidates.append(it)
+
+    # Safety net: never delete down to zero backups.
+    if delete_candidates and len(items) - len(delete_candidates) <= 0:
+        # Promote the newest deletion candidate back to kept.
+        rescued = delete_candidates.pop(0)
+        keep_names.add(rescued["name"])
+
+    deleted_names: list[str] = []
+    freed = 0
+    root = _backup_root()
+    root_resolved = root.resolve()
+    for it in delete_candidates:
+        name = it["name"]
+        size = int(it.get("sizeBytes", 0) or 0)
+        if dry_run:
+            deleted_names.append(name)
+            freed += size
+            continue
+        try:
+            target = (root / name).resolve()
+            if root_resolved not in target.parents:
+                continue
+            if not _archive_has_manifest(target):
+                continue
+            target.unlink()
+            deleted_names.append(name)
+            freed += size
+        except Exception:
+            continue
+
+    return {
+        "ok": True,
+        "kept": sorted(keep_names),
+        "deleted": deleted_names,
+        "freedBytes": freed,
+        "dryRun": dry_run,
+    }
 
 
 def api_backup_create(body: dict) -> dict:

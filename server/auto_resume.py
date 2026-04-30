@@ -1167,3 +1167,67 @@ def stop_auto_resume() -> None:
         _RETRY_POOL.shutdown(wait=False, cancel_futures=True)
     except Exception:
         pass
+
+
+# ───────── v2.54.0 — Stale entry purge ─────────
+
+def api_auto_resume_prune_stale(body: dict) -> dict:
+    """Purge auto-resume bindings stuck in terminal states past ``thresholdDays``.
+
+    Body: ``{thresholdDays: int = 30, dryRun: bool = false}``.
+
+    Active states (``running`` / ``waiting`` / ``watching``) are NEVER purged
+    even if their timestamps are old. We only target terminal states.
+    """
+    try:
+        threshold_days = int(body.get("thresholdDays", 30))
+    except Exception:
+        threshold_days = 30
+    threshold_days = max(0, threshold_days)
+    dry_run = bool(body.get("dryRun", False))
+
+    terminal_states = {
+        STATE_DONE, STATE_FAILED, STATE_EXHAUSTED, STATE_STOPPED, STATE_ERROR,
+    }
+    threshold_ms = threshold_days * 86400 * 1000
+    now_ms_val = _now_ms()
+
+    store = _load_all()
+    sessions_scanned = len(store)
+    deleted: list[dict] = []
+    new_store: dict = {}
+    for sid, entry in store.items():
+        if not isinstance(entry, dict):
+            new_store[sid] = entry
+            continue
+        state = entry.get("state") or ""
+        if state not in terminal_states:
+            new_store[sid] = entry
+            continue
+        last_attempt = int(entry.get("lastAttemptAt") or 0)
+        created_at = int(entry.get("createdAt") or 0)
+        ref_ts = last_attempt or created_at
+        if ref_ts <= 0:
+            # Cannot decide age — keep to be safe.
+            new_store[sid] = entry
+            continue
+        age_ms = now_ms_val - ref_ts
+        if age_ms < threshold_ms:
+            new_store[sid] = entry
+            continue
+        deleted.append({
+            "sessionId": sid,
+            "state": state,
+            "lastAttemptAt": last_attempt,
+        })
+
+    if not dry_run and deleted:
+        _dump_all(new_store)
+
+    return {
+        "ok": True,
+        "kept": len(new_store) if not dry_run else (sessions_scanned - len(deleted)),
+        "deleted": deleted,
+        "sessionsScanned": sessions_scanned,
+        "dryRun": dry_run,
+    }
