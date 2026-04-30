@@ -1283,7 +1283,10 @@ class OllamaApiProvider(BaseProvider):
             or os.environ.get("OLLAMA_HOST", "")
             or "http://localhost:11434"
         ).rstrip("/")
-        self._api_key = api_key  # Ollama 는 보통 키 불필요
+        self._api_key = api_key  # Ollama usually does not require a key.
+        # 60s TTL cache — list_models is hit on every nav render.
+        self._models_cache_at: float = 0.0
+        self._models_cache: list[ModelInfo] = []
 
     def is_available(self) -> bool:
         import urllib.request
@@ -1300,11 +1303,14 @@ class OllamaApiProvider(BaseProvider):
 
     def list_models(self) -> list[ModelInfo]:
         import urllib.request
+        now = time.time()
+        if self._models_cache and (now - self._models_cache_at) < 60.0:
+            return self._models_cache
         try:
             req = urllib.request.Request(f"{self._base_url}/api/tags")
             with urllib.request.urlopen(req, timeout=5) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-            out = []
+            out: list[ModelInfo] = []
             for m in data.get("models", []):
                 name = m.get("name", "")
                 is_embed = self._is_embed_model(name)
@@ -1313,9 +1319,11 @@ class OllamaApiProvider(BaseProvider):
                 out.append(ModelInfo(
                     id=name, label=name, note=note, capabilities=caps,
                 ))
+            self._models_cache = out
+            self._models_cache_at = now
             return out
         except Exception:
-            return []
+            return self._models_cache or []
 
     def execute(
         self,

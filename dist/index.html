@@ -1443,7 +1443,12 @@ const __noReloadPaths = [
   '/api/hyper-agents/',
 ];
 // ── 인메모리 GET 캐시 — 빈번한 GET 호출의 중복 네트워크 비용 제거 ──
-const _apiCache = {};
+// v2.46.0 perf — Map preserves insertion order so we can evict the oldest
+// entry when the cache exceeds _API_CACHE_MAX. Re-insertion (set) on a hit
+// could be used for true LRU, but for our usage (read-only catalog data)
+// FIFO eviction with TTL is sufficient and cheaper.
+const _apiCache = new Map();
+const _API_CACHE_MAX = 50;
 const _apiCacheTTL = {
   '/api/ai-providers/list': 30000,
   '/api/ai-providers/health': 20000,
@@ -1452,17 +1457,26 @@ const _apiCacheTTL = {
 };
 function _apiCacheInvalidate(path) {
   // POST/PUT/DELETE 시 관련 캐시 무효화
-  for (const key of Object.keys(_apiCache)) {
-    if (key.startsWith(path) || path.startsWith(key.replace(/\/[^/]*$/, ''))) {
-      delete _apiCache[key];
+  const prefix = path.replace(/\/[^/]*$/, '');
+  for (const key of Array.from(_apiCache.keys())) {
+    if (key.startsWith(path) || path.startsWith(key.replace(/\/[^/]*$/, '')) || key.startsWith(prefix)) {
+      _apiCache.delete(key);
     }
   }
 }
+function _apiCacheSet(path, data) {
+  if (_apiCache.size >= _API_CACHE_MAX && !_apiCache.has(path)) {
+    // evict oldest insertion
+    const oldest = _apiCache.keys().next().value;
+    if (oldest !== undefined) _apiCache.delete(oldest);
+  }
+  _apiCache.set(path, { data, ts: Date.now() });
+}
 function cachedApi(path, ttlMs) {
   const ttl = ttlMs || _apiCacheTTL[path] || 30000;
-  const c = _apiCache[path];
+  const c = _apiCache.get(path);
   if (c && Date.now() - c.ts < ttl) return Promise.resolve(c.data);
-  return api(path).then(d => { _apiCache[path] = { data: d, ts: Date.now() }; return d; });
+  return api(path).then(d => { _apiCacheSet(path, d); return d; });
 }
 
 // v2.40.1 — In-flight GET dedupe. Many views fetch the same endpoint in parallel
@@ -1523,9 +1537,11 @@ function toast(msg, kind='info') {
   setTimeout(() => div.remove(), holdMs + 600);
 }
 
+// v2.46.0 perf — hoist replacement map so it isn't reallocated per call.
+const _ESC_HTML_MAP = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
 function escapeHtml(s) {
   if (s == null) return '';
-  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  return String(s).replace(/[&<>"']/g, ch => _ESC_HTML_MAP[ch]);
 }
 // JSON 객체를 HTML 속성(작은/큰따옴표 모두 안전) 으로 인코딩
 function jsonAttr(obj) {
@@ -1819,21 +1835,27 @@ function go(id) {
 
 // ── v2.40.0 — Sidebar discovery: favorites + recents + '/' spotlight ──
 const _RECENT_TABS_KEY = 'cc-recent-tabs';
+// v2.46.0 perf — memoize parsed list so renderNav() doesn't re-parse
+// localStorage on every navigation render. Updated in-place by _pushRecentTab.
+let _recentTabsCache = null;
 function _getRecentTabs() {
+  if (_recentTabsCache !== null) return _recentTabsCache;
   try {
     const raw = localStorage.getItem(_RECENT_TABS_KEY);
     const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.filter(s => typeof s === 'string') : [];
-  } catch { return []; }
+    _recentTabsCache = Array.isArray(arr) ? arr.filter(s => typeof s === 'string') : [];
+  } catch { _recentTabsCache = []; }
+  return _recentTabsCache;
 }
 function _pushRecentTab(id) {
   if (!id || typeof id !== 'string') return;
   const limit = (window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.recentTabsLimit) || 5;
   if (limit <= 0) return;
-  let cur = _getRecentTabs();
+  let cur = _getRecentTabs().slice();
   cur = cur.filter(x => x !== id);
   cur.unshift(id);
   if (cur.length > limit) cur = cur.slice(0, limit);
+  _recentTabsCache = cur;
   try { localStorage.setItem(_RECENT_TABS_KEY, JSON.stringify(cur)); } catch {}
 }
 function _isFavoriteTab(id) {
@@ -2630,6 +2652,11 @@ const __wf = {
   _nodeEls: new Map(),         // node id → live <g.wf-node> element in #wfNodes
   _nodeSnapshot: new Map(),    // node id → JSON of fields that affect rendering
   _forceFullCanvasRebuild: true, // when true, _wfRenderCanvas falls back to innerHTML rebuild
+  // v2.46.0 perf — cache the <g id="wfViewport"> element so pan/wheel/fit
+  // handlers don't have to call getElementById on every event. Set in
+  // _wfBindCanvas after the SVG is in the DOM; cleared on _wfOpen so the
+  // next bind cycle (after a view re-render) refreshes the reference.
+  _viewportEl: null,
 };
 
 const WF_NODE_TYPES = [
@@ -4051,6 +4078,9 @@ async function _wfOpen(wfId) {
   __wf._inspectorDirty = true;
   // v2.44.1 — drop keyed-diff caches so the new workflow renders fresh.
   __wf._forceFullCanvasRebuild = true;
+  // v2.46.0 perf — drop cached viewport ref; _wfBindCanvas (re-)sets it on
+  // the next AFTER.workflows pass after a view re-render.
+  __wf._viewportEl = null;
   _wfRenderList();
   _wfRenderCanvas();
   _wfRenderInspector();
@@ -4704,7 +4734,10 @@ function _wfUpdateNodeTransform(nid) {
   }
   const n = nodeMap.get(nid);
   if (!n) return;
-  const g = document.querySelector('#wfNodes g.wf-node[data-node="' + nid + '"]');
+  // v2.46.0 perf — use cached `__wf._nodeEls` map populated by the keyed-diff
+  // canvas renderer instead of querying the DOM on every drag mousemove frame.
+  const g = (__wf._nodeEls && __wf._nodeEls.get(nid)) ||
+            document.querySelector('#wfNodes g.wf-node[data-node="' + nid + '"]');
   if (g) g.setAttribute('transform', `translate(${n.x},${n.y})`);
   const touched = adj.get(nid) || [];
   for (const e of touched) {
@@ -4885,6 +4918,8 @@ function _wfBindCanvas() {
   const svg = document.getElementById('wfCanvas');
   if (!svg || svg.__wfBound) return;
   svg.__wfBound = true;
+  // v2.46.0 perf — cache viewport <g> ref for pan/wheel/fit handlers.
+  __wf._viewportEl = document.getElementById('wfViewport');
 
   // 좌표 변환 — 스크린 좌표를 SVG 뷰포트 좌표(팬/줌 적용 후)로
   function svgPt(evt) {
@@ -4982,7 +5017,8 @@ function _wfBindCanvas() {
       __wf.current.viewport = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
       __wf.current.viewport.panX = __wf.drag.origPanX + dx;
       __wf.current.viewport.panY = __wf.drag.origPanY + dy;
-      const vp = document.getElementById('wfViewport');
+      // v2.46.0 perf — use cached viewport <g> ref (set in _wfBindCanvas).
+      const vp = __wf._viewportEl || (__wf._viewportEl = document.getElementById('wfViewport'));
       if (vp) vp.setAttribute('transform',
         `translate(${__wf.current.viewport.panX},${__wf.current.viewport.panY}) scale(${__wf.current.viewport.zoom||1})`);
       _wfSchedulePatch();
@@ -5156,7 +5192,8 @@ function _wfBindCanvas() {
     view.zoom = Math.max(0.4, Math.min(2.5, (view.zoom||1) * dz));
     __wf.current.viewport = view;
     // 뷰포트 transform 만 갱신 (깜빡임 방지)
-    const vp = document.getElementById('wfViewport');
+    // v2.46.0 perf — use cached viewport <g> ref (set in _wfBindCanvas).
+    const vp = __wf._viewportEl || (__wf._viewportEl = document.getElementById('wfViewport'));
     if (vp) vp.setAttribute('transform',
       `translate(${view.panX||0},${view.panY||0}) scale(${view.zoom||1})`);
     _wfSchedulePatch();
@@ -6885,6 +6922,8 @@ function _wfStartPolling() {
 function _wfStartPollingFallback() {
   if (__wf.pollTimer) { clearInterval(__wf.pollTimer); __wf.pollTimer = null; }
   __wf.pollTimer = setInterval(async () => {
+    // v2.46.0 perf — skip network round-trips while the tab is hidden.
+    if (document.hidden) return;
     if (!__wf.runId) { clearInterval(__wf.pollTimer); __wf.pollTimer = null; return; }
     try {
       const s = await api('/api/workflows/run-status?runId=' + __wf.runId);
@@ -8234,9 +8273,9 @@ async function _wfRerunWorkflow() {
 // ────────────────────────────────────────────────────────────────
 VIEWS.overview = async () => {
   const [opt, briefing, stats] = await Promise.all([
-    api('/api/optimization/score'),
-    api('/api/briefing/overview'),
-    api('/api/sessions/stats'),
+    cachedApi('/api/optimization/score', 30000),
+    cachedApi('/api/briefing/overview', 30000),
+    cachedApi('/api/sessions/stats', 30000),
   ]);
   state.data.overview = { opt, briefing, stats };
 
@@ -8880,7 +8919,7 @@ function drawTimeline(data) {
 // ANALYTICS
 // ────────────────────────────────────────────────────────────────
 VIEWS.analytics = async () => {
-  const stats = await api('/api/sessions/stats');
+  const stats = await cachedApi('/api/sessions/stats', 30000);
   state.data.analytics = stats;
   return `
     <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
@@ -9564,7 +9603,7 @@ function drawSessionTimeline(tl) {
 // ────────────────────────────────────────────────────────────────
 VIEWS.agents = async () => {
   const [list, graph, modelRes, hyperList] = await Promise.all([
-    api('/api/agents'),
+    cachedApi('/api/agents', 20000),
     api('/api/agents/graph?days=60'),
     api('/api/subagent/model-choices'),
     api('/api/hyper-agents/list').catch(() => ({items:[]})),
@@ -10463,7 +10502,7 @@ VIEWS.skills = async () => {
     const r = await api('/api/project/skills/list?cwd=' + encodeURIComponent(cfgCwd));
     skills = (r.skills || []).map(s => ({...s, scope: 'project', source: 'project', pluginEnabled: false}));
   } else {
-    skills = await api('/api/skills');
+    skills = await cachedApi('/api/skills', 60000);
   }
   state.data.skills = skills;
   const q = (state.data.skillsFilter || '').toLowerCase();
@@ -10670,7 +10709,7 @@ VIEWS.commands = async () => {
       category: 'other', categoryLabel: '📁 ' + t('프로젝트'),
     }));
   } else {
-    cmds = await api('/api/commands');
+    cmds = await cachedApi('/api/commands', 60000);
   }
   state.data.commands = cmds;
   const q = (state.data.cmdFilter || '').toLowerCase();
@@ -14764,7 +14803,7 @@ async function startProfileFlow(i) {
 // tabs so they don't re-pick a project on every navigation.
 async function _ensureProjectsCache() {
   if (window.__cfgProjects) return window.__cfgProjects;
-  const r = await api('/api/projects').catch(() => ({projects: []}));
+  const r = await cachedApi('/api/projects', 30000).catch(() => ({projects: []}));
   window.__cfgProjects = (r.projects || []).filter(p => p.cwdResolved && p.path);
   return window.__cfgProjects;
 }
@@ -14891,7 +14930,7 @@ async function saveClaudeMd() {
 // PROJECTS
 // ────────────────────────────────────────────────────────────────
 VIEWS.projects = async () => {
-  const [p, summary] = await Promise.all([api('/api/projects'), api('/api/briefing/projects-summary')]);
+  const [p, summary] = await Promise.all([cachedApi('/api/projects', 30000), cachedApi('/api/briefing/projects-summary', 30000)]);
   const summaryMap = {};
   (summary.summaries||[]).forEach(s => { summaryMap[s.cwd] = s; });
   return `
@@ -15500,7 +15539,7 @@ async function openSessionTerminal(sessionId) {
 // PROJECT SUBAGENTS (역할 카탈로그 + 프로젝트별 관리)
 // ────────────────────────────────────────────────────────────────
 VIEWS.projectAgents = async () => {
-  const projects = await api('/api/projects');
+  const projects = await cachedApi('/api/projects', 30000);
   const validProjects = projects.projects.filter(p => p.cwdResolved && p.path);
   if (!state.data.paCwd || !validProjects.find(p => p.path === state.data.paCwd)) {
     state.data.paCwd = validProjects[0]?.path || '';
@@ -16806,6 +16845,9 @@ window._cliInstall = async (toolId) => {
       // 10초마다 상태 재확인 (완료 시 자동 UI 갱신)
       let tries = 0;
       const poll = setInterval(async () => {
+        // v2.46.0 perf — pause while tab is hidden so we don't burn the
+        // 30-try budget on background polls the user can't see finish.
+        if (document.hidden) return;
         tries += 1;
         try {
           const s = await api('/api/cli/status');
@@ -17295,6 +17337,8 @@ async function _ollamaPull(modelName) {
     // 2초 간격 폴링
     if (_ollamaPullTimers[pullId]) clearInterval(_ollamaPullTimers[pullId]);
     _ollamaPullTimers[pullId] = setInterval(async () => {
+      // v2.46.0 perf — pause polling while tab is hidden.
+      if (document.hidden) return;
       try {
         const s = await api('/api/ollama/pull-status?pullId=' + encodeURIComponent(pullId));
         const pct = Math.min(100, Math.max(0, s.percent || s.progress || 0));
@@ -17777,6 +17821,8 @@ function _telToggleLive() {
   if (s.timer) { clearInterval(s.timer); s.timer = null; }
   if (s.enabled) {
     s.timer = setInterval(() => {
+      // v2.46.0 perf — skip refresh while tab is hidden.
+      if (document.hidden) return;
       if (state.view !== 'telemetry') { clearInterval(s.timer); s.timer = null; s.enabled = false; renderView(); return; }
       renderView();
     }, 30000);
@@ -20792,6 +20838,8 @@ function _showVersionModal() {
 function _scheduleVersionPoll() {
   if (window.__verPollTimer) return;
   window.__verPollTimer = setInterval(async () => {
+    // v2.46.0 perf — skip while tab is hidden; the user can't see banners anyway.
+    if (document.hidden) return;
     try {
       const v = await api('/api/version');
       if (!window.__bootedAt) return;
@@ -22097,7 +22145,7 @@ function enterDashboard() {
     _chatDragInit = true;
   }
   // 신기능 데이터 미리 로드 (검색용)
-  api('/api/features/list').then(r => { state.data.features = r; }).catch(() => {});
+  cachedApi('/api/features/list', 120000).then(r => { state.data.features = r; }).catch(() => {});
   loadCliFoot();
   renderView();
 }
@@ -23405,8 +23453,9 @@ async function _wfDiffVersions() {
 (function _initMobileNav() {
   // v2.33.1 — 원본 _syncNavToggleVisibility 가 (모바일 OR collapsed) 조건을
   // 이미 올바르게 처리한다. 래핑하지 않고 원본 그대로 사용.
+  // v2.46.0 perf — duplicate resize listener removed (already attached at
+  // ~line 21386). Just call once on init to set initial visibility.
   if (typeof _syncNavToggleVisibility === 'function') {
-    window.addEventListener('resize', _syncNavToggleVisibility);
     _syncNavToggleVisibility();
   }
 })();

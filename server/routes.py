@@ -586,7 +586,21 @@ CONTENT_TYPES = {
 
 # v2.40.1 — process-wide static cache: {abs_path: (mtime, raw_bytes, gz_or_None)}.
 # Invalidates automatically when mtime changes (e.g. after a dist/index.html edit).
-_STATIC_CACHE: dict[str, tuple[float, bytes, "bytes | None"]] = {}
+# v2.46.0 — switched to OrderedDict with size cap (LRU-ish eviction) to bound memory,
+# and added a parallel cache for dist/locales/*.json.
+from collections import OrderedDict
+_STATIC_CACHE: "OrderedDict[str, tuple[float, bytes, bytes | None]]" = OrderedDict()
+_LOCALE_CACHE: "OrderedDict[str, tuple[float, bytes, bytes | None]]" = OrderedDict()
+_STATIC_CACHE_MAX = 64
+_LOCALE_CACHE_MAX = 16
+
+
+def _cache_put(cache: "OrderedDict", key: str, value, cap: int) -> None:
+    """Insert/refresh a cache entry and evict oldest until size <= cap."""
+    cache[key] = value
+    cache.move_to_end(key)
+    while len(cache) > cap:
+        cache.popitem(last=False)
 
 
 # ───────── Handler ─────────
@@ -618,7 +632,8 @@ class Handler(BaseHTTPRequestHandler):
             mtime = fp.stat().st_mtime
         except Exception:
             self.send_response(500); self.end_headers(); return
-        entry = _STATIC_CACHE.get(str(fp))
+        key = str(fp)
+        entry = _STATIC_CACHE.get(key)
         if not entry or entry[0] != mtime:
             try:
                 data = fp.read_bytes()
@@ -631,8 +646,20 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 gz = None
             entry = (mtime, data, gz)
-            _STATIC_CACHE[str(fp)] = entry
+            _cache_put(_STATIC_CACHE, key, entry, _STATIC_CACHE_MAX)
+        else:
+            _STATIC_CACHE.move_to_end(key)
         _, raw_body, gz_body = entry
+        # v2.46.0 — weak ETag derived from mtime. Pair with Cache-Control:
+        # no-cache so the browser revalidates each load but skips body on 304.
+        etag = f'W/"{int(mtime)}"'
+        inm = self.headers.get("If-None-Match", "") or ""
+        if inm and etag in inm:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "no-cache, must-revalidate")
+            self.end_headers()
+            return
         accept_enc = self.headers.get("Accept-Encoding", "") or ""
         if gz_body is not None and "gzip" in accept_enc.lower():
             body = gz_body
@@ -643,7 +670,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", ct)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", "no-cache, must-revalidate")
+        self.send_header("ETag", etag)
         if content_encoding:
             self.send_header("Content-Encoding", content_encoding)
             self.send_header("Vary", "Accept-Encoding")
@@ -651,22 +679,57 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _send_locale(self, lang: str) -> None:
-        """/api/locales/{lang}.json 서빙. 화이트리스트 검증."""
+        """/api/locales/{lang}.json 서빙. 화이트리스트 검증.
+        v2.46.0 — mtime-keyed cache + on-the-fly gzip + ETag/304, mirroring
+        _send_static. Locale JSON is ~100 KB raw and gzips to ~25 KB."""
         if lang not in ("ko", "en", "zh"):
             self.send_response(404); self.end_headers(); return
         fp = DIST / "locales" / f"{lang}.json"
         if not fp.exists():
             self.send_response(404); self.end_headers(); return
         try:
-            data = fp.read_bytes()
+            mtime = fp.stat().st_mtime
         except Exception:
             self.send_response(500); self.end_headers(); return
+        key = str(fp)
+        entry = _LOCALE_CACHE.get(key)
+        if not entry or entry[0] != mtime:
+            try:
+                data = fp.read_bytes()
+            except Exception:
+                self.send_response(500); self.end_headers(); return
+            import gzip
+            gz = gzip.compress(data, compresslevel=6)
+            entry = (mtime, data, gz)
+            _cache_put(_LOCALE_CACHE, key, entry, _LOCALE_CACHE_MAX)
+        else:
+            _LOCALE_CACHE.move_to_end(key)
+        _, raw_body, gz_body = entry
+        etag = f'W/"{int(mtime)}"'
+        inm = self.headers.get("If-None-Match", "") or ""
+        if inm and etag in inm:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "no-cache, must-revalidate")
+            self.end_headers()
+            return
+        accept_enc = self.headers.get("Accept-Encoding", "") or ""
+        if gz_body is not None and "gzip" in accept_enc.lower():
+            body = gz_body
+            content_encoding: str | None = "gzip"
+        else:
+            body = raw_body
+            content_encoding = None
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-cache, must-revalidate")
+        self.send_header("ETag", etag)
+        if content_encoding:
+            self.send_header("Content-Encoding", content_encoding)
+            self.send_header("Vary", "Accept-Encoding")
         self.end_headers()
-        self.wfile.write(data)
+        self.wfile.write(body)
 
     def _read_body(self) -> dict:
         length = int(self.headers.get("Content-Length", 0) or 0)

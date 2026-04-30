@@ -11,6 +11,7 @@ import os
 import signal
 import socket
 import sys
+import threading
 from http.server import ThreadingHTTPServer
 
 from server.config import DB_PATH, DIST, get_bind
@@ -116,12 +117,15 @@ def main() -> None:
             sys.exit(1)
 
     _db_init()
-    background_index()
+    # v2.46.0 — non-blocking boot: defer slow probes/scans to daemon threads
+    # so the HTTP server starts listening within ~hundreds of ms instead of
+    # waiting on session indexing (~seconds) and ollama HTTP probe (1–3 s).
+    threading.Thread(target=background_index, daemon=True, name="bg-index").start()
     warmup_caches()
     start_scheduler()
     start_auto_resume()
     start_hyper_agent_worker()
-    _auto_start_ollama()
+    threading.Thread(target=_auto_start_ollama, daemon=True, name="ollama-autostart").start()
     log.info("Serving http://%s:%s (dist=%s, db=%s)", host, port, DIST, DB_PATH)
     ThreadingHTTPServer((host, port), Handler).serve_forever()
 

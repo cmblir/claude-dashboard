@@ -2080,7 +2080,7 @@ def _record_workflow_cost(run_id: str, workflow_id: str, node_id: str, res: dict
     if not provider and not model:
         return  # start/aggregate/branch 등 AI 호출 없는 노드는 스킵
     try:
-        _db_init()
+        # _db_init() is invoked from API entry points; no need to repeat per cost write.
         with _db() as c:
             c.execute(
                 """INSERT INTO workflow_costs

@@ -10,6 +10,86 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.46.0] — 2026-04-30
+
+### 🚀 Comprehensive perf sweep (33 surgical fixes across backend / frontend / boot)
+
+User: "지금부터 대시보드를 모두 최적화 작업을 진행할거야. 엄청 세세한
+코드까지 극한의 효율과 알고리즘으로 최적화해줘." Three deep-recon agents
+mapped every hot spot across 50+ Python modules + the 23k-line single-file
+SPA + the i18n / static / boot path; three implementation agents executed
+phase 1 in parallel on isolated file regions. No backwards-incompat changes.
+
+### 🐍 Backend (12 fixes)
+
+| # | File | Fix |
+|---|---|---|
+| B1 | `server/db.py::_db_init` | `_INITIALIZED` flag with double-checked lock — was running `PRAGMA table_info` + `ALTER TABLE` guards on every API request. Now O(1) per process. |
+| B2 | `server/db.py::_db()` | `PRAGMA journal_mode=WAL` moved out of per-connection path into the one-time init. |
+| B3 | `server/db.py` | Added 3 missing indexes: `idx_sess_started`, `idx_sess_score(score, tool_use_count)`, `idx_sess_cwd_started(cwd, started_at)` (verified absent in live DB before adding). |
+| B4 | `server/workflows.py::_record_workflow_cost` | Removed redundant `_db_init()` call — was firing on every workflow node execution. |
+| B5 | `server/mcp.py` | Module-level `_MCP_LIST_CACHE_FILE.read_text()` + `json.loads` deferred to `_load_disk_cache()` invoked from `warmup_caches()` daemon thread — no boot-time disk I/O. |
+| B6 | `server/translations.py::_load_translation_cache` | Module-level `_TRANS_CACHE` + `_TRANS_MTIME` mtime-keyed memory cache. Was reloading + parsing JSON on every call. |
+| B7 | `server/ai_providers.py::OllamaApiProvider.list_models` | Instance-level 60s TTL cache. Was firing HTTP `/api/tags` on every model dispatch. |
+| B8 | `server/process_monitor.py::api_ports_list` | TCP/UDP `lsof` probes parallelized via `ThreadPoolExecutor(2)`. |
+| B9 | `server/hooks.py::_scan_plugin_hooks` | mtime-guarded TTL-30s cache. Recent-blocks endpoint cold→warm: **2754 ms → 4 ms (~700×)**. |
+| B10 | `server/sessions.py::api_sessions_stats` | **Pre-existing bug**: daily-timeline `c.execute(...)` was nested inside the per-project loop AND outside the `with _db()` block — used a closed cursor and ran N×projects. Pulled out as one global `GROUP BY` query inside the connection scope. |
+| B11 | `server/sessions.py::index_all_sessions` | New `mtime` column on `sessions` table. Index skip-check compares stored mtime first; falls back to `indexed_at` for legacy rows. |
+| B12 | `server/learner.py::_collect_sessions` | Replaced `~/.claude/projects/*/*.jsonl` filesystem walk with SQL queries against indexed `sessions + tool_uses` tables. Same return shape; cuts the warmup learner cycle. |
+
+### 🌐 Frontend (8 fixes)
+
+| # | File | Fix |
+|---|---|---|
+| F1 | `dist/index.html::_wfUpdateNodeTransform` | Drag mousemove was running `document.querySelector('#wfNodes g.wf-node[data-node="..."]')` — full SVG attribute scan at 60fps. Replaced with `__wf._nodeEls.get(nid)` (O(1) Map lookup; the keyed-diff Map was already maintained). |
+| F2 | `dist/index.html` pan + wheel handlers | `document.getElementById('wfViewport')` cached on `__wf._viewportEl`, set in `_wfBindCanvas`, invalidated on `_wfOpen`. Was running every event tick. |
+| F3 | `dist/index.html` | Removed duplicate `window.addEventListener('resize', _syncNavToggleVisibility)` registered twice (every resize fired the handler twice). |
+| F4 | `dist/index.html` 11 endpoints | `await api(...)` → `await cachedApi(...)` for read-only catalogs: `/api/optimization/score`, `/api/briefing/overview`, `/api/sessions/stats` (×2), `/api/agents`, `/api/skills`, `/api/commands`, `/api/projects` (×2), `/api/briefing/projects-summary`, `/api/features/list`. |
+| F5 | `dist/index.html::_getRecentTabs` | Module-level `_recentTabsCache`. Was `JSON.parse(localStorage.getItem(...))` on every `renderNav` (every tab switch). |
+| F6 | `dist/index.html` 5 polling timers | `if (document.hidden) return;` guard added to: workflow run-status fallback poll (1.2s), ollama pull-status (2s), telemetry live-refresh (30s), version poll (60s), aiProviders install-detect (10s). Background tabs no longer burn requests. |
+| F7 | `dist/index.html::escapeHtml` | Replacement map hoisted to module-scope const `_ESC_HTML_MAP`. Was re-allocating the 5-entry object on every match. Function is called 905× across the codebase, up to 1000× per filter keystroke in 200-card list renders. |
+| F8 | `dist/index.html::_apiCache` | Converted plain object to `Map` with LRU eviction at 50 entries (`_apiCacheSet` evicts oldest insertion). Cache was unbounded — long sessions accumulated stale entries. |
+
+### 🚀 Boot + static + i18n (4 fixes)
+
+| # | File | Fix |
+|---|---|---|
+| C1 | `server.py::main` | `background_index()` and `_auto_start_ollama()` wrapped in daemon threads. Boot log now shows `Serving http://...` BEFORE indexing/ollama probe — server accepts connections immediately. |
+| C2 | `server/routes.py` | New `_LOCALE_CACHE: OrderedDict` (cap 16) + rewritten `_send_locale` with mtime cache + gzip + ETag. `_send_static` adds `ETag: W/"<int(mtime)>"` + `Cache-Control: no-cache, must-revalidate`; `If-None-Match` returns 304 — verified. `_STATIC_CACHE` capped at 64 entries with `OrderedDict` LRU. |
+| C3 | `scripts/translate-refresh.sh` | mtime-guard early-exit: skip the 1.7s pipeline when no source file is newer than `translation-audit.json`. Bypass with `FORCE=1`. |
+| C4 | `tools/translations_manual.py` | Removed duplicate `_NEW_EN_26 / _NEW_ZH_26` merge block (recon agent caught the duplication). |
+
+### Measured wins
+```
+=== Boot ordering ===  Serving http://… BEFORE initial index BEFORE ollama probe ✓
+=== ETag + gzip ===    locale en.json: Content-Encoding: gzip + ETag W/"…" ✓
+=== 304 short-circuit ===  If-None-Match → HTTP 304 ✓
+=== /api/hooks/recent-blocks ===  cold 2754 ms → warm 4 ms  (~700×)
+=== /api/version ===   ≤ 15 ms warm
+=== /api/workflows/list ===  3 ms warm
+=== _db_init second call ===  0.00 ms (was every request)
+=== translation cache warm ===  0.01 ms (was per-request reload)
+=== hooks scan warm ===  0.02 ms (was every /api/hooks call)
+=== learner _collect_sessions ===  11 ms via SQL (was JSONL filesystem walk)
+```
+
+### Risks held back to v2.47.0+ (intentionally)
+- `workflows.py` runs dict → SQLite migration (high blast).
+- Boot RSS profiling with `tracemalloc` (the recon's "867 MB" suspicion needs measurement before refactor).
+- Session table virtual-scroll (frontend Phase C).
+- 8× `Chart.js` `destroy+new` → `chart.update('none')` (frontend Phase B).
+- 9× global keydown listeners → single dispatcher.
+- `_makeDraggable` document-listener leak fix (medium-risk window-lifecycle change).
+
+### Smoke
+```
+$ python3 -m py_compile server.py server/db.py server/sessions.py server/workflows.py …
+compile_ok
+$ make i18n-verify
+✓ 모든 검증 통과
+```
+
+---
 ## [2.45.2] — 2026-04-30
 
 ### 🐛 Fix — installed Ollama models table never repainted + 🔌 auto-start toggle

@@ -21,6 +21,7 @@ import re
 import signal
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -149,14 +150,18 @@ def _parse_lsof_line(line: str, proto: str) -> dict | None:
 def api_ports_list(query: dict | None = None) -> dict:
     """GET /api/ports/list — listening TCP + all UDP bindings."""
     rows: list[dict] = []
-    rc_t, out_t, _ = _run(["lsof", "-nP", "-iTCP", "-sTCP:LISTEN"], _LSOF_TIMEOUT)
+    # Run TCP-listen and UDP lsof probes concurrently — they are independent.
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        fut_tcp = ex.submit(_run, ["lsof", "-nP", "-iTCP", "-sTCP:LISTEN"], _LSOF_TIMEOUT)
+        fut_udp = ex.submit(_run, ["lsof", "-nP", "-iUDP"], _LSOF_TIMEOUT)
+        rc_t, out_t, _ = fut_tcp.result()
+        rc_u, out_u, _ = fut_udp.result()
     if rc_t == 127:
         return {"ok": False, "error": "lsof unavailable"}
     for line in out_t.splitlines():
         row = _parse_lsof_line(line, "tcp")
         if row:
             rows.append(row)
-    rc_u, out_u, _ = _run(["lsof", "-nP", "-iUDP"], _LSOF_TIMEOUT)
     if rc_u != 127:
         for line in out_u.splitlines():
             row = _parse_lsof_line(line, "udp")
