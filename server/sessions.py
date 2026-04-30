@@ -772,3 +772,196 @@ def api_agent_graph(query: dict) -> dict:
     return {"nodes": list(nodes.values()), "edges": edge_list}
 
 
+# ── v2.53.0 — full-text session search ─────────────────────────────────────
+# Streams JSONL transcripts from disk and returns ranked snippets.
+_SEARCH_CACHE: dict = {}
+_SEARCH_CACHE_TTL_MS = 30_000
+_SEARCH_MAX_SESSIONS = 200
+_SEARCH_MATCHES_PER_SESSION = 5
+_SEARCH_SNIPPET_RADIUS = 80
+
+
+def _search_extract_text(msg: dict) -> tuple[str, str]:
+    """Return (role, text) for a single transcript line.
+
+    Handles user/assistant messages with content as either string or list of
+    blocks. Returns ('', '') when the line has no usable text.
+    """
+    t = msg.get("type")
+    if t not in ("user", "assistant"):
+        return "", ""
+    inner = msg.get("message") or {}
+    if not isinstance(inner, dict):
+        return "", ""
+    content = inner.get("content")
+    parts: list[str] = []
+    if isinstance(content, str):
+        parts.append(content)
+    elif isinstance(content, list):
+        for b in content:
+            if not isinstance(b, dict):
+                continue
+            bt = b.get("type")
+            if bt == "text":
+                txt = b.get("text") or ""
+                if txt:
+                    parts.append(str(txt))
+            elif bt == "tool_use":
+                # Include short tool input description so users can find tool calls.
+                inp = b.get("input") or {}
+                if isinstance(inp, dict):
+                    for k in ("description", "command", "prompt", "pattern"):
+                        v = inp.get(k)
+                        if v:
+                            parts.append(str(v))
+                            break
+    return t, " ".join(parts).strip()
+
+
+def _search_build_snippet(text: str, q_lower: str) -> str:
+    """Return an excerpt with ~80 chars on each side of the first match."""
+    low = text.lower()
+    idx = low.find(q_lower)
+    if idx < 0:
+        return text[:160]
+    start = max(0, idx - _SEARCH_SNIPPET_RADIUS)
+    end = min(len(text), idx + len(q_lower) + _SEARCH_SNIPPET_RADIUS)
+    snip = text[start:end]
+    if start > 0:
+        snip = "…" + snip
+    if end < len(text):
+        snip = snip + "…"
+    # Collapse runs of whitespace so the snippet stays compact.
+    return " ".join(snip.split())
+
+
+def api_sessions_search(query: dict) -> dict:
+    """Full-text search across recent session JSONL transcripts.
+
+    Query params (under the routes-style ``{key: [val]}`` shape):
+      - ``q``     : required, min 2 chars (case-insensitive substring)
+      - ``limit`` : max hits to return (default 20, capped at 100)
+      - ``cwd``   : optional — restrict to one project's working directory
+
+    Returns ``{ok, query, totalScanned, totalMatched, hits: [...]}``. Hits
+    are sorted by score (occurrence count + recency boost) descending.
+    """
+    _db_init()
+    q_raw = (query.get("q", [""])[0] or "").strip()
+    if len(q_raw) < 2:
+        return {
+            "ok": False,
+            "error": "query too short (min 2 chars)",
+            "query": q_raw,
+            "totalScanned": 0,
+            "totalMatched": 0,
+            "hits": [],
+        }
+    try:
+        limit = int(query.get("limit", ["20"])[0])
+    except (TypeError, ValueError):
+        limit = 20
+    limit = max(1, min(100, limit))
+    cwd_filter = (query.get("cwd", [""])[0] or "").strip()
+
+    # Cache lookup — collapse rapid keystrokes to one disk scan.
+    cache_key = (q_raw.lower(), limit, cwd_filter)
+    now_ms = int(time.time() * 1000)
+    cached = _SEARCH_CACHE.get(cache_key)
+    if cached and (now_ms - cached[0]) < _SEARCH_CACHE_TTL_MS:
+        return cached[1]
+
+    q_lower = q_raw.lower()
+
+    sql = (
+        "SELECT session_id, cwd, jsonl_path, started_at FROM sessions "
+        "WHERE jsonl_path != '' "
+    )
+    params: list = []
+    if cwd_filter:
+        sql += "AND cwd = ? "
+        params.append(cwd_filter)
+    sql += "ORDER BY started_at DESC LIMIT ?"
+    params.append(_SEARCH_MAX_SESSIONS)
+
+    with _db() as c:
+        sess_rows = [dict(r) for r in c.execute(sql, params).fetchall()]
+
+    hits: list[dict] = []
+    total_scanned = 0
+    total_matched = 0
+    now_s = time.time()
+
+    for s in sess_rows:
+        if len(hits) >= limit:
+            break
+        jp = s.get("jsonl_path") or ""
+        if not jp:
+            continue
+        path = Path(jp)
+        if not path.exists():
+            continue
+        total_scanned += 1
+        occurrences = 0
+        first_match: Optional[dict] = None
+        try:
+            with path.open("r", encoding="utf-8", errors="replace") as f:
+                for raw in f:
+                    raw = raw.strip()
+                    if not raw or q_lower not in raw.lower():
+                        # Quick reject before json.loads keeps the hot path cheap.
+                        continue
+                    try:
+                        m = json.loads(raw)
+                    except Exception:
+                        continue
+                    role, text = _search_extract_text(m)
+                    if not text:
+                        continue
+                    low = text.lower()
+                    n = low.count(q_lower)
+                    if n <= 0:
+                        continue
+                    occurrences += n
+                    if first_match is None:
+                        first_match = {
+                            "role": role,
+                            "ts": _iso_ms(m.get("timestamp", "") or ""),
+                            "snippet": _search_build_snippet(text, q_lower),
+                        }
+                    if occurrences >= _SEARCH_MATCHES_PER_SESSION:
+                        break
+        except OSError:
+            continue
+        if occurrences <= 0 or first_match is None:
+            continue
+        total_matched += 1
+        started_ms = int(s.get("started_at") or 0)
+        days_old = max(0.0, (now_s * 1000 - started_ms) / 86_400_000.0) if started_ms else 30.0
+        recency_boost = max(0, 30 - int(days_old))
+        score = occurrences + recency_boost
+        hits.append({
+            "sessionId": s.get("session_id") or "",
+            "cwd": s.get("cwd") or "",
+            "started_at": started_ms,
+            "snippet": first_match["snippet"],
+            "role": first_match["role"],
+            "ts": first_match["ts"],
+            "score": score,
+        })
+
+    hits.sort(key=lambda h: h["score"], reverse=True)
+    hits = hits[:limit]
+
+    result = {
+        "ok": True,
+        "query": q_raw,
+        "totalScanned": total_scanned,
+        "totalMatched": total_matched,
+        "hits": hits,
+    }
+    # Bound cache size to avoid unbounded growth on diverse queries.
+    if len(_SEARCH_CACHE) > 64:
+        _SEARCH_CACHE.clear()
+    _SEARCH_CACHE[cache_key] = (now_ms, result)
+    return result

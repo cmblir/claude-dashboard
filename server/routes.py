@@ -148,6 +148,10 @@ from .auto_resume import (
     api_auto_resume_set, api_auto_resume_status,
     api_auto_resume_uninstall_hooks,
 )
+from .backup import (
+    api_backup_create, api_backup_delete,
+    api_backup_list, api_backup_restore,
+)
 from .prefs import api_prefs_get, api_prefs_reset, api_prefs_set
 from .hyper_agent import (
     api_hyper_configure, api_hyper_get, api_hyper_get_post, api_hyper_history,
@@ -212,7 +216,7 @@ from .projects import (
 from .sessions import (
     api_agent_graph, api_project_timeline, api_session_detail,
     api_session_timeline, api_session_tokens, api_sessions_list,
-    api_sessions_stats, index_all_sessions,
+    api_sessions_search, api_sessions_stats, index_all_sessions,
 )
 from .skills import get_skill, list_skills, put_skill
 from .system import (
@@ -261,6 +265,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/briefing/pending-approvals": lambda q: briefing_pending_approvals(),
     "/api/device/info": lambda q: get_device_info(),
     "/api/sessions/list": api_sessions_list,
+    "/api/sessions/search": api_sessions_search,
     "/api/sessions/stats": lambda q: api_sessions_stats(),
     "/api/agents/graph": api_agent_graph,
     "/api/optimization/score": lambda q: api_optimization_score(),
@@ -365,6 +370,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/auto_resume/status": api_auto_resume_status,
     "/api/auto_resume/get": api_auto_resume_get,
     "/api/auto_resume/hook_status": api_auto_resume_hook_status,
+    "/api/backup/list": api_backup_list,
     "/api/rtk/status": api_rtk_status,
     "/api/rtk/config": api_rtk_config,
     "/api/rtk/gain": api_rtk_gain,
@@ -540,6 +546,9 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/auto_resume/advise": api_auto_resume_advise,
     "/api/auto_resume/install_hooks": api_auto_resume_install_hooks,
     "/api/auto_resume/uninstall_hooks": api_auto_resume_uninstall_hooks,
+    "/api/backup/create": api_backup_create,
+    "/api/backup/restore": api_backup_restore,
+    "/api/backup/delete": api_backup_delete,
     "/api/prefs/set": api_prefs_set,
     "/api/prefs/reset": api_prefs_reset,
     "/api/hyper-agents/toggle": api_hyper_toggle,
