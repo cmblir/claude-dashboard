@@ -1372,7 +1372,7 @@ const NAV = [
   { id: 'memoryManager', icon: '🧮', label: '메모리 관리',
     group: 'observe', desc: 'vm_stat 기반 시스템 메모리 + 상위 30 프로세스 + idle Claude Code 일괄 종료' },
   { id: 'autoResumeManager', icon: '🔄', label: 'Auto-Resume 관리',
-    group: 'observe', desc: '활성 바인딩 리스트 + 일괄 취소' },
+    group: 'reliability', desc: '활성 바인딩 리스트 + 일괄 취소' },
   { id: 'securityScan', icon: '🛡️', label: 'Security Scan',
     group: 'observe', desc: '~/.claude 정적 검사 — 시크릿 / 위험 훅 / 과도한 권한 / 신뢰 불가 MCP',
     docUrl: DOCS_BASE+'security' },
@@ -1384,6 +1384,7 @@ const GROUPS = [
   { id: 'playground', icon: '🧪', label: '플레이그라운드', short: '실험실', desc: 'Claude API 실험 12종 + 프로바이더' },
   { id: 'config',     icon: '⚙️', label: '구성',         short: '구성',   desc: '훅 · 권한 · MCP · 플러그인 · 설정' },
   { id: 'observe',    icon: '📊', label: '관측',         short: '관측',   desc: '비용 · 메트릭 · 시스템 관측' },
+  { id: 'reliability',icon: '🛟', label: '안정성',       short: '안정성', desc: 'Auto-Resume · 자동 복구 · 바인딩 관리' },
 ];
 
 function viewHeader(title, subtitle, viewId) {
@@ -20590,18 +20591,34 @@ VIEWS.autoResumeManager = async () => {
       ).join('')
     : `<span class="text-xs text-[var(--text-mute)]">${t('활성 바인딩 없음')}</span>`;
 
-  const rowsHtml = active.length ? active.map(e => {
+  // Sort defensively client-side too: live first, then dead.
+  const sortedActive = active.slice().sort((a, b) => {
+    const la = a.liveSession ? 0 : 1;
+    const lb = b.liveSession ? 0 : 1;
+    if (la !== lb) return la - lb;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+  const rowsHtml = sortedActive.length ? sortedActive.map(e => {
     const sid = e.sessionId || '';
     const sidShort = sid.slice(0, 8);
     const cwd = e.cwd || '';
     const attempts = e.attempts ?? 0;
     const maxA = e.maxAttempts ?? 0;
     const eta = _armEtaText(e.nextAttemptAt || 0);
+    const termApp = e.terminal_app || '';
+    const pid = (e.pid != null ? e.pid : '');
+    const liveChip = e.liveSession
+      ? `<span class="badge text-[10px]" style="background:rgba(34,197,94,.15);color:#16a34a;">🟢 ${t('실행 중')}</span>`
+      : `<span class="badge text-[10px]" style="background:rgba(148,163,184,.15);color:var(--text-mute);">⚪ ${t('종료됨')}</span>`;
+    const termCell = termApp || pid
+      ? `<div class="mono text-[10px]">${escapeHtml(termApp || '-')}${pid ? ' <span class="text-[var(--text-mute)]">#'+escapeHtml(String(pid))+'</span>' : ''}</div><div class="mt-0.5">${liveChip}</div>`
+      : `<div>${liveChip}</div>`;
     return `
       <tr data-sid="${escapeHtml(sid)}">
         <td><input type="checkbox" class="arm-row-chk" data-sid="${escapeHtml(sid)}" /></td>
         <td class="mono text-[10px]" title="${escapeHtml(sid)}">${escapeHtml(sidShort)}</td>
         <td class="mono text-[10px] text-[var(--text-mute)] truncate" style="max-width:280px;" title="${escapeHtml(cwd)}">${escapeHtml(cwd)}</td>
+        <td>${termCell}</td>
         <td>${_armStateChip(e.state)}</td>
         <td class="mono text-xs">${attempts}/${maxA}</td>
         <td class="mono text-xs">${escapeHtml(eta)}</td>
@@ -20636,6 +20653,7 @@ VIEWS.autoResumeManager = async () => {
               <th style="width:30px;"><input type="checkbox" id="arm-chk-all" /></th>
               <th>${t('세션')}</th>
               <th>cwd</th>
+              <th>${t('터미널')}</th>
               <th>${t('상태')}</th>
               <th>${t('시도 수')}</th>
               <th>${t('다음 시도까지')}</th>
@@ -21808,6 +21826,7 @@ const _QS_SECTIONS = [
   { id: 'ai',       icon: '🤖', label: 'AI 기본값' },
   { id: 'behavior', icon: '⚙️', label: '동작' },
   { id: 'workflow', icon: '🔀', label: '워크플로우 기본값' },
+  { id: 'current',  icon: '🔎', label: '현재 파라미터', readonly: true },
 ];
 
 // ko labels per (section, key) — fall back to key when missing
@@ -21865,6 +21884,7 @@ function openQuickSettings(initialSection) {
   }
   let bd = document.getElementById('qsBackdrop');
   let dr = document.getElementById('qsDrawer');
+  const isFreshOpen = !bd || !dr;
   if (!bd) {
     bd = document.createElement('div'); bd.id = 'qsBackdrop';
     bd.onclick = closeQuickSettings;
@@ -21877,19 +21897,27 @@ function openQuickSettings(initialSection) {
     document.body.appendChild(dr);
   }
   const sec = initialSection || dr.dataset.section || 'ui';
+  _qsRefreshSection(sec);
+  if (isFreshOpen) {
+    requestAnimationFrame(() => { bd.classList.add('open'); dr.classList.add('open'); });
+  } else {
+    bd.classList.add('open'); dr.classList.add('open');
+  }
+}
+
+// Re-render drawer body for the requested section without recursing back into
+// openQuickSettings(). Used for tab clicks and reset flows where the drawer is
+// already mounted. Renders shell + binds controls exactly once per call.
+function _qsRefreshSection(sec) {
+  const dr = document.getElementById('qsDrawer');
+  if (!dr) return;
   dr.dataset.section = sec;
   dr.innerHTML = _qsRenderShell(sec);
-  // bind tab switches
+  // Re-bind tab switches — innerHTML wiped the previous handlers.
   dr.querySelectorAll('.qs-tab').forEach(tab => {
-    tab.onclick = () => {
-      dr.dataset.section = tab.dataset.section;
-      dr.innerHTML = _qsRenderShell(tab.dataset.section);
-      // re-bind after innerHTML rewrite — call openQuickSettings recursively to re-attach
-      openQuickSettings(tab.dataset.section);
-    };
+    tab.onclick = () => _qsRefreshSection(tab.dataset.section);
   });
   _qsBindControls(sec);
-  requestAnimationFrame(() => { bd.classList.add('open'); dr.classList.add('open'); });
 }
 
 function closeQuickSettings() {
@@ -21919,8 +21947,10 @@ function _qsRenderShell(section) {
     <div id="qsFoot">
       <span class="qs-saved" id="qsSaved">${_qsEscape(savedTxt)}</span>
       <div style="display:flex;gap:8px;">
+        ${(_QS_SECTIONS.find(s => s.id === section) || {}).readonly ? '' : `
         <button class="btn-ghost btn" onclick="_qsResetSection('${section}')" data-i18n="이 섹션 초기화">이 섹션 초기화</button>
         <button class="btn-ghost btn" onclick="_qsResetAll()" data-i18n="모두 초기화">모두 초기화</button>
+        `}
       </div>
     </div>
   `;
@@ -21932,6 +21962,7 @@ function _qsI18nKey(label) {
     'AI 기본값': 'qs.section.ai',
     '동작': 'qs.section.behavior',
     '워크플로우 기본값': 'qs.section.workflow',
+    '현재 파라미터': 'qs.section.current',
   };
   return m[label] || '';
 }
@@ -21943,6 +21974,7 @@ function _qsEscape(s) {
 }
 
 function _qsRenderSection(section) {
+  if (section === 'current') return _qsRenderCurrentParams();
   const schema = window.CC_PREFS_SCHEMA && window.CC_PREFS_SCHEMA[section];
   const cur = (window.CC_PREFS && window.CC_PREFS[section]) || {};
   if (!schema) return '<div class="qs-section-desc">스키마 로딩 실패</div>';
@@ -21994,6 +22026,9 @@ function _qsRenderRow(section, key, def, value) {
 function _qsBindControls(section) {
   const dr = document.getElementById('qsDrawer');
   if (!dr) return;
+  // Read-only sections (e.g. "current") have no interactive controls.
+  const meta = _QS_SECTIONS.find(s => s.id === section);
+  if (meta && meta.readonly) return;
   // toggle
   dr.querySelectorAll('.qs-toggle').forEach(el => {
     const fn = () => {
@@ -22037,6 +22072,76 @@ function _qsBindControls(section) {
   });
 }
 
+// Read-only "현재 파라미터" pane — debugging/transparency view of effective
+// prefs, runtime info, and quick links to inspection endpoints.
+function _qsRenderCurrentParams() {
+  const prefs = window.CC_PREFS || {};
+  const defs  = window.CC_PREFS_DEFAULTS || null;
+  const sections = ['ui', 'ai', 'behavior', 'workflow'];
+  const rows = [];
+  for (const sec of sections) {
+    const cur = prefs[sec] || {};
+    const def = (defs && defs[sec]) || null;
+    Object.keys(cur).sort().forEach(k => {
+      const v = cur[k];
+      let source = '—';
+      if (def && Object.prototype.hasOwnProperty.call(def, k)) {
+        source = (JSON.stringify(def[k]) === JSON.stringify(v)) ? 'default' : 'user-set';
+      }
+      rows.push(`<tr>
+        <td><code>${_qsEscape(sec)}</code></td>
+        <td><code>${_qsEscape(k)}</code></td>
+        <td><code>${_qsEscape(JSON.stringify(v))}</code></td>
+        <td>${_qsEscape(source)}</td>
+      </tr>`);
+    });
+  }
+  const ver = (window.__VERSION_CACHE || {});
+  const lang = (typeof _curLang !== 'undefined' && _curLang) ? _curLang : '—';
+  const theme = (document.body.dataset.theme) || (document.body.getAttribute('data-theme')) || '—';
+  const runtime = [
+    ['<span data-i18n="서버 버전">서버 버전</span>', _qsEscape(ver.version || '—')],
+    ['<span data-i18n="부팅 시각">부팅 시각</span>', _qsEscape(ver.serverStartedAt ? new Date(ver.serverStartedAt).toLocaleString() : '—')],
+    ['<span data-i18n="현재 언어">현재 언어</span>', _qsEscape(lang)],
+    ['<span data-i18n="현재 테마">현재 테마</span>', _qsEscape(theme)],
+    ['<span data-i18n="자동 재개 워커 수">자동 재개 워커 수</span>', _qsEscape(ver.autoResumeWorkers || '—')],
+    ['<span data-i18n="DB 인덱스 수">DB 인덱스 수</span>', _qsEscape(ver.dbIndexCount || '—')],
+  ].map(([k, v]) => `<tr><td colspan="2">${k}</td><td colspan="2"><code>${v}</code></td></tr>`).join('');
+  // Fire-and-forget: refresh runtime info on first render.
+  try {
+    fetch('/api/version', {cache: 'no-store'}).then(r => r.json()).then(j => {
+      window.__VERSION_CACHE = j || {};
+      // Re-render only if pane is still open.
+      const dr = document.getElementById('qsDrawer');
+      if (dr && dr.dataset.section === 'current') _qsRefreshSection('current');
+    }).catch(() => {});
+  } catch {}
+  const link = (path, label) => `<button class="btn btn-ghost" onclick="window.open('${path}', '_blank')">${label}</button>`;
+  return `
+    <div class="qs-section-desc" data-i18n="qs.section.current.desc">현재 적용 중인 모든 파라미터와 런타임 정보를 보여줍니다 (읽기 전용).</div>
+    <h4 style="margin:0.6rem 0 0.3rem;font-size:0.85rem;" data-i18n="유효 파라미터">유효 파라미터</h4>
+    <table class="qs-current-table" style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+      <thead><tr style="text-align:left;border-bottom:1px solid var(--border, #333);">
+        <th style="padding:0.3rem 0.4rem;" data-i18n="섹션">섹션</th>
+        <th style="padding:0.3rem 0.4rem;" data-i18n="키">키</th>
+        <th style="padding:0.3rem 0.4rem;" data-i18n="값">값</th>
+        <th style="padding:0.3rem 0.4rem;" data-i18n="출처">출처</th>
+      </tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>
+    <h4 style="margin:0.8rem 0 0.3rem;font-size:0.85rem;" data-i18n="런타임 정보">런타임 정보</h4>
+    <table class="qs-current-table" style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+      <tbody>${runtime}</tbody>
+    </table>
+    <h4 style="margin:0.8rem 0 0.3rem;font-size:0.85rem;" data-i18n="엔드포인트 링크">엔드포인트 링크</h4>
+    <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
+      ${link('/api/version', '/api/version')}
+      ${link('/api/prefs/get', '/api/prefs/get')}
+      ${link('/api/auto_resume/status', '/api/auto_resume/status')}
+    </div>
+  `;
+}
+
 function _qsApplyAndPersist(section, key, value) {
   setPref(section, key, value);
   // Side-effects for keys that need immediate behavior beyond data-* attrs
@@ -22056,7 +22161,7 @@ async function _qsResetSection(section) {
   if (j.ok) {
     window.CC_PREFS = j.prefs;
     _applyPrefsToDOM(j.prefs);
-    openQuickSettings(section); // re-render
+    _qsRefreshSection(section); // re-render — drawer is already open
   }
 }
 
@@ -22067,7 +22172,8 @@ async function _qsResetAll() {
   if (j.ok) {
     window.CC_PREFS = j.prefs;
     _applyPrefsToDOM(j.prefs);
-    openQuickSettings();
+    const cur = (document.getElementById('qsDrawer') || {}).dataset?.section || 'ui';
+    _qsRefreshSection(cur); // re-render — drawer is already open
   }
 }
 
@@ -22431,6 +22537,8 @@ function _stopMascotWander() {
 }
 function _mascotWanderStep() {
   if (_mascotDragging || _mascotOnChat) return;
+  // Skip work when the user has hidden the mascot via Quick Settings.
+  if (document.body.dataset.mascotHidden === 'true') return;
   const el = document.getElementById('claudeMascot');
   if (!el || el.style.display === 'none') return;
 
@@ -22600,6 +22708,8 @@ function _mascotLeaveModal() {
 
 function _showRandomBubble() {
   if (_chatOpen || _mascotDragging) return;
+  // Skip work when the user has hidden the mascot via Quick Settings.
+  if (document.body.dataset.mascotHidden === 'true') return;
   const bubble = document.getElementById('mascotBubble');
   if (!bubble) return;
   const msg = t(_mascotBubbles[Math.floor(Math.random() * _mascotBubbles.length)]);
