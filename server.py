@@ -69,10 +69,24 @@ def _kill_existing_server(port: int) -> bool:
 # ───────── Ollama 자동 시작 (중복 방지) ─────────
 
 def _auto_start_ollama() -> None:
-    """Ollama 가 설치되어 있고 아직 실행 중이 아니면 자동 시작."""
+    """Auto-start ollama serve if installed, not running, and pref enabled.
+
+    v2.45.2: honors `behavior.autoStartOllama` pref (default True).
+    Set to false in Quick Settings to skip auto-start and reclaim memory.
+    """
     import shutil
     if not shutil.which("ollama"):
         return
+    # honor user pref
+    try:
+        from server.prefs import api_prefs_get
+        prefs = api_prefs_get({}) or {}
+        beh = (prefs.get("prefs") or prefs).get("behavior") or {}
+        if beh.get("autoStartOllama") is False:
+            log.info("ollama auto-start: disabled by behavior.autoStartOllama=false")
+            return
+    except Exception as e:
+        log.debug("ollama auto-start pref check skipped: %s", e)
     try:
         from server.ollama_hub import _is_ollama_reachable, api_ollama_serve_start
         if _is_ollama_reachable():

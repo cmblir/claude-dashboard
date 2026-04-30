@@ -10,6 +10,42 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.45.2] — 2026-04-30
+
+### 🐛 Fix — installed Ollama models table never repainted + 🔌 auto-start toggle
+
+User: "설치된 모델에서 아예 보이지 않아. 그리고 ollama가 대시보드를 켤
+때마다 자동으로 같이 켜지는데 메모리를 너무 많이 먹어. 내가 켜고 끌 수
+있게 해줘."
+
+| # | Where | What |
+|---|---|---|
+| 1 | `dist/index.html::_ollamaLoadInstalled` | After `await api('/api/ollama/models')` populated `_ollamaInstalledData`, the catalog grid was repainted but the **installed-models table was never refreshed** — stuck on the "no models installed" placeholder forever. Added the missing `_ollamaRenderInstalled()` call. The 🗑 delete + 상세 button per row now actually appear. |
+| 2 | `server/prefs.py` | New pref `behavior.autoStartOllama` (`bool`, default `True` for back-compat). Validated in `PREFS_SCHEMA["behavior"]`; persisted to `~/.claude-dashboard-prefs.json` like every other behavior key. |
+| 3 | `server.py::_auto_start_ollama` | Reads the pref before spawning `ollama serve`. When `behavior.autoStartOllama=false`, logs `disabled by behavior.autoStartOllama=false` and skips. |
+| 4 | `dist/index.html` Quick Settings labels | New row `behavior.autoStartOllama` → "Ollama 자동 시작 / 대시보드 부팅 시 ollama serve 자동 실행 (끄면 메모리 절감)". Renders automatically since the drawer is schema-driven (v2.38.0). |
+| 5 | `tools/translations_manual_26.py` (new) + `tools/translations_manual.py` wiring | KO → EN/ZH for the new label and its hint. |
+
+### Note on Gemini
+
+User also reported "gemini also auto-starts and eats memory". Verified
+via `grep -rn "gemini" server/` + `ps aux | grep gemini` that **lazyclaude
+never auto-starts a Gemini process**. Gemini CLI is only invoked when
+the user clicks 🖥 Spawn on a workflow node assigned to `gemini:*`. The
+process they see is from a separately configured MCP server or external
+tool — outside lazyclaude's lifecycle. The v2.44.0 Memory Manager tab
+(`POST /api/process/kill`) can already terminate it on demand.
+
+### Smoke
+```
+$ python3 -c "from server.prefs import api_prefs_get, api_prefs_set, PREFS_SCHEMA; print(PREFS_SCHEMA['behavior']['autoStartOllama']); api_prefs_set({'section':'behavior','key':'autoStartOllama','value':False}); g=api_prefs_get({}); print((g.get('prefs') or g)['behavior']['autoStartOllama']); api_prefs_set({'section':'behavior','key':'autoStartOllama','value':True})"
+('bool', None)
+False
+$ make i18n-verify
+✓ 모든 검증 통과
+```
+
+---
 ## [2.45.1] — 2026-04-29
 
 ### 🚀 Perf hotfix — `/api/ccr/status` parallel probes + `/api/sessions-monitor/list` batched ps
