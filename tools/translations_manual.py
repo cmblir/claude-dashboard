@@ -193,6 +193,18 @@ try:
 except Exception:
     _NEW_EN_32, _NEW_ZH_32 = {}, {}
 
+# v2.53.0 — Backup & Restore (dashboard persistent data snapshots)
+try:
+    from translations_manual_33 import NEW_EN as _NEW_EN_33, NEW_ZH as _NEW_ZH_33
+except Exception:
+    _NEW_EN_33, _NEW_ZH_33 = {}, {}
+
+# v2.53.0 — full-text session search UI strings
+try:
+    from translations_manual_34 import NEW_EN as _NEW_EN_34, NEW_ZH as _NEW_ZH_34
+except Exception:
+    _NEW_EN_34, _NEW_ZH_34 = {}, {}
+
 # ── 구조화 키 → 한국어 라벨 ──
 MANUAL_KO: dict[str, str] = {
     "settings.theme": "테마",
@@ -734,6 +746,18 @@ for _k, _v in _NEW_ZH_31.items():
 for _k, _v in _NEW_EN_32.items():
     MANUAL_EN.setdefault(_k, _v)
 for _k, _v in _NEW_ZH_32.items():
+    MANUAL_ZH.setdefault(_k, _v)
+
+# v2.53.0 — Backup & Restore (dashboard persistent data snapshots)
+for _k, _v in _NEW_EN_33.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH_33.items():
+    MANUAL_ZH.setdefault(_k, _v)
+
+# v2.53.0 — full-text session search UI strings
+for _k, _v in _NEW_EN_34.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH_34.items():
     MANUAL_ZH.setdefault(_k, _v)
 
 # extractor 오탐(코드/주석)이 초기 MANUAL_EN/ZH 에 한글 원문으로 등록돼 있는 경우 덮어쓰기

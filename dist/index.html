@@ -1373,6 +1373,8 @@ const NAV = [
     group: 'observe', desc: 'vm_stat 기반 시스템 메모리 + 상위 30 프로세스 + idle Claude Code 일괄 종료' },
   { id: 'autoResumeManager', icon: '🔄', label: 'Auto-Resume 관리',
     group: 'reliability', desc: '활성 바인딩 리스트 + 일괄 취소' },
+  { id: 'backupRestore', icon: '💾', label: '백업 & 복원',
+    group: 'reliability', desc: '워크플로우/AR/AI 키/설정 스냅샷 + 복원' },
   { id: 'securityScan', icon: '🛡️', label: 'Security Scan',
     group: 'observe', desc: '~/.claude 정적 검사 — 시크릿 / 위험 훅 / 과도한 권한 / 신뢰 불가 MCP',
     docUrl: DOCS_BASE+'security' },
@@ -8881,6 +8883,10 @@ function _sessRowHtml(s, arActiveIds) {
 
 VIEWS.sessions = async () => {
   const q = state.data.sessionsFilter || { q: '', sort: 'recent', project: '', minScore: 0, errorsOnly: false };
+  // v2.53.0 — full-text content search across recent JSONL transcripts.
+  // When `searchState.results` is set, the result table replaces the normal list.
+  const searchState = state.data._sessSearch || { query: '', results: null, loading: false, error: '' };
+  state.data._sessSearch = searchState;
   const params = new URLSearchParams({ limit: 100, q: q.q, sort: q.sort });
   const [res, ar] = await Promise.all([
     api('/api/sessions/list?' + params),
@@ -8910,6 +8916,8 @@ VIEWS.sessions = async () => {
   state.data._sessRendered = Math.min(50, filtered.length);
   const initial = filtered.slice(0, state.data._sessRendered);
   const needSentinel = filtered.length > state.data._sessRendered;
+  const showingSearch = !!(searchState.results && searchState.results.ok);
+  const searchHits = showingSearch ? (searchState.results.hits || []) : [];
   return `
     <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
       <div>
@@ -8929,6 +8937,41 @@ VIEWS.sessions = async () => {
       </div>
     </div>
 
+    <div class="card p-3 mb-4 flex flex-wrap items-center gap-2">
+      <input id="sessSearch" type="search" class="input flex-1 min-w-[200px]"
+             placeholder="${t('세션 내용 검색…')}" value="${escapeHtml(searchState.query || '')}" />
+      ${showingSearch ? `<button class="btn text-xs" onclick="_sessSearchClear()">${t('검색 지우기')}</button>` : ''}
+      ${searchState.loading ? `<span class="text-xs text-[var(--text-dim)]">${t('검색 중…')}</span>` : ''}
+      ${searchState.error ? `<span class="text-xs text-[var(--err)]">${escapeHtml(searchState.error)}</span>` : ''}
+      ${showingSearch ? `<span class="text-xs text-[var(--text-dim)]">${t('스캔한 세션')}: ${searchState.results.totalScanned} · ${t('일치한 세션')}: ${searchState.results.totalMatched}</span>` : ''}
+    </div>
+
+    ${showingSearch ? `
+    <div class="card overflow-hidden">
+      <div class="p-3 border-b border-[var(--border)] text-sm font-bold">${t('검색 결과')}</div>
+      <div class="overflow-x-auto">
+        <table class="data">
+          <thead><tr>
+            <th class="text-right">${t('점수')}</th>
+            <th>${t('역할')}</th>
+            <th>${t('스니펫')}</th>
+            <th class="hidden md:table-cell">${t('프로젝트')}</th>
+            <th class="text-right hidden sm:table-cell">${t('시작')}</th>
+          </tr></thead>
+          <tbody>
+          ${searchHits.length === 0 ? `<tr><td colspan="5" class="empty">${t('검색 결과 없음')}</td></tr>` : searchHits.map(h => `
+            <tr style="cursor:pointer" onclick="openSessionDetail('${escapeHtml(h.sessionId)}')">
+              <td class="text-right mono">${h.score}</td>
+              <td><span class="chip ${h.role==='user'?'':'chip-accent'}">${escapeHtml(h.role || '')}</span></td>
+              <td class="text-xs"><div class="line-clamp-2">${escapeHtml(h.snippet || '')}</div></td>
+              <td class="hidden md:table-cell text-xs text-[var(--text-mute)]">${escapeHtml((h.cwd || '').split('/').pop() || '—')}</td>
+              <td class="text-right text-xs hidden sm:table-cell">${fmtRel(h.started_at || h.ts || 0)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ` : `
     <div class="card p-3 mb-4 flex flex-wrap items-center gap-2">
       <span class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mr-1">${t('프로젝트')}</span>
       <button class="chip ${!q.project?'chip-accent':''}" onclick="_sessSet('project','')">${t('전체')} ${allSessions.length}</button>
@@ -8958,21 +9001,35 @@ VIEWS.sessions = async () => {
         </tbody>
       </table>
     </div>
+    `}
   `;
 };
 AFTER.sessions = () => {
   const qInput = document.getElementById('sessQ');
   const sortInput = document.getElementById('sessSort');
   let debounce;
-  qInput.addEventListener('input', e => {
-    clearTimeout(debounce);
-    debounce = setTimeout(() => {
-      _sessSet('q', e.target.value);
-    }, 250);
-  });
-  sortInput.addEventListener('change', () => {
-    _sessSet('sort', sortInput.value);
-  });
+  if (qInput) {
+    qInput.addEventListener('input', e => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        _sessSet('q', e.target.value);
+      }, 250);
+    });
+  }
+  if (sortInput) {
+    sortInput.addEventListener('change', () => {
+      _sessSet('sort', sortInput.value);
+    });
+  }
+  // v2.53.0 — full-text content search box (debounced 300ms).
+  const searchInput = document.getElementById('sessSearch');
+  if (searchInput) {
+    let sDeb;
+    searchInput.addEventListener('input', e => {
+      clearTimeout(sDeb);
+      sDeb = setTimeout(() => _sessSearchInput(e.target.value), 300);
+    });
+  }
   // v2.47 perf — virtual scroll: append rows in 50-row chunks when the
   // sentinel intersects the viewport.
   const sentinel = document.getElementById('sessSentinel');
@@ -9007,6 +9064,44 @@ function _sessSet(key, value) {
   renderView();
 }
 window._sessSet = _sessSet;
+
+// v2.53.0 — full-text content search wiring.
+async function _sessSearchInput(raw) {
+  const q = (raw || '').trim();
+  const ss = state.data._sessSearch || (state.data._sessSearch = { query: '', results: null, loading: false, error: '' });
+  ss.query = q;
+  if (q.length < 2) {
+    ss.results = null;
+    ss.loading = false;
+    ss.error = q.length === 1 ? t('검색어가 너무 짧음 (2글자 이상)') : '';
+    renderView();
+    return;
+  }
+  ss.loading = true;
+  ss.error = '';
+  try {
+    const r = await api('/api/sessions/search?' + new URLSearchParams({ q, limit: 20 }));
+    if (r && r.ok) {
+      ss.results = r;
+      ss.error = '';
+    } else {
+      ss.results = null;
+      ss.error = (r && r.error) || t('검색 결과 없음');
+    }
+  } catch (e) {
+    ss.results = null;
+    ss.error = e.message || String(e);
+  } finally {
+    ss.loading = false;
+    renderView();
+  }
+}
+function _sessSearchClear() {
+  state.data._sessSearch = { query: '', results: null, loading: false, error: '' };
+  renderView();
+}
+window._sessSearchInput = _sessSearchInput;
+window._sessSearchClear = _sessSearchClear;
 
 async function openSessionDetail(sessionId) {
   showModalLoading(t('세션 불러오는 중…'));
@@ -20836,6 +20931,146 @@ window._armCancelSelected = async () => {
   if (failN === 0) toast(t('취소 완료') + ': ' + okN + ' ' + t('건'), 'ok');
   else toast(t('취소 실패') + ': ' + failN + ' / ' + (okN + failN), 'err');
   setTimeout(() => renderView && renderView(), 400);
+};
+
+// ────────────────────────────────────────────────────────────────
+// BACKUP & RESTORE — v2.53.0
+// Snapshot dashboard persistent data (workflows / AR / AI keys / prefs / DB)
+// to ~/.claude-dashboard-backups/<timestamp>.tar.gz, restore on demand.
+// ────────────────────────────────────────────────────────────────
+function _bkFmtSize(n) {
+  if (!n) return '0 B';
+  const u = ['B', 'KB', 'MB', 'GB'];
+  let i = 0; let v = n;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return v.toFixed(v >= 10 || i === 0 ? 0 : 1) + ' ' + u[i];
+}
+function _bkFmtTime(ms) {
+  if (!ms) return '-';
+  try { return new Date(ms).toLocaleString(); } catch { return '-'; }
+}
+
+VIEWS.backupRestore = async () => {
+  const r = await api('/api/backup/list').catch(() => null);
+  const backups = (r && r.ok) ? (r.backups || []) : [];
+  const totalSize = backups.reduce((a, b) => a + (b.sizeBytes || 0), 0);
+
+  const rowsHtml = backups.length ? backups.map(b => `
+    <tr>
+      <td class="mono text-[11px]" title="${escapeHtml(b.name)}">${escapeHtml(b.name)}</td>
+      <td class="mono text-xs">${escapeHtml(_bkFmtTime(b.createdAt))}</td>
+      <td class="mono text-xs">${_bkFmtSize(b.sizeBytes)}</td>
+      <td class="mono text-xs">${b.files || 0}</td>
+      <td class="text-right">
+        <button class="btn text-xs" onclick="_backupRestore('${escapeHtml(b.name)}')">📥 ${t('복원')}</button>
+        <button class="btn text-xs" onclick="_backupDelete('${escapeHtml(b.name)}')">🗑 ${t('삭제')}</button>
+      </td>
+    </tr>
+  `).join('') : '';
+
+  return `
+    ${viewHeader(t('백업 & 복원'), t('워크플로우/AR/AI 키/설정 스냅샷 + 복원'), 'backupRestore')}
+
+    <div class="card p-5 mb-4">
+      <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+        <div class="flex gap-4 text-sm">
+          <div><span class="text-[var(--text-mute)]">${t('총 백업')}:</span> <strong class="mono">${backups.length}</strong></div>
+          <div><span class="text-[var(--text-mute)]">${t('전체 크기')}:</span> <strong class="mono">${_bkFmtSize(totalSize)}</strong></div>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <input id="bk-label" type="text" class="input text-xs" placeholder="${t('라벨 (선택)')}" style="max-width:180px;" />
+          <button class="btn primary text-xs" onclick="_backupCreate()">💾 ${t('새 백업 만들기')}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-5">
+      <h3 class="font-semibold text-sm mb-3">${t('백업')}</h3>
+      ${backups.length ? `
+        <div style="overflow-x:auto;">
+          <table class="data">
+            <thead><tr>
+              <th>${t('이름')}</th>
+              <th>${t('만든 시각')}</th>
+              <th>${t('크기')}</th>
+              <th>${t('파일 수')}</th>
+              <th class="text-right">${t('작업')}</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      ` : `<div class="empty text-sm">${t('백업 없음')}</div>`}
+    </div>
+    <style>
+      @media (max-width: 640px) {
+        #view table.data thead { display: none; }
+        #view table.data, #view table.data tbody, #view table.data tr, #view table.data td { display: block; width: 100%; }
+        #view table.data tr { border-bottom: 1px solid var(--border, rgba(148,163,184,.2)); padding: 6px 0; }
+        #view table.data td { padding: 3px 4px; max-width: 100% !important; white-space: normal; }
+      }
+    </style>
+  `;
+};
+
+AFTER.backupRestore = () => {
+  // No timer — backups change only on user action; refresh manually via re-render.
+};
+
+window._backupCreate = async () => {
+  const labelEl = document.getElementById('bk-label');
+  const label = labelEl ? labelEl.value.trim() : '';
+  try {
+    if (typeof showModalLoading === 'function') showModalLoading(t('백업 만드는 중…'));
+    const r = await api('/api/backup/create', { label });
+    if (typeof closeModal === 'function') closeModal();
+    if (!r || !r.ok) {
+      toast(t('백업 만들기 실패') + ': ' + (r && r.error ? r.error : 'unknown'), 'err');
+      return;
+    }
+    toast(t('백업 생성 완료') + ': ' + (r.name || ''), 'ok');
+    if (labelEl) labelEl.value = '';
+    setTimeout(() => renderView && renderView(), 200);
+  } catch (e) {
+    if (typeof closeModal === 'function') closeModal();
+    toast(t('백업 만들기 실패') + ': ' + e.message, 'err');
+  }
+};
+
+window._backupRestore = async (name) => {
+  if (!name) return;
+  const proceed = confirm(t('정말 복원하시겠습니까?') + '\n\n' + name + '\n\n' + t('덮어쓰기 경고'));
+  if (!proceed) return;
+  try {
+    if (typeof showModalLoading === 'function') showModalLoading(t('복원 중…'));
+    const r = await api('/api/backup/restore', { name, overwrite: true });
+    if (typeof closeModal === 'function') closeModal();
+    if (!r || !r.ok) {
+      toast(t('복원 실패') + ': ' + (r && r.error ? r.error : 'unknown'), 'err');
+      return;
+    }
+    const n = (r.restored || []).length;
+    toast(t('복원 완료') + ': ' + n + ' ' + t('파일 수'), 'ok');
+    setTimeout(() => renderView && renderView(), 200);
+  } catch (e) {
+    if (typeof closeModal === 'function') closeModal();
+    toast(t('복원 실패') + ': ' + e.message, 'err');
+  }
+};
+
+window._backupDelete = async (name) => {
+  if (!name) return;
+  if (!confirm(t('정말 삭제하시겠습니까?') + '\n\n' + name)) return;
+  try {
+    const r = await api('/api/backup/delete', { name });
+    if (!r || !r.ok) {
+      toast(t('삭제 실패') + ': ' + (r && r.error ? r.error : 'unknown'), 'err');
+      return;
+    }
+    toast(t('삭제 완료'), 'ok');
+    setTimeout(() => renderView && renderView(), 200);
+  } catch (e) {
+    toast(t('삭제 실패') + ': ' + e.message, 'err');
+  }
 };
 
 // ────────────────────────────────────────────────────────────────

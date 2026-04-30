@@ -10,6 +10,56 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.53.0] — 2026-05-01
+
+### 💾 Backup/restore + 🔍 session search + 171 tests
+
+User: "다음 라운드 자율모드." Three parallel agents on independent
+domains.
+
+### 💾 Backup/restore (A)
+
+| # | Where | What |
+|---|---|---|
+| 1 | `server/backup.py` (new, ~280 lines, stdlib only) | tar.gz archives in `~/.claude-dashboard-backups/` containing all `*.json` data files + a sqlite-vacuumed snapshot via `VACUUM INTO`. Manifest at archive root with `{version, files, createdAt, hostname, label}`. |
+| 2 | `api_backup_list` | Returns sorted-by-mtime list with `name, path, sizeBytes, createdAt, files`. |
+| 3 | `api_backup_create({label?})` | Generates `lazyclaude-YYYYMMDD-HHMMSS[-label].tar.gz`. Atomic `.tmp` + rename. Backs up: `*.db`, all `~/.claude-dashboard-*.json` files (silently skip missing), `~/.claude-code-router/config.json` (flattened to `claude-code-router__config.json`). |
+| 4 | `api_backup_restore({name, overwrite, files?})` | Pre-flight check rejects when target exists unless `overwrite=true`. Safe extraction (rejects `..` / absolute paths). |
+| 5 | `api_backup_delete({name})` | Containment check via `Path.resolve()` parents. Manifest signature check. |
+| 6 | `server/nav_catalog.py` + `dist/index.html` `VIEWS.backupRestore` | New `💾 백업 & 복원` tab under `reliability` category. Header card with backup count + new-backup form (label input). Backups table (name, createdAt, size, files, actions 📥/🗑). Confirm dialog before restore/delete. |
+| 7 | `tools/translations_manual_33.py` (new) | 25 KO→EN/ZH for backup strings. |
+
+### 🔍 Session full-text search (B)
+
+| # | Where | What |
+|---|---|---|
+| 8 | `server/sessions.py::api_sessions_search` | Streams `~/.claude/projects/*/*.jsonl` line-by-line (no whole-file load). Score = occurrences + recency boost (`max(0, 30 - days_old)`). Top-200 most-recent sessions cap, ≤5 matches per session early-termination. In-memory TTL-30s cache (capacity 64). |
+| 9 | Endpoint | `GET /api/sessions/search?q=...&limit=20&cwd=...` (default 20, max 100). `q < 2 chars` rejected. Returns `{ok, query, totalScanned, totalMatched, hits: [...]}`. |
+| 10 | `dist/index.html` `VIEWS.sessions` | Search box at top with 300ms debounce. Hides session list while results showing. "검색 지우기" reverts. |
+| 11 | `tools/translations_manual_34.py` (new) | 13 KO→EN/ZH for search strings. |
+
+### 🧪 Pytest expansion (C)
+
+| # | Where | Cases |
+|---|---|---|
+| 12 | `tests/test_hooks.py` (127 lines) | 9 — `_scan_plugin_hooks` shape, TTL-30s cache, mtime-based invalidation. |
+| 13 | `tests/test_mcp.py` (158 lines) | 13 — `_load_disk_cache` idempotent, `_claude_mcp_list_cached` shape, TTL behavior. Mocks `subprocess.run`. |
+| 14 | `tests/test_cost_timeline.py` (185 lines) | 20 — `_aggregate_by_model`, `_infer_provider`, all 4 recommendation rules, `api_cost_recommendations` shape. Mocks `_gather_all`. |
+| 15 | `tests/test_notify.py` (128 lines) | 16 — `_send_notify({})` no-op, `send_email` empty/missing, `send_telegram` mocked URLError. Fully offline. |
+
+**Test totals: 113 → 171 (+58), runtime 1.82s → 1.80s.**
+
+### Smoke
+```
+$ make test                                    171 passed in 1.80s
+$ make i18n-verify                             ✓ 모든 검증 통과
+$ /api/version                       200       3.5 ms
+$ /api/backup/list                   200       0.8 ms
+$ /api/sessions/search?q=the&limit=5 200      47.0 ms (cold)
+$ /api/auto_resume/status            200       0.8 ms
+```
+
+---
 ## [2.52.0] — 2026-04-30
 
 ### 🧠 Hyper-Advisor + 113 tests + 467× AR status

@@ -265,6 +265,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
     ("autoResumeManager", "reliability",
         "🔄 Auto-Resume 관리 — 활성 바인딩 리스트 + 일괄 취소",
         ["auto-resume", "auto resume", "재개", "바인딩", "session"]),
+
+    # v2.53.0 — Backup & Restore for dashboard persistent data
+    ("backupRestore", "reliability",
+        "💾 백업 & 복원 — 워크플로우/AR/AI 키/설정 스냅샷 + 복원",
+        ["backup", "restore", "snapshot", "백업", "복원", "스냅샷"]),
 ]
 
 
@@ -358,6 +363,8 @@ TAB_DESC_I18N: dict[str, dict[str, str]] = {
                       "zh": "内存管理 — 基于 vm_stat 的系统内存 + 前 30 进程 + 批量终止空闲 Claude Code"},
     "autoResumeManager": {"en": "Auto-Resume Manager — active binding list + bulk cancel",
                           "zh": "Auto-Resume 管理 — 活动绑定列表 + 批量取消"},
+    "backupRestore": {"en": "Backup & Restore — workflows/AR/AI keys/settings snapshot + restore",
+                      "zh": "备份与恢复 — 工作流/AR/AI 密钥/设置 快照 + 恢复"},
 }
 
 
