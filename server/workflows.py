@@ -106,12 +106,209 @@ def _runs_cache_pop(runId: str) -> Optional[dict]:
         return _RUNS_CACHE.pop(runId, None)
 
 
-def _persist_run(runId: str) -> None:
-    """Flush the cached run dict to the on-disk store under _LOCK.
+# ───────── Runs SQLite store (v2.47.0) ─────────
+#
+# Runs migrated from the global ~/.claude-dashboard-workflows.json blob into
+# their own table so per-node status updates (running/ok/err/skipped) no
+# longer contend with workflow definition saves on `_LOCK`. Reads/writes go
+# through `_db()` (a connection-per-call factory) which is thread-safe via
+# SQLite's own internal locking — no Python-level lock needed for runs.
 
-    Safe to call repeatedly; no-op if the run is not in cache. We deliberately
-    take _RUNS_LOCK only briefly to copy, then take _LOCK for the file I/O,
-    to avoid holding both locks across a synchronous fsync.
+def _run_indexed_fields(run: dict) -> tuple:
+    """Extract the columns hoisted out of the run payload for indexing.
+
+    Returns (workflow_id, status, started_at, ended_at, iteration,
+    total_iterations, cost_total, tokens_in, tokens_out).
+    """
+    workflow_id = run.get("workflowId") or run.get("wfId") or ""
+    status = run.get("status") or "running"
+    started_at = float(run.get("startedAt") or 0)
+    finished = run.get("finishedAt") or 0
+    ended_at = float(finished) if finished else None
+    iteration = int(run.get("iteration") or 0)
+    repeat = run.get("repeat") or {}
+    total_iter = int(repeat.get("maxIterations") or run.get("totalIterations") or 1)
+    cost_total = float(run.get("costUsd") or run.get("totalCostUsd") or 0.0)
+    tokens_in = int(run.get("tokensIn") or run.get("totalTokensIn") or 0)
+    tokens_out = int(run.get("tokensOut") or run.get("totalTokensOut") or 0)
+    return (workflow_id, status, started_at, ended_at, iteration,
+            total_iter, cost_total, tokens_in, tokens_out)
+
+
+def _runs_db_save(run_id: str, run_dict: dict) -> None:
+    """UPSERT a run into the workflow_runs table."""
+    if not run_id or not isinstance(run_dict, dict):
+        return
+    try:
+        _db_init()
+        (workflow_id, status, started_at, ended_at, iteration,
+         total_iter, cost_total, tokens_in, tokens_out) = _run_indexed_fields(run_dict)
+        payload = json.dumps(run_dict, ensure_ascii=False)
+        with _db() as c:
+            c.execute(
+                """INSERT OR REPLACE INTO workflow_runs
+                   (run_id, workflow_id, status, started_at, ended_at,
+                    iteration, total_iterations, cost_total,
+                    tokens_in, tokens_out, payload_json)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                (run_id, workflow_id, status, started_at, ended_at,
+                 iteration, total_iter, cost_total,
+                 tokens_in, tokens_out, payload),
+            )
+    except Exception as e:
+        log.warning("workflow_runs save failed (run=%s): %s", run_id, e)
+
+
+def _runs_db_load(workflow_id: str | None = None,
+                  run_id: str | None = None,
+                  limit: int = 200) -> dict[str, dict]:
+    """Read runs from SQLite. Returns {run_id: run_dict}."""
+    out: dict[str, dict] = {}
+    try:
+        _db_init()
+        with _db() as c:
+            if run_id:
+                rows = c.execute(
+                    "SELECT run_id, payload_json FROM workflow_runs WHERE run_id=?",
+                    (run_id,),
+                ).fetchall()
+            elif workflow_id:
+                rows = c.execute(
+                    "SELECT run_id, payload_json FROM workflow_runs "
+                    "WHERE workflow_id=? ORDER BY started_at DESC LIMIT ?",
+                    (workflow_id, int(limit)),
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    "SELECT run_id, payload_json FROM workflow_runs "
+                    "ORDER BY started_at DESC LIMIT ?",
+                    (int(limit),),
+                ).fetchall()
+            for row in rows:
+                try:
+                    out[row["run_id"]] = json.loads(row["payload_json"])
+                except Exception:
+                    continue
+    except Exception as e:
+        log.warning("workflow_runs load failed: %s", e)
+    return out
+
+
+def _runs_db_delete(run_id: str) -> None:
+    """Remove a run row (used for cancel cleanup)."""
+    if not run_id:
+        return
+    try:
+        _db_init()
+        with _db() as c:
+            c.execute("DELETE FROM workflow_runs WHERE run_id=?", (run_id,))
+    except Exception as e:
+        log.warning("workflow_runs delete failed (run=%s): %s", run_id, e)
+
+
+def _runs_db_list_recent(workflow_id: str, limit: int = 3) -> list[dict]:
+    """Recent runs (full payload) for one workflow, newest first."""
+    out: list[dict] = []
+    if not workflow_id:
+        return out
+    try:
+        _db_init()
+        with _db() as c:
+            rows = c.execute(
+                "SELECT payload_json FROM workflow_runs "
+                "WHERE workflow_id=? ORDER BY started_at DESC LIMIT ?",
+                (workflow_id, int(limit)),
+            ).fetchall()
+            for row in rows:
+                try:
+                    out.append(json.loads(row["payload_json"]))
+                except Exception:
+                    continue
+    except Exception as e:
+        log.warning("workflow_runs list_recent failed: %s", e)
+    return out
+
+
+def _runs_db_summaries(workflow_id: str | None = None,
+                       limit: int = 200) -> list[dict]:
+    """Indexed-column summaries (no payload deserialization). Used by the
+    list endpoint when only the chip data is needed."""
+    out: list[dict] = []
+    try:
+        _db_init()
+        with _db() as c:
+            if workflow_id:
+                rows = c.execute(
+                    "SELECT run_id, workflow_id, status, started_at, ended_at, "
+                    "iteration FROM workflow_runs WHERE workflow_id=? "
+                    "ORDER BY started_at DESC LIMIT ?",
+                    (workflow_id, int(limit)),
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    "SELECT run_id, workflow_id, status, started_at, ended_at, "
+                    "iteration FROM workflow_runs "
+                    "ORDER BY started_at DESC LIMIT ?",
+                    (int(limit),),
+                ).fetchall()
+            for r in rows:
+                out.append({
+                    "runId":       r["run_id"],
+                    "workflowId":  r["workflow_id"],
+                    "status":      r["status"],
+                    "startedAt":   r["started_at"],
+                    "finishedAt":  r["ended_at"] or 0,
+                    "iteration":   r["iteration"],
+                })
+    except Exception as e:
+        log.warning("workflow_runs summaries failed: %s", e)
+    return out
+
+
+def _migrate_runs_to_db() -> None:
+    """One-time migration: copy any pre-v2.47 `runs` dict from the JSON store
+    into workflow_runs. Idempotent via the `migration_v2_47_runs_done` flag.
+    The original `runs` key is left in the JSON file as a defensive backup;
+    no read path consults it after the flag is set.
+    """
+    try:
+        if not WORKFLOWS_PATH.exists():
+            return
+        with _LOCK:
+            store = _load_all()
+            if store.get("migration_v2_47_runs_done"):
+                return
+            legacy_runs = store.get("runs") or {}
+            if not isinstance(legacy_runs, dict) or not legacy_runs:
+                # Nothing to migrate — still mark as done to skip on next boot.
+                store["migration_v2_47_runs_done"] = True
+                _dump_all(store)
+                return
+        # Copy each entry into the table (outside _LOCK — SQL is its own
+        # synchronization domain).
+        copied = 0
+        for rid, run in legacy_runs.items():
+            if not isinstance(run, dict):
+                continue
+            run.setdefault("id", rid)
+            _runs_db_save(rid, run)
+            copied += 1
+        with _LOCK:
+            store = _load_all()
+            store["migration_v2_47_runs_done"] = True
+            # Defensive: keep the legacy `runs` dict in the file untouched so
+            # rollback is possible. Future writes never read it.
+            _dump_all(store)
+        log.info("workflow runs migrated to SQLite: %d entries", copied)
+    except Exception as e:
+        log.warning("runs migration failed: %s", e)
+
+
+def _persist_run(runId: str) -> None:
+    """Flush the cached run dict to the workflow_runs table.
+
+    Safe to call repeatedly; no-op if the run is not in cache. v2.47.0:
+    writes go directly to SQLite — no _LOCK, no JSON round-trip.
     """
     with _RUNS_LOCK:
         cached = _RUNS_CACHE.get(runId)
@@ -121,11 +318,7 @@ def _persist_run(runId: str) -> None:
         nr = cached.get("nodeResults")
         if isinstance(nr, dict):
             snap["nodeResults"] = dict(nr)
-    with _LOCK:
-        store = _load_all()
-        store.setdefault("runs", {})
-        store["runs"][runId] = snap
-        _dump_all(store)
+    _runs_db_save(runId, snap)
 
 
 # ───────── 영속 ─────────
@@ -687,18 +880,37 @@ def _new_run_id() -> str:
 
 def api_workflows_list(query: dict | None = None) -> dict:
     store = _load_all()
-    # v2.42.1 — group runs by wfId so each list card can surface the latest 3
-    # statuses + a "running" badge inline. Without this the user has to open
-    # the workflow into the canvas just to see whether it last passed/failed.
-    runs_by_wf: dict[str, list[dict]] = {}
-    for rid, r in (store.get("runs") or {}).items():
-        wid = r.get("wfId") or ""
-        if not wid:
-            continue
-        runs_by_wf.setdefault(wid, []).append(r)
+    # v2.47.0 — runs read from the workflow_runs table per workflow. The
+    # in-memory cache is consulted as well so an in-flight run shows up
+    # before its first iteration-boundary flush.
+    cache_by_wf: dict[str, list[dict]] = {}
+    with _RUNS_LOCK:
+        for cached in _RUNS_CACHE.values():
+            wid = cached.get("workflowId") or cached.get("wfId") or ""
+            if not wid:
+                continue
+            cache_by_wf.setdefault(wid, []).append(dict(cached))
+    # Batch totals from SQL — avoids one query per workflow.
+    totals_by_wf: dict[str, int] = {}
+    try:
+        _db_init()
+        with _db() as c:
+            for row in c.execute(
+                "SELECT workflow_id, COUNT(*) AS n FROM workflow_runs GROUP BY workflow_id"
+            ).fetchall():
+                totals_by_wf[row["workflow_id"]] = int(row["n"])
+    except Exception as e:
+        log.warning("workflow runs total aggregation failed: %s", e)
     out = []
     for wfId, wf in store["workflows"].items():
-        runs = runs_by_wf.get(wfId, [])
+        # Pull the most recent runs (DB) and merge any live entries.
+        runs = list(_runs_db_list_recent(wfId, limit=10))
+        live = cache_by_wf.get(wfId) or []
+        if live:
+            seen = {r.get("id") or r.get("runId") for r in runs}
+            for lr in live:
+                if (lr.get("id") or lr.get("runId")) not in seen:
+                    runs.append(lr)
         runs.sort(key=lambda x: x.get("startedAt") or 0, reverse=True)
         last_runs = []
         running_count = 0
@@ -731,7 +943,7 @@ def api_workflows_list(query: dict | None = None) -> dict:
             "lastRuns":     last_runs,
             "runningCount": running_count,
             "activeRunId":  active_run_id,
-            "totalRuns":    len(runs),
+            "totalRuns":    totals_by_wf.get(wfId, len(runs)),
         })
     out.sort(key=lambda x: x["updatedAt"], reverse=True)
     return {"ok": True, "workflows": out}
@@ -937,9 +1149,14 @@ def api_workflow_delete(body: dict) -> dict:
         if wfId not in store["workflows"]:
             return {"ok": False, "error": "not found"}
         del store["workflows"][wfId]
-        # 연관 runs purge
-        store["runs"] = {rid: r for rid, r in store["runs"].items() if r.get("workflowId") != wfId}
         _dump_all(store)
+    # v2.47.0 — runs live in SQLite now; purge them outside _LOCK.
+    try:
+        _db_init()
+        with _db() as c:
+            c.execute("DELETE FROM workflow_runs WHERE workflow_id=?", (wfId,))
+    except Exception as e:
+        log.warning("workflow_runs purge on delete failed (wf=%s): %s", wfId, e)
     return {"ok": True, "id": wfId}
 
 
@@ -1047,8 +1264,9 @@ def _run_status_snapshot(runId: str) -> dict:
     cached = _runs_cache_get(runId)
     if cached is not None:
         return {"ok": True, "run": cached}
-    store = _load_all()
-    r = store["runs"].get(runId)
+    # v2.47.0 — completed runs live in SQLite. Cache misses fall through here.
+    loaded = _runs_db_load(run_id=runId)
+    r = loaded.get(runId)
     if not r:
         return {"ok": False, "error": "run not found"}
     return {"ok": True, "run": r}
@@ -1801,11 +2019,8 @@ def _execute_subworkflow_node(data: dict, inputs: list[str], _elapsed) -> dict:
         "nodeResults": {}, "iteration": 0, "error": None,
         "isSubworkflow": True,
     }
-    with _LOCK:
-        store = _load_all()
-        store["runs"][sub_run_id] = sub_entry
-        _dump_all(store)
     _runs_cache_set(sub_run_id, dict(sub_entry))
+    _runs_db_save(sub_run_id, sub_entry)
 
     ok, _results, final_out = _run_one_iteration(
         sub_wf, sub_run_id, 0, extra_inputs)
@@ -2435,7 +2650,8 @@ def _notify_run_completion(wfId: str, runId: str, status: str, summary: str = ""
         discord_url = (notify.get("discord") or "").strip()
         if not slack_url and not discord_url:
             return
-        run = (store.get("runs") or {}).get(runId) or {}
+        # v2.47.0 — run lives in SQLite. Cache first, then DB fallback.
+        run = _runs_cache_get(runId) or _runs_db_load(run_id=runId).get(runId) or {}
         started = run.get("startedAt") or 0
         finished = run.get("finishedAt") or int(time.time() * 1000)
         duration_ms = max(0, finished - started)
@@ -2548,22 +2764,22 @@ def api_workflow_run(body: dict) -> dict:
         cyc = _check_dag(wf.get("nodes", []), wf.get("edges", []))
         if cyc:
             return {"ok": False, "error": cyc[0]}
-        runId = _new_run_id()
-        run_entry = {
-            "id": runId,
-            "workflowId": wfId,
-            "status": "running",
-            "startedAt": int(time.time()*1000),
-            "finishedAt": 0,
-            "currentNodeId": None,
-            "nodeResults": {},
-            "iteration": 0,
-            "error": None,
-        }
-        store["runs"][runId] = run_entry
-        _dump_all(store)
+    runId = _new_run_id()
+    run_entry = {
+        "id": runId,
+        "workflowId": wfId,
+        "status": "running",
+        "startedAt": int(time.time()*1000),
+        "finishedAt": 0,
+        "currentNodeId": None,
+        "nodeResults": {},
+        "iteration": 0,
+        "error": None,
+    }
     # v2.44.0 — seed in-memory cache so per-node updates avoid disk I/O.
+    # v2.47.0 — also persist initial state to SQLite (no _LOCK needed).
     _runs_cache_set(runId, dict(run_entry))
+    _runs_db_save(runId, run_entry)
     # 백그라운드 시작
     th = threading.Thread(target=_run_workflow_background, args=(wfId, runId), daemon=True)
     th.start()
@@ -2656,10 +2872,10 @@ def api_workflow_webhook(wfId: str, body: dict | None = None, secret_header: str
             "trigger": "webhook",
             "webhookInput": (body or {}).get("input", "") if isinstance(body, dict) else "",
         }
-        store["runs"][runId] = run_entry
-        _dump_all(store)
     # v2.44.0 — seed in-memory run cache.
+    # v2.47.0 — runs persisted to SQLite, not the workflows JSON store.
     _runs_cache_set(runId, dict(run_entry))
+    _runs_db_save(runId, run_entry)
 
     # webhook 입력을 start 다음 노드에 주입
     webhook_input = ((body or {}).get("input") or "") if isinstance(body, dict) else ""
@@ -3266,9 +3482,9 @@ def api_workflow_run_diff(body: dict) -> dict:
         return {"ok": False, "error": "invalid a"}
     if not (isinstance(b, str) and _RUN_ID_RE.match(b)):
         return {"ok": False, "error": "invalid b"}
-    store = _load_all()
-    runs = store.get("runs") or {}
-    ra = runs.get(a); rb = runs.get(b)
+    # v2.47.0 — load both runs from SQLite (cache first for live runs).
+    ra = _runs_cache_get(a) or _runs_db_load(run_id=a).get(a)
+    rb = _runs_cache_get(b) or _runs_db_load(run_id=b).get(b)
     if not ra or not rb:
         return {"ok": False, "error": "run(s) not found"}
     nra = ra.get("nodeResults") or {}
@@ -3339,11 +3555,10 @@ def api_workflow_runs_list(query: dict) -> dict:
             wfId = v
     if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
         return {"ok": False, "error": "invalid wfId"}
-    store = _load_all()
+    # v2.47.0 — runs come from the workflow_runs table.
+    runs_map = _runs_db_load(workflow_id=wfId, limit=50)
     out = []
-    for rid, r in (store.get("runs") or {}).items():
-        if r.get("workflowId") != wfId:
-            continue
+    for rid, r in runs_map.items():
         out.append({
             "id": rid,
             "status": r.get("status"),
@@ -3354,7 +3569,7 @@ def api_workflow_runs_list(query: dict) -> dict:
             "error": r.get("error"),
         })
     out.sort(key=lambda x: x["startedAt"], reverse=True)
-    return {"ok": True, "runs": out[:50]}  # 최근 50개 제한
+    return {"ok": True, "runs": out[:50]}
 
 
 # ═══════════════════════════════════════════
@@ -3506,7 +3721,9 @@ def api_workflow_restore(body: dict) -> dict:
 def api_workflow_stats() -> dict:
     """전체 워크플로우 실행 통계 집계."""
     store = _load_all()
-    runs = store.get("runs", {})
+    # v2.47.0 — pull all runs from SQLite. Bound the scan to avoid
+    # unbounded memory once the table grows.
+    runs = _runs_db_load(limit=5000)
     total = len(runs)
     ok_count = sum(1 for r in runs.values() if r.get("status") == "ok")
     err_count = sum(1 for r in runs.values() if r.get("status") == "err")

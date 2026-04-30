@@ -20,7 +20,7 @@ from server.logger import log, setup_logging
 from server.mcp import warmup_caches
 from server.routes import Handler
 from server.sessions import background_index
-from server.workflows import start_scheduler
+from server.workflows import _migrate_runs_to_db, start_scheduler
 from server.auto_resume import start_auto_resume
 from server.hyper_agent_worker import start_hyper_agent_worker
 
@@ -117,6 +117,8 @@ def main() -> None:
             sys.exit(1)
 
     _db_init()
+    # v2.47.0 — one-time migration of workflow runs from JSON to SQLite.
+    _migrate_runs_to_db()
     # v2.46.0 — non-blocking boot: defer slow probes/scans to daemon threads
     # so the HTTP server starts listening within ~hundreds of ms instead of
     # waiting on session indexing (~seconds) and ollama HTTP probe (1–3 s).

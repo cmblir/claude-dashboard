@@ -1905,13 +1905,74 @@ window.addEventListener('hashchange', () => {
     state.view = h; renderNav(); renderView();
   }
 });
-// 글로벌 Alt+←/→ 핸들러
+// v2.47 perf — single global keydown dispatcher.
+// Each former module-level handler is pushed as a function on this array.
+// Returning truthy from a handler consumes the event (later handlers skipped).
+// Order matters: register hot/global handlers (Cmd+K spotlight, Esc) first.
+// v2.47 perf — registry of live Chart.js instances keyed by canvas id.
+// Lets render-paths update existing charts in place instead of destroy+new.
+const _chartInstances = window._chartInstances || (window._chartInstances = new Map());
+
+// Render or update a Chart.js chart on `canvasEl` with `cfg`.
+// If a chart already exists for this canvas id and matches the requested type,
+// data is patched in place and `update('none')` runs for animation-free refresh.
+// Otherwise the old instance is destroyed and a fresh chart is created.
+function _renderChart(canvasEl, cfg) {
+  if (!canvasEl || typeof Chart === 'undefined') return null;
+  const id = canvasEl.id;
+  if (!id) {
+    // Fallback for unidentified canvases — behave like the old destroy+new flow
+    return new Chart(canvasEl, cfg);
+  }
+  // Sweep entries whose canvas was removed from the DOM by a renderView swap
+  _chartInstances.forEach((c, key) => {
+    if (!document.getElementById(key)) {
+      try { c.destroy?.(); } catch (_) {}
+      _chartInstances.delete(key);
+    }
+  });
+  const existing = _chartInstances.get(id);
+  if (existing && existing.config && existing.config.type === cfg.type
+      && existing.data && cfg.data
+      && Array.isArray(existing.data.datasets) && Array.isArray(cfg.data.datasets)
+      && existing.data.datasets.length === cfg.data.datasets.length) {
+    try {
+      existing.data.labels = cfg.data.labels;
+      cfg.data.datasets.forEach((ds, i) => {
+        const target = existing.data.datasets[i];
+        target.data = ds.data;
+        if ('label' in ds) target.label = ds.label;
+        if ('backgroundColor' in ds) target.backgroundColor = ds.backgroundColor;
+        if ('borderColor' in ds) target.borderColor = ds.borderColor;
+      });
+      existing.update('none');
+      return existing;
+    } catch (_) {
+      // Fall through to recreate on any update failure
+      try { existing.destroy(); } catch (_) {}
+      _chartInstances.delete(id);
+    }
+  }
+  if (existing) { try { existing.destroy(); } catch (_) {} }
+  const fresh = new Chart(canvasEl, cfg);
+  _chartInstances.set(id, fresh);
+  return fresh;
+}
+
+const _KEYDOWN_HANDLERS = [];
 document.addEventListener('keydown', (e) => {
+  for (const h of _KEYDOWN_HANDLERS) {
+    try { if (h(e)) break; } catch (err) { /* one bad handler must not break others */ console.error(err); }
+  }
+});
+
+// Global Alt+ArrowLeft/Right — tab history nav
+_KEYDOWN_HANDLERS.push((e) => {
   if (!e.altKey || e.ctrlKey || e.metaKey) return;
   const inInput = ['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName);
   if (inInput) return;
-  if (e.key === 'ArrowLeft') { e.preventDefault(); _tabHistoryBack(); }
-  else if (e.key === 'ArrowRight') { e.preventDefault(); _tabHistoryForward(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); _tabHistoryBack(); return true; }
+  if (e.key === 'ArrowRight') { e.preventDefault(); _tabHistoryForward(); return true; }
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -2166,6 +2227,7 @@ function openFeatureWindow(feat) {
 
 function closeFeatureWindow(winId) {
   const w = document.getElementById(winId); if (!w) return;
+  _detachDragListeners(w);
   w.remove(); _winMgr.openIds.delete(winId);
 }
 function minimizeFeatureWindow(winId) {
@@ -2218,7 +2280,7 @@ function _makeDraggable(w) {
   if (!title) return;
   let startX, startY, origLeft, origTop, dragging = false;
   title.addEventListener('mousedown', e => {
-    // 트래픽라이트 클릭은 드래그 시작 X
+    // Traffic-light click does not initiate drag
     if (e.target.classList.contains('feat-light')) return;
     if (w.classList.contains('feat-win-maxed')) return;
     dragging = true;
@@ -2228,12 +2290,32 @@ function _makeDraggable(w) {
     w.style.zIndex = ++_winMgr.zIndex;
     e.preventDefault();
   });
-  document.addEventListener('mousemove', e => {
+  // v2.47 perf — keep references so closeFeatureWindow / _wfCloseNodeEditor
+  // can detach these document-level listeners and avoid leaking one pair
+  // per opened feature window.
+  const onMove = (e) => {
     if (!dragging) return;
     w.style.left = (origLeft + (e.clientX - startX)) + 'px';
     w.style.top = Math.max(0, origTop + (e.clientY - startY)) + 'px';
-  });
-  document.addEventListener('mouseup', () => { dragging = false; });
+  };
+  const onUp = () => { dragging = false; };
+  w._dragMoveBound = onMove;
+  w._dragUpBound = onUp;
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+// v2.47 perf — shared drag-listener teardown for any window-closer.
+function _detachDragListeners(el) {
+  if (!el) return;
+  if (el._dragMoveBound) {
+    document.removeEventListener('mousemove', el._dragMoveBound);
+    delete el._dragMoveBound;
+  }
+  if (el._dragUpBound) {
+    document.removeEventListener('mouseup', el._dragUpBound);
+    delete el._dragUpBound;
+  }
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -5091,97 +5173,101 @@ function _wfBindCanvas() {
     onUp(e, true);
   }, { passive: false });
 
-  // 키보드 단축키 (워크플로우 캔버스)
-  document.addEventListener('keydown', (e) => {
-    if (state.view !== 'workflows') return;
-    const inInput = ['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName);
+  // Workflow canvas keyboard shortcuts — register once via the global dispatcher.
+  // _wfBindCanvas runs on every workflow tab visit; the flag prevents
+  // duplicate handlers from accumulating.
+  if (!window.__wfKeydownRegistered) {
+    window.__wfKeydownRegistered = true;
+    _KEYDOWN_HANDLERS.push((e) => {
+      if (state.view !== 'workflows') return;
+      const inInput = ['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName);
 
-    // ? → 단축키 도움말 (input 안에서는 무시)
-    if (e.key === '?' && !inInput && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault(); _wfShowShortcutHelp(); return;
-    }
-
-    // Esc → 단축키 모달 닫기 / 선택 해제
-    if (e.key === 'Escape') {
-      const helpModal = document.getElementById('wfShortcutModal');
-      if (helpModal) { helpModal.remove(); return; }
-      if (!inInput) {
-        __wf.selectedNodeId = null; __wf.selectedEdgeId = null;
-        _wfSyncSelectionClasses(); _wfRenderInspector();
+      // ? — shortcut help (skip inside input)
+      if (e.key === '?' && !inInput && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault(); _wfShowShortcutHelp(); return true;
       }
-      return;
-    }
 
-    // Ctrl/Cmd 단축키
-    const mod = e.ctrlKey || e.metaKey;
-
-    // Alt+C → 노드 편집기 카테고리 접기/펴기
-    if (e.altKey && (e.key === 'c' || e.key === 'C')) {
-      const topWin = document.querySelector('.feat-win[id^="wfNodeEdit_"]');
-      if (topWin && topWin._wfDraft) { e.preventDefault(); _wfToggleCat(topWin.id); return; }
-    }
-
-    // Ctrl+Z → 실행 취소
-    if (mod && e.key === 'z' && !e.shiftKey && !inInput) {
-      e.preventDefault(); _wfUndo(); return;
-    }
-
-    // Ctrl+C → 노드 복사
-    if (mod && e.key === 'c' && !inInput) {
-      if (__wf.current && __wf.selectedNodeId) {
-        const node = __wf.current.nodes.find(n => n.id === __wf.selectedNodeId);
-        if (node) {
-          __wf._clipboard = [JSON.parse(JSON.stringify(node))];
-          toast(t('노드 복사됨'), 'ok');
+      // Esc — close shortcut modal / clear selection
+      if (e.key === 'Escape') {
+        const helpModal = document.getElementById('wfShortcutModal');
+        if (helpModal) { helpModal.remove(); return true; }
+        if (!inInput) {
+          __wf.selectedNodeId = null; __wf.selectedEdgeId = null;
+          _wfSyncSelectionClasses(); _wfRenderInspector();
+          return true;
         }
+        return;
       }
-      return;
-    }
 
-    // Ctrl+V → 노드 붙여넣기
-    if (mod && e.key === 'v' && !inInput) {
-      if (__wf.current && __wf._clipboard.length) {
-        e.preventDefault();
-        _wfPushUndo();
-        const pasted = [];
-        __wf._clipboard.forEach(src => {
-          const nid = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-          const clone = JSON.parse(JSON.stringify(src));
-          clone.id = nid;
-          clone.x = (clone.x || 0) + 40;
-          clone.y = (clone.y || 0) + 40;
-          clone.title = clone.title || 'Copy';
-          __wf.current.nodes.push(clone);
-          pasted.push(clone);
-        });
-        // clipboard 업데이트 (연속 붙여넣기 시 점점 오프셋 누적)
-        __wf._clipboard = pasted.map(n => JSON.parse(JSON.stringify(n)));
-        __wf.selectedNodeId = pasted[pasted.length - 1].id;
-        __wf.dirty = true;
-        _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
-        toast(t('노드 붙여넣기 완료'), 'ok');
+      const mod = e.ctrlKey || e.metaKey;
+
+      // Alt+C — collapse/expand node-editor categories
+      if (e.altKey && (e.key === 'c' || e.key === 'C')) {
+        const topWin = document.querySelector('.feat-win[id^="wfNodeEdit_"]');
+        if (topWin && topWin._wfDraft) { e.preventDefault(); _wfToggleCat(topWin.id); return true; }
       }
-      return;
-    }
 
-    // Ctrl+S → 저장
-    if (mod && e.key === 's') {
-      e.preventDefault(); _wfSave(); return;
-    }
+      // Ctrl+Z — undo
+      if (mod && e.key === 'z' && !e.shiftKey && !inInput) {
+        e.preventDefault(); _wfUndo(); return true;
+      }
 
-    // Ctrl+F → 노드 검색 포커스
-    if (mod && e.key === 'f') {
-      const si = document.getElementById('wfNodeSearch');
-      if (si) { e.preventDefault(); si.focus(); }
-      return;
-    }
+      // Ctrl+C — copy node
+      if (mod && e.key === 'c' && !inInput) {
+        if (__wf.current && __wf.selectedNodeId) {
+          const node = __wf.current.nodes.find(n => n.id === __wf.selectedNodeId);
+          if (node) {
+            __wf._clipboard = [JSON.parse(JSON.stringify(node))];
+            toast(t('노드 복사됨'), 'ok');
+          }
+        }
+        return true;
+      }
 
-    // Delete / Backspace → 삭제
-    if (['Delete','Backspace'].includes(e.key) && !inInput) {
-      if (__wf.selectedNodeId) { e.preventDefault(); _wfDeleteSelectedNode(); }
-      else if (__wf.selectedEdgeId) { e.preventDefault(); _wfDeleteSelectedEdge(); }
-    }
-  });
+      // Ctrl+V — paste node
+      if (mod && e.key === 'v' && !inInput) {
+        if (__wf.current && __wf._clipboard.length) {
+          e.preventDefault();
+          _wfPushUndo();
+          const pasted = [];
+          __wf._clipboard.forEach(src => {
+            const nid = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+            const clone = JSON.parse(JSON.stringify(src));
+            clone.id = nid;
+            clone.x = (clone.x || 0) + 40;
+            clone.y = (clone.y || 0) + 40;
+            clone.title = clone.title || 'Copy';
+            __wf.current.nodes.push(clone);
+            pasted.push(clone);
+          });
+          __wf._clipboard = pasted.map(n => JSON.parse(JSON.stringify(n)));
+          __wf.selectedNodeId = pasted[pasted.length - 1].id;
+          __wf.dirty = true;
+          _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
+          toast(t('노드 붙여넣기 완료'), 'ok');
+        }
+        return true;
+      }
+
+      // Ctrl+S — save
+      if (mod && e.key === 's') {
+        e.preventDefault(); _wfSave(); return true;
+      }
+
+      // Ctrl+F — focus node search
+      if (mod && e.key === 'f') {
+        const si = document.getElementById('wfNodeSearch');
+        if (si) { e.preventDefault(); si.focus(); return true; }
+        return;
+      }
+
+      // Delete / Backspace — remove
+      if (['Delete','Backspace'].includes(e.key) && !inInput) {
+        if (__wf.selectedNodeId) { e.preventDefault(); _wfDeleteSelectedNode(); return true; }
+        if (__wf.selectedEdgeId) { e.preventDefault(); _wfDeleteSelectedEdge(); return true; }
+      }
+    });
+  }
 
   // 휠 줌
   svg.addEventListener('wheel', (e) => {
@@ -5659,7 +5745,10 @@ function _wfOpenNodeEditor(nid) {
 
 function _wfCloseNodeEditor(winId) {
   const w = document.getElementById(winId);
-  if (w) w.remove();
+  if (w) {
+    _detachDragListeners(w);
+    w.remove();
+  }
   _winMgr.openIds.delete(winId);
 }
 
@@ -8884,16 +8973,14 @@ function statCard(label, value, color, hint) {
     </div>`;
 }
 
-let _overviewTimelineChart = null;
 function drawTimeline(data) {
   const ctx = document.getElementById('timelineChart');
   if (!ctx) return;
-  if (_overviewTimelineChart) { _overviewTimelineChart.destroy(); _overviewTimelineChart = null; }
   const labels = data.map(d => d.date.slice(5));
   const scores = data.map(d => d.avg_score);
   const tools = data.map(d => d.tools);
   const errors = data.map(d => d.errors);
-  _overviewTimelineChart = new Chart(ctx, {
+  _renderChart(ctx, {
     type: 'line',
     data: {
       labels,
@@ -8972,14 +9059,11 @@ VIEWS.analytics = async () => {
     </div>
   `;
 };
-let _analyticsToolChart = null;
-let _analyticsAgentChart = null;
 AFTER.analytics = () => {
   const s = state.data.analytics;
   const tc = document.getElementById('toolChart');
   if (tc && s.toolDistribution.length) {
-    if (_analyticsToolChart) { _analyticsToolChart.destroy(); _analyticsToolChart = null; }
-    _analyticsToolChart = new Chart(tc, {
+    _renderChart(tc, {
       type: 'bar',
       data: {
         labels: s.toolDistribution.map(t => t.tool),
@@ -8995,8 +9079,7 @@ AFTER.analytics = () => {
   }
   const ac = document.getElementById('agentChart');
   if (ac && s.subagentDistribution.length) {
-    if (_analyticsAgentChart) { _analyticsAgentChart.destroy(); _analyticsAgentChart = null; }
-    _analyticsAgentChart = new Chart(ac, {
+    _renderChart(ac, {
       type: 'doughnut',
       data: {
         labels: s.subagentDistribution.map(t => t.name),
@@ -9012,6 +9095,32 @@ AFTER.analytics = () => {
 // ────────────────────────────────────────────────────────────────
 // SESSIONS
 // ────────────────────────────────────────────────────────────────
+// v2.47 perf — single-row renderer used by the initial paint and the
+// IntersectionObserver-driven append. Keeps the markup in one place.
+function _sessRowHtml(s, arActiveIds) {
+  return `
+    <tr class="link-row" onclick="openSessionDetail('${s.session_id}')">
+      <td>
+        <div class="inline-flex items-center justify-center w-10 h-8 rounded-lg mono font-bold"
+             style="background:${scoreColor(s.score)}20; color:${scoreColor(s.score)};">
+          ${s.score}
+        </div>
+      </td>
+      <td class="max-w-[340px] truncate">${escapeHtml((s.first_user_prompt||'(요청 없음)').slice(0,120))}</td>
+      <td class="text-xs" title="${escapeHtml(s.projectPath||'')}">
+        <div class="font-semibold">${escapeHtml(s.project || '—')}${arActiveIds && arActiveIds.has(s.session_id) ? ` <span class="chip chip-accent text-[9px]" title="${t('Auto-Resume 주입 중')}">🔄 AR</span>` : ''}</div>
+        <div class="mono text-[10px] text-[var(--text-dim)] truncate" style="max-width:240px;">${escapeHtml(s.projectPath || '')}</div>
+      </td>
+      <td class="text-right">${s.message_count}</td>
+      <td class="text-right">${s.tool_use_count}</td>
+      <td class="text-right">${s.agent_call_count ? `<span class="chip chip-accent">${s.agent_call_count}</span>` : '0'}</td>
+      <td class="text-right mono text-xs" style="color:#d97757">${fmtTokens(s.total_tokens||0)}</td>
+      <td class="text-right">${s.error_count ? `<span class="chip chip-err">${s.error_count}</span>` : '0'}</td>
+      <td class="text-right mono text-xs">${fmtDur(s.duration_ms)}</td>
+      <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(s.started_at)}</td>
+    </tr>`;
+}
+
 VIEWS.sessions = async () => {
   const q = state.data.sessionsFilter || { q: '', sort: 'recent', project: '', minScore: 0, errorsOnly: false };
   const params = new URLSearchParams({ limit: 100, q: q.q, sort: q.sort });
@@ -9036,6 +9145,13 @@ VIEWS.sessions = async () => {
     return true;
   });
   state.data.sessions = { ...res, sessions: filtered, _rawTotal: allSessions.length };
+  // v2.47 perf — virtual scroll. Render first 50 rows; an IntersectionObserver
+  // appends the next 50 when the sentinel scrolls into view.
+  state.data._sessRows = filtered;
+  state.data._sessArActiveIds = arActiveIds;
+  state.data._sessRendered = Math.min(50, filtered.length);
+  const initial = filtered.slice(0, state.data._sessRendered);
+  const needSentinel = filtered.length > state.data._sessRendered;
   return `
     <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
       <div>
@@ -9078,29 +9194,9 @@ VIEWS.sessions = async () => {
           <th class="text-right">지속</th>
           <th class="text-right">시작</th>
         </tr></thead>
-        <tbody>
-        ${filtered.map(s => `
-          <tr class="link-row" onclick="openSessionDetail('${s.session_id}')">
-            <td>
-              <div class="inline-flex items-center justify-center w-10 h-8 rounded-lg mono font-bold"
-                   style="background:${scoreColor(s.score)}20; color:${scoreColor(s.score)};">
-                ${s.score}
-              </div>
-            </td>
-            <td class="max-w-[340px] truncate">${escapeHtml((s.first_user_prompt||'(요청 없음)').slice(0,120))}</td>
-            <td class="text-xs" title="${escapeHtml(s.projectPath||'')}">
-              <div class="font-semibold">${escapeHtml(s.project || '—')}${arActiveIds.has(s.session_id) ? ` <span class="chip chip-accent text-[9px]" title="${t('Auto-Resume 주입 중')}">🔄 AR</span>` : ''}</div>
-              <div class="mono text-[10px] text-[var(--text-dim)] truncate" style="max-width:240px;">${escapeHtml(s.projectPath || '')}</div>
-            </td>
-            <td class="text-right">${s.message_count}</td>
-            <td class="text-right">${s.tool_use_count}</td>
-            <td class="text-right">${s.agent_call_count ? `<span class="chip chip-accent">${s.agent_call_count}</span>` : '0'}</td>
-            <td class="text-right mono text-xs" style="color:#d97757">${fmtTokens(s.total_tokens||0)}</td>
-            <td class="text-right">${s.error_count ? `<span class="chip chip-err">${s.error_count}</span>` : '0'}</td>
-            <td class="text-right mono text-xs">${fmtDur(s.duration_ms)}</td>
-            <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(s.started_at)}</td>
-          </tr>
-        `).join('') || `<tr><td colspan="10" class="empty">세션이 없습니다. 재인덱스 버튼을 눌러보세요.</td></tr>`}
+        <tbody id="sessTbody">
+        ${initial.map(s => _sessRowHtml(s, arActiveIds)).join('') || `<tr><td colspan="10" class="empty">세션이 없습니다. 재인덱스 버튼을 눌러보세요.</td></tr>`}
+        ${needSentinel ? `<tr id="sessSentinel"><td colspan="10" class="text-center text-xs text-[var(--text-dim)] py-3">${t('더 불러오는 중…')}</td></tr>` : ''}
         </tbody>
       </table>
     </div>
@@ -9119,6 +9215,29 @@ AFTER.sessions = () => {
   sortInput.addEventListener('change', () => {
     _sessSet('sort', sortInput.value);
   });
+  // v2.47 perf — virtual scroll: append rows in 50-row chunks when the
+  // sentinel intersects the viewport.
+  const sentinel = document.getElementById('sessSentinel');
+  if (!sentinel) return;
+  const tbody = document.getElementById('sessTbody');
+  const rows = state.data._sessRows || [];
+  const arActiveIds = state.data._sessArActiveIds || new Set();
+  const io = new IntersectionObserver((entries) => {
+    if (!entries.some(en => en.isIntersecting)) return;
+    const start = state.data._sessRendered || 0;
+    const end = Math.min(start + 50, rows.length);
+    if (end <= start) { io.disconnect(); sentinel.remove(); return; }
+    const frag = document.createRange().createContextualFragment(
+      rows.slice(start, end).map(s => _sessRowHtml(s, arActiveIds)).join('')
+    );
+    tbody.insertBefore(frag, sentinel);
+    state.data._sessRendered = end;
+    if (end >= rows.length) {
+      io.disconnect();
+      sentinel.remove();
+    }
+  }, { root: null, rootMargin: '200px', threshold: 0 });
+  io.observe(sentinel);
 };
 // v2.33.7 — 부분 업데이트 헬퍼
 function _sessSet(key, value) {
@@ -17454,9 +17573,7 @@ function _formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-// ── 비용 차트 인스턴스 캐시 (메모리 누수 방지) ──
-let _costTimelineChart = null;
-let _costByProviderChart = null;
+// Cost chart instances now live in the shared _chartInstances Map.
 
 window.__lastCostsData = null; // 비용 데이터 캐시 — 스택 바 차트에서 재사용
 window.initCostCharts = async () => {
@@ -17484,8 +17601,7 @@ window.initCostCharts = async () => {
     // 일별 비용 타임라인 (라인 차트)
     const ctxTimeline = document.getElementById('costTimeline');
     if (ctxTimeline) {
-      if (_costTimelineChart) { _costTimelineChart.destroy(); _costTimelineChart = null; }
-      _costTimelineChart = new Chart(ctxTimeline, {
+      _renderChart(ctxTimeline, {
         type: 'line',
         data: {
           labels: daily.map(d => d.date),
@@ -17517,9 +17633,8 @@ window.initCostCharts = async () => {
     // 프로바이더별 비용 비교 (도넛 차트)
     const ctxProvider = document.getElementById('costByProvider');
     if (ctxProvider) {
-      if (_costByProviderChart) { _costByProviderChart.destroy(); _costByProviderChart = null; }
       const providerColors = ['#d97757','#7dd3fc','#4ade80','#c084fc','#fbbf24','#f87171','#a78bfa','#38bdf8'];
-      _costByProviderChart = new Chart(ctxProvider, {
+      _renderChart(ctxProvider, {
         type: 'doughnut',
         data: {
           labels: byProvider.map(p => p.provider),
@@ -18154,13 +18269,11 @@ VIEWS.metrics = async () => {
       </table>
     </div>`;
 };
-let _metricsDailyChart = null;
 AFTER.metrics = () => {
   const d = state.data.metrics;
   const ctx = document.getElementById('metricsDaily');
   if (!ctx || !d?.timeline) return;
-  if (_metricsDailyChart) { _metricsDailyChart.destroy(); _metricsDailyChart = null; }
-  _metricsDailyChart = new Chart(ctx, {
+  _renderChart(ctx, {
     type: 'line',
     data: {
       labels: d.timeline.map(x => x.date.slice(5)),
@@ -18917,7 +19030,7 @@ function _srHighlight(idx) {
   row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   state.data._srCurIdx = idx;
 }
-document.addEventListener('keydown', (e) => {
+_KEYDOWN_HANDLERS.push((e) => {
   if (state.view !== 'sessionReplay') return;
   if (['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName)) return;
   const events = state.data._srEvents || [];
@@ -18925,14 +19038,15 @@ document.addEventListener('keydown', (e) => {
   let cur = state.data._srCurIdx;
   if (cur == null || cur < 0) cur = -1;
   const n = events.length;
-  if (e.key === 'j' || e.key === 'J') { e.preventDefault(); _srHighlight(cur + 1); }
-  else if (e.key === 'k' || e.key === 'K') { e.preventDefault(); _srHighlight(cur - 1); }
-  else if (e.key === 'Home') { e.preventDefault(); _srHighlight(0); }
-  else if (e.key === 'End') { e.preventDefault(); _srHighlight(n - 1); }
-  else if (/^[1-9]$/.test(e.key)) {
+  if (e.key === 'j' || e.key === 'J') { e.preventDefault(); _srHighlight(cur + 1); return true; }
+  if (e.key === 'k' || e.key === 'K') { e.preventDefault(); _srHighlight(cur - 1); return true; }
+  if (e.key === 'Home') { e.preventDefault(); _srHighlight(0); return true; }
+  if (e.key === 'End') { e.preventDefault(); _srHighlight(n - 1); return true; }
+  if (/^[1-9]$/.test(e.key)) {
     e.preventDefault();
     const pct = parseInt(e.key, 10) / 10;
     _srHighlight(Math.floor((n - 1) * pct));
+    return true;
   }
 });
 
@@ -19594,14 +19708,12 @@ VIEWS.usage = async () => {
     </div>` : ''}
   `;
 };
-let _usageTokenDailyChart = null;
 AFTER.usage = () => {
   const d = state.data.usage;
   const tl = (d && d.tokens && d.tokens.dailyTimeline) || [];
   const ctx = document.getElementById('usageTokenDaily');
   if (ctx && tl.length) {
-    if (_usageTokenDailyChart) { _usageTokenDailyChart.destroy(); _usageTokenDailyChart = null; }
-    _usageTokenDailyChart = new Chart(ctx, {
+    _renderChart(ctx, {
       type: 'bar',
       data: {
         labels: tl.map(x => x.date.slice(5)),
@@ -20662,10 +20774,11 @@ function showModalLoading(msg) {
   if (typeof _mascotJumpOnModal === 'function') _mascotJumpOnModal();
 }
 function closeModal() {
-  // 포커스 트랩 해제
+  // Tear down focus trap — handler is registered through _KEYDOWN_HANDLERS
+  // and stays inert via its `_active` flag once the modal closes.
   const modal = document.querySelector('#modal-root .modal');
   if (modal && modal._focusTrapHandler) {
-    document.removeEventListener('keydown', modal._focusTrapHandler);
+    modal._focusTrapHandler._active = false;
   }
   document.getElementById('modal-root').innerHTML = '';
   if (typeof _mascotLeaveModal === 'function') _mascotLeaveModal();
@@ -20744,15 +20857,17 @@ function confirmModal({ title, message, confirmLabel, cancelLabel, danger }) {
       closeModal();
       resolve(!!v);
     };
-    // Enter = 확인 / Esc = 취소
+    // Enter = confirm / Esc = cancel — wired through the global dispatcher
+    // with a one-shot guard. The handler self-disables once it resolves.
     setTimeout(() => {
       const root = document.getElementById('modal-root');
       if (!root) return;
-      const handler = (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); window.__cmResolve(mid, true); document.removeEventListener('keydown', handler); }
-        else if (e.key === 'Escape') { e.preventDefault(); window.__cmResolve(mid, false); document.removeEventListener('keydown', handler); }
-      };
-      document.addEventListener('keydown', handler);
+      let active = true;
+      _KEYDOWN_HANDLERS.push((e) => {
+        if (!active) return;
+        if (e.key === 'Enter') { e.preventDefault(); active = false; window.__cmResolve(mid, true); return true; }
+        if (e.key === 'Escape') { e.preventDefault(); active = false; window.__cmResolve(mid, false); return true; }
+      });
     }, 30);
   });
 }
@@ -20783,8 +20898,8 @@ function showEditModal({ title, raw, save, readOnly }) {
     };
   }
 }
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
+_KEYDOWN_HANDLERS.push((e) => {
+  if (e.key === 'Escape') { closeModal(); }
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -21924,8 +22039,8 @@ async function _qsResetAll() {
   }
 }
 
-// Keyboard shortcut: ⌘, / Ctrl+,
-document.addEventListener('keydown', (e) => {
+// Keyboard shortcut: Cmd+, / Ctrl+, — Quick Settings drawer
+_KEYDOWN_HANDLERS.push((e) => {
   if (e.key !== ',' || !(e.metaKey || e.ctrlKey)) return;
   const tag = (document.activeElement && document.activeElement.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable)) return;
@@ -21933,12 +22048,14 @@ document.addEventListener('keydown', (e) => {
   const dr = document.getElementById('qsDrawer');
   if (dr && dr.classList.contains('open')) closeQuickSettings();
   else openQuickSettings();
+  return true;
 });
-// Esc closes drawer
-document.addEventListener('keydown', (e) => {
+// Esc closes Quick Settings drawer (registered before generic Esc-closeModal so
+// it consumes the event when the drawer is open).
+_KEYDOWN_HANDLERS.push((e) => {
   if (e.key !== 'Escape') return;
   const dr = document.getElementById('qsDrawer');
-  if (dr && dr.classList.contains('open')) { e.stopPropagation(); closeQuickSettings(); }
+  if (dr && dr.classList.contains('open')) { e.stopPropagation(); closeQuickSettings(); return true; }
 });
 
 // Mirror existing setTheme/setLang into prefs so they survive reload
@@ -23016,14 +23133,15 @@ function _spotlightKeydown(e) {
   }
 }
 
-// 글로벌 Cmd+K / Ctrl+K 핸들러
-document.addEventListener('keydown', e => {
+// Global Cmd+K / Ctrl+K spotlight + '?' help dispatcher
+_KEYDOWN_HANDLERS.push((e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault();
     if (_spotlightOpen) closeSpotlight();
     else openSpotlight();
+    return true;
   }
-  // v2.40.0 — '/' alone opens spotlight (when not in input/textarea/contentEditable)
+  // '/' alone opens spotlight (when not in input/textarea/contentEditable)
   if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
     const ae = document.activeElement;
     const tag = (ae && ae.tagName) || '';
@@ -23031,19 +23149,21 @@ document.addEventListener('keydown', e => {
     if (!inField && !_spotlightOpen) {
       e.preventDefault();
       openSpotlight();
+      return true;
     }
   }
   if (e.key === 'Escape' && _spotlightOpen) {
     closeSpotlight();
+    return true;
   }
-  // v2.33.4 — 글로벌 단축키 도움말 (? 키, input/textarea 포커스 아닐 때만)
+  // '?' — global shortcut help (workflow tab has its own handler with priority)
   if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
     const inInput = ['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName);
     if (!inInput && !document.querySelector('#shortcutHelpModal')) {
-      // 워크플로우 탭에서는 _wfShowShortcutHelp 가 우선권 — let it handle
       if (state.view !== 'workflows') {
         e.preventDefault();
         _openShortcutHelp();
+        return true;
       }
     }
   }
@@ -23113,6 +23233,7 @@ function _setupFocusTrap(modalEl) {
   if (!modalEl) return;
   const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input:not([disabled]), select, [tabindex]:not([tabindex="-1"])';
   function handleTrap(e) {
+    if (!handleTrap._active) return;
     if (e.key !== 'Tab') return;
     const focusable = Array.from(modalEl.querySelectorAll(FOCUSABLE)).filter(el => el.offsetParent !== null);
     if (!focusable.length) return;
@@ -23123,8 +23244,9 @@ function _setupFocusTrap(modalEl) {
       if (document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
   }
+  handleTrap._active = true;
   modalEl._focusTrapHandler = handleTrap;
-  document.addEventListener('keydown', handleTrap);
+  _KEYDOWN_HANDLERS.push(handleTrap);
   // 자동 포커스: 모달 내 첫 포커스 가능 요소
   requestAnimationFrame(() => {
     const first = modalEl.querySelector(FOCUSABLE);
@@ -23203,9 +23325,9 @@ async function _ollamaCreateCustomModel() {
 // ────────────────────────────────────────────────────────────────
 // Task 8: 비용 히스토리 상세 — 프로바이더별 일별 스택 바 차트
 // ────────────────────────────────────────────────────────────────
-let _costStackedBarChart = null;
+// Cost stacked-bar chart instance lives in the shared _chartInstances Map.
 
-// initCostCharts 에 추가 호출 — 원본 함수 wrap
+// initCostCharts wrapper — adds the stacked bar after the original runs.
 const _origInitCostCharts = window.initCostCharts;
 window.initCostCharts = async function() {
   if (_origInitCostCharts) await _origInitCostCharts();
@@ -23222,8 +23344,7 @@ window.initCostCharts = async function() {
     const providerNames = byProvider.map(p => p.provider);
     const ctxStacked = document.getElementById('costStackedBar');
     if (!ctxStacked || !providerNames.length || !daily.length) return;
-    if (_costStackedBarChart) { _costStackedBarChart.destroy(); _costStackedBarChart = null; }
-    // 일별 프로바이더별 데이터 구성
+    // Build per-provider per-day datasets
     const datasets = providerNames.map((pName, i) => ({
       label: pName,
       data: daily.map(day => {
@@ -23234,7 +23355,7 @@ window.initCostCharts = async function() {
       borderColor: 'transparent',
       borderWidth: 1,
     }));
-    _costStackedBarChart = new Chart(ctxStacked, {
+    _renderChart(ctxStacked, {
       type: 'bar',
       data: { labels: daily.map(d => d.date), datasets },
       options: {

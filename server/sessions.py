@@ -28,29 +28,28 @@ def background_index() -> None:
         log.warning("index failed: %s", e)
 
 
-def _first_user_prompt(lines: list[dict]) -> str:
-    for msg in lines:
-        if msg.get("type") != "user":
-            continue
-        c = msg.get("message", {})
-        if isinstance(c, dict):
-            content = c.get("content")
-            if isinstance(content, str):
-                return content.strip()[:500]
-            if isinstance(content, list):
-                for b in content:
-                    if isinstance(b, dict) and b.get("type") == "text":
-                        return (b.get("text") or "").strip()[:500]
-    return ""
+def _extract_first_prompt_from_msg(msg: dict) -> Optional[str]:
+    """Return the user prompt text from a single 'user' message, capped at 500 chars."""
+    if msg.get("type") != "user":
+        return None
+    c = msg.get("message", {})
+    if isinstance(c, dict):
+        content = c.get("content")
+        if isinstance(content, str):
+            return content.strip()[:500]
+        if isinstance(content, list):
+            for b in content:
+                if isinstance(b, dict) and b.get("type") == "text":
+                    return (b.get("text") or "").strip()[:500]
+    return None
 
 
-def _extract_model(lines: list[dict]) -> str:
-    for msg in lines:
-        if msg.get("type") == "assistant":
-            m = (msg.get("message") or {}).get("model")
-            if m:
-                return str(m)
-    return ""
+def _extract_model_from_msg(msg: dict) -> Optional[str]:
+    """Return assistant model id from a single 'assistant' message, if present."""
+    if msg.get("type") != "assistant":
+        return None
+    m = (msg.get("message") or {}).get("model")
+    return str(m) if m else None
 
 
 def _compute_score(stats: dict) -> tuple[int, dict]:
@@ -79,113 +78,128 @@ def _compute_score(stats: dict) -> tuple[int, dict]:
 
 
 def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
-    """단일 세션 jsonl 파싱 → DB 업서트."""
-    try:
-        text = jsonl.read_text(encoding="utf-8", errors="replace")
-    except Exception:
-        return None
-    if not text.strip():
-        return None
+    """Parse a single session jsonl → upsert into DB.
 
+    Memory-conscious: streams lines from disk and processes them in a single
+    pass without retaining the full ``list[dict]`` of parsed messages. The
+    previous implementation read the whole file as one string + ``splitlines()``
+    + a list of parsed dicts, holding three full copies of the file content
+    simultaneously. For users with hundreds of large jsonl files (~500 MB
+    total), forced re-index pushed peak RSS to ~1.9 GB.
+    """
     session_id = jsonl.stem
-    lines: list[dict] = []
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            lines.append(json.loads(line))
-        except Exception:
-            continue
-    if not lines:
-        return None
 
-    timestamps = []
+    timestamps: list[int] = []
     msg_count = user_cnt = asst_cnt = tool_cnt = err_cnt = agent_cnt = 0
     tok_in = tok_out = tok_cache_read = tok_cache_create = 0
     tool_counter: Counter = Counter()
     subagent_counter: Counter = Counter()
     tool_rows: list[tuple] = []
     edges: list[tuple] = []
+    first_prompt = ""
+    model = ""
+    cwd = ""
+    saw_any = False
 
-    for m in lines:
-        ts = _iso_ms(m.get("timestamp", "") or "")
-        if ts:
-            timestamps.append(ts)
-        t = m.get("type")
-        if t == "user":
-            user_cnt += 1
-            msg_count += 1
-        elif t == "assistant":
-            asst_cnt += 1
-            msg_count += 1
-            msg_obj = m.get("message") or {}
-            content = msg_obj.get("content")
-            # 이 턴에서 생긴 tool_use 들을 수집해 둔 뒤, turn_tokens 를 split
-            turn_tools: list[tuple] = []
-            if isinstance(content, list):
-                for b in content:
-                    if isinstance(b, dict) and b.get("type") == "tool_use":
-                        tool_cnt += 1
-                        tool_name = b.get("name") or "?"
-                        tool_counter[tool_name] += 1
-                        inp = b.get("input") or {}
-                        subagent = inp.get("subagent_type") if isinstance(inp, dict) else None
-                        if tool_name == "Agent" and subagent:
-                            agent_cnt += 1
-                            subagent_counter[subagent] += 1
-                            edges.append((session_id, "claude", subagent, ts or 0))
-                        input_summary = ""
-                        if isinstance(inp, dict):
-                            for k in ("description", "command", "prompt", "file_path", "pattern"):
-                                v = inp.get(k)
-                                if v:
-                                    input_summary = str(v)[:200]
-                                    break
-                        turn_tools.append((tool_name, subagent or "", input_summary))
-            # usage 파싱 — 이 턴의 토큰
-            usage = msg_obj.get("usage") or {}
-            u_in = int(usage.get("input_tokens") or 0)
-            u_out = int(usage.get("output_tokens") or 0)
-            u_cr = int(usage.get("cache_read_input_tokens") or 0)
-            u_cc = int(usage.get("cache_creation_input_tokens") or 0)
-            tok_in += u_in
-            tok_out += u_out
-            tok_cache_read += u_cr
-            tok_cache_create += u_cc
-            # 턴 전체 토큰 (입력 + 출력) 을 이 턴의 tool 개수로 분배 — 0개면 무시
-            turn_total = u_in + u_out + u_cr + u_cc
-            per_tool = (turn_total // len(turn_tools)) if turn_tools else 0
-            for (tn, sa, inp_sum) in turn_tools:
-                tool_rows.append((session_id, ts or 0, tn, sa, inp_sum, 0, per_tool))
-        elif t == "tool_result":
-            content = (m.get("message") or {}).get("content")
-            if isinstance(content, list):
-                for b in content:
-                    if isinstance(b, dict) and b.get("is_error"):
-                        err_cnt += 1
+    try:
+        # Iterate line-by-line; each loop body holds only the current parsed
+        # dict, then drops it. Peak memory ~= max(line size).
+        with jsonl.open("r", encoding="utf-8", errors="replace") as f:
+            for raw in f:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    m = json.loads(raw)
+                except Exception:
+                    continue
+                saw_any = True
+
+                if not cwd:
+                    c_val = m.get("cwd")
+                    if isinstance(c_val, str) and c_val:
+                        cwd = c_val
+
+                ts = _iso_ms(m.get("timestamp", "") or "")
+                if ts:
+                    timestamps.append(ts)
+                t = m.get("type")
+                if t == "user":
+                    user_cnt += 1
+                    msg_count += 1
+                    if not first_prompt:
+                        cand = _extract_first_prompt_from_msg(m)
+                        if cand:
+                            first_prompt = cand
+                elif t == "assistant":
+                    asst_cnt += 1
+                    msg_count += 1
+                    msg_obj = m.get("message") or {}
+                    if not model:
+                        cand = _extract_model_from_msg(m)
+                        if cand:
+                            model = cand
+                    content = msg_obj.get("content")
+                    # Collect tool_uses in this turn so we can split turn_tokens.
+                    turn_tools: list[tuple] = []
+                    if isinstance(content, list):
+                        for b in content:
+                            if isinstance(b, dict) and b.get("type") == "tool_use":
+                                tool_cnt += 1
+                                tool_name = b.get("name") or "?"
+                                tool_counter[tool_name] += 1
+                                inp = b.get("input") or {}
+                                subagent = inp.get("subagent_type") if isinstance(inp, dict) else None
+                                if tool_name == "Agent" and subagent:
+                                    agent_cnt += 1
+                                    subagent_counter[subagent] += 1
+                                    edges.append((session_id, "claude", subagent, ts or 0))
+                                input_summary = ""
+                                if isinstance(inp, dict):
+                                    for k in ("description", "command", "prompt", "file_path", "pattern"):
+                                        v = inp.get(k)
+                                        if v:
+                                            input_summary = str(v)[:200]
+                                            break
+                                turn_tools.append((tool_name, subagent or "", input_summary))
+                    # usage parsing — this turn's tokens
+                    usage = msg_obj.get("usage") or {}
+                    u_in = int(usage.get("input_tokens") or 0)
+                    u_out = int(usage.get("output_tokens") or 0)
+                    u_cr = int(usage.get("cache_read_input_tokens") or 0)
+                    u_cc = int(usage.get("cache_creation_input_tokens") or 0)
+                    tok_in += u_in
+                    tok_out += u_out
+                    tok_cache_read += u_cr
+                    tok_cache_create += u_cc
+                    # Distribute (input+output) tokens evenly across this turn's tools.
+                    turn_total = u_in + u_out + u_cr + u_cc
+                    per_tool = (turn_total // len(turn_tools)) if turn_tools else 0
+                    for (tn, sa, inp_sum) in turn_tools:
+                        tool_rows.append((session_id, ts or 0, tn, sa, inp_sum, 0, per_tool))
+                elif t == "tool_result":
+                    content = (m.get("message") or {}).get("content")
+                    if isinstance(content, list):
+                        for b in content:
+                            if isinstance(b, dict) and b.get("is_error"):
+                                err_cnt += 1
+    except Exception:
+        return None
+
+    if not saw_any:
+        return None
 
     started = min(timestamps) if timestamps else 0
     ended = max(timestamps) if timestamps else 0
     duration = max(0, ended - started)
-    first_prompt = _first_user_prompt(lines)
-    model = _extract_model(lines)
-    # 프로젝트 슬러그(`-Users-<user>-foo-bar`) 에서 홈 prefix 를 제거 → 사람이 읽을 수 있는 이름으로
-    home_slug = _cwd_to_slug(Path.home())  # 예: "-Users-<username>"
+    # Convert project slug (`-Users-<user>-foo-bar`) → human-readable name.
+    home_slug = _cwd_to_slug(Path.home())  # e.g. "-Users-<username>"
     project_name = ""
     if project_dir:
         if project_dir.startswith(home_slug + "-"):
             project_name = project_dir[len(home_slug) + 1 :].replace("-", "/")
         else:
             project_name = project_dir.lstrip("-").replace("-", "/")
-
-    # 세션의 실제 cwd는 JSONL 메시지에 기록되어 있음 (첫 번째 찾은 값)
-    cwd = ""
-    for m in lines:
-        c_val = m.get("cwd")
-        if isinstance(c_val, str) and c_val:
-            cwd = c_val
-            break
 
     stats = {
         "message_count": msg_count,
