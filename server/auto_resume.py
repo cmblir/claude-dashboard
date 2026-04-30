@@ -67,6 +67,7 @@ import shutil
 import subprocess
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, time as dt_time, timedelta
 from pathlib import Path
 from typing import Optional
@@ -173,6 +174,15 @@ _LOCK = threading.RLock()
 _WORKER_THREAD: Optional[threading.Thread] = None
 _WORKER_STOP = threading.Event()
 _RUNNING_PROCS: dict[str, subprocess.Popen] = {}
+
+# Worker concurrency: up to N due entries handled per tick in parallel.
+# Lock discipline: _process_one already takes _LOCK during JSON IO and
+# guards same-sid concurrency via _RUNNING_PROCS, so a shared pool is safe.
+_RETRY_POOL_MAX_WORKERS = 4
+_RETRY_POOL = ThreadPoolExecutor(
+    max_workers=_RETRY_POOL_MAX_WORKERS,
+    thread_name_prefix="ar-retry",
+)
 
 
 # ───────── Storage ─────────
@@ -871,16 +881,50 @@ def _process_one(session_id: str) -> None:
 
 
 def _worker_loop() -> None:
-    log.info("auto_resume worker started (tick=%ss)", WORKER_TICK_SECONDS)
+    log.info(
+        "auto_resume worker started (tick=%ss, pool=%d)",
+        WORKER_TICK_SECONDS, _RETRY_POOL_MAX_WORKERS,
+    )
     while not _WORKER_STOP.wait(WORKER_TICK_SECONDS):
         try:
             store = _load_all()
-            ids = [sid for sid, e in store.items() if e.get("enabled")]
-            for sid in ids:
-                try:
-                    _process_one(sid)
-                except Exception as e:
-                    log.warning("auto_resume: process error for %s: %s", sid, e)
+            now_ms = _now_ms()
+            # Build the due-list: enabled entries whose nextAttemptAt has elapsed.
+            # nextAttemptAt == 0 is treated as "due now" (initial schedule).
+            entries_due: list[str] = []
+            for sid, e in store.items():
+                if not e.get("enabled"):
+                    continue
+                if sid in _RUNNING_PROCS:
+                    continue
+                next_at = int(e.get("nextAttemptAt") or 0)
+                if next_at and now_ms < next_at:
+                    continue
+                entries_due.append(sid)
+            # Cap per-tick fan-out at the pool's max_workers; overflow defers
+            # to the next tick, preserving backpressure.
+            batch = entries_due[:_RETRY_POOL_MAX_WORKERS]
+            if not batch:
+                continue
+            futures = {
+                _RETRY_POOL.submit(_process_one, sid): sid for sid in batch
+            }
+            # Bounded wait: tick interval is the natural budget. Anything
+            # still running falls through; same-sid re-entry is blocked by
+            # _RUNNING_PROCS so concurrent ticks are safe.
+            try:
+                for fut in as_completed(futures, timeout=WORKER_TICK_SECONDS * 12):
+                    sid = futures[fut]
+                    try:
+                        fut.result()
+                    except Exception as ex:
+                        log.warning(
+                            "auto_resume: process error for %s: %s", sid, ex,
+                        )
+            except TimeoutError:
+                # Long-running attempts continue in the background; we just
+                # release the worker thread to schedule the next tick.
+                pass
         except Exception as e:
             log.warning("auto_resume worker error: %s", e)
     log.info("auto_resume worker stopped")
@@ -915,3 +959,8 @@ def stop_auto_resume() -> None:
             except Exception:
                 pass
         _RUNNING_PROCS.clear()
+    # Drain pool without waiting; cancel queued submissions.
+    try:
+        _RETRY_POOL.shutdown(wait=False, cancel_futures=True)
+    except Exception:
+        pass
