@@ -76,6 +76,7 @@ PREFS_SCHEMA: dict[str, dict[str, tuple]] = {
         "liveTickerSeconds": ("int", (1, 600)),
         "soundOnComplete":   ("bool", None),
         "openLastTab":       ("bool", None),
+        "autoStartOllama":   ("bool", None),
     },
     "workflow": {
         "defaultIterations":     ("int", (1, 50)),
@@ -122,6 +123,7 @@ DEFAULT_PREFS: dict[str, dict[str, Any]] = {
         "liveTickerSeconds": 5,
         "soundOnComplete":   False,
         "openLastTab":       True,
+        "autoStartOllama":   True,
     },
     "workflow": {
         "defaultIterations":     1,

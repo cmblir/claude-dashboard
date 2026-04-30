@@ -17127,14 +17127,17 @@ async function _ollamaLoadInstalled() {
   try {
     const d = await api('/api/ollama/models');
     _ollamaInstalledData = d.models || [];
-    // 카탈로그에 installed 플래그 갱신
+    // refresh installed flag on catalog rows
     const installedNames = new Set(_ollamaInstalledData.map(m => (m.name || m.model || '').replace(/:latest$/, '')));
     _ollamaCatalogData.forEach(m => {
       m._installed = installedNames.has(m.name) || installedNames.has(m.id);
     });
     _ollamaRenderCatalog();
+    // fix(v2.45.2): table was never repainted after data load — installed
+    // models stayed hidden behind the "no models installed" placeholder.
+    _ollamaRenderInstalled();
   } catch (e) {
-    // installed 로드 실패 — silent
+    // installed load failed — silent
   }
 }
 
@@ -21643,6 +21646,7 @@ const _QS_LABELS = {
   'behavior.liveTickerSeconds':  ['라이브 티커(초)', '실시간 상태 폴링 주기'],
   'behavior.soundOnComplete':    ['완료 알림 소리', '워크플로우 종료 시 비프'],
   'behavior.openLastTab':        ['마지막 탭 자동 열기', '재방문 시 직전 탭 복원'],
+  'behavior.autoStartOllama':    ['Ollama 자동 시작', '대시보드 부팅 시 ollama serve 자동 실행 (끄면 메모리 절감)'],
 
   'workflow.defaultIterations':     ['기본 반복 횟수', 'Repeat 노드 기본값'],
   'workflow.defaultRepeatDelaySec': ['반복 간격(초)', '반복 간 대기'],
