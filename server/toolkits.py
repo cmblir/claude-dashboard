@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .config import PLUGINS_DIR, KNOWN_MARKETPLACES_JSON, CLAUDE_HOME
+from .config import PLUGINS_DIR, KNOWN_MARKETPLACES_JSON
 from .utils import _safe_write
 from .cli_tools import _which
 

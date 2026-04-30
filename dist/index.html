@@ -132,7 +132,7 @@ tailwind.config = {
   body.theme-light .nav-item.active { background: rgba(217,119,87,0.15) !important; border-color: rgba(217,119,87,0.3) !important; color: var(--text) !important; }
   body.theme-light .nav-item:hover { background: rgba(0,0,0,0.04); }
   body.theme-light .card { background: rgba(255,255,255,0.6); border-color: rgba(0,0,0,0.08); }
-  body.theme-light .card-hi, body.theme-light .hover-lift:hover { background: rgba(255,255,255,0.8); }
+  body.theme-light .hover-lift:hover { background: rgba(255,255,255,0.8); }
   body.theme-light .chip { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.1); color: var(--text-mute); }
   body.theme-light .chip-ok { background: rgba(22,163,74,0.1); border-color: rgba(22,163,74,0.25); color: #15803d; }
   body.theme-light .chip-warn { background: rgba(202,138,4,0.1); border-color: rgba(202,138,4,0.25); color: #a16207; }
@@ -309,7 +309,6 @@ tailwind.config = {
   ::-webkit-scrollbar-track { background: transparent; }
   .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; min-width: 0; max-width: 100%; }
-  .card-hi { background: var(--card-hi); border-color: var(--border-hi); }
   .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.85rem; border-radius: 10px; font-size: 0.82rem; font-weight: 500; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text); cursor: pointer; transition: background 0.15s, border-color 0.15s, filter 0.15s, transform 0.15s; }
   .btn:hover { background: rgba(255,255,255,0.12); border-color: var(--border-hi); }
   .btn-primary { background: var(--grad); border: none; color: #0a0a0f; font-weight: 600; }
@@ -363,7 +362,6 @@ tailwind.config = {
   .settings-item:hover { background:rgba(255,255,255,0.06); }
   body.theme-light .settings-item:hover { background:rgba(0,0,0,0.05); }
   .settings-check { margin-left:auto;color:var(--accent);font-size:0.85rem; }
-  .divider { height: 1px; background: var(--border); margin: 0.75rem 0; }
   .nav-item { display: flex; align-items: center; gap: 0.7rem; padding: 0.6rem 0.8rem; border-radius: 10px; color: var(--text-mute); font-size: 0.88rem; cursor: pointer; transition: background 0.15s, color 0.15s; user-select: none; will-change: background; }
   .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
   .nav-item.active { background: var(--grad-soft); color: var(--text); border: 1px solid rgba(167,139,250,0.35); }
@@ -842,7 +840,6 @@ tailwind.config = {
   body.sb-collapsed #sidebar .nav-label,
   body.sb-collapsed #sidebar .nav-desc,
   body.sb-collapsed #sidebar .brand-text,
-  body.sb-collapsed #sidebar .group-label,
   body.sb-collapsed #sidebar .cli-body { display: none; }
   body.sb-collapsed #sidebar .nav-item { justify-content: center; padding: 0.55rem 0.4rem; }
   /* v2.33.1 — collapsed 카테고리: 아이콘 + 짧은 라벨 세로 배치로 "뭐가 뭔지" 즉시 인지 가능 */
@@ -4905,42 +4902,6 @@ function _wfShowShortcutHelp() {
 }
 
 // ─── 노드/엣지 추가·삭제 ──────────────────────────────────────
-function _wfAddNode(type) {
-  if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
-  _wfPushUndo();
-  const nid = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
-  // 캔버스 중앙 근처
-  const host = document.getElementById('wfCanvasHost');
-  const rect = host ? host.getBoundingClientRect() : { width: 600, height: 400 };
-  const cx = (rect.width / 2 - (view.panX||0)) / (view.zoom||1) - WF_NODE_W/2;
-  const cy = (rect.height / 2 - (view.panY||0)) / (view.zoom||1) - WF_NODE_H/2;
-  const meta = WF_TYPE_MAP[type] || WF_TYPE_MAP.session;
-  const newNode = {
-    id: nid, type, x: Math.round(cx), y: Math.round(cy),
-    title: meta.label, data: {},
-  };
-  if (type === 'session' || type === 'subagent') {
-    newNode.data = { subject: '', description: '', assignee: 'sonnet-4.6', agentRole: '', cwd: '', inputsMode: 'concat' };
-  } else if (type === 'branch') newNode.data = { condition: '' };
-  else if (type === 'aggregate') newNode.data = { mode: 'concat' };
-  else if (type === 'output') newNode.data = { exportTo: '' };
-  else if (type === 'http') newNode.data = { url:'', method:'GET', headers:{}, body:'', extractPath:'', allowInternal: false };
-  else if (type === 'transform') newNode.data = { transformType:'template', template:'{{input}}', jsonPath:'', regexPattern:'', regexReplacement:'', separator:'\\n' };
-  else if (type === 'variable') newNode.data = { varName:'var1', defaultValue:'' };
-  else if (type === 'subworkflow') newNode.data = { workflowId:'', passInput:true };
-  else if (type === 'embedding') newNode.data = { provider:'ollama-api', model:'bge-m3', outputFormat:'json' };
-  else if (type === 'loop') newNode.data = { loopType:'for_each', maxIterations:10, separator:'\\n', condition:'' };
-  else if (type === 'retry') newNode.data = { maxRetries:3, backoffMs:1000, backoffMultiplier:2.0, retryOn:'error' };
-  else if (type === 'error_handler') newNode.data = { onError:'skip', defaultOutput:'' };
-  else if (type === 'merge') newNode.data = { mergeMode:'all', requiredCount:1, timeout:300 };
-  else if (type === 'delay') newNode.data = { delayMs:1000, delayType:'fixed', maxDelayMs:5000 };
-  __wf.current.nodes.push(newNode);
-  __wf.selectedNodeId = nid;
-  __wf.dirty = true;
-  _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
-}
-
 function _wfDeleteSelectedNode() {
   if (!__wf.current || !__wf.selectedNodeId) return;
   _wfPushUndo();
@@ -6286,196 +6247,6 @@ function _wfDeleteFromEditor(winId) {
   _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
   _wfCloseNodeEditor(winId);
   toast(t('삭제됨'), 'ok');
-}
-
-function _wfInspectorBody(n) {
-  const d = n.data || {};
-  if (n.type === 'session' || n.type === 'subagent') {
-    // v2.44.1 — multi-assignee block. Always one row minimum (back-compat with
-    // single `assignee`); chip shows when length >= 2 to signal parallel
-    // fan-out is active.
-    const maRows = _wfMultiAssigneeRows(n);
-    const maRemovable = maRows.length >= 2;
-    const maRowsHtml = maRows.map((v, i) => _wfMultiAssigneeRowHtml(n.id, i, v, maRemovable)).join('');
-    const maAddDisabled = maRows.length >= 8 ? 'disabled' : '';
-    const maChip = maRows.length >= 2
-      ? `<span class="ml-2 px-1.5 py-0.5 rounded text-[9px]" style="background:var(--accent);color:#fff">${t('병렬')} (${maRows.length})</span>`
-      : '';
-    return `
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('업무 (subject)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.subject||'')}" oninput="_wfNodeSetData('${n.id}','subject',this.value)" placeholder="${t('이 세션이 수행할 업무 한 줄')}">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('설명 (description)')}</label>
-      <textarea class="input w-full mt-1" rows="4" oninput="_wfNodeSetData('${n.id}','description',this.value)" placeholder="${t('상세 지시·제약·출력 형식')}">${escapeHtml(d.description||'')}</textarea>
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">
-        ${t('다중 어시니 (병렬 fan-out)')}${maChip}
-      </label>
-      ${maRowsHtml}
-      <button class="btn text-xs mt-2" ${maAddDisabled} onclick="_wfMultiAssigneeAdd('${n.id}')">+ ${t('어시니 추가')}</button>
-      <div class="text-[10px] mt-1" style="color:var(--text-dim)">${t('두 개 이상 지정 시 병렬 실행 후 가장 먼저 성공한 응답을 채택합니다.')}</div>
-      ${n.type==='subagent' ? `
-        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('에이전트 역할')}</label>
-        <input class="input w-full mt-1" value="${escapeHtml(d.agentRole||'')}" oninput="_wfNodeSetData('${n.id}','agentRole',this.value)" placeholder="researcher / writer / reviewer …">
-      ` : ''}
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('작업 디렉토리 (cwd)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.cwd||'')}" oninput="_wfNodeSetData('${n.id}','cwd',this.value)" placeholder="~/projects/my-app">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('입력 합치기 모드')}</label>
-      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','inputsMode',this.value)">
-        <option value="concat" ${d.inputsMode==='concat'?'selected':''}>${t('이어붙이기 (concat)')}</option>
-        <option value="first"  ${d.inputsMode==='first'?'selected':''}>${t('첫 입력만 (first)')}</option>
-        <option value="json"   ${d.inputsMode==='json'?'selected':''}>${t('JSON 배열 (json)')}</option>
-      </select>
-      <div class="mt-4 flex gap-2 flex-wrap">
-        <button class="btn-primary btn text-xs" onclick="_wfSpawnSession('${n.id}')">🆕 ${t('새 Claude 세션 spawn')}</button>
-      </div>
-    `;
-  }
-  if (n.type === 'branch') {
-    return `
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('조건 (입력에 포함되면 Y 포트 활성)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.condition||'')}" oninput="_wfNodeSetData('${n.id}','condition',this.value)" placeholder="success">
-    `;
-  }
-  if (n.type === 'aggregate') {
-    return `
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('합치기 모드')}</label>
-      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','mode',this.value)">
-        <option value="concat" ${d.mode==='concat'?'selected':''}>${t('텍스트 concat')}</option>
-        <option value="json"   ${d.mode==='json'?'selected':''}>${t('JSON 배열')}</option>
-      </select>
-    `;
-  }
-  if (n.type === 'output') {
-    return `
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('파일로 저장 (선택, ~/ 하위만)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.exportTo||'')}" oninput="_wfNodeSetData('${n.id}','exportTo',this.value)" placeholder="~/workflow-output.md">
-    `;
-  }
-  if (n.type === 'merge') {
-    return `
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('합류 모드')}</label>
-      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','mergeMode',this.value);_wfRenderInspector();">
-        <option value="all" ${d.mergeMode==='all'?'selected':''}>${t('전체 대기 (all)')}</option>
-        <option value="any" ${d.mergeMode==='any'?'selected':''}>${t('하나라도 도착 (any)')}</option>
-        <option value="count" ${d.mergeMode==='count'?'selected':''}>${t('지정 개수 도착 (count)')}</option>
-      </select>
-      ${d.mergeMode === 'count' ? `
-        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('필요 입력 수')}</label>
-        <input type="number" class="input w-full mt-1" min="1" value="${d.requiredCount||1}" oninput="_wfNodeSetData('${n.id}','requiredCount',Math.max(1,parseInt(this.value)||1))">
-      ` : ''}
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('타임아웃 (초)')}</label>
-      <input type="number" class="input w-full mt-1" min="0" value="${d.timeout||300}" oninput="_wfNodeSetData('${n.id}','timeout',parseInt(this.value)||300)">
-    `;
-  }
-  if (n.type === 'delay') {
-    return `
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('대기 시간 (ms)')}</label>
-      <input type="number" class="input w-full mt-1" min="0" value="${d.delayMs||1000}" oninput="_wfNodeSetData('${n.id}','delayMs',parseInt(this.value)||1000)">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('딜레이 유형')}</label>
-      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','delayType',this.value);_wfRenderInspector();">
-        <option value="fixed" ${d.delayType==='fixed'?'selected':''}>${t('고정 (fixed)')}</option>
-        <option value="random" ${d.delayType==='random'?'selected':''}>${t('랜덤 (random)')}</option>
-      </select>
-      ${d.delayType === 'random' ? `
-        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('최대 대기 시간 (ms)')}</label>
-        <input type="number" class="input w-full mt-1" min="0" value="${d.maxDelayMs||5000}" oninput="_wfNodeSetData('${n.id}','maxDelayMs',parseInt(this.value)||5000)">
-      ` : ''}
-    `;
-  }
-  if (n.type === 'slack_approval') {
-    return `
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('Slack 채널 ID (Cxxxx, Gxxxx, 또는 #name)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.channel||'')}" oninput="_wfNodeSetData('${n.id}','channel',this.value)" placeholder="C012345 또는 #ops">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('메시지 템플릿')}</label>
-      <textarea class="input w-full mt-1" rows="2" oninput="_wfNodeSetData('${n.id}','messageTemplate',this.value)" placeholder=":memo: 사이클 보고 도착">${escapeHtml(d.messageTemplate||'')}</textarea>
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block flex items-center gap-2">
-        <input type="checkbox" ${d.includeInput!==false?'checked':''} onchange="_wfNodeSetData('${n.id}','includeInput',this.checked)">
-        ${t('이전 노드 출력 포함')}
-      </label>
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('타임아웃 (초)')}</label>
-      <input type="number" class="input w-full mt-1" min="5" max="14400" value="${d.timeoutSeconds||300}" oninput="_wfNodeSetData('${n.id}','timeoutSeconds',Math.max(5,Math.min(14400,parseInt(this.value)||300)))">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('타임아웃 시 동작')}</label>
-      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','onTimeout',this.value);_wfRenderInspector();">
-        <option value="approve" ${d.onTimeout==='approve'?'selected':''}>${t('자동 승인 (계속 진행)')}</option>
-        <option value="reject"  ${d.onTimeout==='reject'?'selected':''}>${t('자동 거부 (defaultOutput 사용)')}</option>
-        <option value="default" ${d.onTimeout==='default'?'selected':''}>${t('defaultOutput 으로 통과')}</option>
-        <option value="abort"   ${d.onTimeout==='abort'?'selected':''}>${t('워크플로우 중단')}</option>
-      </select>
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('Default 출력 (거부 / 타임아웃-default 시)')}</label>
-      <textarea class="input w-full mt-1" rows="2" oninput="_wfNodeSetData('${n.id}','defaultOutput',this.value)">${escapeHtml(d.defaultOutput||'')}</textarea>
-      <div class="text-[10px] mt-2" style="color:var(--text-dim);">${t('승인: ✅ 또는 답장에 \"approve/ok/승인\" · 거부: ❌ 또는 \"reject/거부\" · 자유 답장은 다음 사이클 입력으로 사용됩니다.')}</div>
-    `;
-  }
-  if (n.type === 'obsidian_log') {
-    return `
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('Vault 경로 ($HOME 하위)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.vaultPath||'')}" oninput="_wfNodeSetData('${n.id}','vaultPath',this.value)" placeholder="~/ObsidianVault">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('프로젝트 폴더명')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.project||'')}" oninput="_wfNodeSetData('${n.id}','project',this.value)" placeholder="lazyclaude">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('헤딩 (선택)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.heading||'')}" oninput="_wfNodeSetData('${n.id}','heading',this.value)" placeholder="crew cycle">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('태그 (콤마 구분)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.tagsCsv||'')}" oninput="_wfNodeSetData('${n.id}','tagsCsv',this.value)" placeholder="crew,plan">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block flex items-center gap-2">
-        <input type="checkbox" ${d.passThrough!==false?'checked':''} onchange="_wfNodeSetData('${n.id}','passThrough',this.checked);_wfRenderInspector();">
-        ${t('입력을 그대로 다음 노드로 통과')}
-      </label>
-      ${d.passThrough===false ? `
-        <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('대신 기록할 텍스트')}</label>
-        <textarea class="input w-full mt-1" rows="2" oninput="_wfNodeSetData('${n.id}','defaultOutput',this.value)">${escapeHtml(d.defaultOutput||'')}</textarea>
-      ` : ''}
-      <div class="text-[10px] mt-2" style="color:var(--text-dim);">${t('파일: <vault>/Projects/<project>/logs/YYYY-MM-DD.md — 사이클마다 append.')}</div>
-    `;
-  }
-  if (n.type === 'auto_resume') {
-    return `
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('동작')}</label>
-      <select class="input w-full mt-1" onchange="_wfNodeSetData('${n.id}','action',this.value)">
-        <option value="set"    ${(d.action||'set')==='set'?'selected':''}>${t('set — 워커 바인딩 / 갱신')}</option>
-        <option value="cancel" ${d.action==='cancel'?'selected':''}>${t('cancel — 워커 해제')}</option>
-      </select>
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('대상 세션 ID (비우면 입력 문자열에서 첫 UUID 추출)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.sessionId||'')}" oninput="_wfNodeSetData('${n.id}','sessionId',this.value)" placeholder="00000000-0000-0000-0000-000000000000">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('cwd (비우면 자동 추정)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.cwd||'')}" oninput="_wfNodeSetData('${n.id}','cwd',this.value)" placeholder="/Users/.../my-project">
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('재개 프롬프트 (비우면 기본값)')}</label>
-      <textarea class="input w-full mt-1" rows="2" oninput="_wfNodeSetData('${n.id}','prompt',this.value)" placeholder="Continue the previous task...">${escapeHtml(d.prompt||'')}</textarea>
-      <div class="grid grid-cols-3 gap-2 mt-3">
-        <div>
-          <label class="text-[10px] text-[var(--text-dim)] uppercase block">${t('재시도 간격(초)')}</label>
-          <input class="input w-full mt-1" type="number" min="30" max="3600" value="${d.pollInterval||300}" oninput="_wfNodeSetData('${n.id}','pollInterval',Number(this.value))">
-        </div>
-        <div>
-          <label class="text-[10px] text-[var(--text-dim)] uppercase block">${t('정지 idle(초)')}</label>
-          <input class="input w-full mt-1" type="number" min="30" value="${d.idleSeconds||90}" oninput="_wfNodeSetData('${n.id}','idleSeconds',Number(this.value))">
-        </div>
-        <div>
-          <label class="text-[10px] text-[var(--text-dim)] uppercase block">${t('최대 재시도')}</label>
-          <input class="input w-full mt-1" type="number" min="1" max="60" value="${d.maxAttempts||12}" oninput="_wfNodeSetData('${n.id}','maxAttempts',Number(this.value))">
-        </div>
-      </div>
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block flex items-center gap-2">
-        <input type="checkbox" ${d.useContinue?'checked':''} onchange="_wfNodeSetData('${n.id}','useContinue',this.checked)">
-        ${t('--continue 모드 (--resume <id> 대신)')}
-      </label>
-      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-1 block flex items-center gap-2">
-        <input type="checkbox" ${d.installHooks?'checked':''} onchange="_wfNodeSetData('${n.id}','installHooks',this.checked)">
-        ${t('Stop+SessionStart Hook 자동 설치')}
-      </label>
-      <div class="text-[10px] mt-2" style="color:var(--text-dim);">${t('워크플로우는 즉시 다음 노드로 진행 — 워커는 백그라운드에서 동작.')}</div>
-    `;
-  }
-  return '';
-}
-
-function _wfNodeSet(nid, field, value) {
-  if (!__wf.current) return;
-  const n = __wf.current.nodes.find(x => x.id === nid);
-  if (!n) return;
-  n[field] = value;
-  __wf.dirty = true;
-  _wfUpdateToolbar();
-  // title 은 캔버스에도 반영
-  if (field === 'title') _wfRenderCanvas();
 }
 
 function _wfNodeSetData(nid, field, value) {
@@ -8533,134 +8304,6 @@ async function quickRecommend(kind) {
   if (kind === 'mcp') return go('mcp');
   if (kind === 'analytics') return go('analytics');
   if (['hooks','permissions','output-styles','statusline'].includes(kind)) return startFeatureRecommend(kind);
-}
-
-// ────────────────────────────────────────────────────────────────
-// CLAUDE DESIGN (claude.ai/design)
-// ────────────────────────────────────────────────────────────────
-VIEWS.design = async () => {
-  const r = await api('/api/design/exports');
-  state.data.design = r;
-  const files = r.files || [];
-  const fmtSize = (b) => b < 1024 ? b+'B' : b < 1048576 ? (b/1024).toFixed(1)+'KB' : (b/1048576).toFixed(2)+'MB';
-  const extIcon = { pdf:'📄', pptx:'📊', html:'🌐', canva:'🎨' };
-
-  return `
-    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
-      <div>
-        <h1 class="text-2xl font-bold">🎨 Claude Design <span class="chip chip-accent text-[10px]">Anthropic Labs · Research Preview</span></h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">claude.ai/design 바로가기 + 공식 가이드 + 로컬 export 파일 모음</p>
-      </div>
-      <div class="flex gap-2">
-        <a class="btn-primary btn text-xs" href="https://claude.ai/design" target="_blank" rel="noopener">🚀 claude.ai/design 열기</a>
-        <a class="btn text-xs" href="https://www.anthropic.com/news/claude-design-anthropic-labs" target="_blank" rel="noopener">📖 공식 발표</a>
-      </div>
-    </div>
-
-    <!-- 빠른 사용 가이드 -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-      <div class="card p-5">
-        <div class="text-3xl mb-2">✨</div>
-        <div class="font-semibold text-sm mb-2">1. 프롬프트 입력</div>
-        <div class="text-xs text-[var(--text-mute)]">원하는 디자인을 말로 설명 — 슬라이드, 원페이저, 프로토타입, 목업 등. 예: "SaaS 랜딩 페이지, 다크 테마, hero+features+pricing".</div>
-      </div>
-      <div class="card p-5">
-        <div class="text-3xl mb-2">🎛</div>
-        <div class="font-semibold text-sm mb-2">2. 인라인 편집</div>
-        <div class="text-xs text-[var(--text-mute)]">특정 요소에 코멘트, 텍스트 직접 수정, 조절 손잡이로 간격·색·레이아웃 실시간 변경. Claude 에게 "전체에 적용" 요청 가능.</div>
-      </div>
-      <div class="card p-5">
-        <div class="text-3xl mb-2">📦</div>
-        <div class="font-semibold text-sm mb-2">3. 내보내기 / 핸드오프</div>
-        <div class="text-xs text-[var(--text-mute)]">PDF, PPTX, HTML, Canva 로 export. 또는 <b>handoff bundle</b> 을 Claude Code 로 넘겨 실제 코드 구현까지 한 번에.</div>
-      </div>
-    </div>
-
-    <!-- 주요 기능 요약 -->
-    <div class="card p-5 mb-5">
-      <h3 class="font-semibold text-sm mb-3">📋 주요 기능</h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-        <div class="flex gap-2"><span>🧠</span><div><b>Opus 4.7 기반</b> · 이미지 픽셀 처리 용량 3.3× 증가 (4.6 대비), 2576px 해상도 전체 지원</div></div>
-        <div class="flex gap-2"><span>🏷</span><div><b>디자인 시스템 통합</b> · 팀 코드베이스 + 디자인 파일 읽어 브랜드 일관성 유지</div></div>
-        <div class="flex gap-2"><span>🔒</span><div><b>조직 범위 공유</b> · private / view-only link / edit 세 단계</div></div>
-        <div class="flex gap-2"><span>📤</span><div><b>Export</b> · Canva · PDF · PPTX · 독립 HTML 파일</div></div>
-        <div class="flex gap-2"><span>🔧</span><div><b>Claude Code 핸드오프</b> · 디자인 → 코드 한 번의 지시</div></div>
-        <div class="flex gap-2"><span>💰</span><div><b>플랜</b> · Pro / Max / Team / Enterprise 에서 이용. Enterprise 는 관리자가 조직 설정에서 활성화</div></div>
-      </div>
-    </div>
-
-    <!-- API 부재 안내 -->
-    <div class="card p-4 mb-5" style="background:rgba(251,191,36,0.06);">
-      <div class="text-xs">
-        <b>⚠️ 공식 프로그래밍 API 는 아직 미공개</b> — Anthropic 에서 "빠른 시일 내 통합 빌드 지원 확대" 예정.
-        지금은 claude.ai/design 웹에서 만든 디자인을 로컬로 <b>export</b> 한 뒤 이 대시보드에서 스캔합니다.
-      </div>
-    </div>
-
-    <!-- 로컬 export 스캔 -->
-    <div class="card p-5 mb-5">
-      <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
-        <h3 class="font-semibold text-sm">📁 로컬에서 찾은 Claude Design export 후보</h3>
-        <button class="btn text-xs" onclick="addDesignDir()">＋ 검색 경로 추가</button>
-      </div>
-      <div class="text-[11px] text-[var(--text-dim)] mb-3">
-        검색 경로: ${(r.searchedDirs||[]).map(d => `<code class="mono">${escapeHtml(d)}</code>`).join(' · ')}
-      </div>
-      ${files.length ? `
-        <table class="data">
-          <thead><tr>
-            <th></th>
-            <th>파일</th>
-            <th class="text-right">크기</th>
-            <th class="text-right">수정</th>
-            <th>위치</th>
-          </tr></thead>
-          <tbody>
-            ${files.map(f => `
-              <tr class="link-row" onclick="window.open('file://${encodeURI(f.path)}','_blank')">
-                <td class="text-lg">${extIcon[f.ext]||'📎'}</td>
-                <td class="text-sm">
-                  ${f.matchedByKeyword ? '<span class="chip chip-accent text-[9px] mr-1">design</span>' : ''}
-                  ${escapeHtml(f.name)}
-                </td>
-                <td class="text-right mono text-xs">${fmtSize(f.size)}</td>
-                <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(f.mtime)}</td>
-                <td class="text-[10px] mono text-[var(--text-dim)] truncate" style="max-width:320px;">${escapeHtml(f.dir)}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>` : `
-        <div class="empty text-xs">
-          Claude Design export 파일이 없습니다.<br>
-          claude.ai/design → 디자인 열기 → Export 메뉴 → PDF/PPTX/HTML 로 저장 후 다시 보세요.
-        </div>`}
-    </div>
-
-    <!-- 공식 문서 링크 -->
-    <div class="card p-5">
-      <h3 class="font-semibold text-sm mb-3">🔗 관련 링크</h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-        <a class="text-[var(--accent)] hover:underline" href="https://claude.ai/design" target="_blank" rel="noopener">→ claude.ai/design (디자인 작성)</a>
-        <a class="text-[var(--accent)] hover:underline" href="https://www.anthropic.com/news/claude-design-anthropic-labs" target="_blank" rel="noopener">→ Anthropic Labs 공식 발표</a>
-        <a class="text-[var(--accent)] hover:underline" href="https://support.anthropic.com" target="_blank" rel="noopener">→ Anthropic Support (FAQ)</a>
-        <a class="text-[var(--accent)] hover:underline" href="https://www.anthropic.com/pricing" target="_blank" rel="noopener">→ 플랜별 Claude Design 이용 범위</a>
-      </div>
-    </div>
-  `;
-};
-
-async function addDesignDir() {
-  const p = await promptModal({
-    title: t('디자인 스캔 디렉토리 추가'),
-    message: t('추가로 스캔할 디렉토리 절대경로 (홈 디렉토리 내):'),
-    placeholder: '~/Design',
-  });
-  if (!p || !p.trim()) return;
-  const r = await api('/api/design/add-dir', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ dir: p }),
-  });
-  if (r.ok) toast('검색 경로 추가됨', 'ok');
-  else toast(errMsg(r), 'err');
 }
 
 // AI 종합 평가 탭

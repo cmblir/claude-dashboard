@@ -7,13 +7,10 @@ from __future__ import annotations
 
 import json
 import platform
-import re
 import shutil
 import subprocess
-from pathlib import Path
 
-from .config import CLAUDE_HOME, CLAUDE_JSON
-from .logger import log
+from .config import CLAUDE_JSON
 from .translations import _load_dash_config, _save_dash_config
 from .utils import _safe_read
 

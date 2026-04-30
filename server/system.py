@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .claude_md import get_settings
 from .config import (
-    CLAUDE_HOME, MEMORY_DIR, PROJECTS_DIR,
+    CLAUDE_HOME, PROJECTS_DIR,
     SCHEDULED_TASKS_DIR, SESSIONS_DIR, TASKS_DIR,
 )
 from .db import _db, _db_init
