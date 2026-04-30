@@ -114,6 +114,26 @@ def _db_init() -> None:
                 CREATE INDEX IF NOT EXISTS idx_sess_started ON sessions(started_at);
                 CREATE INDEX IF NOT EXISTS idx_sess_score ON sessions(score, tool_use_count);
                 CREATE INDEX IF NOT EXISTS idx_sess_cwd_started ON sessions(cwd, started_at);
+                -- v2.48 perf pass: kill TEMP B-TREE sorts on alternate
+                -- "sessions list" sort orders. Each is a covering index for
+                -- ORDER BY <col> DESC LIMIT N.
+                CREATE INDEX IF NOT EXISTS idx_sess_tool_use_count ON sessions(tool_use_count DESC);
+                CREATE INDEX IF NOT EXISTS idx_sess_total_tokens ON sessions(total_tokens DESC);
+                CREATE INDEX IF NOT EXISTS idx_sess_duration_ms ON sessions(duration_ms DESC);
+                """)
+
+                # tool_uses indexes — existing idx_tool_session covers
+                # per-session lookups, idx_tool_name covers tool-distribution
+                # aggregation. Add a subagent-aware index for stats/agent_graph
+                # which filter by subagent_type and time window.
+                c.executescript("""
+                CREATE INDEX IF NOT EXISTS idx_tool_subagent_ts ON tool_uses(subagent_type, ts);
+                """)
+
+                # agent_edges — ts-window queries (agent_graph edges) full-scan
+                # currently; add a ts index so growth stays bounded.
+                c.executescript("""
+                CREATE INDEX IF NOT EXISTS idx_edge_ts ON agent_edges(ts);
                 """)
 
                 # Workflow cost tracking table
@@ -160,7 +180,28 @@ def _db_init() -> None:
                 );
                 CREATE INDEX IF NOT EXISTS idx_runs_workflow ON workflow_runs(workflow_id, started_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_runs_status ON workflow_runs(status, started_at DESC);
+                -- v2.48 perf pass: global "runs list" path
+                -- (`SELECT … FROM workflow_runs ORDER BY started_at DESC LIMIT ?`)
+                -- previously SCAN + TEMP B-TREE; this kills the sort.
+                CREATE INDEX IF NOT EXISTS idx_runs_started ON workflow_runs(started_at DESC);
                 """)
+
+                # run_history — filtered list path
+                # (`WHERE source=? AND item_id=? ORDER BY ts DESC LIMIT ?`)
+                # used the existing 2-col idx_runhist_item but still incurred
+                # a TEMP B-TREE sort. Composite (source, item_id, ts DESC) is
+                # a covering ordering for the LIMIT.
+                c.executescript("""
+                CREATE INDEX IF NOT EXISTS idx_runhist_item_ts ON run_history(source, item_id, ts DESC);
+                """)
+
+                # Refresh planner statistics so the new indexes are actually
+                # picked. ANALYZE on a small DB is ~milliseconds; gating it
+                # behind init means we only pay the cost once per process.
+                try:
+                    c.execute("ANALYZE")
+                except Exception:
+                    pass
             except Exception:
                 pass
         _INITIALIZED = True

@@ -10,6 +10,64 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.48.0] — 2026-04-30
+
+### 🧹 Phase-3 perf — dead code purge + 7 new DB indexes + CSS prune
+
+User: "다음 라운드 지시하고 main으로 모두 머지." Three parallel agents on
+independent low-risk targets. Conservative — when in doubt, kept.
+
+### 🐍 / 🌐 Dead code purge
+
+| # | Where | What |
+|---|---|---|
+| 1 | `dist/index.html::VIEWS.design + addDesignDir` | 128 lines removed. Orphaned tab — defined but no NAV entry, only self-referencing call. |
+| 2 | `dist/index.html::_wfAddNode` | 35 lines removed. Defined but never referenced; superseded by inline node creation. |
+| 3 | `dist/index.html::_wfInspectorBody` | 178 lines removed. Superseded by `_wfRenderInspector` inlining per-type forms. |
+| 4 | `dist/index.html::_wfNodeSet` | 10 lines removed. Legacy variant superseded by `_wfNodeSetData`. |
+| 5 | `server/system.py / auth.py / toolkits.py` | Unused imports (`MEMORY_DIR`, `re`, `Path`, `CLAUDE_HOME`, `log`). |
+
+**Total JS removed: 354 lines, -23 KB**.  `dist/index.html` 1131 KB → 1108 KB.
+
+### 🎨 CSS prune
+
+`dist/index.html` `<style>` — removed `.card-hi`, `.divider`, `.group-label` (0 references). Theme/state classes verified dynamic-set and kept. CSS 932 → 928 lines, -2.1 KB. `css_opens=507 css_closes=507` balanced.
+
+### 💾 Database — EXPLAIN-driven indexes
+
+7 new indexes added after running `EXPLAIN QUERY PLAN` against the live `~/.claude-dashboard.db` for every static SQL in `server/*.py`. Each query went from `SCAN + TEMP B-TREE` to `SCAN/SEARCH USING INDEX` (no sort step).
+
+| Query | Plan before | Index added | Plan after |
+|---|---|---|---|
+| `sessions ORDER BY tool_use_count DESC` | SCAN+TEMP B-TREE | `idx_sess_tool_use_count(tool_use_count DESC)` | SCAN USING INDEX |
+| `sessions ORDER BY total_tokens DESC` | SCAN+TEMP B-TREE | `idx_sess_total_tokens(total_tokens DESC)` | SCAN USING INDEX |
+| `sessions ORDER BY duration_ms DESC` | SCAN+TEMP B-TREE | `idx_sess_duration_ms(duration_ms DESC)` | SCAN USING INDEX |
+| stats subagent dist (`tool_uses`) | SCAN tool_uses | `idx_tool_subagent_ts(subagent_type, ts)` | SCAN COVERING INDEX |
+| `agent_edges WHERE ts >= ?` | SCAN | `idx_edge_ts(ts)` | SEARCH (kicks in past ~500 rows) |
+| `workflow_runs ORDER BY started_at DESC` | SCAN+TEMP B-TREE | `idx_runs_started(started_at DESC)` | SCAN USING INDEX |
+| `run_history WHERE source=? AND item_id=? ORDER BY ts DESC` | SEARCH+TEMP B-TREE | `idx_runhist_item_ts(source, item_id, ts DESC)` | SEARCH USING INDEX |
+
+`ANALYZE` added at end of `_db_init()` — 4.8 ms one-time per process.
+
+DB index count: 12 → **19**.
+
+### Smoke
+```
+=== endpoint smoke (warm) ===
+/api/version          200   4.0 ms
+/api/workflows/list   200   3.3 ms
+/api/sessions/list    200   6.2 ms
+/api/sessions/stats   200   4.5 ms
+/api/usage/summary    200  11.4 ms
+/api/agents           200  21.5 ms
+/api/skills           200  10 ms cached
+/api/ports/list       200  144 ms (lsof bound)
+=== RSS ===                71.5 MB
+=== DB indexes ===          19  (+7)
+=== make i18n-verify ===   ✓ 모든 검증 통과
+```
+
+---
 ## [2.47.0] — 2026-04-30
 
 ### 🚀 Phase-2 perf — workflows runs → SQLite + 27× RSS drop + frontend consolidation
