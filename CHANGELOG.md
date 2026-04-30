@@ -10,6 +10,71 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.51.0] — 2026-04-30
+
+### 🛠️ UX hardening — QS lag fix + mascot toggle + 현재 파라미터 + AR terminal-scoped + 🛟 reliability category
+
+User: "마스코트 끄기 기능 및 현재 파라미터 기능 구현 필요. 빠른 설정
+키면 렉이 급격하게 심해짐. auto-resume을 단순히 키는게 아니라 현재
+열려있는 터미널에 대해서만 킬 수 있게 하고, 켜져있는지 확인할 수
+있어야함. 따로 카테고리 만들어."
+
+### ⚡ Quick Settings lag fix (A1)
+
+| # | Where | What |
+|---|---|---|
+| 1 | `dist/index.html::openQuickSettings` | Pre-fix tab-click handler: `dr.innerHTML = _qsRenderShell()` then `openQuickSettings()` recursively → re-rendered shell + re-bound controls TWICE per click. |
+| 2 | `dist/index.html::_qsRefreshSection` (new) | Extract refresh logic — sets `dataset.section`, sets `innerHTML`, rebinds tabs (self-recursive ref), calls `_qsBindControls(sec)` exactly **once**. |
+| 3 | `_qsResetSection` / `_qsResetAll` | Use `_qsRefreshSection` for re-render instead of re-calling full `openQuickSettings`. |
+
+### 🐰 Mascot toggle (A2)
+
+| # | Where | What |
+|---|---|---|
+| 4 | CSS `body[data-mascot-hidden="true"] #claudeMascot` | Already correct. Toggle flips via `_applyPrefsToDOM`. |
+| 5 | `_showRandomBubble` + `_mascotWanderStep` | Added `if (document.body.dataset.mascotHidden === 'true') return;` guard — 15s bubble + 6-10s wander timers do no work when hidden. |
+
+### 🔎 Current parameters viewer (A3)
+
+| # | Where | What |
+|---|---|---|
+| 6 | `dist/index.html::_QS_SECTIONS` | New 5th section `{ id: 'current', icon: '🔎', label: '현재 파라미터', readonly: true }`. |
+| 7 | `_qsRenderCurrentParams` (new) | Read-only pane. Three blocks: **Effective prefs** (section · key · value · source), **Runtime info** (server version, boot time, locale, theme, AR worker count, DB index count), **Endpoint quick links** (`/api/version`, `/api/prefs/get`, `/api/auto_resume/status`). |
+| 8 | `_qsRenderSection` / `_qsBindControls` | Short-circuit on `'current'` and `readonly: true` respectively. Footer reset buttons hidden. |
+| 9 | `tools/translations_manual_30.py` (new) | 16 KO→EN/ZH for new section labels. |
+
+### 🔄 Auto-Resume terminal-scoping (B1)
+
+| # | Where | What |
+|---|---|---|
+| 10 | `server/auto_resume.py::_live_cli_sessions` (new) | Wraps `process_monitor.api_cli_sessions_list({})` into `{sessionId: record}`. Best-effort try/except. |
+| 11 | `api_auto_resume_set` | Rejects bindings for sessions with no live PID unless `allowUnboundSession=true`: `{"ok": False, "error": "Session not currently running. Pass allowUnboundSession=true to bind anyway."}`. When live, persists `pid` + `terminal_app` to entry alongside new `terminalClosedAction` field. |
+| 12 | `api_auto_resume_status` | Cross-references live sessions per status call. Each active row gets `pid`, `terminal_app`, `liveSession: bool`. Server-side sort: live first. |
+| 13 | `_process_one` | Tracks `_deadTicks` per entry (resets on revival). `terminalClosedAction == "cancel"` AND `_deadTicks > 2` → auto-cancel with `stopReason="terminal closed (auto-cancel after 3 ticks)"`. `"wait"` (default) preserves prior behavior. |
+| 14 | `_public_state` | Surfaces `pid`, `terminal_app`, `terminalClosedAction` to UI. |
+| 15 | `dist/index.html` AR mgmt table | New "터미널" column (mono `terminal_app + #pid`), live chip `🟢 실행 중` / `⚪ 종료됨` per `liveSession`. Client-side sort live-first. |
+
+### 🛟 Reliability category (B2)
+
+| # | Where | What |
+|---|---|---|
+| 16 | `server/nav_catalog.py` | `TAB_GROUPS` appended `("reliability", "Reliability — Auto-Resume · 자동 복구 · 바인딩 관리")`. `autoResumeManager` row's group changed from `observe` → `reliability`. |
+| 17 | `dist/index.html` GROUPS | Appended `{ id: 'reliability', icon: '🛟', label: '안정성', short: '안정성', desc: 'Auto-Resume · 자동 복구 · 바인딩 관리' }`. NAV entry's `group:` updated. |
+| 18 | `tools/translations_manual_31.py` (new) | 6 KO→EN/ZH for new column/chip/error strings. |
+
+### Smoke
+```
+$ make test                                    68 passed in 0.58s
+$ make i18n-verify                             ✓ 모든 검증 통과
+$ /api/version                       200       7 ms
+$ /api/auto_resume/status            200     327 ms  (new process_monitor cross-ref)
+$ /api/prefs/get                     200     3.7 ms
+```
+
+### Note — auto_resume/status latency
+The new live-session cross-reference adds a `lsof` + `ps` call (~150-300 ms macOS) per status request. Acceptable for the manual-refresh / 10s-poll cadence. Future micro-optimization: short-circuit when 0 bindings exist.
+
+---
 ## [2.50.0] — 2026-04-30
 
 ### 📊 Observability + reliability — telemetry, cost recommendations, expanded test coverage

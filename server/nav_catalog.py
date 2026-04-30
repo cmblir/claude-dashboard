@@ -20,6 +20,7 @@ TAB_GROUPS = [
     ("playground", "Playground — Claude API 실험 12종 + 프로바이더"),
     ("config",     "Config — 훅 · 권한 · MCP · 플러그인 · 설정"),
     ("observe",    "Observe — 비용 · 메트릭 · 시스템 관측"),
+    ("reliability","Reliability — Auto-Resume · 자동 복구 · 바인딩 관리"),
 ]
 
 
@@ -260,8 +261,8 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
     ("memoryManager", "system",   "메모리 관리 — vm_stat 기반 시스템 메모리 + 상위 30 프로세스 + idle Claude Code 일괄 종료",
         ["메모리", "memory", "vm_stat", "swap", "스왑", "메모리 관리", "kill idle"]),
 
-    # v2.49.0 — Auto-Resume management
-    ("autoResumeManager", "observe",
+    # v2.49.0 — Auto-Resume management (moved to dedicated "reliability" group in v2.51)
+    ("autoResumeManager", "reliability",
         "🔄 Auto-Resume 관리 — 활성 바인딩 리스트 + 일괄 취소",
         ["auto-resume", "auto resume", "재개", "바인딩", "session"]),
 ]

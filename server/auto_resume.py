@@ -444,6 +444,9 @@ def _public_state(entry: dict) -> dict:
         "stopReason":     entry.get("stopReason") or "",
         "lastResetAt":    entry.get("lastResetAt") or 0,
         "createdAt":      entry.get("createdAt") or 0,
+        "pid":            entry.get("pid") if entry.get("pid") is not None else None,
+        "terminal_app":   entry.get("terminal_app") or "",
+        "terminalClosedAction": entry.get("terminalClosedAction") or "wait",
     }
 
 
@@ -523,12 +526,39 @@ def _send_notify(entry: dict, kind: str, summary: str) -> None:
 
 # ───────── Public API ─────────
 
+def _live_cli_sessions() -> dict:
+    """Return {sessionId: liveRecord} for currently-running Claude Code CLI sessions.
+    Best-effort — failures degrade to empty dict so binding still works in headless tests."""
+    try:
+        from .process_monitor import api_cli_sessions_list
+        r = api_cli_sessions_list({}) or {}
+        out: dict = {}
+        for s in (r.get("sessions") or []):
+            sid = s.get("sessionId")
+            if sid:
+                out[sid] = s
+        return out
+    except Exception as e:
+        log.warning("auto_resume: live cli session lookup failed: %s", e)
+        return {}
+
+
 def api_auto_resume_set(body: dict) -> dict:
     if not isinstance(body, dict):
         return {"ok": False, "error": "body must be object"}
     session_id = (body.get("sessionId") or "").strip()
     if not session_id:
         return {"ok": False, "error": "sessionId required"}
+
+    # Terminal-scope check — refuse binding to sessions that are not currently
+    # running unless caller explicitly opts in via allowUnboundSession=true.
+    live_map = _live_cli_sessions()
+    live_rec = live_map.get(session_id)
+    if not live_rec and not body.get("allowUnboundSession"):
+        return {
+            "ok": False,
+            "error": "Session not currently running. Pass allowUnboundSession=true to bind anyway.",
+        }
 
     cwd = (body.get("cwd") or "").strip()
     jsonl = _resolve_jsonl(session_id, cwd)
@@ -557,6 +587,21 @@ def api_auto_resume_set(body: dict) -> dict:
     notify_clean = _sanitize_notify(body.get("notify") or {})
 
     use_haiku_summary = bool(body.get("useHaikuSummary"))
+
+    # v2.51 — terminal-scope behavior on terminal close.
+    tca = (body.get("terminalClosedAction") or "wait").strip().lower()
+    if tca not in ("cancel", "wait", "exhaust"):
+        tca = "wait"
+
+    # Snapshot of live record (if any) — used purely for display.
+    bind_pid = None
+    bind_terminal_app = ""
+    if live_rec:
+        try:
+            bind_pid = int(live_rec.get("pid")) if live_rec.get("pid") is not None else None
+        except Exception:
+            bind_pid = None
+        bind_terminal_app = (live_rec.get("terminal_app") or "")[:64]
 
     # Optional: install Stop + SessionStart hooks for this cwd
     hook_result = None
@@ -597,6 +642,10 @@ def api_auto_resume_set(body: dict) -> dict:
             "state":           STATE_WATCHING,
             "stopReason":      "",
             "lastResetAt":     existing.get("lastResetAt") or 0,
+            "pid":             bind_pid if bind_pid is not None else existing.get("pid"),
+            "terminal_app":    bind_terminal_app or existing.get("terminal_app") or "",
+            "terminalClosedAction": tca,
+            "_deadTicks":      0,
         }
         store[session_id] = entry
         _dump_all(store)
@@ -637,8 +686,24 @@ def api_auto_resume_cancel(body: dict) -> dict:
 
 def api_auto_resume_status(query: dict) -> dict:
     store = _load_all()
-    entries = [_public_state(e) for e in store.values()]
-    entries.sort(key=lambda e: -(e.get("createdAt") or 0))
+    live_map = _live_cli_sessions()
+    entries = []
+    for e in store.values():
+        ps = _public_state(e)
+        sid = ps.get("sessionId") or ""
+        live = live_map.get(sid)
+        if live:
+            try:
+                ps["pid"] = int(live.get("pid")) if live.get("pid") is not None else ps.get("pid")
+            except Exception:
+                pass
+            ps["terminal_app"] = live.get("terminal_app") or ps.get("terminal_app") or ""
+            ps["liveSession"] = True
+        else:
+            ps["liveSession"] = False
+        entries.append(ps)
+    # Sort: live first, then by createdAt desc.
+    entries.sort(key=lambda e: (0 if e.get("liveSession") else 1, -(e.get("createdAt") or 0)))
     return {
         "ok": True,
         "workerAlive": bool(_WORKER_THREAD and _WORKER_THREAD.is_alive()),
@@ -755,6 +820,14 @@ def _spawn_resume(entry: dict) -> tuple[int, str, str]:
 
 def _process_one(session_id: str) -> None:
     """One supervisor pass — honours nextAttemptAt / idle / hash-stall / cap."""
+    # v2.51 — terminal-scope check. If the session's terminal closed and the
+    # binding's terminalClosedAction is "cancel", auto-cancel after 2 dead ticks.
+    try:
+        live_map = _live_cli_sessions()
+    except Exception:
+        live_map = {}
+    is_live = session_id in live_map
+
     with _LOCK:
         store = _load_all()
         entry = store.get(session_id)
@@ -762,6 +835,22 @@ def _process_one(session_id: str) -> None:
             return
         if session_id in _RUNNING_PROCS:
             return
+        tca = (entry.get("terminalClosedAction") or "wait").lower()
+        dead_ticks = int(entry.get("_deadTicks") or 0)
+        if is_live:
+            if dead_ticks:
+                store[session_id]["_deadTicks"] = 0
+                _dump_all(store)
+        else:
+            dead_ticks += 1
+            store[session_id]["_deadTicks"] = dead_ticks
+            if tca == "cancel" and dead_ticks > 2:
+                store[session_id]["enabled"] = False
+                store[session_id]["state"] = STATE_STOPPED
+                store[session_id]["stopReason"] = "terminal closed (auto-cancel after 3 ticks)"
+                _dump_all(store)
+                return
+            _dump_all(store)
         next_at = int(entry.get("nextAttemptAt") or 0)
         idle_required = int(entry.get("idleSeconds") or DEFAULT_IDLE_SECONDS)
         attempts = int(entry.get("attempts") or 0)
