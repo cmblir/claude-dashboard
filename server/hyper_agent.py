@@ -750,6 +750,131 @@ def rollback(name: str, version_ts: int, cwd: str | None = None) -> dict:
     return {"ok": True, "restoredFrom": str(bak)}
 
 
+# ───────── Auto-Resume advisor ─────────
+
+_AR_ADVISOR_SYSTEM_PROMPT = """You are an Auto-Resume advisor. Given a Claude Code
+session that has been retrying with the same exit reason, propose surgical
+adjustments to the retry policy. Output ONLY valid JSON matching this schema:
+{
+  "pollIntervalSec": int,        // suggested polling interval (60-1800)
+  "maxAttempts": int,            // suggested max retries (1-50)
+  "promptHint": str,              // suggested user-prompt prepend (or "")
+  "rationale": str                // 1-2 sentence explanation
+}
+Decision rules:
+- rate_limit → increase pollInterval to 600+, keep maxAttempts unchanged
+- context_full → suggest "/clear and continue" or "summarize prior context" promptHint
+- auth_expired → keep retrying low-frequency (pollInterval=300), short rationale telling user to run /login
+- unknown with high failure rate → reduce maxAttempts, suggest manual review
+"""
+
+
+def _build_ar_advisor_prompt(entry: dict, recent_failures: list[dict]) -> str:
+    """Compose a compact user prompt summarising the AR entry + last failures."""
+    sid = (entry.get("sessionId") or "")[:64]
+    state = entry.get("state") or ""
+    poll = entry.get("pollInterval") or 0
+    max_attempts = entry.get("maxAttempts") or 0
+    attempts = entry.get("attempts") or 0
+    last_reason = entry.get("lastExitReason") or ""
+    last_error = (entry.get("lastError") or "")[-400:]
+
+    lines = [
+        "Auto-Resume session needs a policy adjustment.",
+        f"sessionId: {sid}",
+        f"state: {state}",
+        f"attempts: {attempts}/{max_attempts}",
+        f"pollIntervalSec: {poll}",
+        f"lastExitReason: {last_reason}",
+    ]
+    if last_error:
+        lines.append(f"lastError(tail): {last_error}")
+
+    lines.append("")
+    lines.append("Recent failures (most recent last):")
+    for f in recent_failures:
+        at = f.get("at") or 0
+        att = f.get("attempt") or 0
+        reason = f.get("exitReason") or ""
+        notes = (f.get("notes") or "")[:200]
+        lines.append(f"- attempt={att} at={at} reason={reason} notes={notes}")
+
+    lines.append("")
+    lines.append("Return JSON only — no prose.")
+    return "\n".join(lines)
+
+
+def hyper_advise_auto_resume(entry: dict, recent_failures: list[dict],
+                             assignee: str = "claude:haiku") -> dict:
+    """Ask meta-LLM for retry-policy adjustments given an AR entry's failure pattern.
+
+    Returns ``{ok: bool, advice: dict | None, error: str | None, cost_usd: float}``.
+    Uses Haiku by default (fast + cheap; advice is structural, not creative).
+    """
+    # Pre-call validation — short-circuit before spending tokens.
+    if not isinstance(entry, dict):
+        return {"ok": False, "advice": None, "error": "entry must be object", "cost_usd": 0.0}
+    if entry.get("state") in ("done", "stopped"):
+        return {"ok": False, "advice": None,
+                "error": "Session not actively retrying", "cost_usd": 0.0}
+    if not isinstance(recent_failures, list) or len(recent_failures) < 2:
+        return {"ok": False, "advice": None,
+                "error": "Not enough failure history (need >=2)", "cost_usd": 0.0}
+
+    user_prompt = _build_ar_advisor_prompt(entry, recent_failures)
+
+    try:
+        from .ai_providers import execute_with_assignee
+        resp = execute_with_assignee(
+            assignee, user_prompt,
+            system_prompt=_AR_ADVISOR_SYSTEM_PROMPT,
+            timeout=180,
+        )
+    except Exception as e:
+        return {"ok": False, "advice": None,
+                "error": f"meta-llm call failed: {e}", "cost_usd": 0.0}
+
+    cost = float(getattr(resp, "cost_usd", 0.0) or 0.0)
+    if getattr(resp, "status", "") != "ok":
+        return {"ok": False, "advice": None,
+                "error": getattr(resp, "error", "unknown"), "cost_usd": cost}
+
+    proposal = _parse_proposal(getattr(resp, "output", "") or "")
+    if not proposal:
+        return {"ok": False, "advice": None,
+                "error": "could not parse JSON proposal", "cost_usd": cost}
+
+    # After-call sanitisation / clamping.
+    try:
+        poll_iv = int(proposal.get("pollIntervalSec") or 0)
+    except Exception:
+        poll_iv = 0
+    if poll_iv <= 0:
+        poll_iv = int(entry.get("pollInterval") or 300)
+    poll_iv = max(60, min(1800, poll_iv))
+
+    try:
+        max_att = int(proposal.get("maxAttempts") or 0)
+    except Exception:
+        max_att = 0
+    if max_att <= 0:
+        max_att = int(entry.get("maxAttempts") or 12)
+    max_att = max(1, min(50, max_att))
+
+    prompt_hint = str(proposal.get("promptHint") or "")[:500]
+    rationale = str(proposal.get("rationale") or "")[:300]
+
+    advice = {
+        "pollIntervalSec": poll_iv,
+        "maxAttempts":     max_att,
+        "promptHint":      prompt_hint,
+        "rationale":       rationale,
+        "provider":        getattr(resp, "provider", "") or "",
+        "model":           getattr(resp, "model", "") or "",
+    }
+    return {"ok": True, "advice": advice, "error": None, "cost_usd": cost}
+
+
 # ───────── HTTP handlers ─────────
 
 def _body_cwd(body: dict) -> str | None:

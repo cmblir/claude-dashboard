@@ -686,6 +686,17 @@ def api_auto_resume_cancel(body: dict) -> dict:
 
 def api_auto_resume_status(query: dict) -> dict:
     store = _load_all()
+    # perf(v2.52.0): short-circuit when no bindings exist — skip the
+    # ~150-300 ms lsof + ps cross-reference. Most installs sit at zero
+    # bindings; the 10s-poll cadence used to burn this cost forever.
+    if not store:
+        return {
+            "ok": True,
+            "workerAlive": bool(_WORKER_THREAD and _WORKER_THREAD.is_alive()),
+            "claudeBin": _claude_bin() or "",
+            "entries": [],
+            "active": [],
+        }
     live_map = _live_cli_sessions()
     entries = []
     for e in store.values():
@@ -733,6 +744,78 @@ def api_auto_resume_get(query: dict) -> dict:
         else:
             out["snapshotPreview"] = ""
     return {"ok": True, "entry": out}
+
+
+def api_auto_resume_advise(body: dict) -> dict:
+    """POST /api/auto_resume/advise — body: {sessionId, assignee?}.
+
+    Calls hyper_advise_auto_resume with the entry's recent failures and returns
+    the advisor's proposed adjustments WITHOUT applying them. Caller decides
+    whether to accept (separate POST to /api/auto_resume/set).
+
+    The function is OPT-IN per session: invoked only when the user clicks the
+    "Hyper Advisor" button in the AR manager tab. No automatic background calls.
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "body must be object"}
+    session_id = (body.get("sessionId") or "").strip()
+    if not session_id:
+        return {"ok": False, "error": "sessionId required"}
+
+    store = _load_all()
+    entry = store.get(session_id)
+    if not entry:
+        return {"ok": False, "error": "no auto-resume binding for this session"}
+
+    # Build recent_failures list. Prefer an explicit history array if the entry
+    # carries one (forward-compat); otherwise synthesise from the last-known
+    # exit reason repeated by the attempts counter — this matches the
+    # "same exit reason on N retries" pattern the advisor is designed for.
+    raw_hist = entry.get("history")
+    recent_failures: list[dict] = []
+    if isinstance(raw_hist, list) and raw_hist:
+        for item in raw_hist[-5:]:
+            if not isinstance(item, dict):
+                continue
+            recent_failures.append({
+                "at":         int(item.get("at") or 0),
+                "attempt":    int(item.get("attempt") or 0),
+                "exitReason": str(item.get("exitReason") or ""),
+                "notes":      str(item.get("notes") or "")[:400],
+            })
+    else:
+        attempts = int(entry.get("attempts") or 0)
+        last_reason = entry.get("lastExitReason") or ""
+        last_error = (entry.get("lastError") or "")[-400:]
+        last_at = int(entry.get("lastAttemptAt") or 0)
+        # Reconstruct up to last 5 attempts as same-reason events.
+        n = min(5, max(0, attempts))
+        for i in range(n):
+            recent_failures.append({
+                "at":         last_at,
+                "attempt":    attempts - (n - 1 - i),
+                "exitReason": last_reason,
+                "notes":      last_error if i == n - 1 else "",
+            })
+
+    assignee = (body.get("assignee") or "claude:haiku").strip() or "claude:haiku"
+
+    try:
+        from .hyper_agent import hyper_advise_auto_resume
+    except Exception as e:
+        return {"ok": False, "error": f"advisor unavailable: {e}"}
+
+    result = hyper_advise_auto_resume(entry, recent_failures, assignee=assignee)
+    out = {
+        "ok":       bool(result.get("ok")),
+        "advice":   result.get("advice"),
+        "error":    result.get("error"),
+        "cost_usd": float(result.get("cost_usd") or 0.0),
+        "sessionId": session_id,
+        "currentPollInterval": entry.get("pollInterval") or DEFAULT_POLL_INTERVAL,
+        "currentMaxAttempts":  entry.get("maxAttempts") or DEFAULT_MAX_ATTEMPTS,
+    }
+    return out
 
 
 def api_auto_resume_install_hooks(body: dict) -> dict:
