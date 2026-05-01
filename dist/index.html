@@ -333,6 +333,20 @@ tailwind.config = {
   .lc-grid-2 { display: grid; grid-template-columns: 1fr; gap: 1rem; }
   @media (min-width: 1024px) { .lc-grid-2 { grid-template-columns: 1fr 1fr; } }
   .lc-stack > * + * { margin-top: 0.75rem; }
+  /* V1 (v2.66.8) — toast styling. */
+  .lc-toast {
+    background: var(--card); border: 1px solid var(--border);
+    border-left-width: 3px; border-radius: 12px;
+    padding: 0.75rem 1rem; font-size: 0.85rem;
+    display: flex; align-items: center; gap: 0.5rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    max-width: 480px;
+  }
+  .lc-toast-info { border-left-color: #60a5fa; }
+  .lc-toast-ok   { border-left-color: #4ade80; }
+  .lc-toast-warn { border-left-color: #fbbf24; }
+  .lc-toast-err  { border-left-color: #fca5a5; }
   /* S1 (v2.66.5) — mode-aware view-header accent. Subtle 2px top-bar
      tinted by current mode; helps the user remember which curated subset
      they're in. Applied via body[data-mode=*] selector so JS just toggles
@@ -545,8 +559,13 @@ tailwind.config = {
   table.data td { padding: 0.65rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
   table.data tr:hover td { background: var(--card-hi); }
   .link-row { cursor: pointer; }
-  .input { width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.88rem; -webkit-appearance: none; }
-  .input:focus { outline: none; border-color: var(--accent); }
+  /* V3 (v2.66.8) — input polish: softer bg, smooth focus ring matching the
+     screenshot reference. Box-shadow ring instead of outline so the radius
+     stays clean. */
+  .input { width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.88rem; -webkit-appearance: none; transition: border-color 0.15s, box-shadow 0.15s, background 0.15s; }
+  .input:hover { background: rgba(255,255,255,0.06); }
+  .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,119,87,0.18); background: rgba(255,255,255,0.07); }
+  .input::placeholder { color: var(--text-dim); opacity: 0.7; }
   /* number/password/text 등 모든 input 타입에 다크 테마 강제 */
   input.input, select.input { background: rgba(255,255,255,0.04) !important; color: var(--text) !important; color-scheme: dark; }
   input.input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px rgba(10,10,10,1) inset !important; -webkit-text-fill-color: var(--text) !important; }
@@ -554,8 +573,11 @@ tailwind.config = {
   body.theme-light input.input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px rgba(245,245,240,1) inset !important; }
   textarea.input { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.8rem; line-height: 1.55; }
   .kbd { display: inline-block; padding: 0.1rem 0.45rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; background: rgba(255,255,255,0.05); font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; }
-  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(4px); z-index: 50; display: grid; place-items: center; padding: 24px; }
-  .modal { background: var(--bg-soft); border: 1px solid var(--border-hi); border-radius: 18px; max-width: 1100px; width: 100%; max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  /* V2 (v2.66.8) — modal polish: softer backdrop blur, slightly larger shadow */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 50; display: grid; place-items: center; padding: 24px; animation: lc-fade-in 0.18s ease-out; }
+  .modal { background: var(--bg-soft); border: 1px solid var(--border-hi); border-radius: 18px; max-width: 1100px; width: 100%; max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 80px rgba(0,0,0,0.6); animation: lc-modal-in 0.22s cubic-bezier(0.16,1,0.3,1); }
+  @keyframes lc-fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes lc-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
   .modal-wide { max-width: 1440px; height: 90vh; max-height: 90vh; }
   .modal-narrow { max-width: 520px !important; }
   .modal-wide textarea { font-size: 13px; line-height: 1.55; }
@@ -1606,7 +1628,10 @@ function errMsg(r) {
 
 function toast(msg, kind='info') {
   const div = document.createElement('div');
-  div.className = `card px-4 py-3 text-sm flex items-center gap-2`;
+  // V1 (v2.66.8) — toast styling unified. The kind-specific class adds
+  // a left-border tint matching the .lc-* palette (purple/blue/amber/rose
+  // are reserved for modes — toasts use the semantic ok/warn/err set).
+  div.className = `lc-toast lc-toast-${kind}`;
   // v2.33.5 — err/warn 토스트는 📋 복사 버튼 + 긴 표시 시간 (디버깅 편의)
   const isFailure = kind === 'err' || kind === 'warn';
   const copyBtn = isFailure
