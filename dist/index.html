@@ -2439,6 +2439,11 @@ function _animateCounters(root) {
 
 // 카드 스태거 입장 애니메이션
 function _animateCards(root) {
+  // T1 (v2.66.6) — respect prefers-reduced-motion. Users who set the
+  // OS-level reduce-motion preference never get the staggered fade-in
+  // (also a perf win on slow devices).
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) return;
   root.querySelectorAll('.card').forEach((el, i) => {
     if (i > 10) return; // 성능: 처음 10개만 애니메이션
     el.classList.add('card-animate');
