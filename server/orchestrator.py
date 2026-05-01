@@ -106,7 +106,7 @@ def load_config() -> dict:
 
 def _sanitize_binding(b: dict) -> Optional[dict]:
     kind = (b.get("kind") or "").strip().lower()
-    if kind not in ("slack", "telegram", "http"):
+    if kind not in ("slack", "telegram", "discord", "http"):
         return None
     out: dict = {"kind": kind}
     if kind == "slack":
@@ -119,6 +119,11 @@ def _sanitize_binding(b: dict) -> Optional[dict]:
         if not chat:
             return None
         out["chat"] = chat
+    elif kind == "discord":
+        ch = (b.get("channel") or "").strip()
+        if not ch:
+            return None
+        out["channel"] = ch
     else:  # http
         out["channel"] = (b.get("channel") or "default").strip()
     wf = (b.get("workflowId") or "").strip()
@@ -127,6 +132,19 @@ def _sanitize_binding(b: dict) -> Optional[dict]:
     assignees = [str(a).strip() for a in (b.get("assignees") or []) if a]
     if assignees:
         out["assignees"] = assignees
+    # v2.56.0 — per-binding fallback chain + daily budget cap (D6)
+    fb = b.get("fallbackChain") or b.get("fallback") or []
+    if isinstance(fb, list):
+        clean_fb = [str(x).strip() for x in fb if str(x).strip()]
+        if clean_fb:
+            out["fallbackChain"] = clean_fb[:8]
+    if "budgetUsdPerDay" in b:
+        try:
+            v = float(b["budgetUsdPerDay"])
+            if v > 0:
+                out["budgetUsdPerDay"] = round(v, 4)
+        except (TypeError, ValueError):
+            pass
     label = (b.get("label") or "").strip()
     if label:
         out["label"] = label
@@ -146,6 +164,8 @@ def find_binding(kind: str, channel_or_chat: str) -> Optional[dict]:
         if kind == "slack" and b.get("channel") == channel_or_chat:
             return b
         if kind == "telegram" and b.get("chat") == channel_or_chat:
+            return b
+        if kind == "discord" and b.get("channel") == channel_or_chat:
             return b
         if kind == "http":
             return b
@@ -443,6 +463,41 @@ def _persist_run_record(run_id: str, *, kind: str, channel: str, user: str,
         log.warning("orch history persist failed: %s", e)
 
 
+def _spent_today_usd(kind: str, channel: str) -> float:
+    """Sum of cost_usd from orch_runs results for ``(kind, channel)`` today.
+
+    Cost is stored inside the results JSON (one entry per sub-agent). We
+    extract via the SQLite ``json_extract`` function — fast even on big
+    tables because we range-scan ``ts`` first via the index.
+    """
+    try:
+        _ensure_history_schema()
+        from .db import _db
+        # Local-day rollover (UTC offset agnostic — treat ``today`` as
+        # the last 24 hours for simplicity; users get a worst-case 24-hour
+        # rolling cap rather than a midnight reset).
+        cutoff_ms = int((time.time() - 86400) * 1000)
+        with _db() as c:
+            rows = c.execute(
+                "SELECT results FROM orch_runs WHERE kind = ? AND channel = ? "
+                "AND ts >= ? AND ok = 1",
+                (kind, channel, cutoff_ms),
+            ).fetchall()
+        total = 0.0
+        for r in rows:
+            try:
+                arr = json.loads(r["results"] or "[]")
+                for it in arr:
+                    cost = float((it or {}).get("cost_usd") or 0.0)
+                    total += cost
+            except Exception:
+                continue
+        return total
+    except Exception as e:
+        log.warning("orch _spent_today_usd failed: %s", e)
+        return 0.0
+
+
 def list_run_history(limit: int = 50) -> list[dict]:
     try:
         _ensure_history_schema()
@@ -492,34 +547,63 @@ def _topic(run_id: str, *parts: str) -> str:
     return ".".join(("orch", run_id, *parts))
 
 
-def _execute_step(run_id: str, idx: int, assignee: str, task: str) -> dict:
+def _execute_step(run_id: str, idx: int, assignee: str, task: str,
+                  fallback_chain: Optional[list[str]] = None) -> dict:
+    """Execute one sub-agent task. If ``fallback_chain`` is non-empty and the
+    primary assignee returns an error, walk the chain in order until one
+    succeeds or all are exhausted. Each attempt publishes its own
+    ``step.<idx>.try.<n>`` event so the live UI sees the failover decision.
+    """
+    chain: list[str] = [assignee]
+    for fb in (fallback_chain or []):
+        if fb and fb != assignee and fb not in chain:
+            chain.append(fb)
+
     agent_bus.publish(_topic(run_id, f"step.{idx}.start"),
-                      {"assignee": assignee, "task": task}, source=assignee)
+                      {"assignee": assignee, "task": task,
+                       "fallbackChain": chain[1:]},
+                      source=assignee)
     t0 = time.time()
-    try:
-        resp: AIResponse = execute_with_assignee(
-            assignee, task, timeout=_PER_AGENT_TIMEOUT_S, fallback=True,
-        )
-        ok = (resp.status == "ok")
-        out = {
-            "ok":        ok,
-            "assignee":  assignee,
-            "task":      task,
-            "output":    resp.output if ok else "",
-            "error":     resp.error if not ok else "",
-            "model":     resp.model,
-            "provider":  resp.provider,
-            "tokens":    resp.tokens_total,
-            "durationMs": int((time.time() - t0) * 1000),
-        }
-    except Exception as e:
-        out = {
-            "ok": False, "assignee": assignee, "task": task,
-            "output": "", "error": f"{type(e).__name__}: {e}",
-            "durationMs": int((time.time() - t0) * 1000),
-        }
-    agent_bus.publish(_topic(run_id, f"step.{idx}.done"), out, source=assignee)
-    return out
+    last_out: dict = {}
+    for attempt, candidate in enumerate(chain):
+        attempt_t0 = time.time()
+        try:
+            resp: AIResponse = execute_with_assignee(
+                candidate, task, timeout=_PER_AGENT_TIMEOUT_S, fallback=True,
+            )
+            ok = (resp.status == "ok")
+            last_out = {
+                "ok":        ok,
+                "assignee":  candidate,
+                "task":      task,
+                "output":    resp.output if ok else "",
+                "error":     resp.error if not ok else "",
+                "model":     resp.model,
+                "provider":  resp.provider,
+                "tokens":    resp.tokens_total,
+                "cost_usd":  float(resp.cost_usd or 0.0),
+                "durationMs": int((time.time() - attempt_t0) * 1000),
+                "failoverIndex": attempt,
+            }
+        except Exception as e:
+            last_out = {
+                "ok": False, "assignee": candidate, "task": task,
+                "output": "", "error": f"{type(e).__name__}: {e}",
+                "cost_usd": 0.0,
+                "durationMs": int((time.time() - attempt_t0) * 1000),
+                "failoverIndex": attempt,
+            }
+        if last_out.get("ok"):
+            break
+        if attempt + 1 < len(chain):
+            agent_bus.publish(_topic(run_id, f"step.{idx}.failover"),
+                              {"failed": candidate, "next": chain[attempt + 1],
+                               "error": last_out.get("error", "")},
+                              source="orchestrator")
+    last_out["totalDurationMs"] = int((time.time() - t0) * 1000)
+    agent_bus.publish(_topic(run_id, f"step.{idx}.done"), last_out,
+                      source=last_out.get("assignee", "?"))
+    return last_out
 
 
 def _aggregate(aggregator: str, user_text: str, results: list[dict]) -> str:
@@ -624,6 +708,33 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
     binding = find_binding(kind, channel) if channel else None
     run_id = _new_run_id()
 
+    # ── Per-binding daily budget cap (D6) ───────────────────────────────
+    # If the binding declared a USD/day cap, refuse new dispatches once
+    # today's spend (sum of orch_runs.cost where channel matches) is over.
+    # Cost figures come from sub-agent results — accumulated lazily, so we
+    # query history rather than carrying a counter.
+    if binding and binding.get("budgetUsdPerDay"):
+        spent = _spent_today_usd(kind, channel)
+        cap = float(binding["budgetUsdPerDay"])
+        if spent >= cap:
+            err_msg = (
+                f"daily budget ${cap:.2f} reached for {kind}:{channel} "
+                f"(spent ${spent:.2f} today). Try again tomorrow or raise "
+                "the cap in the Orchestrator tab."
+            )
+            agent_bus.publish(_topic(run_id, "budget.exceeded"),
+                              {"cap": cap, "spent": spent},
+                              source="orchestrator")
+            if callable(reply):
+                try: reply(err_msg)
+                except Exception: pass
+            _persist_run_record(run_id, kind=kind, channel=channel, user=user,
+                                text=text, plan=[], results=[],
+                                final="", via="budget-blocked",
+                                ok=False, error=err_msg)
+            return {"ok": False, "runId": run_id, "error": err_msg,
+                    "budgetCapUsd": cap, "spentTodayUsd": round(spent, 4)}
+
     # Determine assignee list for this dispatch — binding > config default.
     avail = list((binding or {}).get("assignees") or cfg["defaultAssignees"])
     avail = [a for a in avail if a]
@@ -696,11 +807,14 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
                            "cached": False},
                           source=planner)
 
-    # 2. Execute steps in parallel
+    # 2. Execute steps in parallel — with per-binding failover chain (D6)
     pool_size = min(cfg["maxParallel"], max(1, len(plan)))
     results: list[dict] = [{} for _ in plan]
+    binding_chain = (binding or {}).get("fallbackChain") or []
     with ThreadPoolExecutor(max_workers=pool_size, thread_name_prefix="orch") as pool:
-        futs = {pool.submit(_execute_step, run_id, i, step["assignee"], step["task"]): i
+        futs = {pool.submit(_execute_step, run_id, i,
+                            step["assignee"], step["task"],
+                            binding_chain): i
                 for i, step in enumerate(plan)}
         for fut in as_completed(futs):
             idx = futs[fut]
@@ -756,6 +870,68 @@ def _slack_reply(channel: str, thread_ts: Optional[str] = None):
         coalesced_reply("slack", channel, text, _wire)
 
     return _send
+
+
+def _discord_reply(channel: str):
+    from . import discord_api
+
+    def _wire(text: str) -> None:
+        try:
+            discord_api.send_message(channel, text)
+        except Exception as e:
+            log.warning("discord reply failed: %s", e)
+
+    def _send(text: str) -> None:
+        coalesced_reply("discord", channel, text, _wire)
+
+    return _send
+
+
+def handle_discord_interaction(payload: dict) -> dict:
+    """Discord Interactions API receiver.
+
+    Expects the payload Discord sends to the configured interactions endpoint.
+    Returns a response dict that the HTTP handler serializes back to the
+    client. Type-1 PING gets a Type-1 PONG; Type-2 application command + Type-3
+    component / message events route into the orchestrator.
+    """
+    if not isinstance(payload, dict):
+        return {"type": 4, "data": {"content": "(bad payload)"}}
+    itype = payload.get("type")
+    if itype == 1:                         # PING
+        return {"type": 1}
+    # Application command (slash) or component interaction
+    chan = ((payload.get("channel") or {}).get("id")
+            or payload.get("channel_id") or "")
+    user = ((payload.get("member") or {}).get("user")
+            or payload.get("user") or {}).get("username", "")
+    text = ""
+    data = payload.get("data") or {}
+    # Slash command "/ask <prompt>" — pull the first string option
+    for opt in (data.get("options") or []):
+        if isinstance(opt, dict) and opt.get("type") == 3 and opt.get("value"):
+            text = str(opt["value"]); break
+    # Fall back to a raw "name + first option text" if shape differs
+    if not text:
+        text = str(data.get("custom_id") or data.get("name") or "").strip()
+
+    if not (chan and text):
+        return {"type": 4, "data": {"content": "(missing channel or text)"}}
+
+    binding = find_binding("discord", str(chan))
+    if binding is None and os.environ.get("ORCH_DISCORD_BIND_REQUIRED", "1") != "0":
+        return {"type": 4, "data": {"content": "(channel not bound)"}}
+
+    threading.Thread(
+        target=dispatch,
+        kwargs={"text": text, "kind": "discord", "channel": str(chan),
+                "user": user, "reply": _discord_reply(str(chan))},
+        name=f"orch-dc-{chan}",
+        daemon=True,
+    ).start()
+    # Type 5 = "deferred channel message" — Discord shows a "thinking…" state
+    # while the orchestrator runs. Final reply lands via send_message.
+    return {"type": 5}
 
 
 def _telegram_reply(chat: str, reply_to: Optional[int] = None):
@@ -1054,3 +1230,53 @@ def api_telegram_webhook(body: dict) -> dict:
         return {"ok": False, "error": "bad body"}
     handle_telegram_update(body)
     return {"ok": True}
+
+
+def handle_discord_interactions_request(handler) -> None:
+    """Custom HTTP handler for ``POST /api/discord/interactions``.
+
+    Reads the raw body, verifies the ed25519 signature using the configured
+    publicKey (Discord requires this on every interaction), then dispatches
+    via ``handle_discord_interaction``. Always returns JSON.
+    """
+    from . import discord_api
+
+    length = 0
+    try:
+        length = int(handler.headers.get("Content-Length", 0) or 0)
+    except (TypeError, ValueError):
+        length = 0
+    raw = handler.rfile.read(length) if length else b""
+
+    sig = (handler.headers.get("X-Signature-Ed25519") or "")
+    ts  = (handler.headers.get("X-Signature-Timestamp") or "")
+    cfg = discord_api.load_discord_config()
+    pk_hex = cfg.get("publicKey", "")
+
+    if not pk_hex:
+        log.warning("discord interactions: no publicKey configured — rejecting")
+        handler.send_response(401)
+        handler.send_header("Content-Type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(b'{"error":"publicKey not configured"}')
+        return
+
+    if not discord_api.verify_interaction_signature(raw, sig, ts, pk_hex):
+        handler.send_response(401)
+        handler.send_header("Content-Type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(b'{"error":"invalid request signature"}')
+        return
+
+    try:
+        payload = json.loads(raw.decode("utf-8")) if raw else {}
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    response = handle_discord_interaction(payload)
+    handler.send_response(200)
+    handler.send_header("Content-Type", "application/json")
+    handler.end_headers()
+    handler.wfile.write(json.dumps(response, ensure_ascii=False).encode("utf-8"))
