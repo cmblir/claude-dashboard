@@ -25,6 +25,13 @@ NEW_EN: dict[str, str] = {
     "kind (slack/telegram/http):":           "kind (slack/telegram/http):",
     "assignees (csv, blank=defaults):":      "assignees (csv, blank=defaults):",
     "workflowId (blank for ad-hoc):":        "workflowId (blank for ad-hoc):",
+    # Cycle 2 — live SSE panel + run history.
+    "최근 디스패치":              "Recent dispatches",
+    "아직 디스패치 기록 없음":    "No dispatches yet",
+    "라이브 시작":                "Start live",
+    "라이브 중지":                "Stop live",
+    "라이브 이벤트":              "Live events",
+    "연결 끊김":                  "Disconnected",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -46,4 +53,11 @@ NEW_ZH: dict[str, str] = {
     "kind (slack/telegram/http):":           "kind (slack/telegram/http):",
     "assignees (csv, blank=defaults):":      "assignees (csv, blank=defaults):",
     "workflowId (blank for ad-hoc):":        "workflowId (blank for ad-hoc):",
+    # Cycle 2 — live SSE panel + run history.
+    "최근 디스패치":              "最近调度",
+    "아직 디스패치 기록 없음":    "尚无调度记录",
+    "라이브 시작":                "启动实时",
+    "라이브 중지":                "停止实时",
+    "라이브 이벤트":              "实时事件",
+    "연결 끊김":                  "已断开",
 }

@@ -362,7 +362,18 @@ turns the dashboard into a multi-agent hub for chat platforms:
   to an in-process pub/sub bus (`server/agent_bus.py`). The bus is wakeup-
   driven (no polling), batches writes to SQLite (single shared DB), dedups
   identical events inside a 5-second LRU window, and is queryable over HTTP
-  for live UI streams.
+  for live UI streams (`GET /api/agent-bus/stream` SSE).
+- **Two-way agent protocol.** `agent_bus.ask(topic, payload, timeout_s)` lets
+  one agent block on a correlated reply from any subscriber — built on the
+  same wakeup-driven primitive (no second condition variable, no polling).
+- **Workflow-bound channels.** A binding can point at a saved workflow; the
+  inbound message runs that DAG and the workflow's last meaningful output
+  becomes the channel reply.
+- **Run history.** Every dispatch (ad-hoc or workflow) is persisted to SQLite
+  (`orch_runs` table) and surfaced in the Orchestrator tab.
+- **Slack signature verification.** Set `SLACK_SIGNING_SECRET` to enforce
+  HMAC-SHA256 over `v0:<ts>:<raw-body>` on `/api/slack/events`; stale
+  timestamps (>5 min) are rejected.
 - **No hardcoding.** Models, channels, debounce intervals, retention windows,
   and pool sizes are all env-overridable. Storage paths follow the existing
   `_env_path()` convention (`CLAUDE_DASHBOARD_ORCHESTRATOR`,

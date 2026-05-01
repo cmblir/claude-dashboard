@@ -98,10 +98,13 @@ from .telegram_api import (
     api_telegram_config_clear, api_telegram_config_get,
     api_telegram_config_save, api_telegram_test,
 )
-from .agent_bus import api_agent_bus_history, api_agent_bus_publish
+from .agent_bus import (
+    api_agent_bus_history, api_agent_bus_publish, handle_agent_bus_stream,
+)
 from .orchestrator import (
     api_orch_bind, api_orch_config_get, api_orch_config_save, api_orch_dispatch,
-    api_orch_start, api_orch_unbind, api_slack_events, api_telegram_webhook,
+    api_orch_history, api_orch_history_get, api_orch_start, api_orch_unbind,
+    api_slack_events, api_telegram_webhook,
 )
 from .obsidian_log import api_obsidian_test
 from .crew_wizard import api_crew_create, api_crew_preview
@@ -331,6 +334,8 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/slack/config": lambda q: api_slack_config_get(q),
     "/api/telegram/config": lambda q: api_telegram_config_get(q),
     "/api/orchestrator/config": lambda q: api_orch_config_get(q),
+    "/api/orchestrator/history": api_orch_history,
+    "/api/orchestrator/history/get": api_orch_history_get,
     "/api/agent-bus/history": api_agent_bus_history,
     "/api/run/catalog":      api_run_catalog,
     "/api/run/history":      api_run_history,
@@ -803,6 +808,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/workflows/run-stream":
             handle_workflow_run_stream(self, query)
             return
+        if path == "/api/agent-bus/stream":
+            handle_agent_bus_stream(self, query)
+            return
         if path in ROUTES_GET:
             try:
                 self._send_json(ROUTES_GET[path](query))
@@ -843,6 +851,11 @@ class Handler(BaseHTTPRequestHandler):
         # chat/stream 은 SSE 응답 — dict 외 Handler 를 직접 받음
         if path == "/api/chat/stream":
             handle_chat_stream(self, self._read_body())
+            return
+        # Slack Events — needs raw body for HMAC signature verification.
+        if path == "/api/slack/events":
+            from .orchestrator import handle_slack_events_request
+            handle_slack_events_request(self)
             return
         if path in ROUTES_POST:
             self._send_json(ROUTES_POST[path](self._read_body())); return

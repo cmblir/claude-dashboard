@@ -1,39 +1,42 @@
-# Autonomous queue — 2026-05-01
+# Autonomous queue — 2026-05-01 (cycle 2)
 
-User directive: "PR은 쪼개지 말고, 모두 자율모드로 시작. 라이트하게, 알고리즘/최적화 기반, 하드코딩 금지."
+User directive: "계속 구현해. 자율모드 시작."
+Branch: `feat/openclaw-orchestrator-tui` (continuing same branch).
 
-Branch: `feat/openclaw-orchestrator-tui`
+Cycle 1 left these natural follow-ups; tackling in order.
 
-## [A1] Agent Bus
-- 목표: 모든 에이전트(워크플로우 노드, 슬랙/텔레그램 봇, TUI)가 공통 토픽 채널로 상호 보고할 수 있는 경량 pub/sub.
-- 영향: server/agent_bus.py (신규). SQLite 단일 테이블, in-memory deque, SSE.
-- 완료 기준: 토픽 라우팅 + 1초 deque polling 없이 condition.notify 기반 wakeup. 같은 (topic,sha1(payload)) 중복은 LRU 8 윈도우에서 드롭.
+## [B1] Agent Bus SSE bridge
+- 목표: 프론트가 라이브로 `orch.*` / `wf.*` / 임의 토픽을 구독.
+- 영향: `server/routes.py` (custom GET /api/agent-bus/stream — SSE),
+  `dist/index.html` Orchestrator 탭 라이브 패널.
+- 완료 기준: 디스패치 1회 → UI 패널에 plan/step/final이 실시간으로 흘러옴.
+- 위험도: medium (HTTP handler 직접 작성 필요)
+
+## [B2] Workflow binding execution
+- 목표: 바인딩에 `workflowId` 있을 때 실제 해당 워크플로우 실행 + 결과 회신.
+- 영향: `server/orchestrator.py::dispatch` 분기.
+- 완료 기준: 바인딩된 채널에 메시지 → 워크플로우 run → final.text가 회신됨.
 - 위험도: low
 
-## [A2] Telegram
-- 목표: 슬랙과 동일 설정 UX. Bot Token + 기본 chat. long-poll로 인입.
-- 영향: server/telegram_api.py (신규), config/.json 신규 경로.
-- 완료 기준: getMe + sendMessage + getUpdates(offset, timeout=25) 동작.
+## [B3] Agent-to-agent request/reply protocol
+- 목표: 한 에이전트가 다른 에이전트에 질문하고 답을 기다림 (synchronous over async bus).
+- 영향: `server/agent_bus.py::ask(topic, payload, timeout)` + 매처.
+- 완료 기준: pytest로 두 스레드가 ask/reply 라운드트립.
 - 위험도: low
 
-## [A3] Orchestrator
-- 목표: 채널 멘션 → planner(Claude) → 서브에이전트(execute_with_assignee) → 채널 회신. 워크플로우 바인딩 옵션.
-- 영향: server/orchestrator.py (신규). agent_bus 발행.
-- 완료 기준: 슬랙/텔레그램에서 멘션 1회로 멀티 에이전트 분담 + 결과 회신.
-- 위험도: medium (외부 API 실호출 — 단, 토큰 설정 안 되어 있으면 no-op)
+## [B4] Slack request signing verification
+- 목표: `/api/slack/events`가 서명 검증을 강제 (env에 `SLACK_SIGNING_SECRET` 있으면).
+- 영향: `server/orchestrator.py::api_slack_events` + 헤더 접근 위해 routes 수정.
+- 완료 기준: 잘못된 서명 → 401, 올바른 서명 → 처리 진행.
+- 위험도: low (시크릿 미설정 시 기존 동작 유지)
 
-## [A4] TUI
-- 목표: `python3 tools/tui_config.py` 한 줄로 키/모델/슬랙/텔레그램/오케스트레이터 바인딩.
-- 영향: tools/tui_config.py (신규). curses 표준 라이브러리.
-- 완료 기준: 화살표/Enter/q로 모든 핵심 설정 가능. JSON 파일 직접 갱신.
+## [B5] Orchestrator run history
+- 목표: `dispatch()` 결과를 SQLite에 저장 + `/api/orchestrator/history` + UI 리스트.
+- 영향: `server/orchestrator.py` + 새 테이블, 라우트, UI 패널.
+- 완료 기준: 디스패치 후 새로고침해도 결과 조회 가능.
 - 위험도: low
 
-## [A5] Routes + Frontend
-- 영향: server/routes.py (등록), dist/index.html (탭 1개 추가), server/nav_catalog.py.
-- 완료 기준: /api/orchestrator/* 라우트 + Orchestrator 탭에서 라이브 이벤트 표시.
-- 위험도: medium (dist/index.html 회귀 주의)
-
-## [A6] Tests + docs
-- 영향: tests/test_agent_bus.py (신규), README, i18n.
-- 완료 기준: pytest 통과, i18n verify 0 missing.
+## [B6] Tests + i18n + commit
+- 영향: tests/test_agent_bus_ask.py 등, 추가 t() 문자열 번역.
+- 완료 기준: 전체 pytest pass, i18n verify 0 missing.
 - 위험도: low

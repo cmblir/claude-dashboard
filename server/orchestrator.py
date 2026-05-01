@@ -213,6 +213,106 @@ def _parse_plan(text: str, available: list[str]) -> list[dict]:
 
 # ───────── Run ─────────
 
+# ───────── Run history (SQLite) ─────────
+
+_HISTORY_SCHEMA = """
+CREATE TABLE IF NOT EXISTS orch_runs (
+  run_id   TEXT PRIMARY KEY,
+  ts       INTEGER NOT NULL,
+  kind     TEXT NOT NULL,
+  channel  TEXT NOT NULL DEFAULT '',
+  user     TEXT NOT NULL DEFAULT '',
+  via      TEXT NOT NULL DEFAULT 'ad-hoc',
+  ok       INTEGER NOT NULL DEFAULT 1,
+  error    TEXT,
+  text     TEXT NOT NULL DEFAULT '',
+  plan     TEXT NOT NULL DEFAULT '[]',
+  results  TEXT NOT NULL DEFAULT '[]',
+  final    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_orch_runs_ts ON orch_runs(ts DESC);
+"""
+
+_HISTORY_SCHEMA_READY = False
+
+
+def _ensure_history_schema() -> None:
+    global _HISTORY_SCHEMA_READY
+    if _HISTORY_SCHEMA_READY:
+        return
+    from .db import _db, _db_init
+    _db_init()
+    with _db() as c:
+        c.executescript(_HISTORY_SCHEMA)
+    _HISTORY_SCHEMA_READY = True
+
+
+def _persist_run_record(run_id: str, *, kind: str, channel: str, user: str,
+                        text: str, plan: list, results: list, final: str,
+                        via: str, ok: bool, error: Optional[str] = None) -> None:
+    """Append a single dispatch outcome to ``orch_runs``. Best-effort: a
+    persistence failure must not affect the channel reply we already produced.
+    """
+    try:
+        _ensure_history_schema()
+        from .db import _db
+        with _db() as c:
+            c.execute(
+                "INSERT OR REPLACE INTO orch_runs"
+                "(run_id, ts, kind, channel, user, via, ok, error, text, plan, results, final)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (run_id, int(time.time() * 1000), kind, channel, user, via,
+                 1 if ok else 0, (error or None),
+                 (text or "")[:8000],
+                 json.dumps(plan, ensure_ascii=False)[:32000],
+                 json.dumps(results, ensure_ascii=False)[:64000],
+                 (final or "")[:32000]),
+            )
+    except Exception as e:
+        log.warning("orch history persist failed: %s", e)
+
+
+def list_run_history(limit: int = 50) -> list[dict]:
+    try:
+        _ensure_history_schema()
+        from .db import _db
+        with _db() as c:
+            rows = c.execute(
+                "SELECT run_id, ts, kind, channel, user, via, ok, error, text, final"
+                " FROM orch_runs ORDER BY ts DESC LIMIT ?",
+                (max(1, min(int(limit), 500)),),
+            ).fetchall()
+        return [{"runId": r["run_id"], "ts": r["ts"], "kind": r["kind"],
+                 "channel": r["channel"], "user": r["user"], "via": r["via"],
+                 "ok": bool(r["ok"]), "error": r["error"],
+                 "text": r["text"], "final": r["final"]} for r in rows]
+    except Exception as e:
+        log.warning("orch history list failed: %s", e)
+        return []
+
+
+def get_run_record(run_id: str) -> Optional[dict]:
+    try:
+        _ensure_history_schema()
+        from .db import _db
+        with _db() as c:
+            r = c.execute("SELECT * FROM orch_runs WHERE run_id = ?",
+                          (run_id,)).fetchone()
+        if not r:
+            return None
+        return {
+            "runId": r["run_id"], "ts": r["ts"], "kind": r["kind"],
+            "channel": r["channel"], "user": r["user"], "via": r["via"],
+            "ok": bool(r["ok"]), "error": r["error"],
+            "text": r["text"], "final": r["final"],
+            "plan": json.loads(r["plan"] or "[]"),
+            "results": json.loads(r["results"] or "[]"),
+        }
+    except Exception as e:
+        log.warning("orch history get failed: %s", e)
+        return None
+
+
 def _new_run_id() -> str:
     return uuid.uuid4().hex[:12]
 
@@ -280,6 +380,62 @@ def _aggregate(aggregator: str, user_text: str, results: list[dict]) -> str:
             + "\n\n---\n\n".join(b for b in bullets))
 
 
+def _run_workflow_binding(workflow_id: str, text: str, run_id: str,
+                          user: str = "") -> dict:
+    """Execute a saved workflow with the inbound message as input and block
+    until completion. Returns ``{ok, final, runId, error}``.
+
+    Lives next to ``dispatch()`` so the orchestrator owns its lifecycle and can
+    publish bus events at every transition. We poll the workflow's run snapshot
+    rather than reach into its internals — keeps the workflow engine
+    untouched.
+    """
+    from . import workflows as wf
+
+    agent_bus.publish(_topic(run_id, "workflow.start"),
+                      {"workflowId": workflow_id, "text": text, "user": user},
+                      source="orchestrator")
+    start_resp = wf.api_workflow_run({"id": workflow_id})
+    if not start_resp.get("ok"):
+        err = str(start_resp.get("error") or "workflow start failed")
+        agent_bus.publish(_topic(run_id, "workflow.error"),
+                          {"error": err}, source="orchestrator")
+        return {"ok": False, "error": err, "runId": run_id, "final": ""}
+
+    wf_run_id = start_resp["runId"]
+    deadline = time.time() + max(_PER_AGENT_TIMEOUT_S, 600)
+    last_status = ""
+    while time.time() < deadline:
+        snap = wf._run_status_snapshot(wf_run_id)
+        run = (snap or {}).get("run") or {}
+        status = run.get("status") or ""
+        if status != last_status:
+            agent_bus.publish(_topic(run_id, "workflow.tick"),
+                              {"status": status, "currentNodeId": run.get("currentNodeId"),
+                               "iteration": run.get("iteration", 0)},
+                              source="orchestrator")
+            last_status = status
+        if status in ("ok", "err"):
+            results = run.get("nodeResults") or {}
+            final_text = ""
+            # Prefer an explicit output node, fall back to any node with a
+            # non-empty output.
+            for nid, r in results.items():
+                if isinstance(r, dict) and r.get("output"):
+                    final_text = r["output"]
+            if status == "err":
+                return {"ok": False, "error": run.get("error") or "workflow error",
+                        "runId": run_id, "wfRunId": wf_run_id, "final": final_text}
+            return {"ok": True, "final": final_text or "(workflow finished with no text)",
+                    "runId": run_id, "wfRunId": wf_run_id}
+        time.sleep(0.5)
+
+    agent_bus.publish(_topic(run_id, "workflow.timeout"),
+                      {"wfRunId": wf_run_id}, source="orchestrator")
+    return {"ok": False, "error": "workflow timed out",
+            "runId": run_id, "wfRunId": wf_run_id, "final": ""}
+
+
 def dispatch(text: str, *, kind: str = "http", channel: str = "",
              user: str = "", reply: Optional[Any] = None) -> dict:
     """Run a single orchestrator turn for ``text``.
@@ -308,6 +464,38 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
                        "user": user, "available": avail,
                        "binding": binding},
                       source="orchestrator")
+
+    # 0. Workflow-bound channel? Run the saved workflow instead of ad-hoc plan.
+    if binding and binding.get("workflowId"):
+        wf_result = _run_workflow_binding(
+            binding["workflowId"], text, run_id, user=user,
+        )
+        agent_bus.publish(_topic(run_id, "final"),
+                          {"text": wf_result.get("final", ""),
+                           "via": "workflow",
+                           "workflowId": binding["workflowId"],
+                           "ok": wf_result.get("ok", False)},
+                          source="orchestrator")
+        if callable(reply):
+            try:
+                reply(wf_result.get("final") or
+                      f"(workflow error: {wf_result.get('error', 'unknown')})")
+            except Exception as e:
+                log.warning("orch reply delivery failed: %s", e)
+        _persist_run_record(run_id, kind=kind, channel=channel, user=user,
+                            text=text, plan=[], results=[],
+                            final=wf_result.get("final", ""),
+                            via="workflow",
+                            ok=wf_result.get("ok", False),
+                            error=wf_result.get("error"))
+        return {
+            "ok": wf_result.get("ok", False),
+            "runId": run_id,
+            "via": "workflow",
+            "workflowId": binding["workflowId"],
+            "final": wf_result.get("final", ""),
+            "error": wf_result.get("error"),
+        }
 
     # 1. Plan
     planner = cfg["plannerAssignee"]
@@ -345,7 +533,7 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
     # 3. Aggregate
     final_text = _aggregate(cfg["aggregatorAssignee"], text, results)
     agent_bus.publish(_topic(run_id, "final"),
-                      {"text": final_text, "results": results},
+                      {"text": final_text, "results": results, "via": "ad-hoc"},
                       source=cfg["aggregatorAssignee"])
 
     # 4. Optional channel reply
@@ -354,6 +542,10 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
             reply(final_text)
         except Exception as e:
             log.warning("orch reply delivery failed: %s", e)
+
+    _persist_run_record(run_id, kind=kind, channel=channel, user=user,
+                        text=text, plan=plan, results=results,
+                        final=final_text, via="ad-hoc", ok=True)
 
     return {
         "ok": True, "runId": run_id, "plan": plan,
@@ -550,13 +742,112 @@ def api_orch_start(body: dict | None = None) -> dict:
     return {"ok": True, "status": start_listeners()}
 
 
-def api_slack_events(body: dict) -> dict:
-    """POST /api/slack/events — Slack Events API receiver.
+def api_orch_history(query: dict | None = None) -> dict:
+    """GET /api/orchestrator/history?limit=50"""
+    limit = 50
+    if isinstance(query, dict):
+        v = query.get("limit")
+        if isinstance(v, list):
+            v = v[0] if v else 50
+        try:
+            limit = int(v or 50)
+        except (TypeError, ValueError):
+            limit = 50
+    return {"ok": True, "runs": list_run_history(limit)}
 
-    Handles URL verification challenge and dispatches events to the
-    orchestrator. Signature verification is delegated to a future hook (see
-    ``SLACK_SIGNING_SECRET``); for now we accept any request and rely on
-    keeping the URL secret + Slack's source IP set.
+
+def api_orch_history_get(query: dict | None = None) -> dict:
+    """GET /api/orchestrator/history/get?runId=..."""
+    rid = ""
+    if isinstance(query, dict):
+        v = query.get("runId")
+        if isinstance(v, list):
+            v = v[0] if v else ""
+        rid = str(v or "")
+    if not rid:
+        return {"ok": False, "error": "runId required"}
+    rec = get_run_record(rid)
+    if not rec:
+        return {"ok": False, "error": "not found"}
+    return {"ok": True, "run": rec}
+
+
+def _verify_slack_signature(raw_body: bytes, headers: dict, secret: str,
+                            now_s: Optional[float] = None) -> tuple[bool, str]:
+    """HMAC-SHA256 over ``v0:<ts>:<body>``. Slack rotates timestamps on each
+    request; reject anything more than 5 minutes off the wall clock to
+    foreclose replay attacks.
+
+    Returns ``(ok, reason)``. The reason is for logs only — never send the
+    detail back to the client (no oracle).
+    """
+    import hmac
+    ts = headers.get("X-Slack-Request-Timestamp") or headers.get("x-slack-request-timestamp") or ""
+    sig = headers.get("X-Slack-Signature") or headers.get("x-slack-signature") or ""
+    if not (ts and sig):
+        return False, "missing-headers"
+    try:
+        ts_int = int(ts)
+    except ValueError:
+        return False, "bad-timestamp"
+    if abs((now_s if now_s is not None else time.time()) - ts_int) > 300:
+        return False, "stale-timestamp"
+    base = f"v0:{ts}:".encode("utf-8") + (raw_body or b"")
+    expected = "v0=" + hmac.new(secret.encode("utf-8"), base, "sha256").hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        return False, "signature-mismatch"
+    return True, "ok"
+
+
+def handle_slack_events_request(handler) -> None:
+    """Custom HTTP handler for ``POST /api/slack/events`` so we can read the
+    raw body for HMAC verification *before* JSON parsing.
+
+    Wired in ``server.routes.do_POST`` as a special-case path.
+    """
+    length = 0
+    try:
+        length = int(handler.headers.get("Content-Length", 0) or 0)
+    except (TypeError, ValueError):
+        length = 0
+    raw = handler.rfile.read(length) if length else b""
+
+    secret = os.environ.get("SLACK_SIGNING_SECRET", "").strip()
+    if secret:
+        ok, reason = _verify_slack_signature(raw, dict(handler.headers), secret)
+        if not ok:
+            log.warning("slack signature verification failed: %s", reason)
+            handler.send_response(401)
+            handler.send_header("Content-Type", "application/json")
+            handler.end_headers()
+            handler.wfile.write(b'{"ok":false,"error":"unauthorized"}')
+            return
+
+    try:
+        body = json.loads(raw.decode("utf-8")) if raw else {}
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+
+    if body.get("type") == "url_verification":
+        handler.send_response(200)
+        handler.send_header("Content-Type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"challenge": body.get("challenge", "")}).encode("utf-8"))
+        return
+
+    handle_slack_event(body)
+    handler.send_response(200)
+    handler.send_header("Content-Type", "application/json")
+    handler.end_headers()
+    handler.wfile.write(b'{"ok":true}')
+
+
+def api_slack_events(body: dict) -> dict:
+    """JSON-only fallback handler. Used by the dispatcher for routes that
+    bypass ``handle_slack_events_request`` (e.g. tests). Production traffic
+    goes through the raw-body handler above.
     """
     if not isinstance(body, dict):
         return {"ok": False, "error": "bad body"}

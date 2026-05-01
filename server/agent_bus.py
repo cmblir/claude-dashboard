@@ -373,6 +373,71 @@ def flush_now() -> None:
     _BUS._flush_once()
 
 
+# ───────── Request / reply protocol ─────────
+#
+# Built on top of publish/subscribe so any subscriber can answer a question
+# without a separate transport. The flow:
+#
+#   asker → publish(topic + ".ask", {corrId, ...})
+#   any subscriber to "<topic>.ask.**" can resolve by:
+#     publish(topic + ".reply." + corrId, {...})
+#   asker waits for the matching reply (correlation by corrId).
+#
+# Optimization rationale: we re-use the bus's wakeup-driven subscribe loop
+# instead of building a second condition variable. The matcher filters by
+# exact reply topic, which the glob compiler caches — O(1) per wakeup.
+
+def ask(topic: str, payload: dict, *, source: str = "asker",
+        timeout_s: float = 30.0) -> Optional[dict]:
+    """Publish a question on ``<topic>.ask`` and block until a matching
+    reply on ``<topic>.reply.<corrId>`` arrives or ``timeout_s`` elapses.
+
+    Returns the reply payload, or ``None`` on timeout. Bad input raises
+    ``ValueError`` (we don't silently turn a programmer error into a hang).
+    """
+    if not topic or not isinstance(payload, dict):
+        raise ValueError("topic and dict-payload required")
+    import secrets
+    corr_id = secrets.token_hex(8)
+    ask_topic   = f"{topic}.ask"
+    reply_topic = f"{topic}.reply.{corr_id}"
+    enriched = dict(payload)
+    enriched["__corrId__"] = corr_id
+    enriched["__replyTopic__"] = reply_topic
+    # Subscribe *before* publishing so we don't miss a fast reply.
+    deadline = time.time() + max(0.5, timeout_s)
+    # Use a short wait_s so the heartbeat path lets us re-check the deadline.
+    wait_s = min(2.0, max(0.5, timeout_s / 2.0))
+    sub_iter = subscribe([reply_topic], wait_s=wait_s)
+    publish(ask_topic, enriched, source=source)
+    try:
+        for ev in sub_iter:
+            if time.time() > deadline:
+                return None
+            if ev.topic == reply_topic:
+                return ev.payload
+            # heartbeat — check deadline and continue
+    except Exception as e:
+        log.warning("ask() crash on topic %s: %s", topic, e)
+    return None
+
+
+def reply(question_event: dict, payload: dict, source: str = "responder") -> bool:
+    """Reply to a previously received question event. ``question_event`` is the
+    payload (or full event dict) of an ``<topic>.ask`` publication; we use the
+    embedded ``__replyTopic__`` to route the answer.
+    """
+    if not isinstance(question_event, dict):
+        return False
+    pl = question_event.get("payload") if "payload" in question_event \
+        else question_event
+    rt = (pl or {}).get("__replyTopic__")
+    if not rt:
+        return False
+    publish(str(rt), payload, source=source)
+    return True
+
+
 def reset_for_tests() -> None:
     """Drop in-memory state. Tests only — does not touch SQLite."""
     with _BUS._cv:
@@ -395,6 +460,56 @@ def api_agent_bus_history(query: dict) -> dict:
     limit = int((query.get("limit") or [200])[0]) if isinstance(query.get("limit"), list) \
         else int(query.get("limit") or 200)
     return {"ok": True, "events": history(topics, limit=limit, since_id=since)}
+
+
+def handle_agent_bus_stream(handler, query: dict) -> None:
+    """GET /api/agent-bus/stream?topics=a,b&since=N — Server-Sent Events.
+
+    Each new event is emitted as ``event: bus`` with a JSON ``data`` line.
+    The bus heartbeats with ``event: ping`` so proxies don't kill the stream.
+    The stream stops cleanly if the client disconnects.
+    """
+    topics_raw = query.get("topics") if isinstance(query, dict) else None
+    if isinstance(topics_raw, list):
+        topics_raw = topics_raw[0] if topics_raw else "**"
+    topics = [t.strip() for t in str(topics_raw or "**").split(",") if t.strip()]
+    since_raw = query.get("since") if isinstance(query, dict) else 0
+    if isinstance(since_raw, list):
+        since_raw = since_raw[0] if since_raw else 0
+    try:
+        since = int(since_raw or 0)
+    except (TypeError, ValueError):
+        since = 0
+
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
+    handler.send_header("Cache-Control", "no-cache")
+    handler.send_header("Connection", "keep-alive")
+    handler.send_header("X-Accel-Buffering", "no")
+    handler.end_headers()
+
+    def _send(event: str, data: str) -> bool:
+        try:
+            handler.wfile.write(f"event: {event}\ndata: {data}\n\n".encode("utf-8"))
+            handler.wfile.flush()
+            return True
+        except Exception:
+            return False
+
+    deadline = time.time() + 30 * 60  # cap one connection at 30 minutes
+    try:
+        for ev in subscribe(topics, since_id=since, wait_s=15.0):
+            if ev.topic == "__heartbeat__":
+                if not _send("ping", json.dumps({"ts": ev.ts})):
+                    return
+            else:
+                if not _send("bus", json.dumps(ev.to_dict(), ensure_ascii=False)):
+                    return
+            if time.time() > deadline:
+                _send("done", json.dumps({"reason": "max-duration"}))
+                return
+    except Exception as e:
+        log.warning("agent_bus stream error: %s", e)
 
 
 def api_agent_bus_publish(body: dict) -> dict:
