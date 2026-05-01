@@ -183,6 +183,13 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "sandbox iframe + CSP + 정적 필터 4중 보안으로 안전하게 미리보기.",
         ["artifacts", "아티팩트", "viewer", "뷰어", "preview", "미리보기",
          "render", "sandbox", "csp"]),
+    ("orchestrator", "work",
+        "오케스트레이터 — Slack/Telegram 채널에 멘션하면 Claude(플래너)가 작업을 분해해 "
+        "여러 모델(Claude/GPT/Gemini/Ollama/Codex)에 병렬 분배하고 결과를 합쳐 채널에 회신. "
+        "채널↔워크플로우 바인딩, 에이전트 간 라이브 보고(Agent Bus), 터미널 TUI 설정 지원.",
+        ["오케스트레이터", "orchestrator", "슬랙 봇", "텔레그램 봇", "telegram",
+         "멀티 에이전트", "multi-agent", "agent bus", "openclaw", "nanoclaw",
+         "채널 봇", "분담", "협업"]),
     ("claudeDocs",    "new",
         "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
         "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "

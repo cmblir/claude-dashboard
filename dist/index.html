@@ -1308,6 +1308,9 @@ const NAV = [
   { id: 'artifacts', icon: '🎨', label: 'Artifacts Viewer', group: 'build',
     desc: '워크플로우 출력(HTML/SVG/Markdown/JSON)을 sandbox iframe + CSP + 정적 필터로 안전 미리보기',
     docUrl: null },
+  { id: 'orchestrator', icon: '🎼', label: 'Orchestrator', group: 'build',
+    desc: 'Slack/Telegram 채널 멘션 → Claude 플래너 → 멀티 모델 병렬 분담 → 채널 회신. Agent Bus로 라이브 보고. 터미널 TUI 동시 지원.',
+    docUrl: null },
 
   // config — Claude Code 설정 전반 (13, advanced 흡수)
   { id: 'hooks',       icon: '🪝', label: '훅',
@@ -18338,6 +18341,190 @@ async function _artLoad(rid) {
 function _artSetFormat(f) {
   state.data._artFormat = f;
   _artLoad(state.data._artRunId);
+}
+
+// ────────────────────────────────────────────────────────────────
+// ORCHESTRATOR — Slack/Telegram → Claude planner → multi-agent dispatch
+// ────────────────────────────────────────────────────────────────
+VIEWS.orchestrator = async () => {
+  const [cfgR, slkR, tgR, histR] = await Promise.all([
+    api('/api/orchestrator/config'),
+    api('/api/slack/config'),
+    api('/api/telegram/config'),
+    api('/api/orchestrator/history?limit=20'),
+  ]);
+  if (!cfgR.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}</div>`;
+  const cfg = cfgR.config || {};
+  const avail = (cfgR.availableProviders || []).join(', ') || '—';
+  const bindings = cfg.bindings || [];
+  const slackOk = slkR && slkR.configured;
+  const tgOk    = tgR && tgR.configured;
+
+  const bindRows = bindings.length ? bindings.map((b, i) => `
+    <tr class="text-[11px]">
+      <td class="p-1 font-mono">${escapeHtml(b.kind)}</td>
+      <td class="p-1 font-mono">${escapeHtml(b.channel || b.chat || '')}</td>
+      <td class="p-1">${escapeHtml((b.assignees || []).join(', ') || '(defaults)')}</td>
+      <td class="p-1">${escapeHtml(b.workflowId || '(ad-hoc)')}</td>
+      <td class="p-1"><button class="chip text-[10px]" onclick="_orchUnbind('${escapeHtml(b.kind)}','${escapeHtml(b.channel || b.chat || '')}')">${t('삭제')}</button></td>
+    </tr>
+  `).join('') : `<tr><td colspan="5" class="p-2 text-[11px]" style="color:var(--text-dim);text-align:center;">${t('아직 바인딩 없음')}</td></tr>`;
+
+  return `
+    ${viewHeader('🎼 Orchestrator', t('orch_subtitle', 'Slack/Telegram 채널 멘션 → Claude 플래너 → 멀티 모델 병렬 분담 → 채널 회신. 에이전트 간 라이브 보고는 Agent Bus 탭/SSE 로 연결.'), 'orchestrator')}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="card p-4">
+        <div class="text-[12px] font-semibold mb-2">${t('연결 상태')}</div>
+        <div class="text-[11px] mb-1">Slack: <span class="chip text-[10px]" style="color:${slackOk?'var(--success)':'#fca5a5'}">${slackOk?'configured':'not set'}</span></div>
+        <div class="text-[11px] mb-1">Telegram: <span class="chip text-[10px]" style="color:${tgOk?'var(--success)':'#fca5a5'}">${tgOk?'configured':'not set'}</span></div>
+        <div class="text-[11px] mt-3" style="color:var(--text-dim)">${t('가용 프로바이더')}: ${escapeHtml(avail)}</div>
+        <button class="chip text-[10px] mt-3" onclick="_orchStart()">${t('리스너 시작')}</button>
+      </div>
+      <div class="card p-4">
+        <div class="text-[12px] font-semibold mb-2">${t('기본 설정')}</div>
+        <label class="text-[11px] block mb-1">${t('플래너')}: <input id="orchPlanner" class="text-[11px] bg-transparent border-b" value="${escapeHtml(cfg.plannerAssignee || '')}"></label>
+        <label class="text-[11px] block mb-1">${t('취합기')}: <input id="orchAggregator" class="text-[11px] bg-transparent border-b" value="${escapeHtml(cfg.aggregatorAssignee || '')}"></label>
+        <label class="text-[11px] block mb-1">${t('기본 어사이니')} (csv): <input id="orchDefaults" class="text-[11px] bg-transparent border-b w-full" value="${escapeHtml((cfg.defaultAssignees || []).join(', '))}"></label>
+        <label class="text-[11px] block mb-1">${t('동시 실행')}: <input id="orchParallel" type="number" min="1" max="16" class="text-[11px] bg-transparent border-b w-16" value="${cfg.maxParallel || 4}"></label>
+        <button class="chip text-[10px] mt-2" onclick="_orchSaveCfg()">${t('저장')}</button>
+      </div>
+      <div class="card p-4 lg:col-span-2">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-[12px] font-semibold">${t('바인딩')}</div>
+          <button class="chip text-[10px]" onclick="_orchAddBinding()">+ ${t('바인딩 추가')}</button>
+        </div>
+        <table class="w-full text-left">
+          <thead><tr class="text-[10px]" style="color:var(--text-dim)"><th class="p-1">kind</th><th class="p-1">channel/chat</th><th class="p-1">assignees</th><th class="p-1">workflow</th><th class="p-1"></th></tr></thead>
+          <tbody>${bindRows}</tbody>
+        </table>
+      </div>
+      <div class="card p-4 lg:col-span-2">
+        <div class="text-[12px] font-semibold mb-2">${t('최근 디스패치')}</div>
+        ${(() => {
+          const runs = (histR && histR.runs) || [];
+          if (!runs.length) return `<div class="text-[11px]" style="color:var(--text-dim)">${t('아직 디스패치 기록 없음')}</div>`;
+          return `<table class="w-full text-left">
+            <thead><tr class="text-[10px]" style="color:var(--text-dim)"><th class="p-1">ts</th><th class="p-1">kind</th><th class="p-1">via</th><th class="p-1">channel</th><th class="p-1">text</th><th class="p-1">final</th></tr></thead>
+            <tbody>${runs.map(r => `
+              <tr class="text-[11px]">
+                <td class="p-1 font-mono">${new Date(r.ts).toLocaleTimeString()}</td>
+                <td class="p-1">${escapeHtml(r.kind)}</td>
+                <td class="p-1">${escapeHtml(r.via)}</td>
+                <td class="p-1 font-mono">${escapeHtml((r.channel || '').slice(0, 16))}</td>
+                <td class="p-1 truncate" style="max-width:280px;">${escapeHtml((r.text || '').slice(0, 80))}</td>
+                <td class="p-1 truncate" style="max-width:380px;color:${r.ok?'var(--text)':'#fca5a5'};">${escapeHtml((r.final || r.error || '').slice(0, 120))}</td>
+              </tr>`).join('')}</tbody>
+          </table>`;
+        })()}
+      </div>
+      <div class="card p-4 lg:col-span-2">
+        <div class="text-[12px] font-semibold mb-2">${t('라이브 디스패치 테스트')}</div>
+        <textarea id="orchTestText" rows="3" class="w-full text-[11px] bg-transparent border" placeholder="${t('메시지를 입력해 ad-hoc 디스패치')}"></textarea>
+        <div class="flex items-center gap-2 mt-2">
+          <button class="chip text-[10px]" onclick="_orchDispatch()">${t('실행')}</button>
+          <button class="chip text-[10px]" onclick="_orchToggleLive()" id="orchLiveBtn">${t('라이브 시작')}</button>
+          <span id="orchLiveStatus" class="text-[10px]" style="color:var(--text-dim)">${t('대기')}</span>
+        </div>
+        <pre id="orchOutput" class="text-[10px] mt-3 whitespace-pre-wrap" style="color:var(--text-dim)"></pre>
+        <div class="text-[10px] uppercase tracking-wider mt-3" style="color:var(--text-dim)">${t('라이브 이벤트')}</div>
+        <pre id="orchLiveLog" class="text-[10px] whitespace-pre-wrap" style="max-height:240px;overflow-y:auto;color:var(--text-dim)"></pre>
+      </div>
+    </div>
+  `;
+};
+
+AFTER.orchestrator = () => {
+  // Auto-stop any prior stream when leaving the tab.
+  if (state.data._orchEs) {
+    try { state.data._orchEs.close(); } catch (_) {}
+    state.data._orchEs = null;
+  }
+};
+
+async function _orchSaveCfg() {
+  const body = {
+    plannerAssignee:    (document.getElementById('orchPlanner') || {}).value,
+    aggregatorAssignee: (document.getElementById('orchAggregator') || {}).value,
+    defaultAssignees:   ((document.getElementById('orchDefaults') || {}).value || '').split(',').map(s => s.trim()).filter(Boolean),
+    maxParallel:        parseInt((document.getElementById('orchParallel') || {}).value || '4', 10),
+  };
+  const r = await api('/api/orchestrator/config/save', { method: 'POST', body });
+  toast(r.ok ? t('저장됨') : (r.error || t('저장 실패')));
+  if (r.ok) renderView();
+}
+async function _orchAddBinding() {
+  const kind = (prompt('kind (slack/telegram/http):') || '').trim();
+  if (!kind) return;
+  const target = (prompt(kind === 'telegram' ? 'chat id:' : 'channel id:') || '').trim();
+  if (!target) return;
+  const assignees = (prompt('assignees (csv, blank=defaults):') || '').split(',').map(s => s.trim()).filter(Boolean);
+  const workflowId = (prompt('workflowId (blank for ad-hoc):') || '').trim();
+  const body = { kind };
+  body[kind === 'telegram' ? 'chat' : 'channel'] = target;
+  if (assignees.length) body.assignees = assignees;
+  if (workflowId) body.workflowId = workflowId;
+  const r = await api('/api/orchestrator/bind', { method: 'POST', body });
+  toast(r.ok ? t('추가됨') : (r.error || t('실패')));
+  if (r.ok) renderView();
+}
+async function _orchUnbind(kind, target) {
+  if (!confirm(t('바인딩을 삭제할까요?'))) return;
+  const body = { kind };
+  body[kind === 'telegram' ? 'chat' : 'channel'] = target;
+  const r = await api('/api/orchestrator/unbind', { method: 'POST', body });
+  toast(r.ok ? t('삭제됨') : (r.error || t('실패')));
+  if (r.ok) renderView();
+}
+async function _orchStart() {
+  const r = await api('/api/orchestrator/start', { method: 'POST', body: {} });
+  toast(r.ok ? `OK: ${JSON.stringify(r.status)}` : (r.error || t('실패')));
+}
+async function _orchDispatch() {
+  const txt = (document.getElementById('orchTestText') || {}).value || '';
+  const out = document.getElementById('orchOutput');
+  if (!txt.trim()) return;
+  if (out) out.textContent = t('실행 중...');
+  const r = await api('/api/orchestrator/dispatch', { method: 'POST', body: { text: txt, kind: 'http', channel: 'ui-test' } });
+  if (out) out.textContent = JSON.stringify(r, null, 2);
+}
+
+function _orchToggleLive() {
+  const btn = document.getElementById('orchLiveBtn');
+  const stat = document.getElementById('orchLiveStatus');
+  const log = document.getElementById('orchLiveLog');
+  if (state.data._orchEs) {
+    try { state.data._orchEs.close(); } catch (_) {}
+    state.data._orchEs = null;
+    if (btn) btn.textContent = t('라이브 시작');
+    if (stat) stat.textContent = t('대기');
+    return;
+  }
+  if (typeof EventSource !== 'function') {
+    if (stat) stat.textContent = 'EventSource not supported';
+    return;
+  }
+  const es = new EventSource('/api/agent-bus/stream?topics=' + encodeURIComponent('orch.*,wf.**'));
+  state.data._orchEs = es;
+  if (btn) btn.textContent = t('라이브 중지');
+  if (stat) stat.textContent = t('연결됨');
+  es.addEventListener('bus', (e) => {
+    try {
+      const ev = JSON.parse(e.data);
+      const line = `[${new Date(ev.ts).toLocaleTimeString()}] ${ev.topic}  ${ev.source||''}  ` + JSON.stringify(ev.payload).slice(0, 240);
+      if (log) {
+        log.textContent = (line + '\n' + log.textContent).slice(0, 16000);
+      }
+    } catch (_) {}
+  });
+  es.addEventListener('ping', () => {
+    if (stat) stat.textContent = t('연결됨') + ' · ♥';
+  });
+  es.onerror = () => {
+    if (stat) stat.textContent = t('연결 끊김');
+    try { es.close(); } catch (_) {}
+    state.data._orchEs = null;
+    if (btn) btn.textContent = t('라이브 시작');
+  };
 }
 
 // ────────────────────────────────────────────────────────────────
