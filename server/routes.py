@@ -106,6 +106,14 @@ from .orchestrator import (
     api_orch_history, api_orch_history_get, api_orch_start, api_orch_unbind,
     api_slack_events, api_telegram_webhook,
 )
+from .ralph import (
+    api_ralph_cancel, api_ralph_list, api_ralph_start, api_ralph_status,
+)
+from .ralph_recommend import api_ralph_recommend
+from .discord_api import (
+    api_discord_config_clear, api_discord_config_get,
+    api_discord_config_save, api_discord_test,
+)
 from .obsidian_log import api_obsidian_test
 from .crew_wizard import api_crew_create, api_crew_preview
 from .run_center import (
@@ -336,6 +344,9 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/orchestrator/config": lambda q: api_orch_config_get(q),
     "/api/orchestrator/history": api_orch_history,
     "/api/orchestrator/history/get": api_orch_history_get,
+    "/api/discord/config": lambda q: api_discord_config_get(q),
+    "/api/ralph/list":   api_ralph_list,
+    "/api/ralph/status": api_ralph_status,
     "/api/agent-bus/history": api_agent_bus_history,
     "/api/run/catalog":      api_run_catalog,
     "/api/run/history":      api_run_history,
@@ -530,6 +541,12 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/orchestrator/unbind":      api_orch_unbind,
     "/api/orchestrator/dispatch":    api_orch_dispatch,
     "/api/orchestrator/start":       api_orch_start,
+    "/api/discord/config/save":      api_discord_config_save,
+    "/api/discord/config/clear":     api_discord_config_clear,
+    "/api/discord/test":             api_discord_test,
+    "/api/ralph/start":              api_ralph_start,
+    "/api/ralph/cancel":             api_ralph_cancel,
+    "/api/ralph/recommend":          api_ralph_recommend,
     "/api/agent-bus/publish":        api_agent_bus_publish,
     "/api/obsidian/test":      api_obsidian_test,
     "/api/wizard/crew/create":  api_crew_create,
@@ -856,6 +873,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/slack/events":
             from .orchestrator import handle_slack_events_request
             handle_slack_events_request(self)
+            return
+        # Discord interactions — needs raw body for ed25519 verification.
+        if path == "/api/discord/interactions":
+            from .orchestrator import handle_discord_interactions_request
+            handle_discord_interactions_request(self)
             return
         if path in ROUTES_POST:
             self._send_json(ROUTES_POST[path](self._read_body())); return

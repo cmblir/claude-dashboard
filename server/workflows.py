@@ -38,7 +38,11 @@ _NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
                "slack_approval", "obsidian_log",
                # v2.37.0 — bind a target Claude session to the Auto-Resume
                # supervisor from inside a workflow.
-               "auto_resume"}
+               "auto_resume",
+               # v2.56.0 — Ralph (same-prompt iteration loop) as a node. The
+               # node blocks until the loop terminates (completion-promise,
+               # max-iter, budget, or cancel).
+               "ralph"}
 _INPUT_MODES = {"concat", "first", "json"}
 _ASSIGNEES = {"opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
@@ -618,6 +622,20 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
             "useContinue":   bool(d.get("useContinue")),
             "installHooks":  bool(d.get("installHooks")),
             "action":        d.get("action") if d.get("action") in ("set", "cancel") else "set",
+        }
+    elif ntype == "ralph":
+        # v2.56.0 — Ralph (same-prompt iteration loop) node. Blocks until the
+        # loop terminates; safety bounds enforced server-side regardless of
+        # what the inspector sent (defence-in-depth).
+        out["data"] = {
+            "prompt":         _clamp_str(d.get("prompt"), 8000),
+            "assignee":       _clamp_str(d.get("assignee"), 40),
+            "systemPrompt":   _clamp_str(d.get("systemPrompt"), 4000),
+            "cwd":            _clamp_str(d.get("cwd"), 500),
+            "completion":     _clamp_str(d.get("completion"), 200)
+                              or "<promise>DONE</promise>",
+            "maxIterations":  max(1, min(200, int(d.get("maxIterations") or 25))),
+            "budgetUsd":      max(0.01, min(100.0, float(d.get("budgetUsd") or 5.0))),
         }
     # start 는 data 비움
     return out
@@ -1385,6 +1403,10 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     # ── Auto-Resume binding (v2.37.0) ──
     if ntype == "auto_resume":
         return _execute_auto_resume_node(data, inputs, _elapsed)
+
+    # ── Ralph loop (v2.56.0) ──
+    if ntype == "ralph":
+        return _execute_ralph_node(data, inputs, _elapsed)
 
     # ── session / subagent — 멀티 프로바이더 실행 ──
     prompt_parts = []
@@ -2228,6 +2250,71 @@ def _execute_auto_resume_node(data: dict, inputs: list[str], _elapsed) -> dict:
     )
     return {"status": "ok", "output": summary, "durationMs": _elapsed(),
             "sessionId": "", "autoResumeEntry": entry}
+
+
+def _execute_ralph_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Run a Ralph loop synchronously and return its final state as the node
+    output.
+
+    The node blocks until the loop terminates (completion-promise / max-iter /
+    budget / error). Cancellation is observed via a poll on ``ralph.status``
+    every 1s — this lets a Ralph node sit inside a workflow run that can be
+    cancelled by stopping the run.
+
+    Inputs:
+      - ``prompt`` (data field) — the same prompt fed every iteration. If
+        empty, falls back to ``inputs[0]`` (upstream text).
+      - ``assignee`` — provider:model (default from env ``RALPH_DEFAULT_ASSIGNEE``).
+      - ``maxIterations``, ``completion``, ``budgetUsd`` — safety knobs.
+    """
+    from . import ralph as _ralph
+    import time as _time
+
+    prompt = (data.get("prompt") or "").strip()
+    if not prompt and inputs:
+        prompt = (inputs[0] or "").strip()
+    if not prompt:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": "ralph node: prompt required"}
+
+    started = _ralph.start(
+        prompt=prompt,
+        assignee=(data.get("assignee") or "").strip(),
+        max_iterations=int(data.get("maxIterations") or 0),
+        completion_promise=(data.get("completion") or "").strip(),
+        budget_usd=float(data.get("budgetUsd") or 0.0),
+        system_prompt=(data.get("systemPrompt") or "").strip(),
+        cwd=(data.get("cwd") or "").strip(),
+    )
+    if not started.get("ok"):
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"ralph start failed: {started.get('error')}"}
+
+    rid = started["runId"]
+    # Poll until the run resolves. Hard ceiling: max_iter * per-iter timeout.
+    hard_deadline = _time.time() + max(60, started["maxIter"] * _ralph._PER_ITER_TIMEOUT_S)
+    while _time.time() < hard_deadline:
+        s = _ralph.status(rid)
+        if s and s["status"] != "running":
+            text = s.get("lastOutput") or ""
+            ok = (s["status"] == "done")
+            return {
+                "status": "ok" if ok else "err",
+                "output": text,
+                "durationMs": _elapsed(),
+                "ralphRunId":   rid,
+                "ralphIters":   s.get("iterations"),
+                "ralphCostUsd": s.get("costUsd"),
+                "ralphStatus":  s.get("status"),
+                "error": (s.get("error") or "")
+                         if not ok else "",
+            }
+        _time.sleep(1.0)
+
+    _ralph.cancel(rid)
+    return {"status": "err", "output": "", "durationMs": _elapsed(),
+            "error": "ralph node hit hard deadline before completion",
+            "ralphRunId": rid}
 
 
 def _parse_hhmm(s: str) -> Optional[tuple[int, int]]:

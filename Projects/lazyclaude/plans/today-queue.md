@@ -1,42 +1,33 @@
-# Autonomous queue — 2026-05-01 (cycle 3, optimization)
+# Autonomous queue — 2026-05-01 (cycle 4: Ralph + Discord + failover)
 
-User directive: "계속 구현해. 자율모드. 그리고 main으로 모두 머지해. 최적화도 계속 구현해."
+User: "오케이 해당 순서대로 지금부터 전체적으로 자율모드 시작."
+Reference: `decisions/2026-05-01-openclaw-nanoclaw-ralph-analysis.md` Tier-1+T2-1+T2-2.
 
-Branch continues `feat/openclaw-orchestrator-tui`; cycle 3 finishes with a
-**local** merge into `main` (no remote push — §4.6, §21.3).
+Branch: `feat/v2.56-ralph-discord-failover`. Local --no-ff merge into main at end.
 
-## [C1] HTTPS keep-alive connection pool
-- 목표: Slack/Telegram 호출 시 매번 새 TCP+TLS handshake 하지 않음.
-- 영향: `server/http_pool.py` (신규), slack_api / telegram_api 호출 경유.
-- 완료 기준: 같은 host로 N번 연속 호출 시 두 번째 이후 connection 재사용.
-- 위험도: low
+## [D1] Ralph engine — `server/ralph.py`
+- Same-prompt loop with 4-fold termination: max-iter / completion-promise / cancel / budget-USD.
+- Publishes to agent_bus on `ralph.<run_id>.*`. Persists each iteration to SQLite.
+- Re-uses `execute_with_assignee` so any provider works.
 
-## [C2] Coalesced channel reply (debounce per channel)
-- 목표: 짧은 시간 내 동일 channel로 가는 회신을 1개로 합침. Slack 쿼터 보호.
-- 영향: `server/orchestrator.py` reply pipeline.
-- 완료 기준: pytest로 100ms 내 3회 reply → 1번만 호출.
-- 위험도: low
+## [D2] Ralph workflow node
+- New node type `ralph` in `server/workflows.py`. Inspector form mirrors CLI flags.
 
-## [C3] Plan cache (LRU by sha1)
-- 목표: 같은 (binding, text) 조합의 planner 결과 재사용.
-- 영향: orchestrator dispatch.
-- 완료 기준: pytest로 동일 입력 2번째 호출은 planner 호출 0회.
-- 위험도: low
+## [D3] Ralph CLI — `tools/ralph_loop.py`
+- `python3 tools/ralph_loop.py PROMPT.md --max 25 --completion DONE --budget-usd 5`
+- Stdlib only. Ctrl+C → graceful cancel via the engine.
 
-## [C4] Agent Bus per-topic index (sparse subscribers)
-- 목표: subscribe wakeup 시 ring 전체 스캔 대신 토픽별 last_id 인덱스 활용.
-- 영향: `server/agent_bus.py`.
-- 완료 기준: 1000 events 풀린 ring에 대해 subscribe(["one.topic"]) wakeup이
-  O(matches) 만에 결과 반환.
-- 위험도: medium (성능 회귀 위험 — 벤치 필수)
+## [D4] Project Ralph recommender — `server/ralph_recommend.py`
+- Synth PROMPT.md from CLAUDE.md + git log + TODO grep + last unfinished session.
+- New API + projects-tab card.
 
-## [C5] Perf benchmark suite
-- 목표: agent_bus throughput / latency / 메모리 회귀를 잡는 테스트.
-- 영향: tests/perf/test_agent_bus_perf.py.
-- 완료 기준: publish 10k events < 1.0s, history query < 100ms.
-- 위험도: low
+## [D5] Discord bot — `server/discord_api.py`
+- Bot token + interactions signature (ed25519 / nacl substitute via stdlib hashlib won't fit — use webhook events route instead).
+- Falls back to gateway-less HTTP webhook posting for outbound; uses Slack-style polling for inbound where possible.
 
-## [C6] Tests + commit + LOCAL merge to main
-- 영향: i18n 0 missing, full pytest, then `git checkout main && git merge --no-ff feat/...`
-- 완료 기준: main commit이 새 머지 커밋 포함, origin은 건드리지 않음.
-- 위험도: low (로컬 작업만)
+## [D6] Per-binding failover + daily budget cap
+- Extend `_sanitize_binding` with `fallbackChain`, `budgetUsdPerDay`.
+- Enforce in `dispatch()`. Surface remaining budget per binding.
+
+## [D7] Tests + i18n + commit + LOCAL merge to main
+- Suite must stay green. i18n verify 0 missing. `git merge --no-ff` into main locally; no `git push`.
