@@ -184,12 +184,19 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         ["artifacts", "아티팩트", "viewer", "뷰어", "preview", "미리보기",
          "render", "sandbox", "csp"]),
     ("orchestrator", "work",
-        "오케스트레이터 — Slack/Telegram 채널에 멘션하면 Claude(플래너)가 작업을 분해해 "
-        "여러 모델(Claude/GPT/Gemini/Ollama/Codex)에 병렬 분배하고 결과를 합쳐 채널에 회신. "
-        "채널↔워크플로우 바인딩, 에이전트 간 라이브 보고(Agent Bus), 터미널 TUI 설정 지원.",
+        "오케스트레이터 — Slack/Telegram/Discord 채널에 멘션하면 Claude(플래너)가 작업을 분해해 "
+        "여러 모델에 병렬 분배하고 결과를 합쳐 채널에 회신. "
+        "채널별 fallback 체인 + 일일 예산 cap, 에이전트 간 라이브 보고(Agent Bus).",
         ["오케스트레이터", "orchestrator", "슬랙 봇", "텔레그램 봇", "telegram",
-         "멀티 에이전트", "multi-agent", "agent bus", "openclaw", "nanoclaw",
-         "채널 봇", "분담", "협업"]),
+         "discord", "디스코드", "멀티 에이전트", "multi-agent", "agent bus",
+         "openclaw", "nanoclaw", "채널 봇", "분담", "협업", "예산", "failover"]),
+    ("ralph", "work",
+        "🦞 Ralph 루프 — Geoffrey Huntley의 'Ralph Wiggum' 패턴. 같은 PROMPT.md를 "
+        "max-iter / completion-promise / 예산 USD / 수동 cancel 4중 안전장치 안에서 반복. "
+        "프로젝트별 추천 PROMPT.md 자동 생성 (CLAUDE.md + git log + TODO 합성). "
+        "라이브 진행 SSE, iteration 비용 추적, CLI(tools/ralph_loop.py) 동시 지원.",
+        ["ralph", "랄프", "loop", "루프", "iteration", "반복", "PROMPT.md",
+         "completion-promise", "max-iter", "budget", "예산", "ralph wiggum"]),
     ("claudeDocs",    "new",
         "Claude Docs Hub — docs.anthropic.com 주요 페이지(Claude Code / API / "
         "Agent SDK / Models / Account) 를 카테고리별 카드로 색인 + 검색. "

@@ -1309,7 +1309,10 @@ const NAV = [
     desc: '워크플로우 출력(HTML/SVG/Markdown/JSON)을 sandbox iframe + CSP + 정적 필터로 안전 미리보기',
     docUrl: null },
   { id: 'orchestrator', icon: '🎼', label: 'Orchestrator', group: 'build',
-    desc: 'Slack/Telegram 채널 멘션 → Claude 플래너 → 멀티 모델 병렬 분담 → 채널 회신. Agent Bus로 라이브 보고. 터미널 TUI 동시 지원.',
+    desc: 'Slack/Telegram/Discord 채널 멘션 → Claude 플래너 → 멀티 모델 병렬 분담 → 채널 회신. 채널별 fallback + 일일 예산 cap.',
+    docUrl: null },
+  { id: 'ralph', icon: '🦞', label: 'Ralph Loop', group: 'build',
+    desc: 'Geoffrey Huntley Ralph Wiggum 패턴 — 같은 PROMPT.md를 4중 안전장치 안에서 반복. 프로젝트 추천기 + 라이브 SSE + CLI.',
     docUrl: null },
 
   // config — Claude Code 설정 전반 (13, advanced 흡수)
@@ -2785,6 +2788,8 @@ const WF_NODE_TYPES = [
     desc: 'Vault 의 Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 입력을 마크다운으로 append. 사이클 보고/감사 로그용.' },
   { id: 'auto_resume', icon: '🔄', label: 'Auto-Resume 바인딩', portIn: true, portOut: true,
     desc: '대상 Claude 세션 UUID(또는 입력 문자열에서 추출)에 Auto-Resume 워커를 바인딩/해제. 워크플로우는 즉시 다음 노드로 진행되고, 워커는 백그라운드에서 토큰/레이트 한도 발생 시 claude --resume 으로 자동 재시도.' },
+  { id: 'ralph', icon: '🦞', label: 'Ralph Loop', portIn: true, portOut: true,
+    desc: 'Same-prompt iteration (Ralph Wiggum) — max-iter / completion-promise / 예산 USD / cancel 4중 안전장치. 노드는 루프 종료까지 블로킹.' },
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 
@@ -2806,8 +2811,8 @@ const WF_NODE_CATEGORIES = [
     desc: '변환 · 변수 · 외부 호출 · 서브워크플로우',
     types: ['http', 'transform', 'variable', 'subworkflow'] },
   { id: 'integ',    icon: '🔗', label: '연동',
-    desc: 'Slack 어드민 · Obsidian 기록 · Auto-Resume',
-    types: ['slack_approval', 'obsidian_log', 'auto_resume'] },
+    desc: 'Slack 어드민 · Obsidian 기록 · Auto-Resume · Ralph 루프',
+    types: ['slack_approval', 'obsidian_log', 'auto_resume', 'ralph'] },
   { id: 'output',   icon: '📤', label: '출력',
     desc: '워크플로우 종착',
     types: ['output'] },
@@ -5872,6 +5877,7 @@ function _wfPickNodeType(winId, type) {
   else if (type === 'slack_approval') draft.data = { channel:'', messageTemplate:'', timeoutSeconds:300, pollIntervalSeconds:5, onTimeout:'approve', defaultOutput:'', includeInput:true };
   else if (type === 'obsidian_log') draft.data = { vaultPath:'~/ObsidianVault', project:'lazyclaude', heading:'', tagsCsv:'', passThrough:true, defaultOutput:'' };
   else if (type === 'auto_resume') draft.data = { sessionId:'', cwd:'', prompt:'', pollInterval:300, idleSeconds:90, maxAttempts:12, useContinue:false, installHooks:false, action:'set' };
+  else if (type === 'ralph') draft.data = { prompt:'', assignee:'', completion:'<promise>DONE</promise>', maxIterations:25, budgetUsd:5, systemPrompt:'', cwd:'' };
   else draft.data = {};
   if (!draft.title) draft.title = t(WF_TYPE_MAP[type].label);
   // 타입 선택 직후 카테고리 그리드 자동 접힘 (UX 개선)
@@ -6314,6 +6320,43 @@ function _wfRenderEditorBody(winId) {
     `;
   } else if (draft.type === 'start') {
     body += `<div class="text-xs text-[var(--text-dim)] mt-4">${t('시작 노드는 추가 입력이 없습니다. 워크플로우 진입점이 됩니다.')}</div>`;
+  } else if (draft.type === 'ralph') {
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('PROMPT (반복 입력)')}</label>
+      <textarea class="input w-full mt-1" rows="6"
+        placeholder="${t('매 iteration에 동일하게 주입될 PROMPT.md 본문. 비워두면 입력 노드의 출력이 사용됩니다.')}"
+        oninput="_wfDraftSetData('${winId}','prompt',this.value)">${escapeHtml(d.prompt||'')}</textarea>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('AI 프로바이더 : 모델')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.assignee||'')}"
+        placeholder="claude:sonnet" oninput="_wfDraftSetData('${winId}','assignee',this.value)">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('Completion 표식 (정확 일치)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.completion||'<promise>DONE</promise>')}"
+        oninput="_wfDraftSetData('${winId}','completion',this.value)">
+      <div class="grid grid-cols-2 gap-2 mt-3">
+        <div>
+          <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block">${t('Max iterations')}</label>
+          <input class="input w-full mt-1" type="number" min="1" max="200"
+            value="${d.maxIterations||25}"
+            oninput="_wfDraftSetData('${winId}','maxIterations',parseInt(this.value||'25',10))">
+        </div>
+        <div>
+          <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block">${t('예산 USD')}</label>
+          <input class="input w-full mt-1" type="number" min="0.01" max="100" step="0.5"
+            value="${d.budgetUsd||5}"
+            oninput="_wfDraftSetData('${winId}','budgetUsd',parseFloat(this.value||'5'))">
+        </div>
+      </div>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('시스템 프롬프트 (선택)')}</label>
+      <textarea class="input w-full mt-1" rows="2"
+        oninput="_wfDraftSetData('${winId}','systemPrompt',this.value)">${escapeHtml(d.systemPrompt||'')}</textarea>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('작업 디렉토리 (cwd)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.cwd||'')}"
+        placeholder="~/projects/my-app"
+        oninput="_wfDraftSetData('${winId}','cwd',this.value)">
+      <div class="text-[10px] mt-3" style="color:var(--text-dim)">
+        🦞 ${t('이 노드는 Ralph 루프가 종료될 때까지 블로킹됩니다. 안전장치 4종(max-iter / completion / 예산 / cancel) 모두 강제 적용.')}
+      </div>
+    `;
   }
   formHost.innerHTML = body;
 }
@@ -14934,12 +14977,68 @@ VIEWS.projects = async () => {
                       onclick='event.stopPropagation();${canOpen ? `openProjectDetail(${JSON.stringify(cwd)})` : ''}'>📋 상세</button>
               <button class="btn flex-1 justify-center text-xs" ${canOpen?'':'disabled style="opacity:0.4;cursor:not-allowed;"'}
                       onclick='event.stopPropagation();${canOpen ? `openFolder(${JSON.stringify(cwd)})` : ''}'>📂 폴더</button>
+              <button class="btn justify-center text-xs" title="${t('Ralph 추천 PROMPT.md 생성')}" ${canOpen?'':'disabled style="opacity:0.4;cursor:not-allowed;"'}
+                      onclick='event.stopPropagation();${canOpen ? `openRalphRecommend(${JSON.stringify(cwd)})` : ''}'>🦞</button>
             </div>
           </div>`;
       }).join('') || `<div class="card empty" style="grid-column:1/-1;">프로젝트 없음</div>`}
     </div>
   `;
 };
+
+async function openRalphRecommend(cwd) {
+  showModalLoading(t('Ralph 프롬프트 생성 중…'));
+  try {
+    const url = '/api/ralph/recommend' + (state.data._ralphPolish ? '' : '');
+    const r = await api('/api/ralph/recommend', {
+      method: 'POST',
+      body: { project: cwd, polish: !!state.data._ralphPolish },
+    });
+    closeModal();
+    if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
+    const rec = r.recommendation || {};
+    const sources = rec.sources || {};
+    state.data._ralphRec = rec;
+    showModal(`
+      <div class="text-[12px] font-semibold mb-2">🦞 ${t('Ralph 추천')} — ${escapeHtml(cwd)}</div>
+      <div class="text-[10px] mb-2" style="color:var(--text-dim)">
+        ${t('rationale')}: ${escapeHtml(rec.rationale || '')}
+        <span class="ml-2">CLAUDE.md ${sources.hasClaudeMd?'✓':'·'} · git ${sources.gitLogLines||0} commits · dirty ${sources.dirtyFiles||0} · TODOs ${sources.todoCount||0}</span>
+      </div>
+      <textarea id="ralphRecPrompt" rows="14" class="w-full text-[11px] bg-transparent border" style="font-family:ui-monospace,monospace;">${escapeHtml(rec.promptMd || '')}</textarea>
+      <div class="flex items-center gap-2 mt-3">
+        <label class="text-[11px]"><input type="checkbox" id="ralphRecPolish" ${state.data._ralphPolish?'checked':''} onclick="state.data._ralphPolish=this.checked;openRalphRecommend(${JSON.stringify(cwd)})"> ${t('LLM 다듬기')}</label>
+        <label class="text-[11px] flex-1">${t('Max iter')}
+          <input id="ralphRecMax" type="number" value="25" min="1" max="200" class="bg-transparent border-b text-[11px] w-16">
+        </label>
+        <label class="text-[11px] flex-1">${t('예산 USD')}
+          <input id="ralphRecBudget" type="number" value="5" min="0.01" max="100" step="0.5" class="bg-transparent border-b text-[11px] w-16">
+        </label>
+        <button class="chip text-[10px]" onclick="closeModal()">${t('취소')}</button>
+        <button class="chip text-[10px]" onclick="_ralphRecStart(${JSON.stringify(cwd)})">🚀 ${t('Ralph 시작')}</button>
+      </div>
+    `, { title: '' });
+  } catch (e) {
+    closeModal(); toast(e.message, 'err');
+  }
+}
+
+async function _ralphRecStart(cwd) {
+  const prompt = (document.getElementById('ralphRecPrompt') || {}).value || '';
+  const max = parseInt((document.getElementById('ralphRecMax') || {}).value || '25', 10);
+  const budget = parseFloat((document.getElementById('ralphRecBudget') || {}).value || '5');
+  if (!prompt.trim()) { toast(t('프롬프트가 비어 있음')); return; }
+  const r = await api('/api/ralph/start', { method: 'POST', body: {
+    prompt, maxIterations: max, budgetUsd: budget,
+    completion: (state.data._ralphRec && state.data._ralphRec.completion) || '<promise>DONE</promise>',
+    cwd: cwd,
+  }});
+  closeModal();
+  if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
+  toast(`🦞 ${t('시작됨')}: ${r.runId}`);
+  navigate('ralph');
+  setTimeout(() => _ralphSelect(r.runId), 200);
+}
 
 async function openProjectDetail(cwd) {
   showModalLoading(t('프로젝트 설정 불러오는 중…'));
@@ -18525,6 +18624,151 @@ function _orchToggleLive() {
     state.data._orchEs = null;
     if (btn) btn.textContent = t('라이브 시작');
   };
+}
+
+// ────────────────────────────────────────────────────────────────
+// 🦞 RALPH LOOP — same-prompt iteration with 4-fold safety
+// ────────────────────────────────────────────────────────────────
+VIEWS.ralph = async () => {
+  const r = await api('/api/ralph/list?limit=30');
+  if (!r.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}</div>`;
+  const runs = r.runs || [];
+  const fmtMs = (ms) => ms ? new Date(ms).toLocaleString() : '—';
+  const statusClass = (st) => ({
+    done: 'var(--success)', running: 'var(--accent)',
+    cancelled: 'var(--text-dim)', max_iter: '#fcd34d',
+    budget: '#fca5a5', error: 'var(--danger)',
+  })[st] || 'var(--text)';
+
+  const rows = runs.length ? runs.map(it => `
+    <tr class="text-[11px]" onclick="_ralphSelect('${escapeHtml(it.runId)}')" style="cursor:pointer;">
+      <td class="p-1 font-mono">${escapeHtml(it.runId.slice(-10))}</td>
+      <td class="p-1"><span class="chip text-[10px]" style="color:${statusClass(it.status)}">${escapeHtml(it.status)}</span></td>
+      <td class="p-1">${it.iterations}/${it.maxIter}</td>
+      <td class="p-1">$${(it.costUsd || 0).toFixed(4)} / $${(it.budgetUsd || 0).toFixed(2)}</td>
+      <td class="p-1 font-mono">${escapeHtml(it.assignee)}</td>
+      <td class="p-1" style="color:var(--text-dim)">${fmtMs(it.tsStart)}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="6" class="p-2 text-[11px]" style="color:var(--text-dim);text-align:center;">${t('아직 Ralph 실행 기록 없음')}</td></tr>`;
+
+  return `
+    ${viewHeader('🦞 Ralph Loop', t('ralph_subtitle', 'Same-prompt 반복 — Geoffrey Huntley Ralph Wiggum 패턴. max-iter / completion-promise / 예산 USD / 수동 cancel 4중 안전장치.'), 'ralph')}
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-[12px] font-semibold">${t('실행 목록')}</div>
+          <button class="chip text-[10px]" onclick="renderView()">${t('새로고침')}</button>
+        </div>
+        <table class="w-full text-left">
+          <thead><tr class="text-[10px]" style="color:var(--text-dim)">
+            <th class="p-1">runId</th><th class="p-1">status</th>
+            <th class="p-1">iter</th><th class="p-1">cost / budget</th>
+            <th class="p-1">assignee</th><th class="p-1">started</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div id="ralphLive" class="mt-4"></div>
+      </div>
+      <div class="card p-4">
+        <div class="text-[12px] font-semibold mb-2">${t('새 실행 시작')}</div>
+        <label class="text-[11px] block mb-1">${t('Prompt')}
+          <textarea id="ralphPrompt" rows="6" class="w-full text-[11px] bg-transparent border" placeholder="Fix every failing test. Output <promise>DONE</promise> when green."></textarea>
+        </label>
+        <label class="text-[11px] block mb-1">${t('Assignee')}
+          <input id="ralphAssignee" class="w-full text-[11px] bg-transparent border-b" placeholder="claude:sonnet">
+        </label>
+        <label class="text-[11px] block mb-1">${t('Completion 표식')}
+          <input id="ralphCompletion" class="w-full text-[11px] bg-transparent border-b" value="<promise>DONE</promise>">
+        </label>
+        <div class="flex gap-2 mb-1">
+          <label class="text-[11px] flex-1">${t('Max iter')}
+            <input id="ralphMax" type="number" min="1" max="200" class="w-full text-[11px] bg-transparent border-b" value="25">
+          </label>
+          <label class="text-[11px] flex-1">${t('예산 USD')}
+            <input id="ralphBudget" type="number" min="0.01" max="100" step="0.5" class="w-full text-[11px] bg-transparent border-b" value="5">
+          </label>
+        </div>
+        <button class="chip text-[10px] mt-2" onclick="_ralphStart()">🚀 ${t('시작')}</button>
+        <div class="text-[10px] mt-3" style="color:var(--text-dim)">
+          ${t('CLI')}: <code>python3 tools/ralph_loop.py --prompt-file PROMPT.md</code>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+AFTER.ralph = () => {
+  if (state.data._ralphEs) {
+    try { state.data._ralphEs.close(); } catch (_) {}
+    state.data._ralphEs = null;
+  }
+};
+
+async function _ralphStart() {
+  const prompt   = (document.getElementById('ralphPrompt') || {}).value || '';
+  const assignee = (document.getElementById('ralphAssignee') || {}).value || '';
+  const completion = (document.getElementById('ralphCompletion') || {}).value || '';
+  const max    = parseInt((document.getElementById('ralphMax') || {}).value || '25', 10);
+  const budget = parseFloat((document.getElementById('ralphBudget') || {}).value || '5');
+  if (!prompt.trim()) { toast(t('프롬프트가 비어 있음')); return; }
+  const r = await api('/api/ralph/start', { method: 'POST', body: {
+    prompt, assignee, completion, maxIterations: max, budgetUsd: budget,
+  }});
+  if (!r.ok) { toast(r.error || 'failed'); return; }
+  toast(`${t('시작됨')}: ${r.runId}`);
+  _ralphSelect(r.runId);
+  setTimeout(renderView, 600);
+}
+
+function _ralphSelect(runId) {
+  const host = document.getElementById('ralphLive');
+  if (!host) return;
+  if (state.data._ralphEs) {
+    try { state.data._ralphEs.close(); } catch (_) {}
+    state.data._ralphEs = null;
+  }
+  host.innerHTML = `
+    <div class="flex items-center gap-2 mb-2">
+      <div class="text-[12px] font-semibold">${t('라이브')}: <code>${escapeHtml(runId)}</code></div>
+      <button class="chip text-[10px]" onclick="_ralphCancel('${escapeHtml(runId)}')">⏹ ${t('취소')}</button>
+      <span id="ralphStatus" class="text-[10px]" style="color:var(--text-dim)">${t('연결 중')}</span>
+    </div>
+    <pre id="ralphLog" class="text-[10px] whitespace-pre-wrap" style="max-height:300px;overflow-y:auto;color:var(--text-dim)"></pre>
+  `;
+  if (typeof EventSource !== 'function') {
+    const stat = document.getElementById('ralphStatus');
+    if (stat) stat.textContent = 'EventSource not supported'; return;
+  }
+  const es = new EventSource('/api/agent-bus/stream?topics=' + encodeURIComponent('ralph.' + runId + '.**'));
+  state.data._ralphEs = es;
+  const log = document.getElementById('ralphLog');
+  const stat = document.getElementById('ralphStatus');
+  if (stat) stat.textContent = t('연결됨');
+  es.addEventListener('bus', (e) => {
+    try {
+      const ev = JSON.parse(e.data);
+      const tag = ev.topic.split('.').slice(2).join('.');
+      const line = `[${new Date(ev.ts).toLocaleTimeString()}] ${tag}  ${JSON.stringify(ev.payload).slice(0, 200)}`;
+      if (log) log.textContent = (line + '\n' + log.textContent).slice(0, 16000);
+      if (tag === 'end') {
+        if (stat) stat.textContent = `${t('종료')}: ${ev.payload.status}`;
+        try { es.close(); } catch (_) {}
+        state.data._ralphEs = null;
+      }
+    } catch (_) {}
+  });
+  es.addEventListener('ping', () => { if (stat) stat.textContent = t('연결됨') + ' · ♥'; });
+  es.onerror = () => {
+    if (stat) stat.textContent = t('연결 끊김');
+    try { es.close(); } catch (_) {}
+    state.data._ralphEs = null;
+  };
+}
+
+async function _ralphCancel(runId) {
+  if (!confirm(t('이 Ralph 루프를 중단할까요?'))) return;
+  const r = await api('/api/ralph/cancel', { method: 'POST', body: { runId }});
+  toast(r.ok ? t('취소 요청 전송됨') : (r.error || t('실패')));
 }
 
 // ────────────────────────────────────────────────────────────────
