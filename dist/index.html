@@ -383,9 +383,16 @@ tailwind.config = {
   .settings-item:hover { background:rgba(255,255,255,0.06); }
   body.theme-light .settings-item:hover { background:rgba(0,0,0,0.05); }
   .settings-check { margin-left:auto;color:var(--accent);font-size:0.85rem; }
-  .nav-item { display: flex; align-items: center; gap: 0.7rem; padding: 0.6rem 0.8rem; border-radius: 10px; color: var(--text-mute); font-size: 0.88rem; cursor: pointer; transition: background 0.15s, color 0.15s; user-select: none; will-change: background; }
+  .nav-item { display: flex; align-items: center; gap: 0.7rem; padding: 0.6rem 0.8rem; border-radius: 10px; color: var(--text-mute); font-size: 0.88rem; cursor: pointer; transition: background 0.15s, color 0.15s, transform 0.1s; user-select: none; will-change: background; position: relative; }
   .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
   .nav-item.active { background: var(--grad-soft); color: var(--text); border: 1px solid rgba(167,139,250,0.35); }
+  /* Q3 (v2.66.3) — left-edge accent bar on the active tab so the user
+     spots their location instantly even in dense flyouts. */
+  .nav-item.active::before {
+    content: ''; position: absolute; left: -3px; top: 6px; bottom: 6px;
+    width: 3px; border-radius: 2px; background: var(--accent);
+    box-shadow: 0 0 6px rgba(217,119,87,0.5);
+  }
 
   /* v2.40.0 — Sidebar discovery aids: Favorites + Recent above the categorical groups */
   .nav-quick-block { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
@@ -799,7 +806,11 @@ tailwind.config = {
     #wfCanvasWrap { height: min(55vh, 520px); min-height: 240px; }
   }
   .grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
-  .empty { text-align: center; padding: 3rem 1rem; color: var(--text-dim); }
+  /* P/Q (v2.66.x) — unify .empty look with .lc-empty so every legacy
+     empty-state instantly inherits the new polish. Padding kept generous
+     for the table-row variant (where this is the entire <tr>'s content). */
+  .empty { text-align: center; padding: 2rem 1rem; color: var(--text-dim); font-size: 0.78rem; }
+  .empty.card, .empty[class*="card"] { border: 1px dashed var(--border); border-radius: 12px; background: transparent; }
   .tag-tool { display: inline-block; padding: 1px 7px; font-size: 0.68rem; border-radius: 4px; background: rgba(217,119,87,0.14); color: #f5b997; font-family: 'JetBrains Mono', monospace; margin: 1px; }
   .shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.12), rgba(255,255,255,0.04)); background-size: 200% 100%; animation: shimmerMove 1.6s infinite; border-radius: 6px; }
   @keyframes shimmerMove { 0% { background-position: 0% 0; } 100% { background-position: -200% 0; } }
@@ -1434,11 +1445,15 @@ const GROUPS = [
 function viewHeader(title, subtitle, viewId) {
   const meta = NAV.find(n => n.id === viewId) || {};
   const docUrl = meta.docUrl || '';
+  // Q2 (v2.66.3) — match the Orchestrator screenshot: tighter title row,
+  // generous subtitle, optional doc link on the right. Subtitle becomes
+  // ``max-width: 64ch`` so long descriptions wrap naturally instead of
+  // spanning the full card width.
   return `
-    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
-      <div>
-        <h1 class="text-2xl font-bold">${escapeHtml(t(title))}</h1>
-        ${subtitle ? `<p class="text-sm text-[var(--text-mute)] mt-1">${t(subtitle)}</p>` : ''}
+    <div class="lc-view-header mb-5 flex items-start justify-between gap-3 flex-wrap">
+      <div class="min-w-0 flex-1">
+        <h1 class="text-2xl font-bold leading-tight">${escapeHtml(t(title))}</h1>
+        ${subtitle ? `<p class="text-sm text-[var(--text-mute)] mt-2" style="max-width:64ch;line-height:1.5;">${t(subtitle)}</p>` : ''}
       </div>
       ${docUrl ? `<a class="btn text-xs" href="${docUrl}" target="_blank" rel="noopener">📖 ${t('공식 문서 ↗')}</a>` : ''}
     </div>`;
