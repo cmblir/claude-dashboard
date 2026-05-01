@@ -381,6 +381,27 @@ turns the dashboard into a multi-agent hub for chat platforms:
 - **Slack signature verification.** Set `SLACK_SIGNING_SECRET` to enforce
   HMAC-SHA256 over `v0:<ts>:<raw-body>` on `/api/slack/events`; stale
   timestamps (>5 min) are rejected.
+- **Discord interactions** (v2.56.0) — Bot Token outbound + ed25519
+  signature verification on `/api/discord/interactions` (lazy
+  `cryptography` import; missing → all webhooks refused, never silently
+  passed).
+- **Per-binding failover chain + daily USD cap** (v2.56.0) — each binding
+  can carry its own `fallbackChain` and `budgetUsdPerDay`. 24-hour rolling
+  window per `(kind, channel)`; over-budget channels get a polite refusal
+  before any planner LLM call.
+- **Inbound/outbound IPC streams** (v2.58.0) — single-writer
+  `orch_inbound` + `orch_outbound` SQLite tables alongside `orch_runs`.
+  Tail with `GET /api/orchestrator/inbound` / `…/outbound`. Useful for
+  cross-process replay and debugging "why did the orchestrator think
+  the user said X?".
+- **Recurrence sweeper** (v2.58.0) — bindings can carry
+  `schedule.everyMinutes`; a single 60-second tick wakes due channels and
+  fires their canned prompt. Auto-started at boot.
+- **Email-out reply** (v2.57.0) — bindings with `kind: "email"` carry an
+  inline SMTP config; replies coalesce through `server.notify.send_email`.
+- **Per-agent isolated workspace** (v2.57.0) — each binding gets
+  `~/.claude-dashboard-agents/<id>/{CLAUDE.md, memory/}` so contexts
+  don't leak between channels.
 
 **Optimization knobs** (cycle 3 — all stdlib, no new deps):
 
