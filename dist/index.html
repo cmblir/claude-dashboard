@@ -1643,17 +1643,46 @@ const MODE_TABS = {
 function _getMode() {
   try { return localStorage.getItem('cc.mode') || 'all'; } catch (_) { return 'all'; }
 }
+
+// H1 (v2.60.0) — per-mode last-tab memory. Switching to a mode jumps back
+// to whatever you last viewed in that mode. Defaults below seed the very
+// first switch.
+const MODE_DEFAULT_TAB = {
+  all:        'overview',
+  claude:     'overview',
+  workflow:   'workflows',
+  providers:  'aiProviders',
+  openclaw:   'orchestrator',
+};
+
+function _modeLastTab(m) {
+  try {
+    const stored = localStorage.getItem('cc.mode.' + m + '.lastTab');
+    if (stored && (m === 'all' || (MODE_TABS[m] && MODE_TABS[m].has(stored)))) {
+      return stored;
+    }
+  } catch (_) {}
+  return MODE_DEFAULT_TAB[m] || 'overview';
+}
+
+function _rememberLastTab(mode, tabId) {
+  try { localStorage.setItem('cc.mode.' + mode + '.lastTab', tabId); }
+  catch (_) {}
+}
+
 function setMode(m) {
   if (!['all','claude','workflow','providers','openclaw'].includes(m)) m = 'all';
+  // Remember the tab the user was on in the OLD mode before switching.
+  const prev = state.mode || 'all';
+  if (state.view) _rememberLastTab(prev, state.view);
   try { localStorage.setItem('cc.mode', m); } catch (_) {}
   state.mode = m;
   const sel = document.getElementById('modeSelect');
   if (sel && sel.value !== m) sel.value = m;
-  // If current view is hidden by the new mode, jump to overview.
-  const current = state.view;
-  if (m !== 'all' && !MODE_TABS[m].has(current)) {
-    const fallback = MODE_TABS[m].values().next().value || 'overview';
-    go(fallback);
+  // Restore the user's last tab in the NEW mode (or its default).
+  const target = _modeLastTab(m);
+  if (target && target !== state.view) {
+    go(target);
   } else {
     renderNav();
   }
@@ -1772,10 +1801,25 @@ function renderNav() {
       const descHtml = n.desc ? `<div class="nav-desc text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">${escapeHtml(t(n.desc))}</div>` : '';
       const isFav = _isFavoriteTab(n.id);
       const favBtn = `<button class="nav-fav-btn" aria-label="${isFav?t('즐겨찾기 해제'):t('즐겨찾기 추가')}" title="${isFav?t('즐겨찾기 해제'):t('즐겨찾기 추가')}" style="${isFav?'':'opacity:0.4;'}">${isFav?'★':'☆'}</button>`;
+      // H3 (v2.60.0) — mode badges, only visible in 'all' mode so users can
+      // see at a glance which mode each tab also lives in.
+      let modeBadges = '';
+      if ((state.mode || 'all') === 'all') {
+        const tags = [];
+        if (MODE_TABS.claude.has(n.id))    tags.push({ k:'C',  c:'#a78bfa', t:'Claude' });
+        if (MODE_TABS.workflow.has(n.id))  tags.push({ k:'W',  c:'#60a5fa', t:'Workflow' });
+        if (MODE_TABS.providers.has(n.id)) tags.push({ k:'P',  c:'#fbbf24', t:'Providers' });
+        if (MODE_TABS.openclaw.has(n.id))  tags.push({ k:'O',  c:'#fb7185', t:'OpenClaw' });
+        if (tags.length) {
+          modeBadges = '<div class="nav-mode-badges" style="display:inline-flex;gap:2px;margin-left:4px;">'
+            + tags.map(x => `<span title="${x.t}" style="font-size:8px;padding:1px 3px;border-radius:3px;background:${x.c}22;color:${x.c};font-weight:600;line-height:1;">${x.k}</span>`).join('')
+            + '</div>';
+        }
+      }
       el.innerHTML = `
         <span class="w-5 text-center self-start mt-0.5 flex-shrink-0">${n.icon}</span>
         <div class="nav-label flex-1 min-w-0">
-          <div>${escapeHtml(t(n.label))}</div>
+          <div>${escapeHtml(t(n.label))}${modeBadges}</div>
           ${descHtml}
         </div>
         ${favBtn}`;
@@ -1915,6 +1959,8 @@ function go(id) {
   try { _pushRecentTab(id); } catch {}
   state.view = id;
   location.hash = '#/' + id;
+  // H1 (v2.60.0) — per-mode last-tab memory.
+  try { _rememberLastTab(state.mode || 'all', id); } catch {}
   renderNav();
   renderView();
 }
@@ -23987,6 +24033,7 @@ function openSpotlight() {
         <div style="padding:0 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <input id="spotlightInput" style="flex:1;background:transparent;border:none;outline:none !important;box-shadow:none !important;color:var(--text);font-size:1.1rem;padding:16px 0;font-family:inherit;-webkit-appearance:none;" placeholder="탭 이동, 기능 검색…" autocomplete="off">
+          <button id="spotlightModeToggle" class="chip text-[10px]" onclick="_spotlightToggleAllModes()" title="현재 모드 / 전체 모드 검색 전환"></button>
         </div>
         <div id="spotlightResults" style="flex:1;overflow-y:auto;"></div>
       </div>
@@ -24002,11 +24049,37 @@ function openSpotlight() {
   w.style.cssText = 'position:fixed;inset:0;margin:auto;width:min(680px,92vw);height:min(520px,75vh);z-index:1200;';
   const inp = document.getElementById('spotlightInput');
   setTimeout(() => inp.focus(), 50);
+  _spotlightSyncModeToggle();
   _renderSpotlightResults('');
   // v2.33.4 — 프로젝트/세션/프롬프트/워크플로우 비동기 prefetch
   _ensureSpotlightCache();
   inp.oninput = () => { _spotlightIdx = 0; _renderSpotlightResults(inp.value); };
   inp.onkeydown = _spotlightKeydown;
+}
+
+function _spotlightSyncModeToggle() {
+  const btn = document.getElementById('spotlightModeToggle');
+  if (!btn) return;
+  const m = state.mode || 'all';
+  if (m === 'all') {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = '';
+  const all = !!state.data._spotlightAllModes;
+  btn.innerHTML = all
+    ? `🌐 ${t('전체 모드')}`
+    : `🔒 ${t('모드')}: ${m}`;
+  btn.title = all
+    ? t('현재: 전체 검색 (탭 클릭하여 현재 모드만 검색)')
+    : t('현재: 현재 모드만 (탭 클릭하여 전체 검색)');
+}
+
+function _spotlightToggleAllModes() {
+  state.data._spotlightAllModes = !state.data._spotlightAllModes;
+  _spotlightSyncModeToggle();
+  const inp = document.getElementById('spotlightInput');
+  if (inp) _renderSpotlightResults(inp.value || '');
 }
 
 function closeSpotlight() {
@@ -24091,8 +24164,12 @@ function _getSpotlightItems(query) {
     return 0;
   };
 
-  // 1) 탭 목록 — 이름 + 설명 + 연관 키워드 검색
+  // 1) 탭 목록 — 이름 + 설명 + 연관 키워드 검색.
+  // H2 (v2.60.0): respect the current mode unless the user has opted into
+  // global search via the spotlight toggle (state.data._spotlightAllModes).
+  const allModes = !!state.data._spotlightAllModes;
   for (const n of NAV) {
+    if (!allModes && !_navInMode(n)) continue;
     const keywords = (_NAV_KEYWORDS[n.id] || []).join(' ');
     const text = `${n.label} ${n.desc||''} ${n.id} ${keywords}`;
     const s = _score(text, q);
