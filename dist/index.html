@@ -309,6 +309,27 @@ tailwind.config = {
   ::-webkit-scrollbar-track { background: transparent; }
   .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; min-width: 0; max-width: 100%; }
+
+  /* P1 (v2.66.2) — unified UI primitives, prefixed `lc-` to avoid clashes
+     with the Tailwind utility soup elsewhere in the file. The screenshot
+     reference (Orchestrator tab) is the canonical look — match that. */
+  .lc-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; }
+  .lc-card + .lc-card { margin-top: 1rem; }
+  .lc-section-title { font-size: 0.95rem; font-weight: 600; color: var(--text); margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; }
+  .lc-section-sub { font-size: 0.7rem; color: var(--text-dim); font-weight: 400; }
+  .lc-meta-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; font-size: 0.75rem; color: var(--text-dim); border-bottom: 1px dashed var(--border); }
+  .lc-meta-row:last-child { border-bottom: none; }
+  .lc-meta-row .lc-meta-label { min-width: 110px; color: var(--text-mute); }
+  .lc-meta-row .lc-meta-value { color: var(--text); font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 0.78rem; word-break: break-all; }
+  .lc-empty { padding: 2rem 1rem; text-align: center; color: var(--text-dim); font-size: 0.78rem; border: 1px dashed var(--border); border-radius: 12px; }
+  .lc-empty-emoji { font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.6; }
+  .lc-loading { padding: 1.5rem 1rem; text-align: center; color: var(--text-dim); font-size: 0.78rem; }
+  .lc-loading::before { content: ''; display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; margin-right: 0.5rem; animation: lc-spin 0.8s linear infinite; vertical-align: middle; }
+  @keyframes lc-spin { to { transform: rotate(360deg); } }
+  .lc-error { padding: 1rem; background: rgba(252,165,165,0.06); border: 1px solid rgba(252,165,165,0.3); border-radius: 10px; color: #fca5a5; font-size: 0.78rem; }
+  .lc-grid-2 { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+  @media (min-width: 1024px) { .lc-grid-2 { grid-template-columns: 1fr 1fr; } }
+  .lc-stack > * + * { margin-top: 0.75rem; }
   .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.85rem; border-radius: 10px; font-size: 0.82rem; font-weight: 500; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text); cursor: pointer; transition: background 0.15s, border-color 0.15s, filter 0.15s, transform 0.15s; }
   .btn:hover { background: rgba(255,255,255,0.12); border-color: var(--border-hi); }
   .btn-primary { background: var(--grad); border: none; color: #0a0a0f; font-weight: 600; }
@@ -1591,6 +1612,20 @@ function _renderEmail(email) {
     masked = local[0] + '**';
   }
   return escapeHtml(masked + domain);
+}
+
+// P3 (v2.66.2) — empty / loading / error state helpers. Standardises the
+// "no data" / "loading…" / "failed" markup across every tab. Use them
+// in VIEWS.* for any state that's empty/in-progress/errored.
+function _emptyState(msg, emoji) {
+  const e = emoji || '📭';
+  return `<div class="lc-empty"><span class="lc-empty-emoji">${e}</span>${escapeHtml(msg || t('데이터 없음'))}</div>`;
+}
+function _loadingState(msg) {
+  return `<div class="lc-loading">${escapeHtml(msg || t('로딩 중...'))}</div>`;
+}
+function _errorState(msg) {
+  return `<div class="lc-error">⚠ ${escapeHtml(msg || t('실패'))}</div>`;
 }
 
 function _toggleShowFullEmail() {
@@ -18847,7 +18882,7 @@ VIEWS.orchestrator = async () => {
         <div class="text-[12px] font-semibold mb-2">${t('최근 디스패치')}</div>
         ${(() => {
           const runs = (histR && histR.runs) || [];
-          if (!runs.length) return `<div class="text-[11px]" style="color:var(--text-dim)">${t('아직 디스패치 기록 없음')}</div>`;
+          if (!runs.length) return _emptyState(t('아직 디스패치 기록 없음'), '🎼');
           return `<table class="w-full text-left">
             <thead><tr class="text-[10px]" style="color:var(--text-dim)"><th class="p-1">ts</th><th class="p-1">kind</th><th class="p-1">via</th><th class="p-1">channel</th><th class="p-1">text</th><th class="p-1">final</th></tr></thead>
             <tbody>${runs.map(r => `
@@ -18974,7 +19009,7 @@ async function _orchRefreshIpc() {
           <span class="font-mono ml-auto" style="color:var(--text-dim)">#${it.id}</span>
         </div>
         <div class="text-[11px] mt-1">${escapeHtml((it.text || '').slice(0, 200))}</div>
-      </div>`).join('') : `<div class="text-[10px]" style="color:var(--text-dim)">${t('inbound 없음')}</div>`;
+      </div>`).join('') : _emptyState(t('inbound 없음'), '⬇');
   }
   if (outHost) {
     const items = (out && out.items) || [];
@@ -18988,7 +19023,7 @@ async function _orchRefreshIpc() {
           <span class="font-mono ml-auto" style="color:${it.ok?'var(--success)':'#fca5a5'};">${it.ok?'ok':'err'}</span>
         </div>
         <div class="text-[11px] mt-1">${escapeHtml((it.text || '').slice(0, 200))}</div>
-      </div>`).join('') : `<div class="text-[10px]" style="color:var(--text-dim)">${t('outbound 없음')}</div>`;
+      </div>`).join('') : _emptyState(t('outbound 없음'), '⬆');
   }
 }
 
@@ -21791,7 +21826,7 @@ VIEWS.autoResumeManager = async () => {
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>
-      ` : `<div class="empty text-sm">${t('활성 바인딩 없음')}</div>`}
+      ` : _emptyState(t('활성 바인딩 없음'), '🔄')}
     </div>
     <style>
       @media (max-width: 640px) {
