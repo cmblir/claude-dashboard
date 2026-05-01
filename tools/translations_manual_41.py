@@ -6,6 +6,8 @@ Loaded by ``tools/translations_manual.py``.
 from __future__ import annotations
 
 NEW_EN: dict[str, str] = {
+    # U1 — System tab refactor (newly t()-wrapped strings)
+    "편집은 \"Settings 편집\" 또는 \"권한\" 탭에서.": "Edit via the \"Settings 편집\" or \"권한\" tab.",
     # M1 — System tab boot-timing card
     "서버 부팅":     "Server boot",
     "부팅 시간":     "Boot time",
@@ -20,6 +22,8 @@ NEW_EN: dict[str, str] = {
 }
 
 NEW_ZH: dict[str, str] = {
+    # U1 — System tab refactor
+    "편집은 \"Settings 편집\" 또는 \"권한\" 탭에서.": "在 \"Settings 编辑\" 或 \"权限\" 标签中编辑。",
     # M1 — System tab boot-timing card
     "서버 부팅":     "服务器启动",
     "부팅 시간":     "启动耗时",

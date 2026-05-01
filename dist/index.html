@@ -22377,17 +22377,19 @@ VIEWS.system = async () => {
     api('/api/system/boot-timing').catch(() => null),
   ]);
   const sess = status.sessions || [];
-  // M1 (v2.65.0) — boot-timing card.
+  // U1 (v2.66.7) — System tab refactored to .lc-card primitives so it
+  // matches the screenshot reference look. Same data, more consistent
+  // chrome.
   const bootCard = (boot && boot.ok && boot.bootDurationMs > 0) ? `
-    <div class="card p-5">
-      <h3 class="font-semibold text-sm mb-3">⏱ ${t('서버 부팅')}</h3>
-      <div class="grid grid-cols-2 gap-2 text-xs">
+    <div class="lc-card">
+      <h3 class="lc-section-title">⏱ ${t('서버 부팅')}</h3>
+      <div class="grid grid-cols-2 gap-3">
         <div>
-          <div class="text-[var(--text-mute)]">${t('부팅 시간')}</div>
+          <div class="lc-section-sub">${t('부팅 시간')}</div>
           <div class="mono text-lg font-semibold">${boot.bootDurationMs} ms</div>
         </div>
         <div>
-          <div class="text-[var(--text-mute)]">${t('listen 시작')}</div>
+          <div class="lc-section-sub">${t('listen 시작')}</div>
           <div class="mono text-xs">${new Date(boot.listeningAtMs).toLocaleString()}</div>
         </div>
       </div>
@@ -22398,34 +22400,30 @@ VIEWS.system = async () => {
   return `
     ${viewHeader('시스템 상태', '디바이스 & 활성 세션 · 권한 요약', 'system')}
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+    <div class="lc-grid-2 mb-4">
       ${bootCard}
-      <div class="card p-5">
-        <h3 class="font-semibold text-sm mb-3">🖥 디바이스</h3>
-        <table class="data">
-          <tbody>
-            ${Object.entries(devinfo).map(([k,v]) => `
-              <tr><td class="text-[var(--text-mute)] text-xs w-[130px]">${k}</td><td class="mono text-xs">${escapeHtml(v)}</td></tr>
-            `).join('')}
-          </tbody>
-        </table>
+      <div class="lc-card">
+        <h3 class="lc-section-title">🖥 ${t('디바이스')}</h3>
+        ${Object.entries(devinfo).map(([k,v]) => `
+          <div class="lc-meta-row"><span class="lc-meta-label">${escapeHtml(k)}</span><span class="lc-meta-value">${escapeHtml(v)}</span></div>
+        `).join('')}
       </div>
-      <div class="card p-5">
-        <h3 class="font-semibold text-sm mb-3">💾 권한 요약</h3>
+      <div class="lc-card">
+        <h3 class="lc-section-title">💾 ${t('권한 요약')}</h3>
         <div class="flex items-center gap-2 mb-3 flex-wrap">
-          <span class="chip chip-ok">허용 ${status.permissions.allow.length}</span>
-          <span class="chip chip-err">차단 ${status.permissions.deny.length}</span>
-          <span class="chip">훅 ${status.hooks.length}</span>
+          <span class="chip chip-ok">${t('허용')} ${status.permissions.allow.length}</span>
+          <span class="chip chip-err">${t('차단')} ${status.permissions.deny.length}</span>
+          <span class="chip">${t('훅')} ${status.hooks.length}</span>
         </div>
-        <div class="text-xs text-[var(--text-mute)]">편집은 "Settings 편집" 또는 "권한" 탭에서.</div>
+        <div class="text-xs text-[var(--text-mute)]">${t('편집은 "Settings 편집" 또는 "권한" 탭에서.')}</div>
       </div>
     </div>
 
-    <div class="card p-5">
-      <h3 class="font-semibold text-sm mb-3">⚡ 활성 세션 (${sess.length})</h3>
+    <div class="lc-card">
+      <h3 class="lc-section-title">⚡ ${t('활성 세션')} <span class="lc-section-sub">(${sess.length})</span></h3>
       ${sess.length ? `
         <table class="data">
-          <thead><tr><th>PID</th><th>프로젝트</th><th>경로</th><th>종류</th><th>버전</th><th class="text-right">시작</th><th></th></tr></thead>
+          <thead><tr><th>PID</th><th>${t('프로젝트')}</th><th>${t('경로')}</th><th>${t('종류')}</th><th>${t('버전')}</th><th class="text-right">${t('시작')}</th><th></th></tr></thead>
           <tbody>
             ${sess.map(s => `
               <tr>
@@ -22435,11 +22433,11 @@ VIEWS.system = async () => {
                 <td class="text-xs">${escapeHtml(s.kind||'')}</td>
                 <td class="mono text-xs">${escapeHtml(s.version||'')}</td>
                 <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(s.startedAt)}</td>
-                <td class="text-right"><button class="btn text-xs" onclick="openSessionTerminal('${s.sessionId}')">터미널</button></td>
+                <td class="text-right"><button class="btn text-xs" onclick="openSessionTerminal('${s.sessionId}')">${t('터미널')}</button></td>
               </tr>
             `).join('')}
           </tbody>
-        </table>` : '<div class="empty text-sm">활성 세션이 없습니다.</div>'}
+        </table>` : _emptyState(t('활성 세션이 없습니다.'), '⚡')}
     </div>
   `;
 };
