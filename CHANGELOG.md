@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.65.0] — 2026-05-02
+
+### Added
+- ⏱ System tab boot-timing card — shows time from `python3 server.py`
+  to first HTTP listen. Fetched via `GET /api/system/boot-timing`.
+- 🔁 Ralph run duplicate button — pre-fills the Start form with the
+  configuration of any past run so the user can tweak and re-launch.
+
 ## [2.64.0] — 2026-05-02
 
 ### Added
