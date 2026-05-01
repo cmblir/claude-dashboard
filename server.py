@@ -112,8 +112,20 @@ def _auto_start_ollama() -> None:
 
 # ───────── 메인 ─────────
 
+_BOOT_TIMING: dict = {"startedAtMs": 0, "listeningAtMs": 0, "bootDurationMs": 0}
+
+
+def get_boot_timing() -> dict:
+    """Returns a snapshot of boot timing — used by /api/system/boot-timing."""
+    return dict(_BOOT_TIMING)
+
+
 def main() -> None:
     setup_logging()
+
+    import time as _time
+    _BOOT_TIMING["startedAtMs"] = int(_time.time() * 1000)
+    _t0 = _time.time()
 
     host, port = get_bind()
 
@@ -150,7 +162,10 @@ def main() -> None:
     except Exception as e:
         log.warning("orchestrator sweeper start failed: %s", e)
     threading.Thread(target=_auto_start_ollama, daemon=True, name="ollama-autostart").start()
-    log.info("Serving http://%s:%s (dist=%s, db=%s)", host, port, DIST, DB_PATH)
+    boot_ms = int((_time.time() - _t0) * 1000)
+    _BOOT_TIMING["listeningAtMs"] = int(_time.time() * 1000)
+    _BOOT_TIMING["bootDurationMs"] = boot_ms
+    log.info("Serving http://%s:%s (dist=%s, db=%s) — boot %dms", host, port, DIST, DB_PATH, boot_ms)
     ThreadingHTTPServer((host, port), Handler).serve_forever()
 
 

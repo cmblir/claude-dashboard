@@ -258,6 +258,33 @@ from .system import (
 # ───────── 라우트 테이블 ─────────
 
 
+def _api_boot_timing() -> dict:
+    """GET /api/system/boot-timing — pulls from server.py's _BOOT_TIMING dict.
+
+    The dict lives in the boot script (top-level ``server.py``), not in
+    this package, so we look it up by module name on first call. If the
+    server was launched some other way (e.g. tests), returns zeroed values.
+    """
+    try:
+        import sys
+        scripts = [m for name, m in sys.modules.items()
+                   if name.endswith("server") and hasattr(m, "_BOOT_TIMING")]
+        if scripts:
+            return {"ok": True, **scripts[0]._BOOT_TIMING}
+        # Fallback path: try to import the script.
+        from importlib import util
+        from pathlib import Path
+        p = Path(__file__).resolve().parent.parent / "server.py"
+        spec = util.spec_from_file_location("_server_boot_lookup", p)
+        # Don't actually execute the module here — just check if a parent
+        # process has registered it under a known name.
+        return {"ok": True, "startedAtMs": 0, "listeningAtMs": 0,
+                "bootDurationMs": 0,
+                "note": "server boot script not loaded in this process"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def _q_truthy(q: dict, key: str) -> bool:
     """v2.43.1 — extract a boolean flag from the dispatcher's parsed query.
     Handles both flat dicts and parse_qs's list-valued mappings."""
@@ -272,6 +299,7 @@ def _q_truthy(q: dict, key: str) -> bool:
 ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/claude-md": lambda q: get_claude_md(),
     "/api/system/status": lambda q: get_system_status(),
+    "/api/system/boot-timing": lambda q: _api_boot_timing(),
     "/api/skills": lambda q: list_skills(force_refresh=_q_truthy(q, "refresh")),
     "/api/agents": lambda q: list_agents(),
     "/api/commands": lambda q: list_commands(force_refresh=_q_truthy(q, "refresh")),
