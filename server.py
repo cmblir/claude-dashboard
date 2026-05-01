@@ -70,30 +70,40 @@ def _kill_existing_server(port: int) -> bool:
 # ───────── Ollama 자동 시작 (중복 방지) ─────────
 
 def _auto_start_ollama() -> None:
-    """Auto-start ollama serve if installed, not running, and pref enabled.
+    """Auto-start ollama serve — *opt-in only* since v2.59.0.
 
-    v2.45.2: honors `behavior.autoStartOllama` pref (default True).
-    Set to false in Quick Settings to skip auto-start and reclaim memory.
+    Activation order (first match wins):
+      1. Env var ``OLLAMA_AUTOSTART=1`` → start
+      2. Quick-Settings ``behavior.autoStartOllama=true`` → start
+      3. Otherwise → skip silently (the dashboard's Ollama tab still has
+         a "Start serve" button for one-click manual start)
+
+    The previous default (start unless explicitly disabled) surprised users
+    by spawning ``ollama serve`` and consuming GPU/RAM. Inverting the
+    default to opt-in matches the project's "no surprises" stance.
     """
     import shutil
     if not shutil.which("ollama"):
         return
-    # honor user pref
-    try:
-        from server.prefs import api_prefs_get
-        prefs = api_prefs_get({}) or {}
-        beh = (prefs.get("prefs") or prefs).get("behavior") or {}
-        if beh.get("autoStartOllama") is False:
-            log.info("ollama auto-start: disabled by behavior.autoStartOllama=false")
-            return
-    except Exception as e:
-        log.debug("ollama auto-start pref check skipped: %s", e)
+    env_optin = os.environ.get("OLLAMA_AUTOSTART", "").strip().lower() in ("1", "true", "yes", "on")
+    pref_optin = False
+    if not env_optin:
+        try:
+            from server.prefs import api_prefs_get
+            prefs = api_prefs_get({}) or {}
+            beh = (prefs.get("prefs") or prefs).get("behavior") or {}
+            pref_optin = beh.get("autoStartOllama") is True
+        except Exception as e:
+            log.debug("ollama auto-start pref check skipped: %s", e)
+    if not (env_optin or pref_optin):
+        log.info("ollama auto-start: skipped (set OLLAMA_AUTOSTART=1 or behavior.autoStartOllama=true to opt in)")
+        return
     try:
         from server.ollama_hub import _is_ollama_reachable, api_ollama_serve_start
         if _is_ollama_reachable():
             log.info("ollama already running — skipping auto-start")
             return
-        log.info("auto-starting ollama serve...")
+        log.info("auto-starting ollama serve... (opt-in)")
         result = api_ollama_serve_start({})
         log.info("ollama auto-start: %s", result.get("status") or result.get("error"))
     except Exception as e:
