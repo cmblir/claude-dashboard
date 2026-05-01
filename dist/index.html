@@ -1042,6 +1042,13 @@ tailwind.config = {
       </div>
     </div>
     <div class="flex items-center gap-2">
+      <select id="modeSelect" class="input text-xs" style="width:auto;padding:4px 8px;" onchange="setMode(this.value)" title="대시보드 모드 — 사이드바 탭 필터" aria-label="대시보드 모드 선택">
+        <option value="all">🌐 All</option>
+        <option value="claude">💤 Claude</option>
+        <option value="workflow">🔀 Workflow</option>
+        <option value="providers">🤖 Providers</option>
+        <option value="openclaw">🦞 OpenClaw</option>
+      </select>
       <span id="liveStatus" class="chip chip-ok"><span class="pulse-dot"></span><span>연결됨</span></span>
       <div style="position:relative;">
         <button id="btn-settings" class="btn-ghost btn" title="설정" aria-label="설정 메뉴 열기" onclick="toggleSettingsDropdown()">
@@ -1202,7 +1209,12 @@ tailwind.config = {
 // ────────────────────────────────────────────────────────────────
 // STATE & HELPERS
 // ────────────────────────────────────────────────────────────────
-const state = { view: 'overview', data: {}, loading: {} };
+const state = { view: 'overview', data: {}, loading: {},
+  // v2.59.0 — top-level mode filter for the sidebar.
+  // 'all' shows everything; 'claude' / 'workflow' / 'providers' / 'openclaw'
+  // show curated subsets defined in MODE_TABS.
+  mode: (() => { try { return localStorage.getItem('cc.mode') || 'all'; } catch(_) { return 'all'; } })(),
+};
 
 const DOCS_BASE = 'https://docs.claude.com/en/docs/claude-code/';
 // v2.26.0 — 상위 6 카테고리로 재분류 (hover flyout 사이드바).
@@ -1588,6 +1600,70 @@ function scoreColor(n) {
 // ────────────────────────────────────────────────────────────────
 // v2.26.0 — 상위 카테고리 + hover/focus flyout 구조.
 // 사이드바에는 6 카테고리만 보이고, 마우스/포커스가 가까이 가면 오른쪽으로 서브탭 패널이 열린다.
+// G3 (v2.59.0) — top-level mode switcher. Each mode is a curated subset of
+// the full NAV. Tabs not listed in any mode-specific bucket fall through to
+// 'all'. Modes persist in localStorage.
+//
+// Why a per-id allow-list instead of a `modes:[]` field on every NAV entry:
+// the mapping is small (a few dozen ids) and lives in one place — easy to
+// audit, easy to reorganise without touching the NAV array.
+const MODE_TABS = {
+  claude: new Set([
+    'features','onboarding','guideHub','overview','projects','analytics',
+    'aiEval','sessions','agents','projectAgents','skills','commands',
+    'sessionReplay','rtk',
+    'hooks','permissions','mcp','plugins','marketplaces','settings',
+    'claudemd','envConfig','modelConfig','statusline',
+    'memory','memoryManager','tasks','plans','outputStyles','team',
+    'eventForwarder','autoResumeManager','backupRestore','backups',
+    'system','telemetry','metrics','costsTimeline',
+    'securityScan','claudeDocs','zclaude','homunculus','routines',
+    'usage','ideStatus','scheduled','bashHistory','cliSessions','openPorts',
+  ]),
+  workflow: new Set([
+    'workflows','runCenter','promptLibrary','agentSdkScaffold',
+    'learner','artifacts','crewWizard',
+    'agents','projectAgents','skills','commands',
+    'settings',
+  ]),
+  providers: new Set([
+    'aiProviders','modelConfig',
+    'promptCache','thinkingLab','toolUseLab','batchJobs','apiFiles',
+    'visionLab','modelBench','serverTools','citationsLab','embeddingLab',
+    'computerUseLab','memoryLab','advisorLab',
+    'costsTimeline','zclaude','envConfig','settings',
+  ]),
+  openclaw: new Set([
+    'orchestrator','ralph','agents','workflows',
+    'aiProviders','runCenter','sessionReplay',
+    'settings',
+  ]),
+};
+
+function _getMode() {
+  try { return localStorage.getItem('cc.mode') || 'all'; } catch (_) { return 'all'; }
+}
+function setMode(m) {
+  if (!['all','claude','workflow','providers','openclaw'].includes(m)) m = 'all';
+  try { localStorage.setItem('cc.mode', m); } catch (_) {}
+  state.mode = m;
+  const sel = document.getElementById('modeSelect');
+  if (sel && sel.value !== m) sel.value = m;
+  // If current view is hidden by the new mode, jump to overview.
+  const current = state.view;
+  if (m !== 'all' && !MODE_TABS[m].has(current)) {
+    const fallback = MODE_TABS[m].values().next().value || 'overview';
+    go(fallback);
+  } else {
+    renderNav();
+  }
+}
+function _navInMode(navItem) {
+  const m = state.mode || _getMode();
+  if (m === 'all') return true;
+  return MODE_TABS[m] && MODE_TABS[m].has(navItem.id);
+}
+
 function renderNav() {
   const nav = document.getElementById('nav');
   nav.setAttribute('role', 'menubar');
@@ -1596,12 +1672,14 @@ function renderNav() {
 
   // v2.40.0 — render Favorites + Recent above the categorical groups so the
   // user reaches frequent tabs in one click instead of opening a flyout.
+  // v2.59.0 — additionally filter by current mode (G3).
   const navById = {};
   NAV.forEach(n => { navById[n.id] = n; });
 
+  const inMode = (id) => _navInMode({ id });
   const favIds = ((window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.favoriteTabs) || [])
-    .filter(id => navById[id]);
-  const recIds = _getRecentTabs().filter(id => navById[id] && !favIds.includes(id))
+    .filter(id => navById[id] && inMode(id));
+  const recIds = _getRecentTabs().filter(id => navById[id] && !favIds.includes(id) && inMode(id))
     .slice(0, ((window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.recentTabsLimit) || 5));
 
   const _renderQuickItem = (n, kind) => {
@@ -1647,7 +1725,7 @@ function renderNav() {
   }
 
   GROUPS.forEach(g => {
-    const items = NAV.filter(n => n.group === g.id);
+    const items = NAV.filter(n => n.group === g.id && _navInMode(n));
     if (!items.length) return;
     const activeHere = items.some(n => n.id === state.view);
     const cat = document.createElement('div');
@@ -21171,7 +21249,10 @@ VIEWS.autoResumeManager = async () => {
     <div class="card p-5">
       <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
         <h3 class="font-semibold text-sm">${t('활성 바인딩')}</h3>
-        <button class="btn text-xs" onclick="_armCancelSelected()">${t('선택 취소')}</button>
+        <div class="flex gap-2">
+          <button class="btn text-xs" onclick="_armOpenAddDialog()">+ ${t('새 바인딩 추가')}</button>
+          <button class="btn text-xs" onclick="_armCancelSelected()">${t('선택 취소')}</button>
+        </div>
       </div>
       ${active.length ? `
         <div style="overflow-x:auto;">
@@ -21321,6 +21402,95 @@ window._armApplyAdvice = async (payloadJson) => {
       toast(t('Hyper Advisor') + ': ' + ((r && r.error) || 'unknown'), 'err');
     }
   } catch (e) { toast(e.message, 'err'); }
+};
+
+window._armOpenAddDialog = async () => {
+  // Pull live CLI sessions so the user can pick one rather than guess UUIDs.
+  let live = [];
+  try {
+    const r = await api('/api/cli-sessions/list').catch(() => null);
+    live = (r && r.sessions) || [];
+  } catch (_) {}
+  const liveOptions = live.length
+    ? live.map(s => `<option value="${escapeHtml(s.sessionId || s.session_id || '')}">${escapeHtml((s.sessionId || s.session_id || '').slice(0, 8))} · ${escapeHtml(s.cwd || '')}</option>`).join('')
+    : '';
+  showModal(`
+    <div class="text-sm font-semibold mb-2">+ ${t('새 Auto-Resume 바인딩')}</div>
+    <div class="text-[11px] mb-3" style="color:var(--text-dim)">
+      ${t('대상 Claude 세션을 골라서 Auto-Resume 워커를 붙입니다. 토큰/레이트 한도 발생 시 자동으로 claude --resume 으로 재시도합니다.')}
+    </div>
+    ${live.length ? `
+      <label class="text-[11px] block mb-1">${t('실행 중인 세션 선택')}</label>
+      <select id="armSidPick" class="input w-full mb-3" onchange="document.getElementById('armSid').value=this.value;document.getElementById('armCwd').value=(${JSON.stringify(live)}.find(s=>(s.sessionId||s.session_id)===this.value)||{}).cwd||''">
+        <option value="">— ${t('직접 입력')} —</option>
+        ${liveOptions}
+      </select>
+    ` : `<div class="text-[11px] mb-3" style="color:var(--text-dim)">${t('실행 중인 Claude CLI 세션이 감지되지 않습니다. session UUID 와 cwd 를 직접 입력하세요.')}</div>`}
+    <label class="text-[11px] block mb-1">${t('Session UUID')}</label>
+    <input id="armSid" class="input w-full mb-2 mono" placeholder="abc12345-...">
+    <label class="text-[11px] block mb-1">cwd</label>
+    <input id="armCwd" class="input w-full mb-2 mono" placeholder="~/projects/myapp">
+    <label class="text-[11px] block mb-1">${t('재시도 시 추가 프롬프트 (선택)')}</label>
+    <input id="armPrompt" class="input w-full mb-2" placeholder="${t('예: 이전 작업을 이어서 진행해주세요.')}">
+    <div class="grid grid-cols-3 gap-2 mb-3">
+      <div>
+        <label class="text-[10px] block">${t('폴링 (s)')}</label>
+        <input id="armPoll" type="number" min="30" max="3600" class="input w-full" value="300">
+      </div>
+      <div>
+        <label class="text-[10px] block">${t('idle (s)')}</label>
+        <input id="armIdle" type="number" min="30" class="input w-full" value="90">
+      </div>
+      <div>
+        <label class="text-[10px] block">${t('최대 시도')}</label>
+        <input id="armMax" type="number" min="1" max="60" class="input w-full" value="12">
+      </div>
+    </div>
+    <label class="text-[11px] flex items-center gap-2 mb-2">
+      <input type="checkbox" id="armUseContinue" checked>
+      ${t('--continue 사용 (--resume 대신)')}
+    </label>
+    <label class="text-[11px] flex items-center gap-2 mb-3">
+      <input type="checkbox" id="armAllowUnbound">
+      ${t('실행 중이지 않은 세션도 허용 (terminal closed)')}
+    </label>
+    <div class="flex justify-end gap-2">
+      <button class="btn text-xs" onclick="closeModal()">${t('취소')}</button>
+      <button class="btn text-xs" onclick="_armSubmitAddDialog()">${t('바인딩 추가')}</button>
+    </div>
+  `, { title: '' });
+};
+
+window._armSubmitAddDialog = async () => {
+  const sid = (document.getElementById('armSid')||{}).value || '';
+  const cwd = (document.getElementById('armCwd')||{}).value || '';
+  const prompt = (document.getElementById('armPrompt')||{}).value || '';
+  const poll = parseInt((document.getElementById('armPoll')||{}).value || '300', 10);
+  const idle = parseInt((document.getElementById('armIdle')||{}).value || '90', 10);
+  const max = parseInt((document.getElementById('armMax')||{}).value || '12', 10);
+  const useContinue = !!(document.getElementById('armUseContinue')||{}).checked;
+  const allowUnbound = !!(document.getElementById('armAllowUnbound')||{}).checked;
+  if (!sid.trim()) { toast(t('Session UUID 가 비어있음'), 'err'); return; }
+  try {
+    const r = await api('/api/auto_resume/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid.trim(), cwd: cwd.trim(), prompt: prompt.trim(),
+        pollInterval: poll, idleSeconds: idle, maxAttempts: max,
+        useContinue, allowUnboundSession: allowUnbound,
+      }),
+    });
+    if (r && r.ok) {
+      closeModal();
+      toast(t('바인딩 추가됨'), 'ok');
+      setTimeout(() => renderView && renderView(), 200);
+    } else {
+      toast(t('실패') + ': ' + ((r && r.error) || 'unknown'), 'err');
+    }
+  } catch (e) {
+    toast(t('실패') + ': ' + e.message, 'err');
+  }
 };
 
 window._armCancelOne = async (sid) => {
@@ -24545,6 +24715,9 @@ async function _wfDiffVersions() {
   try { await window._i18nReady; } catch {}
   state.view = (location.hash.replace(/^#\//, '') || 'overview');
   if (!NAV.find(n => n.id === state.view)) state.view = 'overview';
+  // Sync the mode <select> with the persisted value before first paint.
+  const _modeSel = document.getElementById('modeSelect');
+  if (_modeSel) _modeSel.value = state.mode || 'all';
   renderNav();
   // v2.33.2 — 이미 한 번 진입했고 연결돼 있으면 게이트 스킵하고 바로 대시보드로.
   // 첫 방문 OR 연결 끊김 OR 서버 실패 시에만 로그인 게이트 표시.

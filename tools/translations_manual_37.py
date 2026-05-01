@@ -40,6 +40,34 @@ NEW_EN: dict[str, str] = {
         '"items first…" if left blank',
     "비워두면 기본값 사용: \\\"이전 사이클 보고를 검토하고 미해결 항목을 우선 처리…\\\"":
         'Defaults to "Review the previous cycle and tackle outstanding items first…" if left blank',
+    # v2.59.0 — header mode selector
+    "대시보드 모드 — 사이드바 탭 필터": "Dashboard mode — sidebar tab filter",
+    "대시보드 모드 선택":               "Select dashboard mode",
+    # v2.59.0 — Auto-Resume add-binding modal
+    "새 Auto-Resume 바인딩":            "New Auto-Resume binding",
+    "새 바인딩 추가":                   "Add binding",
+    "대상 Claude 세션을 골라서 Auto-Resume 워커를 붙입니다. 토큰/레이트 한도 발생 시 자동으로 claude --resume 으로 재시도합니다.":
+        "Pick a target Claude session to attach an Auto-Resume worker. "
+        "On token/rate-limit failure the worker auto-retries via `claude --resume`.",
+    "실행 중인 세션 선택":              "Pick a running session",
+    "직접 입력":                        "Enter manually",
+    "실행 중인 Claude CLI 세션이 감지되지 않습니다. session UUID 와 cwd 를 직접 입력하세요.":
+        "No running Claude CLI session detected. Enter the session UUID and "
+        "cwd manually.",
+    "Session UUID":                     "Session UUID",
+    "재시도 시 추가 프롬프트 (선택)":   "Retry prompt (optional)",
+    "예: 이전 작업을 이어서 진행해주세요.":
+        "e.g. Continue the previous task.",
+    "폴링 (s)":                         "Poll (s)",
+    "idle (s)":                         "idle (s)",
+    "최대 시도":                        "Max attempts",
+    "--continue 사용 (--resume 대신)":   "Use --continue (instead of --resume)",
+    "실행 중이지 않은 세션도 허용 (terminal closed)":
+        "Allow sessions that are not currently running (terminal closed)",
+    "바인딩 추가":                      "Add binding",
+    "Session UUID 가 비어있음":          "Session UUID is empty",
+    "바인딩 추가됨":                    "Binding added",
+    "실패":                             "Failed",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -69,4 +97,28 @@ NEW_ZH: dict[str, str] = {
         "该节点阻塞直至 Ralph 循环结束。四重安全机制(max-iter / completion / 预算 / cancel)全部强制启用。",
     "비워두면 기본값 사용: \\\"이전 사이클 보고를 검토하고 미해결 항목을 우선 처리…\\\"":
         '留空则使用默认值:"审阅上一周期的报告并优先处理未完成项…"',
+    "대시보드 모드 — 사이드바 탭 필터": "仪表盘模式 — 侧边栏标签过滤",
+    "대시보드 모드 선택":               "选择仪表盘模式",
+    "새 Auto-Resume 바인딩":            "新建 Auto-Resume 绑定",
+    "새 바인딩 추가":                   "新增绑定",
+    "대상 Claude 세션을 골라서 Auto-Resume 워커를 붙입니다. 토큰/레이트 한도 발생 시 자동으로 claude --resume 으로 재시도합니다.":
+        "选择目标 Claude 会话以挂载 Auto-Resume 工作进程。当 token / rate limit 触发时,工作进程会自动通过 `claude --resume` 重试。",
+    "실행 중인 세션 선택":              "选择运行中的会话",
+    "직접 입력":                        "手动输入",
+    "실행 중인 Claude CLI 세션이 감지되지 않습니다. session UUID 와 cwd 를 직접 입력하세요.":
+        "未检测到运行中的 Claude CLI 会话。请手动输入 session UUID 和 cwd。",
+    "Session UUID":                     "Session UUID",
+    "재시도 시 추가 프롬프트 (선택)":   "重试时附加 Prompt(可选)",
+    "예: 이전 작업을 이어서 진행해주세요.":
+        "例如:继续之前的任务。",
+    "폴링 (s)":                         "轮询 (s)",
+    "idle (s)":                         "idle (s)",
+    "최대 시도":                        "最大尝试",
+    "--continue 사용 (--resume 대신)":   "使用 --continue(替代 --resume)",
+    "실행 중이지 않은 세션도 허용 (terminal closed)":
+        "允许未在运行的会话(terminal 已关闭)",
+    "바인딩 추가":                      "新增绑定",
+    "Session UUID 가 비어있음":          "Session UUID 为空",
+    "바인딩 추가됨":                    "绑定已新增",
+    "실패":                             "失败",
 }

@@ -127,16 +127,28 @@ def main() -> None:
             sys.exit(1)
 
     _db_init()
-    # v2.47.0 — one-time migration of workflow runs from JSON to SQLite.
-    _migrate_runs_to_db()
     # v2.46.0 — non-blocking boot: defer slow probes/scans to daemon threads
     # so the HTTP server starts listening within ~hundreds of ms instead of
     # waiting on session indexing (~seconds) and ollama HTTP probe (1–3 s).
+    # v2.59.0 (G5) — also defer the runs migration; it's one-time and
+    # post-migration is a single flag-check that doesn't block boot, but
+    # first-boot-after-upgrade can be O(legacy_runs) so move it off the
+    # critical path. Fresh runs already go straight to SQLite, so a
+    # late-finishing migration doesn't change behaviour.
+    threading.Thread(target=_migrate_runs_to_db, daemon=True, name="runs-migrate").start()
     threading.Thread(target=background_index, daemon=True, name="bg-index").start()
     warmup_caches()
     start_scheduler()
     start_auto_resume()
     start_hyper_agent_worker()
+    # v2.59.0 (G5) — auto-start orchestrator sweeper. Zero-binding cost
+    # is one config read per 60s, so safe to always start; bindings with
+    # schedule.everyMinutes get fired automatically.
+    try:
+        from server.orchestrator import start_sweeper
+        start_sweeper()
+    except Exception as e:
+        log.warning("orchestrator sweeper start failed: %s", e)
     threading.Thread(target=_auto_start_ollama, daemon=True, name="ollama-autostart").start()
     log.info("Serving http://%s:%s (dist=%s, db=%s)", host, port, DIST, DB_PATH)
     ThreadingHTTPServer((host, port), Handler).serve_forever()
