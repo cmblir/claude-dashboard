@@ -535,6 +535,35 @@ CREATE TABLE IF NOT EXISTS orch_runs (
   final    TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_orch_runs_ts ON orch_runs(ts DESC);
+
+-- F1 (v2.58.0) — NanoClaw-style inbound/outbound IPC tables. Each is a
+-- single-writer log so a parallel debugger / replay tool can `tail` either
+-- side without contending with the live orchestrator. The orch_runs table
+-- above remains the rollup view; these two are the raw streams.
+CREATE TABLE IF NOT EXISTS orch_inbound (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts      INTEGER NOT NULL,
+  run_id  TEXT NOT NULL,
+  kind    TEXT NOT NULL,
+  channel TEXT NOT NULL DEFAULT '',
+  user    TEXT NOT NULL DEFAULT '',
+  text    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_orch_inbound_run ON orch_inbound(run_id);
+CREATE INDEX IF NOT EXISTS idx_orch_inbound_chan_ts ON orch_inbound(kind, channel, ts DESC);
+
+CREATE TABLE IF NOT EXISTS orch_outbound (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts      INTEGER NOT NULL,
+  run_id  TEXT NOT NULL,
+  kind    TEXT NOT NULL,
+  channel TEXT NOT NULL DEFAULT '',
+  via     TEXT NOT NULL DEFAULT 'ad-hoc',
+  ok      INTEGER NOT NULL DEFAULT 1,
+  text    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_orch_outbound_run ON orch_outbound(run_id);
+CREATE INDEX IF NOT EXISTS idx_orch_outbound_chan_ts ON orch_outbound(kind, channel, ts DESC);
 """
 
 _HISTORY_SCHEMA_READY = False
@@ -551,11 +580,56 @@ def _ensure_history_schema() -> None:
     _HISTORY_SCHEMA_READY = True
 
 
+def _persist_inbound(run_id: str, *, kind: str, channel: str, user: str,
+                     text: str) -> None:
+    """Append a single user → orchestrator message to ``orch_inbound``.
+
+    Called at dispatch entry, *before* any planner work happens. Crashes after
+    this point still leave a usable inbound log — useful when debugging "why
+    did the orchestrator think the user said X?".
+    """
+    try:
+        _ensure_history_schema()
+        from .db import _db
+        with _db() as c:
+            c.execute(
+                "INSERT INTO orch_inbound(ts, run_id, kind, channel, user, text)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (int(time.time() * 1000), run_id, kind, channel, user,
+                 (text or "")[:16000]),
+            )
+    except Exception as e:
+        log.warning("orch inbound persist failed: %s", e)
+
+
+def _persist_outbound(run_id: str, *, kind: str, channel: str, via: str,
+                      ok: bool, text: str) -> None:
+    """Append a single orchestrator → channel reply to ``orch_outbound``.
+
+    Called when the channel reply lands (or would land for ``http`` kind).
+    Multiple rows per ``run_id`` are valid — coalesced replies still produce
+    one row per actual wire send.
+    """
+    try:
+        _ensure_history_schema()
+        from .db import _db
+        with _db() as c:
+            c.execute(
+                "INSERT INTO orch_outbound(ts, run_id, kind, channel, via, ok, text)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (int(time.time() * 1000), run_id, kind, channel, via,
+                 1 if ok else 0, (text or "")[:16000]),
+            )
+    except Exception as e:
+        log.warning("orch outbound persist failed: %s", e)
+
+
 def _persist_run_record(run_id: str, *, kind: str, channel: str, user: str,
                         text: str, plan: list, results: list, final: str,
                         via: str, ok: bool, error: Optional[str] = None) -> None:
     """Append a single dispatch outcome to ``orch_runs``. Best-effort: a
     persistence failure must not affect the channel reply we already produced.
+    Also writes an outbound row mirroring the final reply text.
     """
     try:
         _ensure_history_schema()
@@ -574,6 +648,10 @@ def _persist_run_record(run_id: str, *, kind: str, channel: str, user: str,
             )
     except Exception as e:
         log.warning("orch history persist failed: %s", e)
+    # Mirror the final reply into the outbound stream — one row per dispatch.
+    if (final or "").strip() or not ok:
+        _persist_outbound(run_id, kind=kind, channel=channel, via=via,
+                          ok=ok, text=(final or "(no reply)"))
 
 
 def _spent_today_usd(kind: str, channel: str) -> float:
@@ -609,6 +687,67 @@ def _spent_today_usd(kind: str, channel: str) -> float:
     except Exception as e:
         log.warning("orch _spent_today_usd failed: %s", e)
         return 0.0
+
+
+def list_inbound(*, kind: str = "", channel: str = "",
+                 limit: int = 100, since_id: int = 0) -> list[dict]:
+    """Tail the user → orchestrator stream. Filters are exact-match; pass
+    empty string to skip. ``since_id`` lets a cross-process tailer resume
+    after a crash without re-reading rows.
+    """
+    try:
+        _ensure_history_schema()
+        from .db import _db
+        clauses = ["id > ?"]
+        params: list = [int(since_id or 0)]
+        if kind:
+            clauses.append("kind = ?"); params.append(kind)
+        if channel:
+            clauses.append("channel = ?"); params.append(channel)
+        sql = ("SELECT id, ts, run_id, kind, channel, user, text "
+               "FROM orch_inbound WHERE " + " AND ".join(clauses) +
+               " ORDER BY id DESC LIMIT ?")
+        params.append(max(1, min(int(limit), 1000)))
+        with _db() as c:
+            rows = c.execute(sql, params).fetchall()
+        return [{"id": r["id"], "ts": r["ts"], "runId": r["run_id"],
+                 "kind": r["kind"], "channel": r["channel"],
+                 "user": r["user"], "text": r["text"]}
+                for r in rows]
+    except Exception as e:
+        log.warning("orch list_inbound failed: %s", e)
+        return []
+
+
+def list_outbound(*, kind: str = "", channel: str = "",
+                  run_id: str = "",
+                  limit: int = 100, since_id: int = 0) -> list[dict]:
+    """Tail the orchestrator → channel stream. Same filters as ``list_inbound``
+    plus an optional ``run_id`` filter for "all replies for this dispatch"."""
+    try:
+        _ensure_history_schema()
+        from .db import _db
+        clauses = ["id > ?"]
+        params: list = [int(since_id or 0)]
+        if kind:
+            clauses.append("kind = ?"); params.append(kind)
+        if channel:
+            clauses.append("channel = ?"); params.append(channel)
+        if run_id:
+            clauses.append("run_id = ?"); params.append(run_id)
+        sql = ("SELECT id, ts, run_id, kind, channel, via, ok, text "
+               "FROM orch_outbound WHERE " + " AND ".join(clauses) +
+               " ORDER BY id DESC LIMIT ?")
+        params.append(max(1, min(int(limit), 1000)))
+        with _db() as c:
+            rows = c.execute(sql, params).fetchall()
+        return [{"id": r["id"], "ts": r["ts"], "runId": r["run_id"],
+                 "kind": r["kind"], "channel": r["channel"],
+                 "via": r["via"], "ok": bool(r["ok"]), "text": r["text"]}
+                for r in rows]
+    except Exception as e:
+        log.warning("orch list_outbound failed: %s", e)
+        return []
 
 
 def list_run_history(limit: int = 50) -> list[dict]:
@@ -855,6 +994,10 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
     avail = [a for a in avail if a]
     if not avail:
         avail = [cfg["plannerAssignee"]]
+
+    # Inbound stream — F1 (v2.58.0). Persisted before any work so a crash
+    # in the planner still leaves the user's request inspectable.
+    _persist_inbound(run_id, kind=kind, channel=channel, user=user, text=text)
 
     agent_bus.publish(_topic(run_id, "begin"),
                       {"text": text, "kind": kind, "channel": channel,
@@ -1255,6 +1398,48 @@ def api_orch_history_get(query: dict | None = None) -> dict:
     if not rec:
         return {"ok": False, "error": "not found"}
     return {"ok": True, "run": rec}
+
+
+def _q_str(query: dict | None, key: str, default: str = "") -> str:
+    if not isinstance(query, dict):
+        return default
+    v = query.get(key)
+    if isinstance(v, list):
+        v = v[0] if v else default
+    return str(v or default)
+
+
+def _q_int(query: dict | None, key: str, default: int) -> int:
+    if not isinstance(query, dict):
+        return default
+    v = query.get(key)
+    if isinstance(v, list):
+        v = v[0] if v else default
+    try:
+        return int(v or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def api_orch_inbound(query: dict | None = None) -> dict:
+    """GET /api/orchestrator/inbound?kind=&channel=&since=&limit="""
+    return {"ok": True, "items": list_inbound(
+        kind=_q_str(query, "kind"),
+        channel=_q_str(query, "channel"),
+        since_id=_q_int(query, "since", 0),
+        limit=_q_int(query, "limit", 100),
+    )}
+
+
+def api_orch_outbound(query: dict | None = None) -> dict:
+    """GET /api/orchestrator/outbound?kind=&channel=&runId=&since=&limit="""
+    return {"ok": True, "items": list_outbound(
+        kind=_q_str(query, "kind"),
+        channel=_q_str(query, "channel"),
+        run_id=_q_str(query, "runId"),
+        since_id=_q_int(query, "since", 0),
+        limit=_q_int(query, "limit", 100),
+    )}
 
 
 def _verify_slack_signature(raw_body: bytes, headers: dict, secret: str,
