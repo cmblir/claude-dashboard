@@ -647,6 +647,9 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
         # --rm + --network=none + read-only mount + no privileged flags.
         # The command is passed as a single string and wrapped with
         # ``sh -c`` inside the container. Env passed through with --env.
+        # v2.61.0 — optional result cache (I2): when ``cache=true`` the
+        # node hashes (image, command, env, mountPath, network) and reuses
+        # the previous successful stdout for ``cacheTtlSec`` seconds.
         env_raw = d.get("env") or {}
         env_clean: dict = {}
         if isinstance(env_raw, dict):
@@ -662,6 +665,8 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
             "env":        env_clean,
             "timeoutSec": max(1, min(600, int(d.get("timeoutSec") or 60))),
             "memMb":      max(64, min(4096, int(d.get("memMb") or 512))),
+            "cache":      bool(d.get("cache")),
+            "cacheTtlSec": max(1, min(86400, int(d.get("cacheTtlSec") or 300))),
         }
     # start 는 data 비움
     return out
@@ -2347,6 +2352,57 @@ def _execute_ralph_node(data: dict, inputs: list[str], _elapsed) -> dict:
             "ralphRunId": rid}
 
 
+_DOCKER_CACHE: dict[str, tuple[float, dict]] = {}
+_DOCKER_CACHE_LOCK = threading.Lock()
+_DOCKER_CACHE_MAX = 256
+
+
+def _docker_cache_key(data: dict, stdin_text: str) -> str:
+    """SHA1 of the inputs that would change the output.
+
+    Includes stdin so different upstream inputs produce different cache
+    entries. Excludes timeout/memMb (those are resource limits, not
+    behaviour) so two nodes with the same logical command share a slot.
+    """
+    import hashlib
+    payload = json.dumps({
+        "image":      data.get("image"),
+        "command":    data.get("command"),
+        "mountPath":  data.get("mountPath"),
+        "mountReadonly": bool(data.get("mountReadonly", True)),
+        "network":    data.get("network"),
+        "env":        data.get("env") or {},
+        "stdin":      stdin_text,
+    }, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha1(payload).hexdigest()
+
+
+def _docker_cache_get(key: str, ttl_s: int) -> Optional[dict]:
+    with _DOCKER_CACHE_LOCK:
+        item = _DOCKER_CACHE.get(key)
+        if item is None:
+            return None
+        ts, payload = item
+        if time.time() - ts > ttl_s:
+            _DOCKER_CACHE.pop(key, None)
+            return None
+        return dict(payload)
+
+
+def _docker_cache_set(key: str, payload: dict) -> None:
+    with _DOCKER_CACHE_LOCK:
+        _DOCKER_CACHE[key] = (time.time(), dict(payload))
+        # Bounded size — drop oldest when full.
+        if len(_DOCKER_CACHE) > _DOCKER_CACHE_MAX:
+            oldest = min(_DOCKER_CACHE.items(), key=lambda kv: kv[1][0])[0]
+            _DOCKER_CACHE.pop(oldest, None)
+
+
+def _docker_cache_clear_for_tests() -> None:
+    with _DOCKER_CACHE_LOCK:
+        _DOCKER_CACHE.clear()
+
+
 def _execute_docker_run_node(data: dict, inputs: list[str], _elapsed) -> dict:
     """Run a single shell command inside a transient docker container.
 
@@ -2399,6 +2455,24 @@ def _execute_docker_run_node(data: dict, inputs: list[str], _elapsed) -> dict:
     if inputs:
         stdin_text = "\n".join(s for s in inputs if isinstance(s, str))
 
+    # I2 (v2.61.0) — opt-in result cache for idempotent commands.
+    cache_on = bool(data.get("cache"))
+    cache_key = ""
+    if cache_on:
+        cache_key = _docker_cache_key(data, stdin_text)
+        ttl = int(data.get("cacheTtlSec") or 300)
+        hit = _docker_cache_get(cache_key, ttl)
+        if hit is not None:
+            return {
+                "status": "ok",
+                "output": hit["output"],
+                "durationMs": _elapsed(),
+                "image": image,
+                "exitCode": 0,
+                "cached": True,
+                "cachedAgeS": int(time.time() - hit["ts"]) if "ts" in hit else 0,
+            }
+
     try:
         proc = subprocess.run(
             argv, input=stdin_text, capture_output=True, text=True,
@@ -2418,10 +2492,14 @@ def _execute_docker_run_node(data: dict, inputs: list[str], _elapsed) -> dict:
                 "output": (proc.stdout or "")[:32000],
                 "error": ("exit %d: %s" % (proc.returncode, (proc.stderr or "")[:2000])),
                 "durationMs": _elapsed(), "image": image}
+    output = (proc.stdout or "")[:32000]
+    if cache_on and cache_key:
+        _docker_cache_set(cache_key, {"output": output, "ts": time.time()})
     return {"status": "ok",
-            "output": (proc.stdout or "")[:32000],
+            "output": output,
             "durationMs": _elapsed(), "image": image,
-            "exitCode": 0}
+            "exitCode": 0,
+            "cached": False}
 
 
 def _parse_hhmm(s: str) -> Optional[tuple[int, int]]:

@@ -94,3 +94,64 @@ def test_api_no_polish_by_default(rec_mod, project, monkeypatch):
                         lambda r, **k: (seen.update(called=True) or r))
     rec_mod.api_ralph_recommend({"project": str(project)})
     assert seen["called"] is False
+
+
+# ───── api_ralph_polish_get / api_ralph_polish_set ─────
+
+def test_polish_prompt_get_default(rec_mod, monkeypatch):
+    monkeypatch.delenv("RALPH_POLISH_SYSTEM", raising=False)
+    result = rec_mod.api_ralph_polish_get()
+    assert result["ok"] is True
+    assert result["source"] == "default"
+    assert result["current"] == rec_mod._DEFAULT_POLISH_SYSTEM
+    assert result["default"] == rec_mod._DEFAULT_POLISH_SYSTEM
+
+
+def test_polish_prompt_get_from_env(rec_mod, monkeypatch):
+    monkeypatch.setenv("RALPH_POLISH_SYSTEM", "custom env prompt")
+    result = rec_mod.api_ralph_polish_get()
+    assert result["ok"] is True
+    assert result["source"] == "env"
+    assert result["current"] == "custom env prompt"
+
+
+def test_polish_prompt_set_and_get(rec_mod, tmp_path, monkeypatch):
+    monkeypatch.delenv("RALPH_POLISH_SYSTEM", raising=False)
+    cfg_file = tmp_path / "polish.md"
+    monkeypatch.setenv("CLAUDE_DASHBOARD_RALPH_POLISH", str(cfg_file))
+
+    set_result = rec_mod.api_ralph_polish_set({"text": "my custom system prompt"})
+    assert set_result["ok"] is True
+    assert cfg_file.exists()
+    assert cfg_file.read_text() == "my custom system prompt"
+
+    get_result = rec_mod.api_ralph_polish_get()
+    assert get_result["source"] == "file"
+    assert get_result["current"] == "my custom system prompt"
+
+
+def test_polish_prompt_set_clear(rec_mod, tmp_path, monkeypatch):
+    monkeypatch.delenv("RALPH_POLISH_SYSTEM", raising=False)
+    cfg_file = tmp_path / "polish.md"
+    cfg_file.write_text("old prompt")
+    monkeypatch.setenv("CLAUDE_DASHBOARD_RALPH_POLISH", str(cfg_file))
+
+    clear_result = rec_mod.api_ralph_polish_set({"clear": True})
+    assert clear_result["ok"] is True
+    assert clear_result.get("cleared") is True
+    assert not cfg_file.exists()
+
+
+def test_polish_prompt_set_bad_body(rec_mod):
+    result = rec_mod.api_ralph_polish_set("not a dict")
+    assert result["ok"] is False
+
+
+def test_polish_prompt_set_empty_text(rec_mod):
+    result = rec_mod.api_ralph_polish_set({"text": ""})
+    assert result["ok"] is False
+
+
+def test_polish_prompt_set_too_long(rec_mod):
+    result = rec_mod.api_ralph_polish_set({"text": "x" * 16001})
+    assert result["ok"] is False

@@ -280,13 +280,35 @@ def recommend(project_path: str) -> Optional[Recommendation]:
 
 # ───────── HTTP API ─────────
 
-_POLISH_SYSTEM = (
+_DEFAULT_POLISH_SYSTEM = (
     "You are an editor refining a Ralph-loop PROMPT.md draft.\n"
     "Keep every section header and every bullet from the input.\n"
     "Tighten language, fix awkward phrasing, ensure the rules section is "
     "explicit and the completion-promise marker stays exactly as given.\n"
     "Output the polished Markdown only — no commentary, no fences."
 )
+
+
+def _polish_system_prompt() -> str:
+    """Resolution order: env ``RALPH_POLISH_SYSTEM`` > config file > default.
+
+    Config file lives at ``$CLAUDE_DASHBOARD_RALPH_POLISH`` (defaults to
+    ``~/.claude-dashboard-ralph-polish.md``); plain Markdown, no frontmatter.
+    """
+    env_val = os.environ.get("RALPH_POLISH_SYSTEM", "").strip()
+    if env_val:
+        return env_val
+    try:
+        from .config import _env_path
+        cfg_path = _env_path("CLAUDE_DASHBOARD_RALPH_POLISH",
+                             Path.home() / ".claude-dashboard-ralph-polish.md")
+        if cfg_path.is_file():
+            text = cfg_path.read_text(encoding="utf-8", errors="replace").strip()
+            if text:
+                return text
+    except Exception:
+        pass
+    return _DEFAULT_POLISH_SYSTEM
 
 
 def polish(rec: Recommendation, *, assignee: str = "") -> Recommendation:
@@ -302,7 +324,7 @@ def polish(rec: Recommendation, *, assignee: str = "") -> Recommendation:
     try:
         resp = execute_with_assignee(
             target, rec.promptMd,
-            system_prompt=_POLISH_SYSTEM,
+            system_prompt=_polish_system_prompt(),
             timeout=int(os.environ.get("RALPH_POLISH_TIMEOUT_S", "30")),
             fallback=True,
         )
@@ -318,6 +340,59 @@ def polish(rec: Recommendation, *, assignee: str = "") -> Recommendation:
         project=rec.project, promptMd=out, rationale=rec.rationale + " · LLM-polished",
         completion=rec.completion, sources={**rec.sources, "polished": True},
     )
+
+
+def api_ralph_polish_get(query: dict | None = None) -> dict:
+    """GET /api/ralph/polish-prompt — current effective polish system prompt
+    plus its source (env / file / default).
+    """
+    src = "default"
+    if os.environ.get("RALPH_POLISH_SYSTEM", "").strip():
+        src = "env"
+    else:
+        try:
+            from .config import _env_path
+            cfg_path = _env_path("CLAUDE_DASHBOARD_RALPH_POLISH",
+                                 Path.home() / ".claude-dashboard-ralph-polish.md")
+            if cfg_path.is_file():
+                src = "file"
+        except Exception:
+            pass
+    return {"ok": True, "source": src,
+            "default": _DEFAULT_POLISH_SYSTEM,
+            "current": _polish_system_prompt()}
+
+
+def api_ralph_polish_set(body: dict) -> dict:
+    """POST /api/ralph/polish-prompt — write a custom system prompt to the
+    config file. Send ``{"clear": true}`` to remove it (revert to default).
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    try:
+        from .config import _env_path
+        cfg_path = _env_path("CLAUDE_DASHBOARD_RALPH_POLISH",
+                             Path.home() / ".claude-dashboard-ralph-polish.md")
+    except Exception as e:
+        return {"ok": False, "error": f"path resolve failed: {e}"}
+    if body.get("clear"):
+        try:
+            if cfg_path.is_file():
+                cfg_path.unlink()
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True, "cleared": True}
+    text = (body.get("text") or "").strip()
+    if not text:
+        return {"ok": False, "error": "text required (or pass clear=true)"}
+    if len(text) > 16000:
+        return {"ok": False, "error": "text too long (max 16000)"}
+    try:
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        cfg_path.write_text(text, encoding="utf-8")
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "savedTo": str(cfg_path)}
 
 
 def api_ralph_recommend(body: dict) -> dict:

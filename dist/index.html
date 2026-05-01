@@ -1801,6 +1801,12 @@ function renderNav() {
       const descHtml = n.desc ? `<div class="nav-desc text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">${escapeHtml(t(n.desc))}</div>` : '';
       const isFav = _isFavoriteTab(n.id);
       const favBtn = `<button class="nav-fav-btn" aria-label="${isFav?t('즐겨찾기 해제'):t('즐겨찾기 추가')}" title="${isFav?t('즐겨찾기 해제'):t('즐겨찾기 추가')}" style="${isFav?'':'opacity:0.4;'}">${isFav?'★':'☆'}</button>`;
+      // I3 (v2.61.0) — 🔥 hot badge for the current mode's top-3 tabs.
+      const _topInThisMode = _topTabsForMode(state.mode || 'all', 3);
+      const isHot = _topInThisMode.includes(n.id);
+      const hotBadge = isHot
+        ? '<span title="' + escapeHtml(t('이 모드에서 가장 많이 사용한 탭')) + '" style="margin-left:4px;font-size:10px;">🔥</span>'
+        : '';
       // H3 (v2.60.0) — mode badges, only visible in 'all' mode so users can
       // see at a glance which mode each tab also lives in.
       let modeBadges = '';
@@ -1819,7 +1825,7 @@ function renderNav() {
       el.innerHTML = `
         <span class="w-5 text-center self-start mt-0.5 flex-shrink-0">${n.icon}</span>
         <div class="nav-label flex-1 min-w-0">
-          <div>${escapeHtml(t(n.label))}${modeBadges}</div>
+          <div>${escapeHtml(t(n.label))}${hotBadge}${modeBadges}</div>
           ${descHtml}
         </div>
         ${favBtn}`;
@@ -1961,8 +1967,38 @@ function go(id) {
   location.hash = '#/' + id;
   // H1 (v2.60.0) — per-mode last-tab memory.
   try { _rememberLastTab(state.mode || 'all', id); } catch {}
+  // I3 (v2.61.0) — per-mode visit counter for "most-used" 🔥 badge.
+  try { _bumpModeTabCounter(state.mode || 'all', id); } catch {}
   renderNav();
   renderView();
+}
+
+// I3 (v2.61.0) — per-mode tab visit counter. Stored as
+// localStorage 'cc.mode.<mode>.counts' = {tabId: count, ...}.
+// Cap each count at 9999 so a single noisy day doesn't dominate forever.
+const _COUNT_CAP = 9999;
+
+function _modeTabCounts(mode) {
+  try {
+    const raw = localStorage.getItem('cc.mode.' + mode + '.counts');
+    return raw ? JSON.parse(raw) : {};
+  } catch (_) { return {}; }
+}
+
+function _bumpModeTabCounter(mode, tabId) {
+  const counts = _modeTabCounts(mode);
+  counts[tabId] = Math.min((counts[tabId] || 0) + 1, _COUNT_CAP);
+  try { localStorage.setItem('cc.mode.' + mode + '.counts', JSON.stringify(counts)); }
+  catch (_) {}
+}
+
+function _topTabsForMode(mode, n = 3) {
+  const counts = _modeTabCounts(mode);
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, n)
+    .filter(([, c]) => c >= 3)   // need ≥3 visits to qualify
+    .map(([id]) => id);
 }
 
 // ── v2.40.0 — Sidebar discovery: favorites + recents + '/' spotlight ──
@@ -18698,11 +18734,70 @@ VIEWS.orchestrator = async () => {
         <div class="text-[10px] uppercase tracking-wider mt-3" style="color:var(--text-dim)">${t('라이브 이벤트')}</div>
         <pre id="orchLiveLog" class="text-[10px] whitespace-pre-wrap" style="max-height:240px;overflow-y:auto;color:var(--text-dim)"></pre>
       </div>
+      <div class="card p-4 lg:col-span-2">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="text-[12px] font-semibold">${t('IPC 스트림')}</div>
+          <span class="text-[10px]" style="color:var(--text-dim)">${t('inbound (사용자 → 오케) / outbound (오케 → 채널) 분리 로그')}</span>
+          <button class="chip text-[10px] ml-auto" onclick="_orchRefreshIpc()">${t('새로고침')}</button>
+          <input id="orchIpcChan" class="text-[11px] bg-transparent border-b" placeholder="${t('채널 필터 (선택)')}" oninput="_orchRefreshIpc()">
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div>
+            <div class="text-[10px] uppercase tracking-wider mb-1" style="color:var(--text-dim)">⬇ inbound</div>
+            <div id="orchIpcInbound" class="text-[11px]" style="max-height:280px;overflow-y:auto;"></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider mb-1" style="color:var(--text-dim)">⬆ outbound</div>
+            <div id="orchIpcOutbound" class="text-[11px]" style="max-height:280px;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 };
 
+async function _orchRefreshIpc() {
+  const chan = (document.getElementById('orchIpcChan') || {}).value || '';
+  const qs = chan ? '?channel=' + encodeURIComponent(chan) : '';
+  const [inb, out] = await Promise.all([
+    api('/api/orchestrator/inbound' + qs).catch(() => null),
+    api('/api/orchestrator/outbound' + qs).catch(() => null),
+  ]);
+  const fmtMs = (ms) => ms ? new Date(ms).toLocaleTimeString() : '—';
+  const inHost = document.getElementById('orchIpcInbound');
+  const outHost = document.getElementById('orchIpcOutbound');
+  if (inHost) {
+    const items = (inb && inb.items) || [];
+    inHost.innerHTML = items.length ? items.map(it => `
+      <div class="card p-2 mb-1" style="background:rgba(96,165,250,0.04);">
+        <div class="flex items-center gap-2 text-[10px]" style="color:var(--text-dim)">
+          <span class="font-mono">${fmtMs(it.ts)}</span>
+          <span class="chip text-[9px]">${escapeHtml(it.kind)}</span>
+          <span class="font-mono truncate" style="max-width:120px;">${escapeHtml(it.channel || '')}</span>
+          <span class="font-mono ml-auto" style="color:var(--text-dim)">#${it.id}</span>
+        </div>
+        <div class="text-[11px] mt-1">${escapeHtml((it.text || '').slice(0, 200))}</div>
+      </div>`).join('') : `<div class="text-[10px]" style="color:var(--text-dim)">${t('inbound 없음')}</div>`;
+  }
+  if (outHost) {
+    const items = (out && out.items) || [];
+    outHost.innerHTML = items.length ? items.map(it => `
+      <div class="card p-2 mb-1" style="background:rgba(${it.ok?'34,197,94':'252,165,165'},0.04);">
+        <div class="flex items-center gap-2 text-[10px]" style="color:var(--text-dim)">
+          <span class="font-mono">${fmtMs(it.ts)}</span>
+          <span class="chip text-[9px]">${escapeHtml(it.kind)}</span>
+          <span class="chip text-[9px]">${escapeHtml(it.via || 'ad-hoc')}</span>
+          <span class="font-mono truncate" style="max-width:120px;">${escapeHtml(it.channel || '')}</span>
+          <span class="font-mono ml-auto" style="color:${it.ok?'var(--success)':'#fca5a5'};">${it.ok?'ok':'err'}</span>
+        </div>
+        <div class="text-[11px] mt-1">${escapeHtml((it.text || '').slice(0, 200))}</div>
+      </div>`).join('') : `<div class="text-[10px]" style="color:var(--text-dim)">${t('outbound 없음')}</div>`;
+  }
+}
+
 AFTER.orchestrator = () => {
+  // I4 (v2.61.0) — initial IPC fetch.
+  try { _orchRefreshIpc(); } catch (_) {}
   // Auto-stop any prior stream when leaving the tab.
   if (state.data._orchEs) {
     try { state.data._orchEs.close(); } catch (_) {}

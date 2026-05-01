@@ -68,6 +68,14 @@ NEW_EN: dict[str, str] = {
     "Session UUID 가 비어있음":          "Session UUID is empty",
     "바인딩 추가됨":                    "Binding added",
     "실패":                             "Failed",
+    # v2.61.0 — mode usage stats + IPC panel
+    "이 모드에서 가장 많이 사용한 탭": "Top tab in this mode",
+    "IPC 스트림":                       "IPC streams",
+    "inbound (사용자 → 오케) / outbound (오케 → 채널) 분리 로그":
+        "inbound (user → orchestrator) / outbound (orchestrator → channel) split log",
+    "채널 필터 (선택)":                 "Channel filter (optional)",
+    "inbound 없음":                     "No inbound",
+    "outbound 없음":                    "No outbound",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -121,4 +129,11 @@ NEW_ZH: dict[str, str] = {
     "Session UUID 가 비어있음":          "Session UUID 为空",
     "바인딩 추가됨":                    "绑定已新增",
     "실패":                             "失败",
+    "이 모드에서 가장 많이 사용한 탭": "本模式中使用最多的标签",
+    "IPC 스트림":                       "IPC 流",
+    "inbound (사용자 → 오케) / outbound (오케 → 채널) 분리 로그":
+        "inbound(用户 → 编排) / outbound(编排 → 频道)分离日志",
+    "채널 필터 (선택)":                 "频道过滤(可选)",
+    "inbound 없음":                     "无 inbound",
+    "outbound 없음":                    "无 outbound",
 }

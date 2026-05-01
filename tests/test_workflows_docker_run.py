@@ -121,3 +121,102 @@ def test_execute_uses_subprocess(wf, monkeypatch):
     assert "FOO=bar" in argv
     assert captured["input"] == "upstream input"
     assert captured["timeout"] == 30
+
+
+# ───── I2 (v2.61.0) — docker_run result cache ─────
+
+def test_sanitize_cache_defaults_false(wf):
+    n = wf._sanitize_node({"id": "n-x", "type": "docker_run",
+                            "x": 0, "y": 0,
+                            "data": {"command": "x"}})
+    assert n["data"]["cache"] is False
+    assert n["data"]["cacheTtlSec"] == 300
+
+
+def test_sanitize_cache_true_survives(wf):
+    n = wf._sanitize_node({"id": "n-x", "type": "docker_run",
+                            "x": 0, "y": 0,
+                            "data": {"command": "x", "cache": True,
+                                     "cacheTtlSec": 60}})
+    assert n["data"]["cache"] is True
+    assert n["data"]["cacheTtlSec"] == 60
+
+
+def test_sanitize_cache_ttl_clamped(wf):
+    n = wf._sanitize_node({"id": "n-x", "type": "docker_run",
+                            "x": 0, "y": 0,
+                            "data": {"command": "x", "cache": True,
+                                     "cacheTtlSec": 999999}})
+    assert n["data"]["cacheTtlSec"] == 86400
+
+
+def test_cache_hit_skips_subprocess(wf, monkeypatch):
+    """A cached result should be returned without calling subprocess.run."""
+    import subprocess
+    subprocess_called = {"n": 0}
+
+    class FakeProc:
+        returncode = 0
+        stdout = "live result\n"
+        stderr = ""
+
+    def fake_run(*a, **k):
+        subprocess_called["n"] += 1
+        return FakeProc()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/local/bin/docker")
+    wf._docker_cache_clear_for_tests()
+
+    data = {"image": "alpine:3", "command": "echo hi",
+            "timeoutSec": 5, "memMb": 64, "network": "none", "env": {},
+            "cache": True, "cacheTtlSec": 300}
+
+    # First call — cache miss, subprocess is invoked.
+    r1 = wf._execute_docker_run_node(data, [], lambda: 0)
+    assert r1["status"] == "ok"
+    assert subprocess_called["n"] == 1
+    assert r1["cached"] is False
+
+    # Second call — cache hit, subprocess should NOT be called again.
+    r2 = wf._execute_docker_run_node(data, [], lambda: 0)
+    assert r2["status"] == "ok"
+    assert subprocess_called["n"] == 1      # still 1
+    assert r2["cached"] is True
+    assert r2["output"] == "live result\n"
+
+
+def test_cache_key_changes_with_different_stdin(wf):
+    key1 = wf._docker_cache_key({"image": "a", "command": "x",
+                                  "mountPath": None, "mountReadonly": True,
+                                  "network": "none", "env": {}}, "input-a")
+    key2 = wf._docker_cache_key({"image": "a", "command": "x",
+                                  "mountPath": None, "mountReadonly": True,
+                                  "network": "none", "env": {}}, "input-b")
+    assert key1 != key2
+
+
+def test_cache_disabled_does_not_cache(wf, monkeypatch):
+    import subprocess
+    call_count = {"n": 0}
+
+    class FakeProc:
+        returncode = 0
+        stdout = "out\n"
+        stderr = ""
+
+    def fake_run(*a, **k):
+        call_count["n"] += 1
+        return FakeProc()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/local/bin/docker")
+    wf._docker_cache_clear_for_tests()
+
+    data = {"image": "alpine:3", "command": "echo hi",
+            "timeoutSec": 5, "memMb": 64, "network": "none", "env": {},
+            "cache": False, "cacheTtlSec": 300}
+
+    wf._execute_docker_run_node(data, [], lambda: 0)
+    wf._execute_docker_run_node(data, [], lambda: 0)
+    assert call_count["n"] == 2     # subprocess called both times

@@ -110,7 +110,9 @@ from .orchestrator import (
 from .ralph import (
     api_ralph_cancel, api_ralph_list, api_ralph_start, api_ralph_status,
 )
-from .ralph_recommend import api_ralph_recommend
+from .ralph_recommend import (
+    api_ralph_polish_get, api_ralph_polish_set, api_ralph_recommend,
+)
 from .discord_api import (
     api_discord_config_clear, api_discord_config_get,
     api_discord_config_save, api_discord_test,
@@ -378,6 +380,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/discord/config": lambda q: api_discord_config_get(q),
     "/api/ralph/list":   api_ralph_list,
     "/api/ralph/status": api_ralph_status,
+    "/api/ralph/polish-prompt": api_ralph_polish_get,
     "/api/agent-bus/history": api_agent_bus_history,
     "/api/run/catalog":      api_run_catalog,
     "/api/run/history":      api_run_history,
@@ -578,6 +581,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/ralph/start":              api_ralph_start,
     "/api/ralph/cancel":             api_ralph_cancel,
     "/api/ralph/recommend":          api_ralph_recommend,
+    "/api/ralph/polish-prompt":      api_ralph_polish_set,
     "/api/agent-bus/publish":        api_agent_bus_publish,
     "/api/obsidian/test":      api_obsidian_test,
     "/api/wizard/crew/create":  api_crew_create,
