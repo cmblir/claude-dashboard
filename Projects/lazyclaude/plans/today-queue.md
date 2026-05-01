@@ -1,33 +1,39 @@
-# Autonomous queue — 2026-05-01 (cycle 4: Ralph + Discord + failover)
+# Autonomous queue — 2026-05-01 (cycle 5: Ralph UI + LLM polish + Email + workspace)
 
-User: "오케이 해당 순서대로 지금부터 전체적으로 자율모드 시작."
-Reference: `decisions/2026-05-01-openclaw-nanoclaw-ralph-analysis.md` Tier-1+T2-1+T2-2.
+User: "깃푸시 권한 승인. 다음 사이클 구현. 자율모드".
+Identity: **`cmblir <cmblir@users.noreply.github.com>`** (per memory; old email banned).
 
-Branch: `feat/v2.56-ralph-discord-failover`. Local --no-ff merge into main at end.
+Branch: `feat/v2.57-ralph-ui-email-llm-polish`. Local merge to main + push.
 
-## [D1] Ralph engine — `server/ralph.py`
-- Same-prompt loop with 4-fold termination: max-iter / completion-promise / cancel / budget-USD.
-- Publishes to agent_bus on `ralph.<run_id>.*`. Persists each iteration to SQLite.
-- Re-uses `execute_with_assignee` so any provider works.
+## [E1] Ralph UI tab
+- 목표: 대시보드에 🦞 Ralph 탭. 실행 목록 / 라이브 진행 SSE / 새 run 시작 폼 / 취소 버튼.
+- 영향: `dist/index.html` (`VIEWS.ralph`), `nav_catalog.py`, i18n.
+- 완료 기준: SSE로 iteration 도착, 비용/iter 카운터 라이브 갱신, 취소 버튼 작동.
 
-## [D2] Ralph workflow node
-- New node type `ralph` in `server/workflows.py`. Inspector form mirrors CLI flags.
+## [E2] Project Ralph card
+- 목표: Projects 탭의 각 프로젝트 카드에 🦞 버튼 → 추천 모달 → 미리보기/편집/시작.
+- 영향: `dist/index.html` Projects 탭, `/api/ralph/recommend` 호출.
+- 완료 기준: 1프로젝트 → recommend → start → Ralph 탭으로 점프 / 라이브 보이기.
 
-## [D3] Ralph CLI — `tools/ralph_loop.py`
-- `python3 tools/ralph_loop.py PROMPT.md --max 25 --completion DONE --budget-usd 5`
-- Stdlib only. Ctrl+C → graceful cancel via the engine.
+## [E3] LLM-polish for PROMPT.md draft
+- 목표: 추천기 mechanical 출력에 plan-cache 가능한 LLM 다듬기 옵션 추가 (`?polish=true`).
+- 영향: `server/ralph_recommend.py` + plan-LRU 재사용.
+- 완료 기준: pytest stub planner로 polish 분기 검증.
 
-## [D4] Project Ralph recommender — `server/ralph_recommend.py`
-- Synth PROMPT.md from CLAUDE.md + git log + TODO grep + last unfinished session.
-- New API + projects-tab card.
+## [E4] Email-out reply (SMTP)
+- 목표: orchestrator binding `kind: "email"` (default chat = recipient).
+- 영향: `server/orchestrator.py` (sink 추가), `server/email_out.py` 신규 (SMTP+STARTTLS 재사용).
+- 완료 기준: smoke 테스트로 reply sink가 SMTP 호출 (mocked).
 
-## [D5] Discord bot — `server/discord_api.py`
-- Bot token + interactions signature (ed25519 / nacl substitute via stdlib hashlib won't fit — use webhook events route instead).
-- Falls back to gateway-less HTTP webhook posting for outbound; uses Slack-style polling for inbound where possible.
+## [E5] Per-agent isolated workspace
+- 목표: binding마다 `~/.claude-dashboard-agents/<id>/CLAUDE.md` + `memory/` 자동 생성·로드.
+- 영향: `server/orchestrator.py` execute_step에서 cwd/system_prompt 세팅.
+- 완료 기준: 같은 binding 두 dispatch가 같은 워크스페이스 사용. 다른 binding은 격리.
 
-## [D6] Per-binding failover + daily budget cap
-- Extend `_sanitize_binding` with `fallbackChain`, `budgetUsdPerDay`.
-- Enforce in `dispatch()`. Surface remaining budget per binding.
+## [E6] Workflow ralph-node inspector form
+- 목표: 워크플로우 캔버스에서 Ralph 노드 클릭 → 인스펙터에 prompt/maxIter/budget/completion 필드.
+- 영향: `dist/index.html` `_wfRenderInspector` 분기.
+- 완료 기준: 저장-불러오기 round-trip + dry-run.
 
-## [D7] Tests + i18n + commit + LOCAL merge to main
-- Suite must stay green. i18n verify 0 missing. `git merge --no-ff` into main locally; no `git push`.
+## [E7] Tests + i18n + commit + merge + push
+- 위 5종 cover. 전체 pytest 통과. i18n 0 missing. main 머지 후 origin push.

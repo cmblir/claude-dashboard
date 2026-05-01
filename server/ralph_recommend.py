@@ -34,6 +34,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+# Module-level import so tests can monkeypatch ``execute_with_assignee``
+# from ``server.ralph_recommend``. The orchestrator's plan LRU is the right
+# place to dedupe identical polish requests, but we don't reach in here —
+# polish is a single one-shot per ``api_ralph_recommend(polish=True)``.
+try:
+    from .ai_providers import execute_with_assignee  # type: ignore
+except Exception:    # pragma: no cover — env without ai_providers
+    def execute_with_assignee(*_a, **_k):  # type: ignore
+        from types import SimpleNamespace
+        return SimpleNamespace(status="err", output="", error="ai_providers unavailable",
+                               model="", provider="", tokens_total=0,
+                               duration_ms=0, cost_usd=0.0, raw={})
+
 
 _TODO_RE = re.compile(r"\b(TODO|FIXME|XXX|HACK)\b[:\s-]*(.{0,160})", re.IGNORECASE)
 _TAGLINE_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
@@ -267,6 +280,46 @@ def recommend(project_path: str) -> Optional[Recommendation]:
 
 # ───────── HTTP API ─────────
 
+_POLISH_SYSTEM = (
+    "You are an editor refining a Ralph-loop PROMPT.md draft.\n"
+    "Keep every section header and every bullet from the input.\n"
+    "Tighten language, fix awkward phrasing, ensure the rules section is "
+    "explicit and the completion-promise marker stays exactly as given.\n"
+    "Output the polished Markdown only — no commentary, no fences."
+)
+
+
+def polish(rec: Recommendation, *, assignee: str = "") -> Recommendation:
+    """Optional second pass: ask a small model to clean up the mechanical
+    draft. Plan-cache-friendly key (text-only) so the same draft + assignee
+    pair short-circuits within the orchestrator's plan LRU.
+
+    Returns the original recommendation on any failure — we never lie about
+    success and we never block the start path on a polish error.
+    """
+    target = (assignee or os.environ.get("RALPH_POLISH_ASSIGNEE",
+                                          "claude:sonnet")).strip()
+    try:
+        resp = execute_with_assignee(
+            target, rec.promptMd,
+            system_prompt=_POLISH_SYSTEM,
+            timeout=int(os.environ.get("RALPH_POLISH_TIMEOUT_S", "30")),
+            fallback=True,
+        )
+    except Exception:
+        return rec
+    if getattr(resp, "status", "") != "ok" or not (resp.output or "").strip():
+        return rec
+    out = resp.output.strip()
+    # Sanity: keep the user's completion marker in the polished output.
+    if rec.completion and rec.completion not in out:
+        out = out + f"\n\n`{rec.completion}`\n"
+    return Recommendation(
+        project=rec.project, promptMd=out, rationale=rec.rationale + " · LLM-polished",
+        completion=rec.completion, sources={**rec.sources, "polished": True},
+    )
+
+
 def api_ralph_recommend(body: dict) -> dict:
     if not isinstance(body, dict):
         return {"ok": False, "error": "bad body"}
@@ -276,4 +329,6 @@ def api_ralph_recommend(body: dict) -> dict:
     rec = recommend(project)
     if rec is None:
         return {"ok": False, "error": "project not found"}
+    if body.get("polish"):
+        rec = polish(rec, assignee=str(body.get("assignee") or ""))
     return {"ok": True, "recommendation": rec.to_dict()}
