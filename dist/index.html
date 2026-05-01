@@ -19082,6 +19082,9 @@ VIEWS.ralph = async () => {
       <td class="p-1">$${(it.costUsd || 0).toFixed(4)} / $${(it.budgetUsd || 0).toFixed(2)}</td>
       <td class="p-1 font-mono">${escapeHtml(it.assignee)}</td>
       <td class="p-1" style="color:var(--text-dim)">${fmtMs(it.tsStart)}</td>
+      <td class="p-1" onclick="event.stopPropagation()">
+        <button class="chip text-[9px]" onclick="_ralphDuplicateRun('${escapeHtml(it.runId)}')" title="${t('이 실행을 동일 설정으로 다시 시작')}">🔁</button>
+      </td>
     </tr>`).join('')
     : `<tr><td colspan="6" class="p-2 text-[11px]" style="color:var(--text-dim);text-align:center;">${t('아직 Ralph 실행 기록 없음')}</td></tr>`;
 
@@ -19112,6 +19115,7 @@ VIEWS.ralph = async () => {
             <th class="p-1">runId</th><th class="p-1">status</th>
             <th class="p-1">iter</th><th class="p-1">cost / budget</th>
             <th class="p-1">assignee</th><th class="p-1">started</th>
+            <th class="p-1"></th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
@@ -19289,6 +19293,25 @@ async function _ralphCancel(runId) {
   if (!confirm(t('이 Ralph 루프를 중단할까요?'))) return;
   const r = await api('/api/ralph/cancel', { method: 'POST', body: { runId }});
   toast(r.ok ? t('취소 요청 전송됨') : (r.error || t('실패')));
+}
+
+// M2 (v2.65.0) — duplicate run: prefill the start form with the same
+// configuration as the picked run so the user can tweak (or just hit
+// Start) instead of retyping everything.
+async function _ralphDuplicateRun(runId) {
+  const r = await api('/api/ralph/status?runId=' + encodeURIComponent(runId));
+  if (!r || !r.ok) { toast(r && r.error || t('실패'), 'err'); return; }
+  const run = r.run || {};
+  const fill = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+  fill('ralphPrompt',     run.prompt);
+  fill('ralphAssignee',   run.assignee);
+  fill('ralphCompletion', run.completion);
+  fill('ralphMax',        run.maxIter);
+  fill('ralphBudget',     run.budgetUsd);
+  // Scroll to start form
+  const ta = document.getElementById('ralphPrompt');
+  if (ta && ta.scrollIntoView) ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toast(t('이전 실행 설정 불러옴 — 검토 후 시작하세요'), 'ok');
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -22212,12 +22235,34 @@ window._backupDelete = async (name) => {
 // SYSTEM
 // ────────────────────────────────────────────────────────────────
 VIEWS.system = async () => {
-  const [status, devinfo] = await Promise.all([api('/api/system/status'), api('/api/device/info')]);
+  const [status, devinfo, boot] = await Promise.all([
+    api('/api/system/status'), api('/api/device/info'),
+    api('/api/system/boot-timing').catch(() => null),
+  ]);
   const sess = status.sessions || [];
+  // M1 (v2.65.0) — boot-timing card.
+  const bootCard = (boot && boot.ok && boot.bootDurationMs > 0) ? `
+    <div class="card p-5">
+      <h3 class="font-semibold text-sm mb-3">⏱ ${t('서버 부팅')}</h3>
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <div class="text-[var(--text-mute)]">${t('부팅 시간')}</div>
+          <div class="mono text-lg font-semibold">${boot.bootDurationMs} ms</div>
+        </div>
+        <div>
+          <div class="text-[var(--text-mute)]">${t('listen 시작')}</div>
+          <div class="mono text-xs">${new Date(boot.listeningAtMs).toLocaleString()}</div>
+        </div>
+      </div>
+      <div class="text-[10px] mt-3" style="color:var(--text-dim)">
+        ${t('python3 server.py 부팅부터 첫 HTTP listen 까지의 시간. db 마이그레이션, 백그라운드 인덱스, ollama auto-start 등은 데몬 스레드라 이 시간에 포함되지 않습니다.')}
+      </div>
+    </div>` : '';
   return `
     ${viewHeader('시스템 상태', '디바이스 & 활성 세션 · 권한 요약', 'system')}
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+      ${bootCard}
       <div class="card p-5">
         <h3 class="font-semibold text-sm mb-3">🖥 디바이스</h3>
         <table class="data">
