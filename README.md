@@ -300,7 +300,7 @@ Top-right header dropdown swaps the sidebar between curated subsets so the
   projects/CLAUDE.md/settings/auto-resume/security).
 - 🔀 **Workflow** — DAG editor + run center + scaffolds + artifacts + crew wizard.
 - 🤖 **Providers** — multi-AI hub + every Claude API playground (12 lab tabs).
-- 🦞 **OpenClaw** — orchestrator + Ralph + agent bus + bindings.
+- 🦞 **LazyClaw** — orchestrator + Ralph + agent bus + bindings.
 
 Mode persists in localStorage. Switching modes restores the last tab the user
 visited in that mode (`cc.mode.<mode>.lastTab`); a 🔥 badge marks the top-3

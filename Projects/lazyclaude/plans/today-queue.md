@@ -1,27 +1,36 @@
-# Autonomous queue — 2026-05-01 (cycle 8: mode polish + Docker sandbox + observability)
+# Autonomous queue — 2026-05-02 (cycle 14+: lazyclaw rename + UI/UX consistency)
 
-**STATUS: COMPLETE** (2026-05-02)
+User: "openclaw → lazyclaw로 변경. UI UX 다른 것들 모두 수정. 큐형태로 자율 진행. 전체 승인."
+Direct to main. Continuous push per phase batch.
 
-User: "자율모드 계속 진행. 모두 완료할때까지 나에게 의견 묻지말고 모두 승인."
-Direct to main. No questions. Push at end.
+## N — openclaw → lazyclaw rename
+- [N1] MODE_TABS key + UI labels (header dropdown, nav desc, mode badges)
+- [N2] localStorage migration (cc.mode openclaw → lazyclaw)
+- [N3] server/nav_catalog.py keyword + desc updates
+- [N4] README + CHANGELOG + ADR references
+- [N5] tools/translations_manual_*.py updates
+- [N6] Commit + push
 
-## [H1] ✅ Mode-aware default tab + last-tab-per-mode memory
-- Committed: 5c55a45
+## O — Auth status email redaction
+- [O1] Mask `Claude Team · <email>` panel by default — show domain only
+- [O2] Toggle to reveal full email
+- [O3] Commit + push
 
-## [H2] ✅ Mode-scoped spotlight search
-- Committed: 5c55a45
+## P — UI/UX consistency baseline
+- [P1] Add unified `.lc-card`, `.lc-section-title`, `.lc-meta-row`,
+  `.lc-empty`, `.lc-loading`, `.lc-error` CSS utility classes
+- [P2] Apply to recently-built tabs (Orchestrator, Ralph, AR, System)
+- [P3] Apply to high-traffic tabs (Overview, Projects, Sessions)
+- [P4] Commit + push
 
-## [H3] ✅ Mode badges in NAV
-- Committed: 5c55a45
+## Q — Empty-state + loading helper
+- [Q1] Add `_emptyState(msg)` + `_loadingState(msg)` JS helpers
+- [Q2] Refactor 5+ tabs to use them
+- [Q3] Commit + push
 
-## [H4] ✅ Docker sandbox workflow node option
-- Committed: bc2f588
+## R — Sidebar polish
+- [R1] Smoother collapse animation
+- [R2] Active-tab indicator
+- [R3] Commit + push
 
-## [H5] ✅ Boot timing observability
-- Committed: 254293d
-
-## [H6] ✅ Tests + i18n + commit-per-phase + push
-- 403 tests pass
-- i18n-verify: 0 missing
-- Committed: 7faeaef, b489781, 6fa14fd
-- 2 commits ahead of origin/main — push requires user confirmation (§21.3)
+(Cycles continue per autonomous mandate.)

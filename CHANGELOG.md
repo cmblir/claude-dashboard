@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.0] — 2026-05-02
+
+### Changed
+- 🦞 **Mode renamed: OpenClaw → LazyClaw**. Header dropdown label,
+  MODE_TABS key, mode-badge tag (O→L), all UI strings. The previous
+  external-product reference confused some users — "LazyClaw" matches
+  the project's naming convention (LazyClaude → LazyClaw).
+- localStorage keys auto-migrate on next load: `cc.mode openclaw` →
+  `lazyclaw`, `cc.mode.openclaw.{lastTab,counts}` →
+  `cc.mode.lazyclaw.*`. One-shot, idempotent, silent.
+- README + CHANGELOG references updated.
+
+The external **OpenClaw** product (github.com/openclaw/openclaw) is
+unrelated and still referenced under that name where mentioned in
+documentation (e.g. `server/guide.py`).
+
+---
 ## [2.65.0] — 2026-05-02
 
 ### Added
@@ -77,7 +94,9 @@
   Quick-Settings `behavior.autoStartOllama=true`). Default skips silently.
 
 ### Added
-- 🎚️ Top-level mode switcher (All / Claude / Workflow / Providers / OpenClaw).
+- 🎚️ Top-level mode switcher (All / Claude / Workflow / Providers / LazyClaw).
+  v2.66.0 renamed the mode from "OpenClaw" → "LazyClaw"; localStorage
+  keys are migrated transparently on next load.
 - 🔄 Auto-Resume manager add-binding modal (live session picker).
 - 📊 `/api/system/boot-timing` time-to-listen observability.
 - Boot path defers `_migrate_runs_to_db` to a daemon thread; orchestrator

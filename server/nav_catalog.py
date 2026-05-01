@@ -189,7 +189,7 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "채널별 fallback 체인 + 일일 예산 cap, 에이전트 간 라이브 보고(Agent Bus).",
         ["오케스트레이터", "orchestrator", "슬랙 봇", "텔레그램 봇", "telegram",
          "discord", "디스코드", "멀티 에이전트", "multi-agent", "agent bus",
-         "openclaw", "nanoclaw", "채널 봇", "분담", "협업", "예산", "failover"]),
+         "lazyclaw", "nanoclaw", "채널 봇", "분담", "협업", "예산", "failover"]),
     ("ralph", "work",
         "🦞 Ralph 루프 — Geoffrey Huntley의 'Ralph Wiggum' 패턴. 같은 PROMPT.md를 "
         "max-iter / completion-promise / 예산 USD / 수동 cancel 4중 안전장치 안에서 반복. "

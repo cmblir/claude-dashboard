@@ -1047,7 +1047,7 @@ tailwind.config = {
         <option value="claude">💤 Claude</option>
         <option value="workflow">🔀 Workflow</option>
         <option value="providers">🤖 Providers</option>
-        <option value="openclaw">🦞 OpenClaw</option>
+        <option value="lazyclaw">🦞 LazyClaw</option>
       </select>
       <span id="liveStatus" class="chip chip-ok"><span class="pulse-dot"></span><span>연결됨</span></span>
       <div style="position:relative;">
@@ -1214,7 +1214,7 @@ tailwind.config = {
 // ────────────────────────────────────────────────────────────────
 const state = { view: 'overview', data: {}, loading: {},
   // v2.59.0 — top-level mode filter for the sidebar.
-  // 'all' shows everything; 'claude' / 'workflow' / 'providers' / 'openclaw'
+  // 'all' shows everything; 'claude' / 'workflow' / 'providers' / 'lazyclaw'
   // show curated subsets defined in MODE_TABS.
   mode: (() => { try { return localStorage.getItem('cc.mode') || 'all'; } catch(_) { return 'all'; } })(),
 };
@@ -1636,12 +1636,32 @@ const MODE_TABS = {
     'computerUseLab','memoryLab','advisorLab',
     'costsTimeline','zclaude','envConfig','settings',
   ]),
-  openclaw: new Set([
+  lazyclaw: new Set([
     'orchestrator','ralph','agents','workflows',
     'aiProviders','runCenter','sessionReplay',
     'settings',
   ]),
 };
+
+// N2 (v2.66.0) — one-shot migration of legacy 'openclaw' storage keys to
+// 'lazyclaw'. Idempotent and silent.
+(function _migrateOpenClawKeys() {
+  try {
+    if (localStorage.getItem('cc.mode') === 'openclaw') {
+      localStorage.setItem('cc.mode', 'lazyclaw');
+    }
+    const oldLast = localStorage.getItem('cc.mode.openclaw.lastTab');
+    if (oldLast) {
+      localStorage.setItem('cc.mode.lazyclaw.lastTab', oldLast);
+      localStorage.removeItem('cc.mode.openclaw.lastTab');
+    }
+    const oldCounts = localStorage.getItem('cc.mode.openclaw.counts');
+    if (oldCounts) {
+      localStorage.setItem('cc.mode.lazyclaw.counts', oldCounts);
+      localStorage.removeItem('cc.mode.openclaw.counts');
+    }
+  } catch (_) {}
+})();
 
 function _getMode() {
   try { return localStorage.getItem('cc.mode') || 'all'; } catch (_) { return 'all'; }
@@ -1655,7 +1675,7 @@ const MODE_DEFAULT_TAB = {
   claude:     'overview',
   workflow:   'workflows',
   providers:  'aiProviders',
-  openclaw:   'orchestrator',
+  lazyclaw:   'orchestrator',
 };
 
 function _modeLastTab(m) {
@@ -1674,7 +1694,7 @@ function _rememberLastTab(mode, tabId) {
 }
 
 function setMode(m) {
-  if (!['all','claude','workflow','providers','openclaw'].includes(m)) m = 'all';
+  if (!['all','claude','workflow','providers','lazyclaw'].includes(m)) m = 'all';
   // Remember the tab the user was on in the OLD mode before switching.
   const prev = state.mode || 'all';
   if (state.view) _rememberLastTab(prev, state.view);
@@ -1818,7 +1838,7 @@ function renderNav() {
         if (MODE_TABS.claude.has(n.id))    tags.push({ k:'C',  c:'#a78bfa', t:'Claude' });
         if (MODE_TABS.workflow.has(n.id))  tags.push({ k:'W',  c:'#60a5fa', t:'Workflow' });
         if (MODE_TABS.providers.has(n.id)) tags.push({ k:'P',  c:'#fbbf24', t:'Providers' });
-        if (MODE_TABS.openclaw.has(n.id))  tags.push({ k:'O',  c:'#fb7185', t:'OpenClaw' });
+        if (MODE_TABS.lazyclaw.has(n.id))  tags.push({ k:'O',  c:'#fb7185', t:'LazyClaw' });
         if (tags.length) {
           modeBadges = '<div class="nav-mode-badges" style="display:inline-flex;gap:2px;margin-left:4px;">'
             + tags.map(x => `<span title="${x.t}" style="font-size:8px;padding:1px 3px;border-radius:3px;background:${x.c}22;color:${x.c};font-weight:600;line-height:1;">${x.k}</span>`).join('')
@@ -1996,7 +2016,7 @@ function _bumpModeTabCounter(mode, tabId) {
 }
 
 function _openModeUsageModal() {
-  const modes = ['all','claude','workflow','providers','openclaw'];
+  const modes = ['all','claude','workflow','providers','lazyclaw'];
   const navById = {};
   NAV.forEach(n => { navById[n.id] = n; });
   const sections = modes.map(m => {
