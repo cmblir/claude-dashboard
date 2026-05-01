@@ -228,6 +228,23 @@ def _sanitize_binding(b: dict) -> Optional[dict]:
     label = (b.get("label") or "").strip()
     if label:
         out["label"] = label
+    # F2 (v2.58.0) — recurrence schedule. Single-shot 60s sweeper picks up
+    # bindings whose ``schedule.everyMinutes`` has elapsed and dispatches
+    # ``schedule.prompt`` against this binding. Both fields required to be
+    # active; missing or malformed → ignored.
+    sched = b.get("schedule")
+    if isinstance(sched, dict):
+        try:
+            every = int(sched.get("everyMinutes") or 0)
+            prompt = (sched.get("prompt") or "").strip()
+        except (TypeError, ValueError):
+            every, prompt = 0, ""
+        if every >= 1 and prompt:
+            out["schedule"] = {
+                "everyMinutes": min(every, 7 * 24 * 60),    # cap 1 week
+                "prompt":       prompt[:4000],
+                "lastRunMs":    int(sched.get("lastRunMs") or 0),
+            }
     return out
 
 
@@ -1262,6 +1279,110 @@ def handle_slack_event(event: dict) -> None:
     ).start()
 
 
+# ───────── Recurrence sweeper (F2) ─────────
+#
+# Single 60-second tick walks every binding with a non-empty
+# ``schedule.everyMinutes``. Bindings whose ``lastRunMs`` is more than
+# ``everyMinutes * 60_000`` ms ago get fired with their canned prompt.
+# A successful fire updates ``lastRunMs`` back into the binding so the
+# next tick computes the right delta.
+#
+# Why a single sweeper rather than per-binding Timers: bindings come and
+# go, and Timer.cancel() races are easy to get wrong. One sweeper, one
+# scan per tick, O(N_bindings) where N is small. Lock-free against
+# dispatch since each fired dispatch runs in its own daemon thread.
+
+_SWEEP_INTERVAL_S = max(5, int(os.environ.get("ORCH_SWEEP_INTERVAL_S", "60")))
+_SWEEP_LOCK = threading.Lock()
+_SWEEP_THREAD: Optional[threading.Thread] = None
+_SWEEP_STOP = threading.Event()
+
+
+def _sweep_once() -> int:
+    """One pass over the bindings. Returns the number of dispatches fired
+    (used by tests + status endpoints).
+    """
+    cfg = load_config()
+    bindings = cfg.get("bindings") or []
+    if not bindings:
+        return 0
+    now_ms = int(time.time() * 1000)
+    fired = 0
+    dirty = False
+    for b in bindings:
+        sched = b.get("schedule")
+        if not (isinstance(sched, dict) and sched.get("everyMinutes")
+                and sched.get("prompt")):
+            continue
+        every_ms = int(sched["everyMinutes"]) * 60_000
+        last = int(sched.get("lastRunMs") or 0)
+        if now_ms - last < every_ms:
+            continue
+        # Fire — in a daemon thread so a stuck dispatch doesn't block the
+        # next tick.
+        kind = b.get("kind", "")
+        channel = b.get("channel") or b.get("chat") or "default"
+        prompt = sched["prompt"]
+        reply = None
+        if kind == "slack":
+            reply = _slack_reply(channel)
+        elif kind == "telegram":
+            reply = _telegram_reply(channel)
+        elif kind == "discord":
+            reply = _discord_reply(channel)
+        elif kind == "email" and isinstance(b.get("smtp"), dict):
+            reply = _email_reply(b["smtp"], b.get("channel", "default"))
+        threading.Thread(
+            target=dispatch,
+            kwargs={"text": prompt, "kind": kind, "channel": channel,
+                    "user": "scheduled", "reply": reply},
+            name=f"orch-sweep-{kind}-{channel}",
+            daemon=True,
+        ).start()
+        sched["lastRunMs"] = now_ms
+        dirty = True
+        fired += 1
+    if dirty:
+        save_config(cfg)
+    return fired
+
+
+def _sweep_loop() -> None:
+    while not _SWEEP_STOP.is_set():
+        try:
+            _sweep_once()
+        except Exception as e:
+            log.warning("orch sweeper crash: %s", e)
+        if _SWEEP_STOP.wait(_SWEEP_INTERVAL_S):
+            return
+
+
+def start_sweeper() -> bool:
+    """Idempotent. Returns True if the sweeper was already running or just
+    started, False on failure (currently always True).
+    """
+    global _SWEEP_THREAD
+    with _SWEEP_LOCK:
+        if _SWEEP_THREAD is not None and _SWEEP_THREAD.is_alive():
+            return True
+        _SWEEP_STOP.clear()
+        t = threading.Thread(target=_sweep_loop, name="orch-sweeper",
+                             daemon=True)
+        _SWEEP_THREAD = t
+        t.start()
+    return True
+
+
+def stop_sweeper(timeout: float = 2.0) -> None:
+    global _SWEEP_THREAD
+    with _SWEEP_LOCK:
+        _SWEEP_STOP.set()
+        t = _SWEEP_THREAD
+        _SWEEP_THREAD = None
+    if t is not None:
+        t.join(timeout=timeout)
+
+
 def start_listeners() -> dict:
     """Idempotently spin up Telegram long-poll if a token is configured.
 
@@ -1271,9 +1392,11 @@ def start_listeners() -> dict:
     """
     from . import telegram_api
     started_tg = telegram_api.start_long_poll(handle_telegram_update)
+    sweeper_ok = start_sweeper()
     return {
         "telegram": "running" if started_tg else "skipped (no token)",
         "slack":    "webhook-mode",
+        "sweeper":  f"running (every {_SWEEP_INTERVAL_S}s)" if sweeper_ok else "off",
     }
 
 
