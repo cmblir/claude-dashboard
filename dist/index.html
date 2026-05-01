@@ -333,6 +333,14 @@ tailwind.config = {
   .lc-grid-2 { display: grid; grid-template-columns: 1fr; gap: 1rem; }
   @media (min-width: 1024px) { .lc-grid-2 { grid-template-columns: 1fr 1fr; } }
   .lc-stack > * + * { margin-top: 0.75rem; }
+  /* S1 (v2.66.5) — mode-aware view-header accent. Subtle 2px top-bar
+     tinted by current mode; helps the user remember which curated subset
+     they're in. Applied via body[data-mode=*] selector so JS just toggles
+     a single attribute on <body>. Keeps the rest of the chrome neutral. */
+  body[data-mode="claude"]    .lc-view-header { border-top: 2px solid #a78bfa44; padding-top: 0.5rem; }
+  body[data-mode="workflow"]  .lc-view-header { border-top: 2px solid #60a5fa44; padding-top: 0.5rem; }
+  body[data-mode="providers"] .lc-view-header { border-top: 2px solid #fbbf2444; padding-top: 0.5rem; }
+  body[data-mode="lazyclaw"]  .lc-view-header { border-top: 2px solid #fb718544; padding-top: 0.5rem; }
   .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.85rem; border-radius: 10px; font-size: 0.82rem; font-weight: 500; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text); cursor: pointer; transition: background 0.15s, border-color 0.15s, filter 0.15s, transform 0.15s; }
   .btn:hover { background: rgba(255,255,255,0.12); border-color: var(--border-hi); }
   /* R2 (v2.66.4) — keyboard a11y. Always-visible outline on :focus-visible
@@ -1802,6 +1810,8 @@ function setMode(m) {
   if (state.view) _rememberLastTab(prev, state.view);
   try { localStorage.setItem('cc.mode', m); } catch (_) {}
   state.mode = m;
+  // S1 (v2.66.5) — body data attribute drives the mode-aware accent stripe.
+  if (document && document.body) document.body.dataset.mode = m;
   const sel = document.getElementById('modeSelect');
   if (sel && sel.value !== m) sel.value = m;
   // Restore the user's last tab in the NEW mode (or its default).
@@ -25386,6 +25396,8 @@ async function _wfDiffVersions() {
   // Sync the mode <select> with the persisted value before first paint.
   const _modeSel = document.getElementById('modeSelect');
   if (_modeSel) _modeSel.value = state.mode || 'all';
+  // S1 — set body data-mode for the accent-stripe CSS.
+  if (document.body) document.body.dataset.mode = state.mode || 'all';
   renderNav();
   // v2.33.2 — 이미 한 번 진입했고 연결돼 있으면 게이트 스킵하고 바로 대시보드로.
   // 첫 방문 OR 연결 끊김 OR 서버 실패 시에만 로그인 게이트 표시.
