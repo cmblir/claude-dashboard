@@ -341,6 +341,39 @@ Highlights: **16 sub-agent role presets**, session timeline with quality scoring
 - **Browser notifications** — workflow complete, usage alert, system event
 - **Performance** — API response caching, debounced auto-reload, RAF batching
 
+### 🎼 Channel Orchestrator (v2.55.0)
+
+A single dashboard tab — and a `python3 tools/tui_config.py` terminal UI — that
+turns the dashboard into a multi-agent hub for chat platforms:
+
+- **Slack and Telegram inbound.** Slack via the Events API (`/api/slack/events`),
+  Telegram via long-poll (no public URL needed). One bot, many channels.
+- **Plan → fan out → aggregate.** Inbound message goes to a configurable
+  *planner* (default: a Claude model), which emits a JSON plan. Sub-tasks run
+  in parallel via `execute_with_assignee` across any registered provider
+  (Claude / OpenAI / Gemini / Ollama / Codex / custom CLI). A small
+  *aggregator* call (also configurable) merges results before the channel
+  reply.
+- **Per-channel bindings.** A binding can either nail a channel to a saved
+  workflow (run that DAG with the message as input) or specify which assignees
+  to use for an ad-hoc plan. Configure from the **Orchestrator** tab or the
+  TUI.
+- **Live agent-to-agent reporting.** Every step publishes `start`/`done` events
+  to an in-process pub/sub bus (`server/agent_bus.py`). The bus is wakeup-
+  driven (no polling), batches writes to SQLite (single shared DB), dedups
+  identical events inside a 5-second LRU window, and is queryable over HTTP
+  for live UI streams.
+- **No hardcoding.** Models, channels, debounce intervals, retention windows,
+  and pool sizes are all env-overridable. Storage paths follow the existing
+  `_env_path()` convention (`CLAUDE_DASHBOARD_ORCHESTRATOR`,
+  `CLAUDE_DASHBOARD_TELEGRAM`, `AGENT_BUS_*`).
+
+```bash
+python3 tools/tui_config.py          # configure providers / Slack / Telegram / bindings
+curl -X POST localhost:8080/api/orchestrator/dispatch \
+     -d '{"text":"draft a release note for v2.55","kind":"http"}'
+```
+
 ---
 
 ## 📐 Architecture
