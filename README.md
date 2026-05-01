@@ -290,6 +290,64 @@ Highlights: **16 sub-agent role presets**, session timeline with quality scoring
 - **Browser notifications** — workflow complete, usage alert, system event
 - **Performance** — API response caching, debounced auto-reload, RAF batching
 
+### 🎚️ Mode switcher (v2.59.0)
+
+Top-right header dropdown swaps the sidebar between curated subsets so the
+72-tab dashboard feels small:
+
+- 🌐 **All** — full sidebar with mode-membership badges (C/W/P/O) on each tab.
+- 💤 **Claude** — core ~/.claude/ management (agents/skills/hooks/MCP/sessions/
+  projects/CLAUDE.md/settings/auto-resume/security).
+- 🔀 **Workflow** — DAG editor + run center + scaffolds + artifacts + crew wizard.
+- 🤖 **Providers** — multi-AI hub + every Claude API playground (12 lab tabs).
+- 🦞 **OpenClaw** — orchestrator + Ralph + agent bus + bindings.
+
+Mode persists in localStorage. Switching modes restores the last tab the user
+visited in that mode (`cc.mode.<mode>.lastTab`); a 🔥 badge marks the top-3
+most-visited tabs in the current mode (≥3 visits to qualify). Spotlight
+(⌘K) defaults to filtering by the current mode; a chip toggles back to
+global search.
+
+### 🦞 Ralph Loop (v2.56.0)
+
+Geoffrey Huntley's "Ralph Wiggum loop" pattern as a first-class feature:
+
+- **Engine** (`server/ralph.py`) — same prompt fed every iteration; four-fold
+  termination: completion-promise string match, max-iter cap, USD budget cap,
+  manual cancel. Per-iteration cost/duration persisted to SQLite.
+- **CLI** (`tools/ralph_loop.py`) — stdlib-only. In-process or `--server URL`
+  to drive a remote dashboard. Ctrl+C cancels gracefully via the engine.
+- **Workflow node** — `🦞 Ralph Loop` palette entry; blocks until termination.
+- **Project recommender** — 🦞 button on every Project card synthesises a
+  PROMPT.md draft from the project's `CLAUDE.md`, recent git log, dirty
+  files, and TODO/FIXME grep. Optional `?polish=true` runs the draft through
+  a configurable system prompt for cleanup.
+- **Auto-commit on done** — when the loop ends with the completion-promise
+  and `autoCommit=true`, dirty files in `cwd` are committed automatically
+  (skipped on max-iter / budget / cancel paths to preserve partial work).
+
+Polish system prompt is fully customisable: `RALPH_POLISH_SYSTEM` env
+var > `~/.claude-dashboard-ralph-polish.md` file > built-in default.
+Editor lives in the Ralph tab.
+
+### 🐳 Docker sandbox node (v2.60.0)
+
+Workflow primitive that runs a single shell command inside a transient
+docker container with conservative defaults:
+
+```
+--rm + --network=none + --memory=<cap>m + --cpus=1
+--security-opt=no-new-privileges
+optional read-only volume mount
+```
+
+Optional result cache (`cache: true`) keys on
+`(image, command, env, mountPath, network, stdin)` so idempotent
+commands re-use stdout for `cacheTtlSec` (default 300 s). Failures
+are never cached. Missing docker CLI returns a clean error rather
+than falling back to host execution — silent privilege elevation
+would defeat the point of the node.
+
 ### 🎼 Channel Orchestrator (v2.55.0)
 
 A single dashboard tab — and a `python3 tools/tui_config.py` terminal UI — that

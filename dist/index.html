@@ -1083,6 +1083,9 @@ tailwind.config = {
             <span>⚡</span><span data-i18n="settings.quickSettings">빠른 설정 — 모든 파라미터</span>
             <span style="margin-left:auto;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.04em;">⌘,</span>
           </button>
+          <button class="settings-item" onclick="toggleSettingsDropdown(); _openModeUsageModal()">
+            <span>📊</span><span>모드별 사용량</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1990,6 +1993,60 @@ function _bumpModeTabCounter(mode, tabId) {
   counts[tabId] = Math.min((counts[tabId] || 0) + 1, _COUNT_CAP);
   try { localStorage.setItem('cc.mode.' + mode + '.counts', JSON.stringify(counts)); }
   catch (_) {}
+}
+
+function _openModeUsageModal() {
+  const modes = ['all','claude','workflow','providers','openclaw'];
+  const navById = {};
+  NAV.forEach(n => { navById[n.id] = n; });
+  const sections = modes.map(m => {
+    const counts = _modeTabCounts(m);
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (!ranked.length) {
+      return `<div class="card p-3 mb-2">
+        <div class="text-[12px] font-semibold mb-1">${m}</div>
+        <div class="text-[10px]" style="color:var(--text-dim)">${t('아직 기록 없음')}</div>
+      </div>`;
+    }
+    const max = ranked[0][1] || 1;
+    const rows = ranked.map(([id, c]) => {
+      const n = navById[id];
+      const label = n ? `${n.icon} ${escapeHtml(t(n.label))}` : `<span style="color:var(--text-dim)">${escapeHtml(id)}</span>`;
+      const pct = Math.max(2, Math.round(c / max * 100));
+      return `<div class="text-[11px] mb-1">
+        <div class="flex items-center gap-2">
+          <span class="flex-1 truncate">${label}</span>
+          <span class="font-mono" style="color:var(--text-dim)">${c}</span>
+        </div>
+        <div style="height:3px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:var(--accent);"></div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="card p-3 mb-2">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="text-[12px] font-semibold">${m}</div>
+        <div class="text-[10px]" style="color:var(--text-dim)">${total} ${t('번 방문')}</div>
+        <button class="chip text-[10px] ml-auto" onclick="_resetModeCounts('${m}')">${t('리셋')}</button>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+  showModal(`
+    <div class="text-[14px] font-semibold mb-3">📊 ${t('모드별 사용량')}</div>
+    ${sections}
+    <div class="flex justify-end mt-3">
+      <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+    </div>
+  `, { title: '' });
+}
+
+function _resetModeCounts(mode) {
+  if (!confirm(t('이 모드의 카운터를 리셋할까요?'))) return;
+  try { localStorage.removeItem('cc.mode.' + mode + '.counts'); } catch {}
+  _openModeUsageModal();   // re-render
+  renderNav();             // 🔥 badges may change
 }
 
 function _topTabsForMode(mode, n = 3) {
@@ -18957,16 +19014,56 @@ VIEWS.ralph = async () => {
         <div class="text-[10px] mt-3" style="color:var(--text-dim)">
           ${t('CLI')}: <code>python3 tools/ralph_loop.py --prompt-file PROMPT.md</code>
         </div>
+        <div class="mt-4 pt-3 border-t border-[var(--border)]">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="text-[12px] font-semibold">${t('Polish 시스템 프롬프트')}</div>
+            <span id="ralphPolishSrc" class="chip text-[10px]" style="color:var(--text-dim)">—</span>
+          </div>
+          <div class="text-[10px] mb-2" style="color:var(--text-dim)">
+            ${t('LLM polish 패스가 추천 PROMPT.md를 다듬을 때 사용하는 시스템 프롬프트. 비워두고 저장하면 기본값으로 복원.')}
+          </div>
+          <textarea id="ralphPolishText" rows="6" class="w-full text-[11px] bg-transparent border" placeholder="${t('비워두면 기본값 사용')}"></textarea>
+          <div class="flex items-center gap-2 mt-2">
+            <button class="chip text-[10px]" onclick="_ralphPolishLoad()">${t('현재 로드')}</button>
+            <button class="chip text-[10px]" onclick="_ralphPolishSave()">${t('저장')}</button>
+            <button class="chip text-[10px]" onclick="_ralphPolishClear()">${t('기본값으로 복원')}</button>
+          </div>
+        </div>
       </div>
     </div>
   `;
 };
+
+async function _ralphPolishLoad() {
+  const r = await api('/api/ralph/polish-prompt');
+  const text = (r && r.current) || '';
+  const src = (r && r.source) || 'default';
+  const ta = document.getElementById('ralphPolishText');
+  const lbl = document.getElementById('ralphPolishSrc');
+  if (ta) ta.value = text;
+  if (lbl) lbl.textContent = `${t('출처')}: ${src}`;
+}
+async function _ralphPolishSave() {
+  const text = (document.getElementById('ralphPolishText') || {}).value || '';
+  if (!text.trim()) { toast(t('비어있는 프롬프트는 저장할 수 없음. 기본값 복원을 사용하세요.'), 'err'); return; }
+  const r = await api('/api/ralph/polish-prompt', { method: 'POST', body: { text }});
+  toast(r && r.ok ? t('저장됨') : ((r && r.error) || t('실패')), r && r.ok ? 'ok' : 'err');
+  if (r && r.ok) _ralphPolishLoad();
+}
+async function _ralphPolishClear() {
+  if (!confirm(t('Polish 시스템 프롬프트를 기본값으로 되돌릴까요?'))) return;
+  const r = await api('/api/ralph/polish-prompt', { method: 'POST', body: { clear: true }});
+  toast(r && r.ok ? t('기본값으로 복원됨') : ((r && r.error) || t('실패')), r && r.ok ? 'ok' : 'err');
+  if (r && r.ok) _ralphPolishLoad();
+}
 
 AFTER.ralph = () => {
   if (state.data._ralphEs) {
     try { state.data._ralphEs.close(); } catch (_) {}
     state.data._ralphEs = null;
   }
+  // J1 (v2.62.0) — auto-load polish prompt on tab open.
+  try { _ralphPolishLoad(); } catch (_) {}
 };
 
 async function _ralphStart() {

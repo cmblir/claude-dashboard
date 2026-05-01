@@ -6,8 +6,11 @@ Loaded by ``tools/translations_manual.py``.
 from __future__ import annotations
 
 NEW_EN: dict[str, str] = {
-    # I3 — per-mode hot badge
+    # I3 — per-mode hot badge + visit counter
     "이 모드에서 가장 많이 사용한 탭":        "Most-used tab in this mode",
+    "아직 기록 없음":                          "No records yet",
+    "번 방문":                                 "visits",
+    "이 모드의 카운터를 리셋할까요?":          "Reset this mode's counter?",
     # Orchestrator IPC log panel
     "IPC 스트림":                              "IPC stream",
     "inbound (사용자 → 오케) / outbound (오케 → 채널) 분리 로그":
@@ -19,6 +22,9 @@ NEW_EN: dict[str, str] = {
 
 NEW_ZH: dict[str, str] = {
     "이 모드에서 가장 많이 사용한 탭":        "本模式使用最多的标签",
+    "아직 기록 없음":                          "暂无记录",
+    "번 방문":                                 "次访问",
+    "이 모드의 카운터를 리셋할까요?":          "重置该模式的计数器？",
     "IPC 스트림":                              "IPC 流",
     "inbound (사용자 → 오케) / outbound (오케 → 채널) 분리 로그":
         "入站（用户→编排）/ 出站（编排→频道）分离日志",
