@@ -144,7 +144,8 @@ def start(prompt: str, *,
           completion_promise: str = "",
           budget_usd: float = 0.0,
           system_prompt: str = "",
-          cwd: str = "") -> dict:
+          cwd: str = "",
+          auto_commit: bool = False) -> dict:
     """Kick off a Ralph loop in a daemon thread. Returns ``{run_id, ...}`` immediately.
 
     All optional fields fall back to env-tunable defaults so a caller with no
@@ -190,7 +191,7 @@ def start(prompt: str, *,
     th = threading.Thread(
         target=_run_loop,
         args=(rid, prompt, assignee, max_iter, completion, budget,
-              system_prompt, cwd),
+              system_prompt, cwd, auto_commit),
         name=f"ralph-{rid}",
         daemon=True,
     )
@@ -315,9 +316,55 @@ def _finalize(run_id: str, *, status: str, error: Optional[str] = None) -> None:
                       source="ralph")
 
 
+def _auto_commit_if_dirty(cwd: str, run_id: str) -> Optional[str]:
+    """Commit any changes in ``cwd`` if it's a git repo. Returns the commit
+    SHA on success, ``None`` if not applicable or skipped.
+
+    Conservative — never force-pushes, never amends, never touches branches.
+    Adds *all* tracked + untracked changes (matches the user's manual flow:
+    Ralph edits files, we capture the result). Author/committer come from
+    the local git config so the user's identity sticks (cycle-5 cmblir).
+    """
+    import subprocess
+    if not cwd:
+        return None
+    try:
+        # Quick check: is this a git working tree?
+        rc = subprocess.run(["git", "-C", cwd, "rev-parse", "--is-inside-work-tree"],
+                            capture_output=True, text=True, timeout=4)
+        if rc.returncode != 0 or rc.stdout.strip() != "true":
+            return None
+        # Anything to commit?
+        st = subprocess.run(["git", "-C", cwd, "status", "--porcelain"],
+                            capture_output=True, text=True, timeout=4)
+        if not st.stdout.strip():
+            agent_bus.publish(_topic(run_id, "autocommit.skip"),
+                              {"reason": "clean tree"}, source="ralph")
+            return None
+        subprocess.run(["git", "-C", cwd, "add", "-A"],
+                       check=True, timeout=10)
+        msg = (f"chore(ralph): autocommit from loop {run_id}\n\n"
+               f"Captured by server.ralph._auto_commit_if_dirty after the "
+               f"loop emitted its completion-promise.")
+        subprocess.run(["git", "-C", cwd, "commit", "-m", msg],
+                       check=True, capture_output=True, timeout=10)
+        head = subprocess.run(["git", "-C", cwd, "rev-parse", "HEAD"],
+                              capture_output=True, text=True, timeout=4)
+        sha = head.stdout.strip() if head.returncode == 0 else ""
+        agent_bus.publish(_topic(run_id, "autocommit.done"),
+                          {"sha": sha[:12]}, source="ralph")
+        return sha
+    except Exception as e:
+        log.warning("ralph auto-commit failed: %s", e)
+        agent_bus.publish(_topic(run_id, "autocommit.error"),
+                          {"error": str(e)}, source="ralph")
+        return None
+
+
 def _run_loop(run_id: str, prompt: str, assignee: str, max_iter: int,
               completion: str, budget_usd: float,
-              system_prompt: str, cwd: str) -> None:
+              system_prompt: str, cwd: str,
+              auto_commit: bool = False) -> None:
     state = _RUNS[run_id]
     try:
         for i in range(max_iter):
@@ -372,6 +419,8 @@ def _run_loop(run_id: str, prompt: str, assignee: str, max_iter: int,
                               source="ralph")
 
             if ok and _completion_seen(output, completion):
+                if auto_commit:
+                    _auto_commit_if_dirty(cwd, run_id)
                 _finalize(run_id, status="done")
                 return
             if state.cost_so_far >= budget_usd:
@@ -398,6 +447,7 @@ def api_ralph_start(body: dict) -> dict:
         budget_usd=float(body.get("budgetUsd") or 0.0),
         system_prompt=str(body.get("systemPrompt") or ""),
         cwd=str(body.get("cwd") or ""),
+        auto_commit=bool(body.get("autoCommit")),
     )
 
 
