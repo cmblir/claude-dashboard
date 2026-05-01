@@ -1,12 +1,24 @@
-"""v2.62.0 — J1 Ralph polish prompt UI + cycle-8/9 residue sweep.
+"""v2.62.0 / v2.63.0 — J1 Ralph polish UI + K2 sweeper status panel + cycle-8/9 residue sweep.
 
-Korean -> English / Chinese for strings left untranslated across H1-H5
-and the new J1 (Ralph polish system prompt editor) UI additions.
+Korean -> English / Chinese for strings left untranslated across H1-H5,
+the new J1 (Ralph polish system prompt editor) UI, and the K2 orchestrator
+sweeper-status panel.
 Loaded by ``tools/translations_manual.py``.
 """
 from __future__ import annotations
 
 NEW_EN: dict[str, str] = {
+    # K2 — Orchestrator sweeper-status panel (v2.63.0)
+    "스케줄러 상태":                            "Scheduler status",
+    "schedule.everyMinutes 가 설정된 바인딩의 다음 실행 시각":
+        "Next fire time for bindings with schedule.everyMinutes set",
+    "예약된 바인딩 없음":                       "No scheduled bindings",
+    "지금 실행 가능":                           "Due now",
+    "주기":                                     "Interval",
+    "다음 실행":                                "Next run",
+    "예약됨":                                   "scheduled",
+    "runId / assignee 검색":                    "Search runId / assignee",
+    "이전에 입력한 값이 있으면 자동 채움":      "Auto-fills if previously entered",
     # J1 — Ralph polish system prompt editor
     "Polish 시스템 프롬프트":
         "Polish system prompt",
@@ -82,6 +94,8 @@ NEW_EN: dict[str, str] = {
     "버튼은 사용 가능합니다.": "button is available.",
     "대신 --continue 사용":    "Use --continue instead",
     "대신 영숫자 /":           "Use alphanumeric /",
+    # I2 — docker_run result cache
+    "캐시 적중":               "Cache hit",
     # Generic error / status strings
     "CLI 실행 실패":           "CLI execution failed",
     "Hyper Agent 로드 실패":   "Hyper Agent load failed",
@@ -98,13 +112,24 @@ NEW_EN: dict[str, str] = {
 }
 
 NEW_ZH: dict[str, str] = {
+    # K2 — Orchestrator sweeper-status panel (v2.63.0)
+    "스케줄러 상태":                            "调度器状态",
+    "schedule.everyMinutes 가 설정된 바인딩의 다음 실행 시각":
+        "已设置 schedule.everyMinutes 的绑定的下次触发时间",
+    "예약된 바인딩 없음":                       "无计划绑定",
+    "지금 실행 가능":                           "立即可运行",
+    "주기":                                     "间隔",
+    "다음 실행":                                "下次运行",
+    "예약됨":                                   "已计划",
+    "runId / assignee 검색":                    "搜索 runId / assignee",
+    "이전에 입력한 값이 있으면 자동 채움":      "若有之前输入的值则自动填充",
     # J1 — Ralph polish system prompt editor
     "Polish 시스템 프롬프트":
         "Polish 系统提示词",
     "LLM polish 패스가 추천 PROMPT.md를 다듬을 때 사용하는 시스템 프롬프트. 비워두고 저장하면 기본값으로 복원.":
         "LLM polish 阶段用于润色推荐 PROMPT.md 的系统提示词。留空并保存可恢复默认值。",
     "비어있는 프롬프트는 저장할 수 없음. 기본값 복원을 사용하세요.":
-        "不能保存空提示词，请使用"恢复默认"。",
+        '不能保存空提示词，请使用"恢复默认"。',
     "Polish 시스템 프롬프트를 기본값으로 되돌릴까요?":
         "将 Polish 系统提示词恢复为默认值？",
     "기본값으로 복원":   "恢复默认",
@@ -173,6 +198,8 @@ NEW_ZH: dict[str, str] = {
     "버튼은 사용 가능합니다.": "按钮仍可用。",
     "대신 --continue 사용":    "改用 --continue",
     "대신 영숫자 /":           "改用字母数字 /",
+    # I2 — docker_run result cache
+    "캐시 적중":               "缓存命中",
     # Generic error / status strings
     "CLI 실행 실패":           "CLI 执行失败",
     "Hyper Agent 로드 실패":   "Hyper Agent 加载失败",

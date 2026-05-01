@@ -104,7 +104,7 @@ from .agent_bus import (
 from .orchestrator import (
     api_orch_bind, api_orch_config_get, api_orch_config_save, api_orch_dispatch,
     api_orch_history, api_orch_history_get, api_orch_inbound, api_orch_outbound,
-    api_orch_start, api_orch_unbind,
+    api_orch_start, api_orch_sweeper_status, api_orch_unbind,
     api_slack_events, api_telegram_webhook,
 )
 from .ralph import (
@@ -377,6 +377,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/orchestrator/history/get": api_orch_history_get,
     "/api/orchestrator/inbound": api_orch_inbound,
     "/api/orchestrator/outbound": api_orch_outbound,
+    "/api/orchestrator/sweeper-status": api_orch_sweeper_status,
     "/api/discord/config": lambda q: api_discord_config_get(q),
     "/api/ralph/list":   api_ralph_list,
     "/api/ralph/status": api_ralph_status,

@@ -1383,6 +1383,56 @@ def stop_sweeper(timeout: float = 2.0) -> None:
         t.join(timeout=timeout)
 
 
+def sweeper_status() -> dict:
+    """Snapshot of every scheduled binding with its next-fire ETA.
+
+    Returns:
+        {
+          "running": bool,
+          "intervalSec": int,
+          "schedules": [
+            {kind, channel, label, everyMinutes, lastRunMs,
+             nextFireMs, dueNow},
+            ...
+          ],
+        }
+    """
+    cfg = load_config()
+    now_ms = int(time.time() * 1000)
+    out = []
+    for b in cfg.get("bindings") or []:
+        sched = b.get("schedule")
+        if not (isinstance(sched, dict) and sched.get("everyMinutes")
+                and sched.get("prompt")):
+            continue
+        every_ms = int(sched["everyMinutes"]) * 60_000
+        last = int(sched.get("lastRunMs") or 0)
+        next_fire = (last + every_ms) if last else now_ms
+        out.append({
+            "kind":         b.get("kind"),
+            "channel":      b.get("channel") or b.get("chat") or "default",
+            "label":        b.get("label") or "",
+            "everyMinutes": int(sched["everyMinutes"]),
+            "promptHead":   (sched.get("prompt") or "")[:120],
+            "lastRunMs":    last,
+            "nextFireMs":   next_fire,
+            "dueNow":       (now_ms - last) >= every_ms if last else True,
+        })
+    out.sort(key=lambda x: x["nextFireMs"])
+    with _SWEEP_LOCK:
+        running = _SWEEP_THREAD is not None and _SWEEP_THREAD.is_alive()
+    return {
+        "ok": True,
+        "running": running,
+        "intervalSec": _SWEEP_INTERVAL_S,
+        "schedules": out,
+    }
+
+
+def api_orch_sweeper_status(query: dict | None = None) -> dict:
+    return sweeper_status()
+
+
 def start_listeners() -> dict:
     """Idempotently spin up Telegram long-poll if a token is configured.
 

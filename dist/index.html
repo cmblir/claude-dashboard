@@ -7058,6 +7058,12 @@ function _wfShowNodeTooltip(nid, evt) {
     ${r.provider ? `<div class="wfnt-row wfnt-meta"><span>${t('제공자')}</span><span>${escapeHtml(r.provider)}${r.model ? ' · ' + escapeHtml(r.model) : ''}</span></div>` : ''}
     ${(usage.input_tokens || r.inputTokens || usage.output_tokens || r.outputTokens)
       ? `<div class="wfnt-row wfnt-meta"><span>${t('토큰')}</span><span>${tokens}</span></div>` : ''}
+    ${r.cached === true
+      ? `<div class="wfnt-row wfnt-meta"><span>🗄</span><span>${t('캐시 적중')} ${r.cachedAgeS!=null?'· '+r.cachedAgeS+'s':''}</span></div>` : ''}
+    ${r.image
+      ? `<div class="wfnt-row wfnt-meta"><span>🐳</span><span class="font-mono">${escapeHtml(r.image)}</span></div>` : ''}
+    ${r.ralphRunId
+      ? `<div class="wfnt-row wfnt-meta"><span>🦞</span><span>${escapeHtml(r.ralphRunId)} · ${r.ralphIters||0} iter · $${(r.ralphCostUsd||0).toFixed(4)}</span></div>` : ''}
     ${status === 'err' && r.error
       ? `<div class="wfnt-out wfnt-err">${escapeHtml(String(r.error).slice(0, 260))}</div>`
       : (output ? `<div class="wfnt-out">${escapeHtml(output)}${more}</div>` : '')}
@@ -18793,6 +18799,14 @@ VIEWS.orchestrator = async () => {
       </div>
       <div class="card p-4 lg:col-span-2">
         <div class="flex items-center gap-2 mb-2">
+          <div class="text-[12px] font-semibold">${t('스케줄러 상태')}</div>
+          <span class="text-[10px]" style="color:var(--text-dim)">${t('schedule.everyMinutes 가 설정된 바인딩의 다음 실행 시각')}</span>
+          <button class="chip text-[10px] ml-auto" onclick="_orchRefreshSweeper()">${t('새로고침')}</button>
+        </div>
+        <div id="orchSweeper" class="text-[11px]" style="color:var(--text-dim)">${t('로딩 중...')}</div>
+      </div>
+      <div class="card p-4 lg:col-span-2">
+        <div class="flex items-center gap-2 mb-2">
           <div class="text-[12px] font-semibold">${t('IPC 스트림')}</div>
           <span class="text-[10px]" style="color:var(--text-dim)">${t('inbound (사용자 → 오케) / outbound (오케 → 채널) 분리 로그')}</span>
           <button class="chip text-[10px] ml-auto" onclick="_orchRefreshIpc()">${t('새로고침')}</button>
@@ -18812,6 +18826,38 @@ VIEWS.orchestrator = async () => {
     </div>
   `;
 };
+
+async function _orchRefreshSweeper() {
+  const r = await api('/api/orchestrator/sweeper-status').catch(() => null);
+  const host = document.getElementById('orchSweeper');
+  if (!host || !r) return;
+  if (!r.ok) { host.textContent = r.error || 'error'; return; }
+  if (!r.schedules.length) {
+    host.innerHTML = `${t('예약된 바인딩 없음')} · sweeper ${r.running?'🟢':'⚪'}`;
+    return;
+  }
+  const rows = r.schedules.map(s => {
+    const nextRel = s.dueNow ? `<span style="color:var(--success)">⚡ ${t('지금 실행 가능')}</span>`
+      : `<span class="font-mono">${new Date(s.nextFireMs).toLocaleTimeString()}</span>`;
+    return `<tr class="text-[11px]">
+      <td class="p-1 font-mono">${escapeHtml(s.kind)}</td>
+      <td class="p-1 font-mono truncate" style="max-width:200px;">${escapeHtml(s.channel)}</td>
+      <td class="p-1">${s.everyMinutes}m</td>
+      <td class="p-1 truncate" style="max-width:280px;color:var(--text)">${escapeHtml(s.promptHead)}</td>
+      <td class="p-1">${nextRel}</td>
+    </tr>`;
+  }).join('');
+  host.innerHTML = `
+    <div class="text-[10px] mb-2">sweeper ${r.running?'🟢':'⚪'} · ${t('주기')} ${r.intervalSec}s · ${r.schedules.length} ${t('예약됨')}</div>
+    <table class="w-full text-left">
+      <thead><tr class="text-[10px]" style="color:var(--text-dim)">
+        <th class="p-1">kind</th><th class="p-1">channel</th>
+        <th class="p-1">${t('주기')}</th><th class="p-1">prompt</th>
+        <th class="p-1">${t('다음 실행')}</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
 
 async function _orchRefreshIpc() {
   const chan = (document.getElementById('orchIpcChan') || {}).value || '';
@@ -18855,6 +18901,8 @@ async function _orchRefreshIpc() {
 AFTER.orchestrator = () => {
   // I4 (v2.61.0) — initial IPC fetch.
   try { _orchRefreshIpc(); } catch (_) {}
+  // K2 (v2.63.0) — initial sweeper status fetch.
+  try { _orchRefreshSweeper(); } catch (_) {}
   // Auto-stop any prior stream when leaving the tab.
   if (state.data._orchEs) {
     try { state.data._orchEs.close(); } catch (_) {}
@@ -18952,9 +19000,28 @@ function _orchToggleLive() {
 // 🦞 RALPH LOOP — same-prompt iteration with 4-fold safety
 // ────────────────────────────────────────────────────────────────
 VIEWS.ralph = async () => {
-  const r = await api('/api/ralph/list?limit=30');
+  const r = await api('/api/ralph/list?limit=200');
   if (!r.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}</div>`;
-  const runs = r.runs || [];
+  const allRuns = r.runs || [];
+  // K4 (v2.63.0) — client-side status filter + prompt search.
+  const filterStatus = state.data._ralphFilter || 'all';
+  const filterQ = (state.data._ralphFilterQ || '').toLowerCase();
+  const runs = allRuns.filter(it => {
+    if (filterStatus !== 'all' && it.status !== filterStatus) return false;
+    if (filterQ && !((it.runId||'') + ' ' + (it.assignee||'')).toLowerCase().includes(filterQ)) return false;
+    return true;
+  });
+  // count by status for the chip bar
+  const statusCounts = {};
+  for (const it of allRuns) {
+    statusCounts[it.status] = (statusCounts[it.status] || 0) + 1;
+  }
+  const _statusChip = (k, label) => {
+    const n = statusCounts[k] || 0;
+    const active = filterStatus === k;
+    return `<button class="chip text-[10px]" style="${active?'background:var(--accent);color:#fff;':''}"
+      onclick="state.data._ralphFilter='${k}';renderView()">${label}${n?` <span class="font-mono ml-1">${n}</span>`:''}</button>`;
+  };
   const fmtMs = (ms) => ms ? new Date(ms).toLocaleString() : '—';
   const statusClass = (st) => ({
     done: 'var(--success)', running: 'var(--accent)',
@@ -18977,9 +19044,23 @@ VIEWS.ralph = async () => {
     ${viewHeader('🦞 Ralph Loop', t('ralph_subtitle', 'Same-prompt 반복 — Geoffrey Huntley Ralph Wiggum 패턴. max-iter / completion-promise / 예산 USD / 수동 cancel 4중 안전장치.'), 'ralph')}
     <div class="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
       <div class="card p-4">
-        <div class="flex items-center justify-between mb-2">
-          <div class="text-[12px] font-semibold">${t('실행 목록')}</div>
+        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div class="text-[12px] font-semibold">${t('실행 목록')}
+            <span class="text-[10px] ml-2" style="color:var(--text-dim)">${runs.length}/${allRuns.length}</span>
+          </div>
           <button class="chip text-[10px]" onclick="renderView()">${t('새로고침')}</button>
+        </div>
+        <div class="flex items-center gap-1 flex-wrap mb-2">
+          ${_statusChip('all', t('전체'))}
+          ${_statusChip('running', '⚡ running')}
+          ${_statusChip('done', '✓ done')}
+          ${_statusChip('budget', '💰 budget')}
+          ${_statusChip('max_iter', '🔁 max-iter')}
+          ${_statusChip('cancelled', '⏹ cancelled')}
+          ${_statusChip('error', '✗ error')}
+          <input class="text-[11px] bg-transparent border-b ml-auto" placeholder="${t('runId / assignee 검색')}"
+            value="${escapeHtml(filterQ)}"
+            oninput="state.data._ralphFilterQ=this.value;renderView()" style="width:200px;">
         </div>
         <table class="w-full text-left">
           <thead><tr class="text-[10px]" style="color:var(--text-dim)">
@@ -21711,8 +21792,11 @@ window._armOpenAddDialog = async () => {
       </select>
     ` : `<div class="text-[11px] mb-3" style="color:var(--text-dim)">${t('실행 중인 Claude CLI 세션이 감지되지 않습니다. session UUID 와 cwd 를 직접 입력하세요.')}</div>`}
     <label class="text-[11px] block mb-1">${t('Session UUID')}</label>
-    <input id="armSid" class="input w-full mb-2 mono" placeholder="abc12345-...">
-    <label class="text-[11px] block mb-1">cwd</label>
+    <input id="armSid" class="input w-full mb-2 mono" placeholder="abc12345-..."
+      oninput="(()=>{const r=_armRecallCwd(this.value);if(r&&!document.getElementById('armCwd').value)document.getElementById('armCwd').value=r;})()">
+    <label class="text-[11px] block mb-1">cwd
+      <span class="text-[9px]" style="color:var(--text-dim)">${t('이전에 입력한 값이 있으면 자동 채움')}</span>
+    </label>
     <input id="armCwd" class="input w-full mb-2 mono" placeholder="~/projects/myapp">
     <label class="text-[11px] block mb-1">${t('재시도 시 추가 프롬프트 (선택)')}</label>
     <input id="armPrompt" class="input w-full mb-2" placeholder="${t('예: 이전 작업을 이어서 진행해주세요.')}">
@@ -21745,6 +21829,30 @@ window._armOpenAddDialog = async () => {
   `, { title: '' });
 };
 
+// K3 (v2.63.0) — per-UUID-prefix cwd memory so repeat-binders don't retype.
+function _armRememberCwd(sid, cwd) {
+  if (!sid || !cwd) return;
+  const key = sid.slice(0, 8);
+  try {
+    const raw = localStorage.getItem('cc.ar.cwds') || '{}';
+    const map = JSON.parse(raw);
+    map[key] = cwd;
+    // bound: 32 entries
+    const keys = Object.keys(map);
+    if (keys.length > 32) {
+      keys.slice(0, keys.length - 32).forEach(k => delete map[k]);
+    }
+    localStorage.setItem('cc.ar.cwds', JSON.stringify(map));
+  } catch (_) {}
+}
+function _armRecallCwd(sid) {
+  if (!sid) return '';
+  try {
+    const raw = localStorage.getItem('cc.ar.cwds') || '{}';
+    return JSON.parse(raw)[sid.slice(0, 8)] || '';
+  } catch (_) { return ''; }
+}
+
 window._armSubmitAddDialog = async () => {
   const sid = (document.getElementById('armSid')||{}).value || '';
   const cwd = (document.getElementById('armCwd')||{}).value || '';
@@ -21766,6 +21874,7 @@ window._armSubmitAddDialog = async () => {
       }),
     });
     if (r && r.ok) {
+      _armRememberCwd(sid, cwd);
       closeModal();
       toast(t('바인딩 추가됨'), 'ok');
       setTimeout(() => renderView && renderView(), 200);
