@@ -42,7 +42,12 @@ _NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
                # v2.56.0 — Ralph (same-prompt iteration loop) as a node. The
                # node blocks until the loop terminates (completion-promise,
                # max-iter, budget, or cancel).
-               "ralph"}
+               "ralph",
+               # v2.60.0 — opt-in Docker sandbox primitive. Runs a shell
+               # command inside a container with explicit volume + env. No
+               # network by default. Falls back to error (not host shell)
+               # when docker CLI is missing — never silently elevates.
+               "docker_run"}
 _INPUT_MODES = {"concat", "first", "json"}
 _ASSIGNEES = {"opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
@@ -636,6 +641,27 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
                               or "<promise>DONE</promise>",
             "maxIterations":  max(1, min(200, int(d.get("maxIterations") or 25))),
             "budgetUsd":      max(0.01, min(100.0, float(d.get("budgetUsd") or 5.0))),
+        }
+    elif ntype == "docker_run":
+        # v2.60.0 — Docker sandbox primitive. Conservative defaults:
+        # --rm + --network=none + read-only mount + no privileged flags.
+        # The command is passed as a single string and wrapped with
+        # ``sh -c`` inside the container. Env passed through with --env.
+        env_raw = d.get("env") or {}
+        env_clean: dict = {}
+        if isinstance(env_raw, dict):
+            for k, v in list(env_raw.items())[:32]:
+                if isinstance(k, str) and re.match(r"^[A-Z_][A-Z0-9_]*$", k):
+                    env_clean[k] = _clamp_str(v, 1000)
+        out["data"] = {
+            "image":      _clamp_str(d.get("image"), 200) or "alpine:3",
+            "command":    _clamp_str(d.get("command"), 4000),
+            "mountPath":  _clamp_str(d.get("mountPath"), 500),
+            "mountReadonly": bool(d.get("mountReadonly", True)),
+            "network":    "bridge" if d.get("network") == "bridge" else "none",
+            "env":        env_clean,
+            "timeoutSec": max(1, min(600, int(d.get("timeoutSec") or 60))),
+            "memMb":      max(64, min(4096, int(d.get("memMb") or 512))),
         }
     # start 는 data 비움
     return out
@@ -1407,6 +1433,10 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     # ── Ralph loop (v2.56.0) ──
     if ntype == "ralph":
         return _execute_ralph_node(data, inputs, _elapsed)
+
+    # ── Docker sandbox (v2.60.0) ──
+    if ntype == "docker_run":
+        return _execute_docker_run_node(data, inputs, _elapsed)
 
     # ── session / subagent — 멀티 프로바이더 실행 ──
     prompt_parts = []
@@ -2315,6 +2345,83 @@ def _execute_ralph_node(data: dict, inputs: list[str], _elapsed) -> dict:
     return {"status": "err", "output": "", "durationMs": _elapsed(),
             "error": "ralph node hit hard deadline before completion",
             "ralphRunId": rid}
+
+
+def _execute_docker_run_node(data: dict, inputs: list[str], _elapsed) -> dict:
+    """Run a single shell command inside a transient docker container.
+
+    Conservative invocation:
+      docker run --rm --network=<none|bridge> --memory=<memMb>m \
+                 --read-only-tmpfs (when mountReadonly)
+                 [-v <mountPath>:<mountPath>:ro] \
+                 [-e KEY=VAL ...] \
+                 <image> sh -c '<command>'
+
+    Stdin is the upstream input (concatenated). Stdout becomes the node's
+    output; non-zero exit → status=err, stderr in error. ``docker`` binary
+    missing → clean error rather than fallback-to-host (silent privilege
+    elevation would be unsafe).
+    """
+    import shutil
+    import subprocess
+    cmd_str = (data.get("command") or "").strip()
+    if not cmd_str:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": "docker_run node: command required"}
+    if not shutil.which("docker"):
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": "docker_run node: docker CLI not installed on host. "
+                         "This node never falls back to host execution — "
+                         "install docker or remove this node."}
+    image = (data.get("image") or "alpine:3").strip()
+    network = "bridge" if (data.get("network") == "bridge") else "none"
+    mem_mb = int(data.get("memMb") or 512)
+    timeout = int(data.get("timeoutSec") or 60)
+    mount = (data.get("mountPath") or "").strip()
+    mount_ro = bool(data.get("mountReadonly", True))
+
+    argv = ["docker", "run", "--rm", "-i",
+            f"--network={network}",
+            f"--memory={mem_mb}m",
+            f"--memory-swap={mem_mb}m",
+            "--cpus=1",
+            "--security-opt=no-new-privileges"]
+    if mount:
+        ro_flag = ":ro" if mount_ro else ""
+        argv += ["-v", f"{mount}:{mount}{ro_flag}"]
+        argv += ["-w", mount]
+    for k, v in (data.get("env") or {}).items():
+        if isinstance(k, str) and isinstance(v, str):
+            argv += ["-e", f"{k}={v}"]
+    argv += [image, "sh", "-c", cmd_str]
+
+    stdin_text = ""
+    if inputs:
+        stdin_text = "\n".join(s for s in inputs if isinstance(s, str))
+
+    try:
+        proc = subprocess.run(
+            argv, input=stdin_text, capture_output=True, text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"docker_run timed out after {timeout}s",
+                "image": image}
+    except Exception as e:
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "error": f"docker_run failed: {e}",
+                "image": image}
+
+    if proc.returncode != 0:
+        return {"status": "err",
+                "output": (proc.stdout or "")[:32000],
+                "error": ("exit %d: %s" % (proc.returncode, (proc.stderr or "")[:2000])),
+                "durationMs": _elapsed(), "image": image}
+    return {"status": "ok",
+            "output": (proc.stdout or "")[:32000],
+            "durationMs": _elapsed(), "image": image,
+            "exitCode": 0}
 
 
 def _parse_hhmm(s: str) -> Optional[tuple[int, int]]:

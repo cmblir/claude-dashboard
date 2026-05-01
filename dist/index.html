@@ -2914,6 +2914,8 @@ const WF_NODE_TYPES = [
     desc: '대상 Claude 세션 UUID(또는 입력 문자열에서 추출)에 Auto-Resume 워커를 바인딩/해제. 워크플로우는 즉시 다음 노드로 진행되고, 워커는 백그라운드에서 토큰/레이트 한도 발생 시 claude --resume 으로 자동 재시도.' },
   { id: 'ralph', icon: '🦞', label: 'Ralph Loop', portIn: true, portOut: true,
     desc: 'Same-prompt iteration (Ralph Wiggum) — max-iter / completion-promise / 예산 USD / cancel 4중 안전장치. 노드는 루프 종료까지 블로킹.' },
+  { id: 'docker_run', icon: '🐳', label: 'Docker Run', portIn: true, portOut: true,
+    desc: '격리된 docker 컨테이너에서 셸 명령 실행. --rm + --network=none + read-only mount + memory cap 기본. docker 미설치 시 호스트 실행 폴백 없이 명확한 에러.' },
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 
@@ -2935,8 +2937,8 @@ const WF_NODE_CATEGORIES = [
     desc: '변환 · 변수 · 외부 호출 · 서브워크플로우',
     types: ['http', 'transform', 'variable', 'subworkflow'] },
   { id: 'integ',    icon: '🔗', label: '연동',
-    desc: 'Slack 어드민 · Obsidian 기록 · Auto-Resume · Ralph 루프',
-    types: ['slack_approval', 'obsidian_log', 'auto_resume', 'ralph'] },
+    desc: 'Slack 어드민 · Obsidian 기록 · Auto-Resume · Ralph 루프 · Docker',
+    types: ['slack_approval', 'obsidian_log', 'auto_resume', 'ralph', 'docker_run'] },
   { id: 'output',   icon: '📤', label: '출력',
     desc: '워크플로우 종착',
     types: ['output'] },
@@ -6002,6 +6004,7 @@ function _wfPickNodeType(winId, type) {
   else if (type === 'obsidian_log') draft.data = { vaultPath:'~/ObsidianVault', project:'lazyclaude', heading:'', tagsCsv:'', passThrough:true, defaultOutput:'' };
   else if (type === 'auto_resume') draft.data = { sessionId:'', cwd:'', prompt:'', pollInterval:300, idleSeconds:90, maxAttempts:12, useContinue:false, installHooks:false, action:'set' };
   else if (type === 'ralph') draft.data = { prompt:'', assignee:'', completion:'<promise>DONE</promise>', maxIterations:25, budgetUsd:5, systemPrompt:'', cwd:'' };
+  else if (type === 'docker_run') draft.data = { image:'alpine:3', command:'echo hello', mountPath:'', mountReadonly:true, network:'none', env:{}, timeoutSec:60, memMb:512 };
   else draft.data = {};
   if (!draft.title) draft.title = t(WF_TYPE_MAP[type].label);
   // 타입 선택 직후 카테고리 그리드 자동 접힘 (UX 개선)
@@ -6479,6 +6482,49 @@ function _wfRenderEditorBody(winId) {
         oninput="_wfDraftSetData('${winId}','cwd',this.value)">
       <div class="text-[10px] mt-3" style="color:var(--text-dim)">
         🦞 ${t('이 노드는 Ralph 루프가 종료될 때까지 블로킹됩니다. 안전장치 4종(max-iter / completion / 예산 / cancel) 모두 강제 적용.')}
+      </div>
+    `;
+  } else if (draft.type === 'docker_run') {
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('Docker 이미지')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.image||'alpine:3')}"
+        placeholder="alpine:3" oninput="_wfDraftSetData('${winId}','image',this.value)">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('명령 (sh -c 로 실행)')}</label>
+      <textarea class="input w-full mt-1" rows="4"
+        placeholder="echo hello && uname -a"
+        oninput="_wfDraftSetData('${winId}','command',this.value)">${escapeHtml(d.command||'')}</textarea>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('볼륨 마운트 경로 (선택)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.mountPath||'')}"
+        placeholder="/Users/o/myproject"
+        oninput="_wfDraftSetData('${winId}','mountPath',this.value)">
+      <label class="text-[11px] flex items-center gap-2 mt-2">
+        <input type="checkbox" ${d.mountReadonly?'checked':''}
+          onchange="_wfDraftSetData('${winId}','mountReadonly',this.checked)">
+        ${t('읽기 전용 마운트 (권장)')}
+      </label>
+      <div class="grid grid-cols-3 gap-2 mt-3">
+        <div>
+          <label class="text-[10px] block">${t('네트워크')}</label>
+          <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','network',this.value)">
+            <option value="none" ${d.network!=='bridge'?'selected':''}>none</option>
+            <option value="bridge" ${d.network==='bridge'?'selected':''}>bridge</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] block">${t('타임아웃 (s)')}</label>
+          <input class="input w-full mt-1" type="number" min="1" max="600"
+            value="${d.timeoutSec||60}"
+            oninput="_wfDraftSetData('${winId}','timeoutSec',parseInt(this.value||'60',10))">
+        </div>
+        <div>
+          <label class="text-[10px] block">${t('메모리 (MB)')}</label>
+          <input class="input w-full mt-1" type="number" min="64" max="4096"
+            value="${d.memMb||512}"
+            oninput="_wfDraftSetData('${winId}','memMb',parseInt(this.value||'512',10))">
+        </div>
+      </div>
+      <div class="text-[10px] mt-3" style="color:var(--text-dim)">
+        🐳 ${t('docker 미설치 시 호스트 실행 폴백 없이 명확한 에러를 반환합니다 (조용한 권한 상승 방지).')}
       </div>
     `;
   }
