@@ -3774,6 +3774,7 @@
   "클릭 → 목표 입력 → 즉시 실행": "Click → enter goal → run immediately",
   "클릭 → 에이전트 정의 보기": "Click → view agent definition",
   "클릭 시 Auth 확인 → 변경 미리보기 → 적용까지 안내됩니다.": "Click to run auth check → preview changes → guided apply.",
+  "클릭으로 이메일 표시 전환": "클릭으로 이메일 표시 전환",
   "클릭하면 해당 훅 카드로 이동": "Click to jump to the matching hook card",
   "클릭해서 상세": "click for details",
   "클립보드가 비어있습니다": "Clipboard is empty",

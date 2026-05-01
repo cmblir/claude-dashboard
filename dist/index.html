@@ -1566,6 +1566,42 @@ function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => _ESC_HTML_MAP[ch]);
 }
+
+// O1 (v2.66.0) — render an email with the local part redacted by default.
+// User can flip with `cc.showFullEmail = true` in localStorage. This is a
+// privacy hint, not a security boundary — the same value can still be
+// scraped via `/api/auth/status`. Reduces accidental over-the-shoulder
+// leakage when sharing a screenshot, which is the actual user complaint.
+function _renderEmail(email) {
+  if (email == null) return '';
+  const s = String(email);
+  let showFull = false;
+  try { showFull = localStorage.getItem('cc.showFullEmail') === '1'; } catch (_) {}
+  if (showFull) return escapeHtml(s);
+  const at = s.indexOf('@');
+  if (at <= 0) return escapeHtml(s);   // no local part to redact
+  const local = s.slice(0, at);
+  const domain = s.slice(at);
+  // Keep first 2 chars + "***" + last char (if length allows) so the
+  // recipient stays vaguely identifiable to the owner.
+  let masked = local;
+  if (local.length > 3) {
+    masked = local.slice(0, 2) + '***' + local.slice(-1);
+  } else {
+    masked = local[0] + '**';
+  }
+  return escapeHtml(masked + domain);
+}
+
+function _toggleShowFullEmail() {
+  let cur = false;
+  try { cur = localStorage.getItem('cc.showFullEmail') === '1'; } catch (_) {}
+  try { localStorage.setItem('cc.showFullEmail', cur ? '0' : '1'); } catch (_) {}
+  if (typeof renderView === 'function') renderView();
+  if (typeof _renderCliStatus === 'function') {
+    try { _renderCliStatus(); } catch (_) {}
+  }
+}
 // JSON 객체를 HTML 속성(작은/큰따옴표 모두 안전) 으로 인코딩
 function jsonAttr(obj) {
   return escapeHtml(JSON.stringify(obj));
@@ -15039,8 +15075,8 @@ async function startProfileFlow(i) {
          <div class="text-2xl">✅</div>
          <div class="flex-1">
            <div class="text-xs uppercase tracking-widest text-[var(--text-dim)]">1. 계정 연결</div>
-           <div class="font-semibold text-sm">${escapeHtml(auth.displayName || auth.email)} · ${escapeHtml(auth.planLabel)}</div>
-           <div class="text-xs text-[var(--text-mute)] mt-0.5">${escapeHtml(auth.email)} · 조직 역할: ${escapeHtml(auth.organizationRole||'—')}</div>
+           <div class="font-semibold text-sm">${escapeHtml(auth.displayName) || _renderEmail(auth.email)} · ${escapeHtml(auth.planLabel)}</div>
+           <div class="text-xs text-[var(--text-mute)] mt-0.5">${_renderEmail(auth.email)} · 조직 역할: ${escapeHtml(auth.organizationRole||'—')}</div>
          </div>
          <span class="chip chip-ok">연결됨</span>
        </div>`
@@ -22606,7 +22642,7 @@ async function loadCliFoot() {
           ${badge(cliOk, cliOk ? `CLI ${escapeHtml((auth.cliVersion||'').split(' ')[0]||'')}` : 'CLI 미설치')}
           ${badge(connOk, connOk ? '구독 인증' : '미로그인')}
         </div>
-        ${connOk ? `<div class="cli-body text-[10px] text-[var(--text-dim)] mt-1 truncate">${escapeHtml(auth.planLabel||'')} · ${escapeHtml(auth.email||'')}</div>` : ''}
+        ${connOk ? `<div class="cli-body text-[10px] text-[var(--text-dim)] mt-1 truncate" title="${t('클릭으로 이메일 표시 전환')}" onclick="event.stopPropagation();_toggleShowFullEmail()" style="cursor:pointer;">${escapeHtml(auth.planLabel||'')} · ${_renderEmail(auth.email||'')}</div>` : ''}
         <div class="flex gap-1 mt-1.5">
           ${connOk
             ? `<button class="btn text-[9px] px-1.5 py-0.5 flex-1" onclick="event.stopPropagation();switchAccount()" title="${t('다른 Claude 계정으로 전환')}">🔄 ${t('전환')}</button>
@@ -22671,7 +22707,7 @@ async function switchAccount() {
            </div>
            <div>
              <div class="font-semibold">${escapeHtml(auth.displayName || '사용자')}</div>
-             <div class="text-xs text-[var(--text-mute)]">${escapeHtml(auth.email)}</div>
+             <div class="text-xs text-[var(--text-mute)]">${_renderEmail(auth.email)}</div>
              <div class="text-[10px] text-[var(--text-dim)]">${escapeHtml(auth.planLabel||'')} ${auth.organizationRole ? '· ' + escapeHtml(auth.organizationRole) : ''}</div>
            </div>
          </div>`
@@ -22777,7 +22813,7 @@ async function openCliStatusModal() {
       <div class="card p-4">
         <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] mb-2">계정 / 구독</div>
         <table class="data"><tbody>
-          ${row('이메일', auth.email)}
+          ${row('이메일', _renderEmail(auth.email))}
           ${row('이름', auth.displayName)}
           ${row('billingType (로컬)', auth.billingType || '—')}
           ${row('조직 역할', auth.organizationRole)}
@@ -23775,8 +23811,8 @@ function showLoginGate(auth) {
                   ${escapeHtml((auth.displayName||auth.email||'?')[0].toUpperCase())}
                 </div>
                 <div class="min-w-0">
-                  <div class="font-semibold text-sm truncate">${escapeHtml(auth.displayName || auth.email)}</div>
-                  <div class="text-xs text-[var(--text-mute)] truncate">${escapeHtml(auth.email)}</div>
+                  <div class="font-semibold text-sm truncate">${escapeHtml(auth.displayName) || _renderEmail(auth.email)}</div>
+                  <div class="text-xs text-[var(--text-mute)] truncate">${_renderEmail(auth.email)}</div>
                   <div class="flex items-center gap-2 mt-0.5">
                     <span class="chip chip-ok text-[9px]">${escapeHtml(auth.planLabel||'연결됨')}</span>
                     ${auth.subscriptionType ? `<span class="chip text-[9px]">${escapeHtml(auth.subscriptionType)}</span>` : ''}
