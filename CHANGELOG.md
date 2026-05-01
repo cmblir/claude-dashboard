@@ -10,6 +10,88 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.62.0] — 2026-05-02
+
+### Added
+- 🦞 Ralph Polish system prompt editor in the Ralph tab (load / save /
+  revert) backed by `GET/POST /api/ralph/polish-prompt`.
+- 📊 Per-mode usage stats panel in Settings dropdown — bar chart of top
+  tabs per mode, per-mode reset.
+- 🐳 docker_run result cache (opt-in `cache:true`) keyed on
+  (image, command, env, mountPath, network, stdin) with `cacheTtlSec` TTL.
+  Failures never cached.
+
+## [2.61.0] — 2026-05-02
+
+### Added
+- Ralph Polish system prompt configurable via env / file / default.
+- Per-mode last-tab memory (`cc.mode.<mode>.lastTab`).
+- 🔥 badge for top-3 most-visited tabs in current mode.
+- Mode-scoped spotlight (Cmd+K) + global toggle chip.
+- Mode badges (C/W/P/O) in all-mode sidebar.
+- Orchestrator IPC stream UI panel.
+
+## [2.60.0] — 2026-05-02
+
+### Added
+- 🐳 `docker_run` workflow node — sandboxed shell as a workflow primitive
+  with `--rm`, `--network=none`, memory cap, `--security-opt=no-new-privileges`,
+  optional read-only volume mount. Missing docker → clean error,
+  no host-execution fallback.
+
+## [2.59.0] — 2026-05-02
+
+### Changed
+- ⚠️ Ollama auto-start is now **opt-in** (env `OLLAMA_AUTOSTART=1` or
+  Quick-Settings `behavior.autoStartOllama=true`). Default skips silently.
+
+### Added
+- 🎚️ Top-level mode switcher (All / Claude / Workflow / Providers / OpenClaw).
+- 🔄 Auto-Resume manager add-binding modal (live session picker).
+- 📊 `/api/system/boot-timing` time-to-listen observability.
+- Boot path defers `_migrate_runs_to_db` to a daemon thread; orchestrator
+  sweeper auto-starts at boot.
+
+## [2.58.0] — 2026-05-01
+
+### Added
+- Orchestrator inbound/outbound SQLite IPC streams (NanoClaw single-writer
+  pattern). `/api/orchestrator/inbound` + `…/outbound`.
+- Recurrence sweeper — bindings with `schedule.everyMinutes` fire on a
+  60-second tick.
+- Ralph auto-commit on `done` when cwd is a git repo + `autoCommit:true`.
+
+## [2.57.0] — 2026-05-01
+
+### Added
+- 🦞 Ralph UI tab + Project card recommendation modal with optional
+  LLM polish.
+- Email-out reply binding (`kind: "email"`) — orchestrator replies via SMTP.
+- Per-agent isolated workspace at
+  `~/.claude-dashboard-agents/<binding-id>/{CLAUDE.md, memory/}`.
+- Workflow `ralph` node inspector form.
+
+## [2.56.0] — 2026-05-01
+
+### Added
+- 🦞 Ralph loop engine + workflow node + CLI + project recommender
+  (Geoffrey Huntley's Ralph Wiggum loop pattern as a first-class feature).
+- Discord bot — outbound + ed25519-verified interactions endpoint
+  (lazy `cryptography` import; missing → all webhooks refused).
+- Per-binding fallback chain + 24h rolling daily budget cap (USD).
+
+### Fixed
+- Deterministic tie-break in `orch_runs ORDER BY` (rowid DESC second key).
+
+## [2.55.x] — 2026-05-01
+
+### Added
+- 🎼 Channel orchestrator (Slack + Telegram), terminal TUI, agent bus.
+- Agent bus SSE bridge + ask/reply protocol + workflow binding execution.
+- Slack signing verification + orchestrator run history.
+- HTTPS keep-alive pool, reply debouncer, plan LRU, per-topic index, perf bench.
+
+---
 ## [2.54.0] — 2026-05-01
 
 ### 🧹 Housekeeping + 264 tests + perf regression suite
