@@ -505,7 +505,7 @@ def list_run_history(limit: int = 50) -> list[dict]:
         with _db() as c:
             rows = c.execute(
                 "SELECT run_id, ts, kind, channel, user, via, ok, error, text, final"
-                " FROM orch_runs ORDER BY ts DESC LIMIT ?",
+                " FROM orch_runs ORDER BY ts DESC, rowid DESC LIMIT ?",
                 (max(1, min(int(limit), 500)),),
             ).fetchall()
         return [{"runId": r["run_id"], "ts": r["ts"], "kind": r["kind"],
