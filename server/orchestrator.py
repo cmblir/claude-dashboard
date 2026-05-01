@@ -157,6 +157,63 @@ def find_binding(kind: str, channel_or_chat: str) -> Optional[dict]:
 _PLAN_FENCE_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 _PLAN_OBJ_RE = re.compile(r"(\{[\s\S]*\})")
 
+# ── Plan LRU cache ─────────────────────────────────────────────────────
+#
+# Same user text on the same binding → same plan. We hash
+# ``(text, binding-key, sorted assignees)`` and cache the parsed plan for
+# ``_PLAN_CACHE_TTL_S`` seconds. A bounded LRU keeps memory in check.
+#
+# This is a pure latency win: the planner LLM call is by far the most
+# expensive part of an ad-hoc dispatch, and many channels see repeated
+# templated requests ("daily standup", "summarise PR ##").
+
+import hashlib as _hashlib
+from collections import OrderedDict as _OrderedDict
+
+_PLAN_CACHE_SIZE = int(os.environ.get("ORCH_PLAN_CACHE_SIZE", "256"))
+_PLAN_CACHE_TTL_S = int(os.environ.get("ORCH_PLAN_CACHE_TTL_S", "1800"))
+
+_PLAN_CACHE: "_OrderedDict[str, tuple[float, list[dict]]]" = _OrderedDict()
+_PLAN_CACHE_LOCK = threading.Lock()
+
+
+def _plan_cache_key(text: str, binding: Optional[dict],
+                    assignees: list[str]) -> str:
+    bkey = ""
+    if binding:
+        bkey = (binding.get("kind", "") + "|"
+                + (binding.get("channel") or binding.get("chat") or ""))
+    blob = "\x1f".join([text.strip(), bkey] + sorted(assignees))
+    return _hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
+
+def _plan_cache_get(key: str) -> Optional[list[dict]]:
+    with _PLAN_CACHE_LOCK:
+        item = _PLAN_CACHE.get(key)
+        if item is None:
+            return None
+        ts, plan = item
+        if time.time() - ts > _PLAN_CACHE_TTL_S:
+            _PLAN_CACHE.pop(key, None)
+            return None
+        _PLAN_CACHE.move_to_end(key)
+        return [dict(s) for s in plan]
+
+
+def _plan_cache_set(key: str, plan: list[dict]) -> None:
+    if not plan:
+        return
+    with _PLAN_CACHE_LOCK:
+        _PLAN_CACHE[key] = (time.time(), [dict(s) for s in plan])
+        _PLAN_CACHE.move_to_end(key)
+        while len(_PLAN_CACHE) > _PLAN_CACHE_SIZE:
+            _PLAN_CACHE.popitem(last=False)
+
+
+def _plan_cache_clear_for_tests() -> None:
+    with _PLAN_CACHE_LOCK:
+        _PLAN_CACHE.clear()
+
 _PLANNER_SYSTEM = """You are an orchestrator's planner. Break the user's request \
 into 1-4 small parallel sub-tasks for sub-agents. Respond ONLY with a JSON object:
 {"plan":[{"assignee":"<provider:model>","task":"<single-sentence prompt>"},...]}
@@ -212,6 +269,120 @@ def _parse_plan(text: str, available: list[str]) -> list[dict]:
 
 
 # ───────── Run ─────────
+
+# ───────── Coalesced channel reply (debounce per channel) ─────────
+#
+# Several sub-agents finish within milliseconds of each other and each
+# wants to surface a status update. Without coalescing we burn N round
+# trips to Slack/Telegram (and N quota slots). The debouncer maintains one
+# pending buffer per ``(kind, channel)`` and one timer thread; further
+# ``send()`` calls inside ``debounce_ms`` append to the buffer instead of
+# opening a new HTTP call. When the timer fires, the joined text goes out
+# in a single message.
+#
+# Optimization rationale:
+# - One ``threading.Timer`` per active channel, started lazily.
+# - Buffers cap at ``_COALESCE_MAX_CHARS`` to honour Slack's 39 KB / Telegram's
+#   4 KB ceiling without truncating individual fragments mid-message.
+# - Bypassed when ``debounce_ms <= 0`` (per-channel config knob) so existing
+#   one-shot replies stay synchronous.
+
+_COALESCE_MAX_CHARS = int(os.environ.get("ORCH_COALESCE_MAX", "30000"))
+
+
+class _ReplyCoalescer:
+    """Channel-keyed buffer + timer. Thread-safe."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._buf: dict[tuple[str, str], list[str]] = {}
+        self._timers: dict[tuple[str, str], threading.Timer] = {}
+
+    def schedule(self, key: tuple[str, str], text: str, debounce_ms: int,
+                 sink) -> None:
+        """``sink`` is ``Callable[[str], None]`` — the actual send-to-channel."""
+        if debounce_ms <= 0:
+            try:
+                sink(text)
+            except Exception as e:
+                log.warning("coalesce immediate sink failed: %s", e)
+            return
+        with self._lock:
+            buf = self._buf.setdefault(key, [])
+            buf.append(text)
+            # If the new fragment would push us past the cap, flush the
+            # current buffer first (synchronously, cheap) and start fresh.
+            if sum(len(x) for x in buf) > _COALESCE_MAX_CHARS:
+                pending = self._buf.pop(key)
+                t = self._timers.pop(key, None)
+                if t is not None:
+                    try:
+                        t.cancel()
+                    except Exception:
+                        pass
+                _flush_text = "\n".join(pending[:-1])
+                self._buf[key] = [pending[-1]]
+            else:
+                _flush_text = ""
+            existing = self._timers.get(key)
+            if existing is None:
+                timer = threading.Timer(debounce_ms / 1000.0,
+                                        self._flush, args=(key, sink))
+                timer.daemon = True
+                self._timers[key] = timer
+                timer.start()
+        if _flush_text:
+            try:
+                sink(_flush_text)
+            except Exception as e:
+                log.warning("coalesce overflow sink failed: %s", e)
+
+    def _flush(self, key: tuple[str, str], sink) -> None:
+        with self._lock:
+            buf = self._buf.pop(key, [])
+            self._timers.pop(key, None)
+        if not buf:
+            return
+        try:
+            sink("\n".join(buf))
+        except Exception as e:
+            log.warning("coalesce timed sink failed: %s", e)
+
+    def flush_now(self, key: Optional[tuple[str, str]] = None) -> None:
+        """Force flush — for tests or shutdown."""
+        with self._lock:
+            keys = [key] if key else list(self._buf.keys())
+            sinks: list[tuple[tuple[str, str], list[str]]] = []
+            for k in keys:
+                buf = self._buf.pop(k, [])
+                t = self._timers.pop(k, None)
+                if t is not None:
+                    try:
+                        t.cancel()
+                    except Exception:
+                        pass
+                if buf:
+                    sinks.append((k, buf))
+        # Sinks are stored on the caller side, so flush_now() just clears.
+        return None
+
+
+_COALESCER = _ReplyCoalescer()
+
+
+def coalesced_reply(kind: str, channel: str, text: str, sink,
+                    debounce_ms: Optional[int] = None) -> None:
+    """Public helper. ``sink(joined_text)`` is what actually hits the wire.
+
+    The debounce window comes from the orchestrator config (``channelDebounceMs``)
+    unless an explicit override is passed in.
+    """
+    if not text:
+        return
+    if debounce_ms is None:
+        debounce_ms = load_config().get("channelDebounceMs", _CHANNEL_DEBOUNCE_MS)
+    _COALESCER.schedule((kind, channel or ""), text, int(debounce_ms or 0), sink)
+
 
 # ───────── Run history (SQLite) ─────────
 
@@ -497,23 +668,33 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
             "error": wf_result.get("error"),
         }
 
-    # 1. Plan
+    # 1. Plan — check LRU cache first (skip planner LLM call on repeats)
     planner = cfg["plannerAssignee"]
-    try:
-        plan_resp = execute_with_assignee(
-            planner,
-            _build_planner_prompt(text, avail),
-            system_prompt=_PLANNER_SYSTEM,
-            timeout=_PER_AGENT_TIMEOUT_S,
-        )
-        plan_text = plan_resp.output if plan_resp.status == "ok" else ""
-    except Exception as e:
-        log.warning("planner crash: %s", e)
-        plan_text = ""
-    plan = _parse_plan(plan_text, avail)
-    agent_bus.publish(_topic(run_id, "plan"),
-                      {"steps": plan, "plannerOutput": plan_text[:2000]},
-                      source=planner)
+    cache_key = _plan_cache_key(text, binding, avail)
+    cached_plan = _plan_cache_get(cache_key)
+    if cached_plan is not None:
+        plan = cached_plan
+        agent_bus.publish(_topic(run_id, "plan"),
+                          {"steps": plan, "cached": True},
+                          source="orchestrator")
+    else:
+        try:
+            plan_resp = execute_with_assignee(
+                planner,
+                _build_planner_prompt(text, avail),
+                system_prompt=_PLANNER_SYSTEM,
+                timeout=_PER_AGENT_TIMEOUT_S,
+            )
+            plan_text = plan_resp.output if plan_resp.status == "ok" else ""
+        except Exception as e:
+            log.warning("planner crash: %s", e)
+            plan_text = ""
+        plan = _parse_plan(plan_text, avail)
+        _plan_cache_set(cache_key, plan)
+        agent_bus.publish(_topic(run_id, "plan"),
+                          {"steps": plan, "plannerOutput": plan_text[:2000],
+                           "cached": False},
+                          source=planner)
 
     # 2. Execute steps in parallel
     pool_size = min(cfg["maxParallel"], max(1, len(plan)))
@@ -561,7 +742,8 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
 
 def _slack_reply(channel: str, thread_ts: Optional[str] = None):
     from . import slack_api
-    def _send(text: str) -> None:
+
+    def _wire(text: str) -> None:
         try:
             payload = {"channel": channel, "text": text[:38000]}
             if thread_ts:
@@ -569,16 +751,25 @@ def _slack_reply(channel: str, thread_ts: Optional[str] = None):
             slack_api._call("chat.postMessage", payload)
         except Exception as e:
             log.warning("slack reply failed: %s", e)
+
+    def _send(text: str) -> None:
+        coalesced_reply("slack", channel, text, _wire)
+
     return _send
 
 
 def _telegram_reply(chat: str, reply_to: Optional[int] = None):
     from . import telegram_api
-    def _send(text: str) -> None:
+
+    def _wire(text: str) -> None:
         try:
             telegram_api.send_message(chat, text, reply_to=reply_to)
         except Exception as e:
             log.warning("telegram reply failed: %s", e)
+
+    def _send(text: str) -> None:
+        coalesced_reply("telegram", chat, text, _wire)
+
     return _send
 
 

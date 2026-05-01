@@ -367,3 +367,87 @@ class TestSafeWriteRoundtrip:
             f"_safe_write+_safe_read roundtrip took {elapsed:.3f}ms, "
             "budget 20ms"
         )
+
+
+
+# ───────── v2.55.0 — agent_bus throughput / latency ─────────
+
+
+class TestAgentBusPublishThroughput:
+    """Publishing 10k events should land well under 1 second on a dev box."""
+
+    def test_publish_10k_under_1s(self, isolated_home, monkeypatch, tmp_path):
+        monkeypatch.setenv("CLAUDE_DASHBOARD_DB", str(tmp_path / "bus.db"))
+        # Tight dedup window so unique payloads aren't dropped.
+        monkeypatch.setenv("AGENT_BUS_DEDUP_WINDOW_MS", "0")
+        monkeypatch.setenv("AGENT_BUS_RING_SIZE", "16384")
+        import importlib
+        from server import config as _c; importlib.reload(_c)
+        from server import db as _db; importlib.reload(_db)
+        from server import agent_bus; importlib.reload(agent_bus)
+        agent_bus.reset_for_tests()
+
+        N = 10_000
+
+        def go():
+            for i in range(N):
+                agent_bus.publish(f"perf.topic.{i % 32}", {"i": i}, source="t")
+
+        elapsed = _best_of(go, n=1)
+        # Budget 5x measured (~150ms on dev box) so CI noise is absorbed.
+        assert elapsed < 1000.0, (
+            f"agent_bus.publish x{N} took {elapsed:.1f}ms, budget 1000ms"
+        )
+
+
+class TestAgentBusHistoryLatency:
+    """history() should return in ms even when the ring is full."""
+
+    def test_history_ring_under_100ms(self, isolated_home, monkeypatch, tmp_path):
+        monkeypatch.setenv("CLAUDE_DASHBOARD_DB", str(tmp_path / "bus.db"))
+        monkeypatch.setenv("AGENT_BUS_DEDUP_WINDOW_MS", "0")
+        monkeypatch.setenv("AGENT_BUS_RING_SIZE", "4096")
+        import importlib
+        from server import config as _c; importlib.reload(_c)
+        from server import db as _db; importlib.reload(_db)
+        from server import agent_bus; importlib.reload(agent_bus)
+        agent_bus.reset_for_tests()
+
+        for i in range(4000):
+            agent_bus.publish(f"perf.topic.{i % 8}", {"i": i}, source="t")
+
+        def go():
+            agent_bus.history(["perf.*"], limit=200)
+
+        elapsed = _best_of(go, n=3)
+        assert elapsed < 100.0, (
+            f"agent_bus.history(ring=4000) took {elapsed:.2f}ms, budget 100ms"
+        )
+
+
+class TestPlanCacheHitLatency:
+    def test_plan_cache_hit_under_1ms(self, isolated_home, monkeypatch, tmp_path):
+        monkeypatch.setenv("CLAUDE_DASHBOARD_ORCHESTRATOR",
+                           str(tmp_path / "orch.json"))
+        monkeypatch.setenv("CLAUDE_DASHBOARD_DB", str(tmp_path / "bus.db"))
+        import importlib
+        from server import config as _c; importlib.reload(_c)
+        from server import db as _db; importlib.reload(_db)
+        from server import agent_bus; importlib.reload(agent_bus)
+        from server import orchestrator; importlib.reload(orchestrator)
+        orchestrator._plan_cache_clear_for_tests()
+
+        key = orchestrator._plan_cache_key(
+            "the same prompt", {"kind": "http", "channel": "x"},
+            ["claude:sonnet"],
+        )
+        orchestrator._plan_cache_set(key, [{"assignee": "claude:sonnet",
+                                            "task": "x"}])
+
+        def go():
+            orchestrator._plan_cache_get(key)
+
+        elapsed = _best_of(go, n=5)
+        assert elapsed < 1.0, (
+            f"plan cache hit took {elapsed:.3f}ms, budget 1ms"
+        )

@@ -197,6 +197,16 @@ class _Bus:
         self._stop = False
         self._last_flush_ms = 0
         self._last_retention_ms = 0
+        # Per-exact-topic last-id index. Allows sparse subscribers to short-
+        # circuit the ring scan: if max(self._topic_last_id[t] for t in
+        # subscriber.topics) <= cursor, we know nothing new matches.
+        # We index by exact topic strings (not glob patterns) because event
+        # publishes are O(1) updates; subscribers do a tiny dict lookup per
+        # known-prefix on wakeup.
+        self._topic_last_id: dict[str, int] = {}
+        # Suffix index: ``.``-segment prefixes → last id. Lets a glob like
+        # ``orch.*`` ask for ``self._prefix_last_id["orch"]`` in O(1).
+        self._prefix_last_id: dict[str, int] = {}
 
     # ---- lifecycle ----
 
@@ -225,6 +235,7 @@ class _Bus:
         if not batch:
             return
         try:
+            _ensure_schema()
             with _db() as c:
                 c.executemany(
                     "INSERT INTO agent_events(ts, topic, source, payload) VALUES (?, ?, ?, ?)",
@@ -275,6 +286,11 @@ class _Bus:
             self._next_local_id += 1
             self._ring.append(ev)
             self._pending.append(ev)
+            # Update topic + prefix index in O(segments).
+            self._topic_last_id[topic] = ev.id
+            parts = topic.split(".")
+            for i in range(1, len(parts) + 1):
+                self._prefix_last_id[".".join(parts[:i])] = ev.id
             self._cv.notify_all()
         return ev
 
@@ -335,10 +351,37 @@ class _Bus:
             cursor = max(cursor, ev.id if ev.id > 0 else cursor)
             yield ev
 
+        # Pre-extract literal prefixes from patterns for the index lookup —
+        # ``orch.*`` → prefix ``orch``; ``a.b.**`` → prefix ``a.b``;
+        # ``**`` / pure-glob → no prefix (must scan).
+        topic_prefixes: list[str] = []
+        any_glob_only = False
+        for p in topics or ["**"]:
+            if "*" not in p and "?" not in p:
+                topic_prefixes.append(p); continue
+            head = p.split("*", 1)[0].rstrip(".")
+            if head:
+                topic_prefixes.append(head)
+            else:
+                any_glob_only = True
+
         while True:
             with self._cv:
                 self._cv.wait(timeout=wait_s)
-                snapshot = list(self._ring)
+                # Short-circuit: if no exact-topic *or* prefix has advanced
+                # past the cursor, skip the ring snapshot entirely.
+                if not any_glob_only:
+                    has_new = False
+                    for prefix in topic_prefixes:
+                        if (self._topic_last_id.get(prefix, 0) > cursor or
+                                self._prefix_last_id.get(prefix, 0) > cursor):
+                            has_new = True; break
+                    if not has_new:
+                        snapshot = []
+                    else:
+                        snapshot = list(self._ring)
+                else:
+                    snapshot = list(self._ring)
             new_events = [e for e in snapshot
                           if e.id > cursor and any(p.match(e.topic) for p in patterns)]
             if not new_events:
@@ -445,6 +488,8 @@ def reset_for_tests() -> None:
         _BUS._pending.clear()
         _BUS._dedup = _DedupLRU(_DEDUP_LRU, _DEDUP_WINDOW_MS)
         _BUS._next_local_id = 1
+        _BUS._topic_last_id.clear()
+        _BUS._prefix_last_id.clear()
 
 
 # ───────── HTTP API ─────────

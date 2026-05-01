@@ -25,6 +25,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Optional
 
+from . import http_pool
 from .config import _env_path
 from .logger import log
 from .utils import _safe_read, _safe_write
@@ -36,6 +37,7 @@ SLACK_CONFIG_PATH = _env_path(
 )
 
 _SLACK_API = "https://slack.com/api"
+_SLACK_HOST = "slack.com"
 _TIMEOUT = 8
 _TOKEN_RE = re.compile(r"^xox[bp]-[A-Za-z0-9-]{10,}$")
 _CHANNEL_RE = re.compile(r"^[A-Z0-9]{3,30}$|^#[a-z0-9_-]{1,80}$")
@@ -110,36 +112,34 @@ def _call(method: str, payload: dict, token: Optional[str] = None,
     if not _TOKEN_RE.match(tok):
         raise SlackError("slack token format invalid (expected xoxb-* / xoxp-*)")
 
-    url = f"{_SLACK_API}/{method}"
+    path = f"/api/{method}"
     headers = {
         "Authorization": f"Bearer {tok}",
-        "User-Agent":    "LazyClaude/2.34",
+        "User-Agent":    "LazyClaude/2.55",
     }
     data: Optional[bytes] = None
-    if http_method.upper() == "POST":
-        body = json.dumps(payload).encode("utf-8")
+    http_method = http_method.upper()
+    if http_method == "POST":
+        data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json; charset=utf-8"
-        data = body
-        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     else:
         if payload:
-            url = url + "?" + urllib.parse.urlencode(payload)
-        req = urllib.request.Request(url, headers=headers, method="GET")
+            path = path + "?" + urllib.parse.urlencode(payload)
 
-    ctx = ssl.create_default_context()
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT, context=ctx) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-            try:
-                obj = json.loads(raw)
-            except Exception as e:
-                raise SlackError(f"non-json response: {e}")
-            if not isinstance(obj, dict):
-                raise SlackError("unexpected response shape")
-            if not obj.get("ok"):
-                raise SlackError(f"slack error: {obj.get('error') or 'unknown'}")
-            return obj
-    except urllib.error.URLError as e:
+        resp = http_pool.request(_SLACK_HOST, http_method, path,
+                                 body=data, headers=headers, timeout=_TIMEOUT)
+        raw = resp.body.decode("utf-8", errors="replace")
+        try:
+            obj = json.loads(raw)
+        except Exception as e:
+            raise SlackError(f"non-json response: {e}")
+        if not isinstance(obj, dict):
+            raise SlackError("unexpected response shape")
+        if not obj.get("ok"):
+            raise SlackError(f"slack error: {obj.get('error') or 'unknown'}")
+        return obj
+    except (urllib.error.URLError, ConnectionError, OSError) as e:
         raise SlackError(f"network error: {e}")
 
 

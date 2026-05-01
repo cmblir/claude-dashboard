@@ -26,6 +26,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from . import http_pool
 from .config import _env_path
 from .logger import log
 from .utils import _safe_read, _safe_write
@@ -114,33 +115,25 @@ def _call(method: str, params: dict, token: Optional[str] = None,
         raise TelegramError("telegram token not configured")
     if not _TOKEN_RE.match(tok):
         raise TelegramError("telegram token format invalid")
-    url = f"https://{_TG_API_HOST}/bot{tok}/{method}"
+    path = f"/bot{tok}/{method}"
     body = json.dumps(params).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "User-Agent": "LazyClaude-Telegram/2.55",
-        },
-        method="POST",
-    )
-    # Hostname pinning — urlopen could in principle follow a 30x; since we
-    # construct the URL ourselves and api.telegram.org doesn't redirect, we
-    # additionally refuse to handle redirects.
-    ctx = ssl.create_default_context()
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent":   "LazyClaude-Telegram/2.55",
+    }
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-            if resp.url and not resp.url.startswith(f"https://{_TG_API_HOST}/"):
-                raise TelegramError(f"unexpected redirect to {resp.url}")
-            raw = resp.read().decode("utf-8", errors="replace")
-            obj = json.loads(raw)
-            if not isinstance(obj, dict):
-                raise TelegramError("unexpected response shape")
-            if not obj.get("ok"):
-                raise TelegramError(f"telegram error: {obj.get('description') or 'unknown'}")
-            return obj.get("result") or {}
-    except urllib.error.URLError as e:
+        resp = http_pool.request(_TG_API_HOST, "POST", path,
+                                 body=body, headers=headers, timeout=timeout)
+        if resp.status // 100 != 2:
+            raise TelegramError(f"http {resp.status}")
+        raw = resp.body.decode("utf-8", errors="replace")
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            raise TelegramError("unexpected response shape")
+        if not obj.get("ok"):
+            raise TelegramError(f"telegram error: {obj.get('description') or 'unknown'}")
+        return obj.get("result") or {}
+    except (urllib.error.URLError, ConnectionError, OSError) as e:
         raise TelegramError(f"network error: {e}")
     except json.JSONDecodeError as e:
         raise TelegramError(f"non-json response: {e}")

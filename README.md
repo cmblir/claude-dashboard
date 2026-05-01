@@ -374,6 +374,16 @@ turns the dashboard into a multi-agent hub for chat platforms:
 - **Slack signature verification.** Set `SLACK_SIGNING_SECRET` to enforce
   HMAC-SHA256 over `v0:<ts>:<raw-body>` on `/api/slack/events`; stale
   timestamps (>5 min) are rejected.
+
+**Optimization knobs** (cycle 3 — all stdlib, no new deps):
+
+| Lever | Default | Env | What it buys you |
+|---|---|---|---|
+| HTTPS keep-alive pool | 4 conns/host, 60 s idle | `HTTP_POOL_PER_HOST`, `HTTP_POOL_IDLE_S` | ~50–200 ms per Slack/Telegram call after warm-up |
+| Reply debouncer        | 2 s/channel | `ORCH_DEBOUNCE_MS`             | Coalesces N rapid sub-agent results into one channel post |
+| Plan LRU               | 256 / 30 min | `ORCH_PLAN_CACHE_SIZE`, `_TTL_S` | Skips planner LLM call on repeated prompts |
+| Bus prefix index       | always on | —                                | Sparse subscribers wake without scanning the ring |
+| Bus retention          | 7 days | `AGENT_BUS_RETENTION_DAYS`         | SQLite VACUUM-friendly bound |
 - **No hardcoding.** Models, channels, debounce intervals, retention windows,
   and pool sizes are all env-overridable. Storage paths follow the existing
   `_env_path()` convention (`CLAUDE_DASHBOARD_ORCHESTRATOR`,
