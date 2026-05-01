@@ -8335,7 +8335,16 @@ async function _wfShowRuns() {
   if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
   const r = await api('/api/workflows/runs?wfId=' + encodeURIComponent(__wf.current.id));
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
-  const runs = r.runs || [];
+  const allRuns = r.runs || [];
+  // L3 (v2.64.0) — client-side status filter on the run-history modal.
+  const filterStatus = state.data._wfRunFilter || 'all';
+  const runs = filterStatus === 'all'
+    ? allRuns
+    : allRuns.filter(x => x.status === filterStatus);
+  const statusCounts = {};
+  for (const x of allRuns) {
+    statusCounts[x.status] = (statusCounts[x.status] || 0) + 1;
+  }
   const statusIcon = { ok:'✅', err:'❌', running:'⏳' };
   // 프로바이더 색상 매핑
   const _provColors = { claude:'#d97757', openai:'#10b981', anthropic:'#d97757', ollama:'#7dd3fc', google:'#fbbf24', gemini:'#fbbf24' };
@@ -8398,6 +8407,18 @@ async function _wfShowRuns() {
         <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
       </div>
       ${chartHtml}
+      <div class="flex items-center gap-1 flex-wrap mb-2">
+        ${(() => {
+          const _chip = (k, label) => {
+            const n = k === 'all' ? allRuns.length : (statusCounts[k] || 0);
+            const active = filterStatus === k;
+            return `<button class="chip text-[10px]" style="${active?'background:var(--accent);color:#fff;':''}"
+              onclick="state.data._wfRunFilter='${k}';closeModal();_wfShowRuns()">${label}${n?` <span class="font-mono ml-1">${n}</span>`:''}</button>`;
+          };
+          return _chip('all', t('전체')) + _chip('ok', '✅ ok') + _chip('err', '❌ err') + _chip('running', '⏳ running');
+        })()}
+        <span class="text-[10px] ml-auto" style="color:var(--text-dim)">${runs.length}/${allRuns.length}</span>
+      </div>
       <div class="text-xs text-[var(--text-dim)] mb-2">${t('최근 50건. 클릭하면 상세 결과')}</div>
       <div class="flex flex-col gap-2 max-h-[50vh] overflow-y-auto">${rows}</div>
     </div>
@@ -18788,6 +18809,23 @@ VIEWS.orchestrator = async () => {
       <div class="card p-4 lg:col-span-2">
         <div class="text-[12px] font-semibold mb-2">${t('라이브 디스패치 테스트')}</div>
         <textarea id="orchTestText" rows="3" class="w-full text-[11px] bg-transparent border" placeholder="${t('메시지를 입력해 ad-hoc 디스패치')}"></textarea>
+        <details class="mt-2 text-[11px]">
+          <summary style="cursor:pointer;color:var(--text-dim)">${t('이 호출만 모델 오버라이드')}</summary>
+          <div class="grid grid-cols-3 gap-2 mt-2">
+            <div>
+              <label class="text-[10px] block">${t('Planner')}</label>
+              <input id="orchOvrPlanner" class="text-[11px] bg-transparent border-b w-full" placeholder="${t('비워두면 기본값')}">
+            </div>
+            <div>
+              <label class="text-[10px] block">${t('Aggregator')}</label>
+              <input id="orchOvrAgg" class="text-[11px] bg-transparent border-b w-full" placeholder="${t('비워두면 기본값')}">
+            </div>
+            <div>
+              <label class="text-[10px] block">${t('Assignees (csv)')}</label>
+              <input id="orchOvrAssignees" class="text-[11px] bg-transparent border-b w-full" placeholder="claude:sonnet, openai:gpt-4.1">
+            </div>
+          </div>
+        </details>
         <div class="flex items-center gap-2 mt-2">
           <button class="chip text-[10px]" onclick="_orchDispatch()">${t('실행')}</button>
           <button class="chip text-[10px]" onclick="_orchToggleLive()" id="orchLiveBtn">${t('라이브 시작')}</button>
@@ -18953,7 +18991,14 @@ async function _orchDispatch() {
   const out = document.getElementById('orchOutput');
   if (!txt.trim()) return;
   if (out) out.textContent = t('실행 중...');
-  const r = await api('/api/orchestrator/dispatch', { method: 'POST', body: { text: txt, kind: 'http', channel: 'ui-test' } });
+  const planner = ((document.getElementById('orchOvrPlanner') || {}).value || '').trim();
+  const agg = ((document.getElementById('orchOvrAgg') || {}).value || '').trim();
+  const assigneesRaw = ((document.getElementById('orchOvrAssignees') || {}).value || '').trim();
+  const body = { text: txt, kind: 'http', channel: 'ui-test' };
+  if (planner) body.plannerAssignee = planner;
+  if (agg) body.aggregatorAssignee = agg;
+  if (assigneesRaw) body.assignees = assigneesRaw.split(',').map(s => s.trim()).filter(Boolean);
+  const r = await api('/api/orchestrator/dispatch', { method: 'POST', body });
   if (out) out.textContent = JSON.stringify(r, null, 2);
 }
 
@@ -19145,7 +19190,39 @@ AFTER.ralph = () => {
   }
   // J1 (v2.62.0) — auto-load polish prompt on tab open.
   try { _ralphPolishLoad(); } catch (_) {}
+  // L1 (v2.64.0) — poll the runs list while any run is in-flight; stop
+  // when all settle. Cleared on tab leave by BEFORE-style hook below.
+  try { _ralphStartAutoRefresh(); } catch (_) {}
 };
+
+function _ralphStartAutoRefresh() {
+  if (state.data._ralphPollTimer) {
+    clearInterval(state.data._ralphPollTimer);
+    state.data._ralphPollTimer = null;
+  }
+  // Only poll while we're actually on the ralph tab.
+  state.data._ralphPollTimer = setInterval(async () => {
+    if (state.view !== 'ralph') {
+      clearInterval(state.data._ralphPollTimer);
+      state.data._ralphPollTimer = null;
+      return;
+    }
+    try {
+      const r = await api('/api/ralph/list?limit=200');
+      if (!r || !r.ok) return;
+      const anyRunning = (r.runs || []).some(x => x.status === 'running');
+      if (!anyRunning) {
+        // No active runs — stop polling. User can renderView() manually
+        // to fetch fresh data when something kicks off again.
+        clearInterval(state.data._ralphPollTimer);
+        state.data._ralphPollTimer = null;
+      }
+      renderView();
+    } catch (_) {
+      // network error — keep timer alive, try again next tick
+    }
+  }, 3000);
+}
 
 async function _ralphStart() {
   const prompt   = (document.getElementById('ralphPrompt') || {}).value || '';

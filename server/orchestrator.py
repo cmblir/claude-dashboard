@@ -963,7 +963,10 @@ def _run_workflow_binding(workflow_id: str, text: str, run_id: str,
 
 
 def dispatch(text: str, *, kind: str = "http", channel: str = "",
-             user: str = "", reply: Optional[Any] = None) -> dict:
+             user: str = "", reply: Optional[Any] = None,
+             override_planner: str = "",
+             override_aggregator: str = "",
+             override_assignees: Optional[list] = None) -> dict:
     """Run a single orchestrator turn for ``text``.
 
     ``kind`` ∈ {slack, telegram, http}. ``reply`` is an optional callable
@@ -1006,11 +1009,19 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
             return {"ok": False, "runId": run_id, "error": err_msg,
                     "budgetCapUsd": cap, "spentTodayUsd": round(spent, 4)}
 
-    # Determine assignee list for this dispatch — binding > config default.
-    avail = list((binding or {}).get("assignees") or cfg["defaultAssignees"])
-    avail = [a for a in avail if a]
+    # Determine assignee list — explicit override > binding > config default.
+    if override_assignees:
+        avail = [str(a).strip() for a in override_assignees if str(a).strip()]
+    else:
+        avail = list((binding or {}).get("assignees") or cfg["defaultAssignees"])
+        avail = [a for a in avail if a]
     if not avail:
         avail = [cfg["plannerAssignee"]]
+    # Pluck planner / aggregator overrides into local vars.
+    planner_assignee = (override_planner.strip() if override_planner
+                        else cfg["plannerAssignee"])
+    aggregator_assignee = (override_aggregator.strip() if override_aggregator
+                           else cfg["aggregatorAssignee"])
 
     # Inbound stream — F1 (v2.58.0). Persisted before any work so a crash
     # in the planner still leaves the user's request inspectable.
@@ -1055,7 +1066,7 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
         }
 
     # 1. Plan — check LRU cache first (skip planner LLM call on repeats)
-    planner = cfg["plannerAssignee"]
+    planner = planner_assignee
     cache_key = _plan_cache_key(text, binding, avail)
     cached_plan = _plan_cache_get(cache_key)
     if cached_plan is not None:
@@ -1104,10 +1115,10 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
                                 "output": "", "durationMs": 0}
 
     # 3. Aggregate
-    final_text = _aggregate(cfg["aggregatorAssignee"], text, results)
+    final_text = _aggregate(aggregator_assignee, text, results)
     agent_bus.publish(_topic(run_id, "final"),
                       {"text": final_text, "results": results, "via": "ad-hoc"},
-                      source=cfg["aggregatorAssignee"])
+                      source=aggregator_assignee)
 
     # 4. Optional channel reply
     if callable(reply):
@@ -1536,6 +1547,10 @@ def api_orch_dispatch(body: dict) -> dict:
         kind=(body.get("kind") or "http"),
         channel=(body.get("channel") or "default"),
         user=(body.get("user") or ""),
+        override_planner=str(body.get("plannerAssignee") or ""),
+        override_aggregator=str(body.get("aggregatorAssignee") or ""),
+        override_assignees=body.get("assignees")
+            if isinstance(body.get("assignees"), list) else None,
     )
 
 

@@ -10,6 +10,29 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.64.0] — 2026-05-02
+
+### Added
+- 🔄 Ralph tab live auto-refresh — polls `/api/ralph/list` every 3 s while
+  any run is `running`; stops automatically when all runs settle.
+- 🎛 Orchestrator `dispatch()` accepts `plannerAssignee`, `aggregatorAssignee`,
+  and `assignees` overrides so the `/api/orchestrator/dispatch` endpoint can
+  target specific models without changing the stored binding config.
+
+## [2.63.0] — 2026-05-02
+
+### Added
+- 🗓 Orchestrator sweeper status panel — live table of scheduled bindings
+  with next-fire ETA, due-now highlighting, via
+  `GET /api/orchestrator/sweeper-status`.
+- 💾 Auto-Resume per-UUID-prefix cwd memory (`cc.ar.cwds` localStorage,
+  bounded at 32 entries) — pre-fills the cwd field on repeat binds.
+- 📋 Workflow run inspector now surfaces cache-hit age, docker image, and
+  Ralph run-id / iter / cost rows when the executor returns them.
+- 🔍 Ralph tab status filter chips (running / done / budget / max_iter /
+  cancelled / error) + free-text search across runId + assignee; default
+  list limit raised from 30 → 200.
+
 ## [2.62.0] — 2026-05-02
 
 ### Added
