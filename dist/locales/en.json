@@ -4334,6 +4334,8 @@
   "허용할 디렉토리 절대경로 (예: /Users/yoo/projects)": "Absolute path of directory to allow (e.g. /Users/yoo/projects)",
   "헤딩 (선택)": "Heading (optional)",
   "헬스 체크 실패": "Health Check Failed",
+  "헬스체크 시작": "Health check start",
+  "헬스체크 완료": "Health check done",
   "현재": "Current",
   "현재 (왼쪽)": "Current (left)",
   "현재 값 유지": "Keep current",

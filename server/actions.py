@@ -339,13 +339,26 @@ def api_lazyclaw_term(body: dict) -> dict:
         "gemini":      [["--version"], ["--help"]],
         "codex":       [["--version"], ["--help"]],
         "lazyclaude":  [["status"], ["version"], ["--version"], ["--help"]],
-        "git":         [["log", "-5"], ["log", "--oneline", "-10"], ["status"], ["status", "-s"], ["remote", "-v"], ["branch", "--show-current"]],
-        "which":       [["claude"], ["ollama"], ["gemini"], ["codex"], ["lazyclaude"], ["git"], ["node"], ["python3"]],
+        # QQ4 (v2.66.79) — broader git read-only set + system health.
+        "git":         [["log", "-5"], ["log", "--oneline", "-10"],
+                        ["status"], ["status", "-s"], ["status", "-sb"],
+                        ["remote", "-v"], ["branch", "--show-current"],
+                        ["diff", "--stat"], ["diff", "--cached", "--stat"],
+                        ["log", "--oneline", "-20"]],
+        "which":       [["claude"], ["ollama"], ["gemini"], ["codex"],
+                        ["lazyclaude"], ["git"], ["node"], ["python3"], ["docker"]],
         "node":        [["--version"]],
         "python3":     [["--version"]],
+        "uname":       [["-a"], ["-s"], ["-m"]],
+        "uptime":      [[]],
+        "df":          [["-h"]],  # whole-disk read-only
+        "echo":        [],  # rejected (no args allowed)
+        "docker":      [["--version"], ["ps"], ["images"]],
     }
-    allowed_args = WHITELIST.get(head)
-    if not allowed_args:
+    if head not in WHITELIST:
+        return {"ok": False, "error": f"command not allowed: {head}"}
+    allowed_args = WHITELIST[head]
+    if not allowed_args:  # explicitly empty list = head listed but no args allowed
         return {"ok": False, "error": f"command not allowed: {head}"}
     matches = False
     for prefix in allowed_args:

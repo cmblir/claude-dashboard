@@ -141,6 +141,9 @@ NEW_EN: dict[str, str] = {
     # QQ3
     "메모": "Note",
     "이 노드에 대한 짧은 메모 (캔버스 hover 시 표시)": "Short note about this node (shown on canvas hover)",
+    # QQ4
+    "헬스체크 시작": "Health check start",
+    "헬스체크 완료": "Health check done",
     # QQ1
     "시스템 프롬프트 설정됨": "System prompt set",
     "시스템 프롬프트 초기화됨": "System prompt cleared",
@@ -309,6 +312,9 @@ NEW_ZH: dict[str, str] = {
     # QQ3
     "메모": "备注",
     "이 노드에 대한 짧은 메모 (캔버스 hover 시 표시)": "关于该节点的短备注（在画布悬停时显示）",
+    # QQ4
+    "헬스체크 시작": "健康检查开始",
+    "헬스체크 완료": "健康检查完成",
     # QQ1
     "시스템 프롬프트 설정됨": "已设置系统提示",
     "시스템 프롬프트 초기화됨": "已清空系统提示",

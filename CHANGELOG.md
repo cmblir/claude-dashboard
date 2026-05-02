@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.79] — 2026-05-02
+
+### Added
+- 🩺 **Auto health-check on terminal tab open** (QQ4). Once an
+  hour, the first visit auto-runs `claude --version`, `ollama list`,
+  `gemini --version`, `codex --version`, and `git status -sb` so
+  the user immediately sees provider state.
+- 📜 **Whitelist expanded**: `uptime`, `df -h`, `docker --version /
+  ps / images`, `uname -a / -s / -m`, `git diff --stat`,
+  `git diff --cached --stat`, `git status -sb`,
+  `git log --oneline -20`, `which docker`. `echo` explicitly
+  rejected. Validation tightened so an empty arg-prefix list also
+  bounces.
+
+---
 ## [2.66.78] — 2026-05-02
 
 ### Added
