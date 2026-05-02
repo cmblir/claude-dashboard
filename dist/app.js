@@ -26934,8 +26934,21 @@ AFTER.lazyclawChat = () => {
       const files = Array.from(e.dataTransfer && e.dataTransfer.files || []);
       if (!files.length) return;
       const TEXT_EXT = /\.(txt|md|json|jsonl|ya?ml|toml|csv|tsv|log|html?|xml|svg|css|scss|less|js|mjs|cjs|ts|tsx|jsx|py|rb|go|rs|java|c|cc|cpp|h|hpp|sh|bash|zsh|fish|sql|graphql|gql|env|gitignore|dockerfile|makefile|conf|ini|properties|patch|diff)$/i;
-      let appended = 0, skipped = 0;
+      let appended = 0, skipped = 0, images = 0;
       for (const f of files) {
+        // QQ39 (v2.66.114) — image attach as base64 data URL.
+        if (f.type && f.type.startsWith('image/') && f.size < 8 * 1024 * 1024) {
+          try {
+            const dataUrl = await new Promise((res, rej) => {
+              const r = new FileReader();
+              r.onload = () => res(r.result); r.onerror = rej;
+              r.readAsDataURL(f);
+            });
+            ta.value = (ta.value || '') + `\n\n![${f.name}](${dataUrl})\n`;
+            images++; appended++;
+            continue;
+          } catch (_) { skipped++; continue; }
+        }
         const isText = (f.type && f.type.startsWith('text/')) || TEXT_EXT.test(f.name) || (f.size < 2 * 1024 * 1024 && f.type === '');
         if (!isText) { skipped++; continue; }
         try {
@@ -26947,11 +26960,35 @@ AFTER.lazyclawChat = () => {
           appended++;
         } catch (err) { skipped++; }
       }
-      // Re-fire input → resize.
       ta.dispatchEvent(new Event('input'));
-      if (appended) toast(`📎 ${appended} ${t('파일 첨부됨')}` + (skipped ? ` · ${skipped} ${t('건너뜀')}` : ''), 'ok');
+      if (appended) toast(`📎 ${appended} ${t('파일 첨부됨')}${images?` · ${images} ${t('이미지')}`:''}` + (skipped ? ` · ${skipped} ${t('건너뜀')}` : ''), 'ok');
       else if (skipped) toast(`${skipped} ${t('파일은 텍스트가 아니라 첨부 안됨')}`, 'warn');
       ta.focus();
+    });
+    // QQ39 — paste images from clipboard.
+    ta.addEventListener('paste', async (e) => {
+      const items = Array.from((e.clipboardData && e.clipboardData.items) || []);
+      const imgs = items.filter(i => i.kind === 'file' && i.type.startsWith('image/'));
+      if (!imgs.length) return;
+      e.preventDefault();
+      let added = 0;
+      for (const it of imgs) {
+        const f = it.getAsFile();
+        if (!f || f.size > 8 * 1024 * 1024) continue;
+        try {
+          const dataUrl = await new Promise((res, rej) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result); r.onerror = rej;
+            r.readAsDataURL(f);
+          });
+          ta.value = (ta.value || '') + `\n\n![${f.name || 'pasted'}](${dataUrl})\n`;
+          added++;
+        } catch (_) {}
+      }
+      if (added) {
+        ta.dispatchEvent(new Event('input'));
+        toast(`📷 ${added} ${t('이미지 붙여넣음')}`, 'ok');
+      }
     });
     setTimeout(() => ta.focus(), 50);
   }
@@ -26981,7 +27018,9 @@ function _lcMsgBody(m) {
   // Per-render id so multiple long messages on screen don't share state.
   const isLong = raw.length > 1500 || (raw.match(/\n/g) || []).length > 30;
   const collapsedKey = '_lcCollapsed_' + (window.__lcMsgIdSeq = (window.__lcMsgIdSeq || 0) + 1);
-  if (!isUser && typeof marked !== 'undefined' && marked.parse) {
+  // QQ39 — render user messages as markdown too so attached images
+  // render inline (![](data:...)). Plain text still renders fine.
+  if (typeof marked !== 'undefined' && marked.parse) {
     try {
       // QQ31 (v2.66.106) — inject a floating 📋 button into every <pre>
       // block so users can copy code without selecting text.

@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.114] — 2026-05-02
+
+### Added
+- 📷 **Image attach in chat — paste & drop** (QQ39, OpenClaw parity).
+  Dropping an image file (≤ 8 MB) onto the composer or pasting one
+  from the clipboard now embeds it as a base64 `![name](data:…)`
+  markdown reference. User messages are now markdown-rendered so the
+  image displays inline in the conversation. Multimodal provider
+  routing comes next; this iteration covers UI capture + history
+  persistence so images survive refresh and export.
+
+### Changed
+- User chat messages now use `marked.parse` (previously plain
+  `<pre>`). Plain text is unaffected; backticked code, lists, and
+  links now render as expected.
+
+---
 ## [2.66.113] — 2026-05-02
 
 ### Added
