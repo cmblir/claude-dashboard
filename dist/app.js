@@ -3670,6 +3670,24 @@ function _wfNodeSearchFilter(q) {
   __wfNodeSearchQuery = (q || '').trim().toLowerCase();
   _wfApplyNodeSearchHighlight();
 }
+// LL24 (v2.66.53) — fuzzy node-search matching (n8n parity).
+// "fy" matches "frontend", "ses" matches "session", etc. Falls back
+// to substring match for full words and CJK queries.
+function _wfFuzzyMatch(query, target) {
+  if (!query) return true;
+  if (!target) return false;
+  const q = query.toLowerCase();
+  const t = target.toLowerCase();
+  // Quick path: substring (covers Korean / Chinese / multi-byte).
+  if (t.includes(q)) return true;
+  // Subsequence match: every char in q appears in t in order.
+  let i = 0, j = 0;
+  while (i < q.length && j < t.length) {
+    if (q[i] === t[j]) i++;
+    j++;
+  }
+  return i === q.length;
+}
 function _wfApplyNodeSearchHighlight() {
   const q = __wfNodeSearchQuery;
   document.querySelectorAll('#wfNodes .wf-node').forEach(el => {
@@ -3683,7 +3701,15 @@ function _wfApplyNodeSearchHighlight() {
     const title = (n && n.title || '').toLowerCase();
     const typeMeta = WF_TYPE_MAP[ntype];
     const label = typeMeta ? typeMeta.label.toLowerCase() : '';
-    const matched = title.includes(q) || ntype.includes(q) || label.includes(q);
+    // LL24 — fuzzy across title / type / label / assignee / agentRole.
+    const assignee = (n && n.data && n.data.assignee || '').toLowerCase();
+    const agentRole = (n && n.data && n.data.agentRole || '').toLowerCase();
+    const matched =
+      _wfFuzzyMatch(q, title) ||
+      _wfFuzzyMatch(q, ntype) ||
+      _wfFuzzyMatch(q, label) ||
+      _wfFuzzyMatch(q, assignee) ||
+      _wfFuzzyMatch(q, agentRole);
     el.style.opacity = matched ? '1' : '0.2';
     const body = el.querySelector('.wf-node-body');
     if (body) body.style.strokeDasharray = matched ? '6 3' : '';
