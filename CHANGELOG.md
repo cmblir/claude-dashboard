@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.136] — 2026-05-02
+
+### Added
+- 📎 **Explicit image attach button in chat composer** (QQ61). New
+  `📎` button next to the send button opens a hidden `<input
+  type="file" accept="image/*" multiple>` picker. Works alongside
+  the existing paste/drop paths (QQ39). Each ≤ 8 MB image becomes a
+  base64 `![]( data:… )` markdown reference in the textarea, then
+  flows through the regular send path including the QQ40-43 vision
+  routing.
+
+---
 ## [2.66.135] — 2026-05-02
 
 ### Fixed
