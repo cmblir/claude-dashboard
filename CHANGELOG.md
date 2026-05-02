@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.31] — 2026-05-02
+
+### Added
+- 📊 **Perf HUD** — `Cmd/Ctrl + Shift + P` toggles a corner overlay
+  showing live FPS, the longest main-thread task in the previous
+  second, and total long-task time per second (LL2). Lets the user
+  confirm at a glance whether a perceived lag is the dashboard,
+  a browser extension, or system load. State persists across
+  reloads via localStorage.
+
+---
 ## [2.66.30] — 2026-05-02
 
 ### Performance

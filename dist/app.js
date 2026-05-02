@@ -25155,3 +25155,85 @@ async function _wfDiffVersions() {
     showLoginGate({ connected: false, cliInstalled: false, reason: '서버 연결 실패: ' + e.message });
   }
 })();
+
+// ──────────────────────────────────────────────────────────────────
+// LL2 (v2.66.31) — perf HUD. Press Cmd/Ctrl+Shift+P to toggle a
+// floating overlay that shows live FPS, the longest recent main-thread
+// task, and total long-task time over the last second. Lets the user
+// confirm whether a perceived lag is the page or something else
+// (extension, system load), and lets a developer pin down the spike.
+// Off by default. Persisted via localStorage.
+// ──────────────────────────────────────────────────────────────────
+(function _initPerfHud() {
+  let on = false;
+  let el = null;
+  let observer = null;
+  let frameCount = 0;
+  let frameStart = performance.now();
+  let lastFps = 0;
+  let longestTask = 0;
+  let longestSinceWindow = 0;
+  let totalLongMsLastWindow = 0;
+  let windowStart = performance.now();
+  let rafId = 0;
+  function tick() {
+    frameCount++;
+    const now = performance.now();
+    if (now - frameStart >= 500) {
+      lastFps = Math.round((frameCount * 1000) / (now - frameStart));
+      frameCount = 0;
+      frameStart = now;
+    }
+    if (now - windowStart >= 1000) {
+      longestTask = longestSinceWindow;
+      longestSinceWindow = 0;
+      totalLongMsLastWindow = 0;
+      windowStart = now;
+    }
+    if (el) {
+      const lagBadge = lastFps < 30 ? '🟥' : (lastFps < 50 ? '🟧' : '🟩');
+      el.textContent = `${lagBadge} ${lastFps} fps · longest ${longestTask.toFixed(0)} ms · long-tasks ${totalLongMsLastWindow.toFixed(0)} ms/s`;
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+  function show() {
+    if (el) return;
+    el = document.createElement('div');
+    el.id = 'perfHud';
+    el.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:99999;'
+      + 'background:rgba(0,0,0,0.78);color:#e5e7eb;font:12px/1.4 ui-monospace,Menlo,monospace;'
+      + 'padding:6px 10px;border-radius:8px;border:1px solid #27272a;pointer-events:none;'
+      + 'box-shadow:0 4px 12px rgba(0,0,0,0.4)';
+    el.textContent = 'perf hud loading…';
+    document.body.appendChild(el);
+    if ('PerformanceObserver' in window) {
+      try {
+        observer = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            longestSinceWindow = Math.max(longestSinceWindow, entry.duration);
+            totalLongMsLastWindow += entry.duration;
+          }
+        });
+        observer.observe({ type: 'longtask', buffered: false });
+      } catch (e) {}
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+  function hide() {
+    if (rafId) cancelAnimationFrame(rafId), rafId = 0;
+    if (observer) try { observer.disconnect(); } catch(e) {}
+    observer = null;
+    if (el) el.remove(), el = null;
+  }
+  window.addEventListener('keydown', (e) => {
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+      e.preventDefault();
+      on = !on;
+      try { localStorage.setItem('cc.perfHud', on ? '1' : '0'); } catch (_) {}
+      if (on) show(); else hide();
+    }
+  });
+  // Restore previous state.
+  try { if (localStorage.getItem('cc.perfHud') === '1') { on = true; show(); } } catch (_) {}
+})();
