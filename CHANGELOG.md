@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.22] — 2026-05-02
+
+### Performance — first-paint
+- 🎨 **Pretendard + JetBrains Mono now load non-blocking** (HH3).
+  Stylesheets switched to `media="print" onload="this.media='all'"`
+  with a paired `preload` and a `<noscript>` fallback. The browser
+  paints with the system font fallback (`-apple-system, ...`) the
+  instant the layout is ready, and swaps to the web font once the
+  CSS is parsed.
+
+### Measured (Playwright on workflow tab)
+| Metric | v2.66.18 | v2.66.22 | Δ |
+|---|---|---|---|
+| DOMContentLoaded | 823 ms | **146 ms** | −82% |
+| networkidle | 2947 ms | **1730 ms** | −41% |
+| load event | — | **281 ms** | — |
+| Long tasks (>50ms) | 234 ms | **none** | — |
+
+---
 ## [2.66.21] — 2026-05-02
 
 ### Performance
