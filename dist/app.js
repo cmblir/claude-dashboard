@@ -118,6 +118,11 @@ const NAV = [
   { id: 'ralph', icon: '🦞', label: 'Ralph Loop', group: 'build',
     desc: 'Geoffrey Huntley Ralph Wiggum 패턴 — 같은 PROMPT.md를 4중 안전장치 안에서 반복. 프로젝트 추천기 + 라이브 SSE + CLI.',
     docUrl: null },
+  // OO1 (v2.66.64) — direct multi-provider chat, n8n-style "playground"
+  // for any registered AI provider (Claude / OpenAI / Gemini / Ollama).
+  { id: 'lazyclawChat', icon: '💬', label: 'AI 채팅', group: 'build',
+    desc: '등록된 AI 프로바이더(Claude·OpenAI·Gemini·Ollama 등)와 직접 대화. assignee 즉석 전환·히스토리 저장.',
+    docUrl: null },
 
   // config — Claude Code 설정 전반 (13, advanced 흡수)
   { id: 'hooks',       icon: '🪝', label: '훅',
@@ -483,7 +488,7 @@ const MODE_TABS = {
     'costsTimeline','zclaude','envConfig','settings',
   ]),
   lazyclaw: new Set([
-    'orchestrator','ralph','agents','workflows',
+    'orchestrator','ralph','agents','workflows','lazyclawChat',
     'aiProviders','runCenter','sessionReplay',
     'settings',
   ]),
@@ -25835,6 +25840,155 @@ async function _wfDiffVersions() {
 })();
 
 // ──────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+// OO1 (v2.66.64) — Direct multi-provider chat tab. Pick any registered
+// provider+model (claude / openai / gemini / ollama / codex / etc)
+// and converse. History persisted in localStorage per-assignee so the
+// user can come back and continue. Single endpoint:
+//   POST /api/lazyclaw/chat  { assignee, message, history }
+//        → { ok, output, error, provider, model, durationMs }
+// Re-uses ProviderRegistry.execute_with_assignee under the hood, so
+// the entire fallback chain + retry / hang-recovery from FF1/MM1 is
+// available here too.
+// ──────────────────────────────────────────────────────────────────
+VIEWS.lazyclawChat = async () => {
+  const provs = await api('/api/ai-providers/list').catch(() => ({ providers: [] }));
+  const available = (provs.providers || []).filter(p => p.available);
+  // Build a flat assignee dropdown: for each available provider, list
+  // a few popular models. Format: "claude:opus", "openai:gpt-4.1-mini" …
+  const opts = available.flatMap(p => {
+    const models = (p.models || []).slice(0, 6);
+    if (!models.length) return [{ value: p.id, label: p.name || p.id }];
+    return models.map(m => ({
+      value: `${p.id}:${m.id || m.name}`,
+      label: `${p.name || p.id} · ${m.id || m.name}`,
+    }));
+  });
+  const lastAssignee = (() => {
+    try { return localStorage.getItem('cc.lazyclawChat.assignee') || (opts[0] && opts[0].value) || ''; }
+    catch (_) { return (opts[0] && opts[0].value) || ''; }
+  })();
+  return `
+    <div class="card p-5" style="display:flex;flex-direction:column;height:calc(100vh - 110px);">
+      <div class="flex items-center gap-3 mb-3">
+        <h1 class="text-lg font-semibold">💬 ${t('AI 채팅')}</h1>
+        <select id="lcChatAssignee" class="input text-xs" style="min-width:240px;">
+          ${opts.map(o => `<option value="${escapeHtml(o.value)}" ${o.value===lastAssignee?'selected':''}>${escapeHtml(o.label)}</option>`).join('') || '<option value="">' + t('가용 프로바이더 없음') + '</option>'}
+        </select>
+        <button class="btn text-xs" onclick="_lcChatClear()" title="${t('대화 비우기')}">🗑 ${t('비우기')}</button>
+        <span class="ml-auto text-[10px] text-[var(--text-dim)]">${t('Enter = 전송 · Shift+Enter = 줄바꿈')}</span>
+      </div>
+      <div id="lcChatLog" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:8px;background:rgba(0,0,0,0.18);border:1px solid var(--border);border-radius:8px;"></div>
+      <div class="mt-3 flex items-end gap-2">
+        <textarea id="lcChatInput" class="input flex-1" rows="2" placeholder="${t('메시지를 입력하세요…')}" style="resize:none;font-family:inherit;"></textarea>
+        <button id="lcChatSend" class="btn-primary btn text-xs" onclick="_lcChatSend()">📨 ${t('전송')}</button>
+      </div>
+    </div>
+  `;
+};
+
+AFTER.lazyclawChat = () => {
+  // Restore log from localStorage so the user can continue a prior chat.
+  _lcChatRender();
+  const ta = document.getElementById('lcChatInput');
+  if (ta) {
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _lcChatSend(); }
+    });
+    setTimeout(() => ta.focus(), 50);
+  }
+  const sel = document.getElementById('lcChatAssignee');
+  if (sel) sel.onchange = () => {
+    try { localStorage.setItem('cc.lazyclawChat.assignee', sel.value); } catch (_) {}
+    _lcChatRender();
+  };
+};
+
+function _lcChatKey() {
+  const sel = document.getElementById('lcChatAssignee');
+  return 'cc.lazyclawChat.history.' + ((sel && sel.value) || 'default');
+}
+
+function _lcChatLoad() {
+  try {
+    const raw = localStorage.getItem(_lcChatKey());
+    return raw ? JSON.parse(raw) : [];
+  } catch (_) { return []; }
+}
+
+function _lcChatSave(history) {
+  try { localStorage.setItem(_lcChatKey(), JSON.stringify(history.slice(-100))); }
+  catch (_) {}
+}
+
+function _lcChatRender() {
+  const log = document.getElementById('lcChatLog');
+  if (!log) return;
+  const history = _lcChatLoad();
+  if (!history.length) {
+    log.innerHTML = `<div class="text-[11px] text-[var(--text-dim)] text-center py-8">${t('새 대화를 시작하세요')}</div>`;
+    return;
+  }
+  log.innerHTML = history.map(m => {
+    const isUser = m.role === 'user';
+    const bg = isUser ? 'rgba(217,119,87,0.12)' : 'rgba(167,139,250,0.10)';
+    const stroke = isUser ? 'rgba(217,119,87,0.35)' : 'rgba(167,139,250,0.28)';
+    const tag = isUser ? '🧑' : '🤖';
+    const meta = m.meta ? `<div class="text-[10px] text-[var(--text-dim)] mt-1">${escapeHtml(m.meta)}</div>` : '';
+    return `<div style="background:${bg};border:1px solid ${stroke};border-radius:10px;padding:10px 12px;align-self:${isUser?'flex-end':'flex-start'};max-width:85%;">
+      <div class="text-[10px] text-[var(--text-dim)]">${tag} ${escapeHtml(isUser ? t('나') : (m.assignee || t('AI')))}</div>
+      <pre class="text-sm mt-1" style="white-space:pre-wrap;word-break:break-word;font-family:inherit;">${escapeHtml(m.text || '')}</pre>
+      ${meta}
+    </div>`;
+  }).join('');
+  log.scrollTop = log.scrollHeight;
+}
+
+async function _lcChatSend() {
+  const ta = document.getElementById('lcChatInput');
+  const sel = document.getElementById('lcChatAssignee');
+  const sendBtn = document.getElementById('lcChatSend');
+  if (!ta || !sel) return;
+  const text = (ta.value || '').trim();
+  if (!text) return;
+  const assignee = sel.value || '';
+  if (!assignee) { toast(t('프로바이더를 선택하세요'), 'warn'); return; }
+  ta.value = '';
+  const history = _lcChatLoad();
+  history.push({ role: 'user', text, assignee, ts: Date.now() });
+  _lcChatSave(history);
+  _lcChatRender();
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳'; }
+  try {
+    const r = await api('/api/lazyclaw/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        assignee,
+        message: text,
+        history: history.slice(-12), // last 12 messages for context
+      }),
+    });
+    const out = (r && r.ok && r.output) ? r.output : ('⚠ ' + (r.error || t('응답 실패')));
+    const meta = r && r.ok ? `${r.provider || ''}${r.model ? ' · ' + r.model : ''}${r.durationMs ? ' · ' + (r.durationMs/1000).toFixed(1) + 's' : ''}` : '';
+    history.push({ role: 'assistant', text: out, assignee, meta, ts: Date.now() });
+    _lcChatSave(history);
+    _lcChatRender();
+  } catch (e) {
+    history.push({ role: 'assistant', text: '⚠ ' + (e && e.message || e), assignee, ts: Date.now() });
+    _lcChatSave(history);
+    _lcChatRender();
+  } finally {
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '📨 ' + t('전송'); }
+    setTimeout(() => ta.focus(), 30);
+  }
+}
+
+window._lcChatClear = function () {
+  if (!confirm(t('이 대화를 비우시겠습니까?'))) return;
+  _lcChatSave([]);
+  _lcChatRender();
+};
+
 // LL2 (v2.66.31) — perf HUD. Press Cmd/Ctrl+Shift+P to toggle a
 // floating overlay that shows live FPS, the longest recent main-thread
 // task, and total long-task time over the last second. Lets the user

@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.64] — 2026-05-02
+
+### Added
+- 💬 **AI 채팅 tab** in LazyClaw mode (OO1). Direct conversation
+  with any registered AI provider (Claude / OpenAI / Gemini /
+  Ollama / Codex / etc) — `n8n`-style "playground" with provider:model
+  dropdown, per-assignee conversation history (persisted in
+  localStorage, last 100 messages), Enter-to-send / Shift+Enter
+  newline. Backend `/api/lazyclaw/chat` reuses
+  `execute_with_assignee` so the entire FF1 fallback chain + MM1
+  fail-fast plumbing applies here too.
+
+---
 ## [2.66.63] — 2026-05-02
 
 ### Added
