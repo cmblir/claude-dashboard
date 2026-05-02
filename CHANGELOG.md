@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.17] — 2026-05-03
+
+### Added
+- 🔢 **Filter-match count in chat sidebar header** (QQ107). When the
+  session filter is active, the sidebar's spend element now also
+  shows `12 / 47` (matched / total). Combines with the QQ99/QQ100
+  spend line as `12 / 47 · 오늘 $0.12 · 총 누적 $0.48`. Quick read
+  on how aggressively the filter narrowed the list.
+
+---
 ## [2.68.16] — 2026-05-03
 
 ### Added
