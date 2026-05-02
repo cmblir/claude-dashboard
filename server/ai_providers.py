@@ -440,6 +440,15 @@ class ClaudeCliProvider(BaseProvider):
         resolved_model = self._resolve_model(model)
         cwd_safe = cwd or str(Path.home())
 
+        # QQ49 (v2.66.124) — claude-cli `-p` is text-only. Strip embedded
+        # base64 image data URLs from the prompt so we don't pipe a
+        # multi-MB chunk over argv (and so the model doesn't hallucinate
+        # about "the image" when the bytes never reached it).
+        if "data:image/" in prompt:
+            cleaned, _ = _extract_inline_images(prompt)
+            note = "[이미지 첨부됨 — claude-cli 는 vision 미지원, claude-api 또는 vision 모델 사용]"
+            prompt = (cleaned + "\n\n" + note).strip()
+
         cmd = [claude_bin, "-p", prompt, "--output-format", "json"]
         if resolved_model:
             cmd += ["--model", resolved_model]
