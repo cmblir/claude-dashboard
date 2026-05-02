@@ -75,6 +75,7 @@ NEW_EN: dict[str, str] = {
     "선택 노드 편집창 열기": "Open editor for selected node",
     "줌 아웃": "Zoom out",
     "줌 인": "Zoom in",
+    "연결 삭제": "Delete connection",
     "워크플로우 실행 / 중단": "Run / stop workflow",
     # LL16 already covered: 새 노드 추가 — exists.
 }
@@ -147,5 +148,6 @@ NEW_ZH: dict[str, str] = {
     "선택 노드 편집창 열기": "打开所选节点的编辑器",
     "줌 아웃": "缩小",
     "줌 인": "放大",
+    "연결 삭제": "删除连接",
     "워크플로우 실행 / 중단": "运行 / 停止工作流",
 }
