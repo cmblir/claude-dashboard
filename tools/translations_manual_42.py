@@ -238,6 +238,8 @@ NEW_EN: dict[str, str] = {
     # QQ30 — multi-delete
     "노드를 삭제하시겠습니까?": "Delete these nodes?",
     "노드 삭제됨": "nodes deleted",
+    # QQ31 — code block copy
+    "코드 복사": "Copy code",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -470,4 +472,6 @@ NEW_ZH: dict[str, str] = {
     # QQ30
     "노드를 삭제하시겠습니까?": "删除这些节点？",
     "노드 삭제됨": "个节点已删除",
+    # QQ31
+    "코드 복사": "复制代码",
 }
