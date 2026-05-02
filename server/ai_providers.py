@@ -1200,11 +1200,19 @@ class OpenAIApiProvider(BaseProvider):
         model = model or "gpt-4.1-mini"
 
         # Build messages array; caller may pass pre-built conversation list.
+        # QQ42 (v2.66.117) — multimodal in streaming: extract inline images.
+        clean_prompt, images = _extract_inline_images(prompt)
         if messages is None:
             msgs: list[dict] = []
             if system_prompt:
                 msgs.append({"role": "system", "content": system_prompt})
-            msgs.append({"role": "user", "content": prompt})
+            if images:
+                user_content: list = [{"type": "text", "text": clean_prompt or "(image)"}]
+                for img in images:
+                    user_content.append({"type": "image_url", "image_url": {"url": img["data_url"]}})
+                msgs.append({"role": "user", "content": user_content})
+            else:
+                msgs.append({"role": "user", "content": prompt})
         else:
             msgs = list(messages)
             if system_prompt and (not msgs or msgs[0].get("role") != "system"):
@@ -1467,6 +1475,8 @@ class GeminiApiProvider(BaseProvider):
         model = model or "gemini-2.5-flash"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={self._api_key}&alt=sse"
 
+        # QQ42 (v2.66.117) — multimodal in streaming: extract inline images.
+        clean_prompt, images = _extract_inline_images(prompt)
         # Build contents from messages or flat prompt.
         if messages:
             contents = []
@@ -1474,7 +1484,10 @@ class GeminiApiProvider(BaseProvider):
                 role = "user" if m.get("role") == "user" else "model"
                 contents.append({"role": role, "parts": [{"text": m.get("content", "")}]})
         else:
-            contents = [{"parts": [{"text": prompt}]}]
+            parts: list = [{"text": clean_prompt if images else prompt}]
+            for img in images:
+                parts.append({"inline_data": {"mime_type": img["mime"], "data": img["base64"]}})
+            contents = [{"parts": parts}]
 
         body_obj: dict = {"contents": contents}
         if system_prompt:
@@ -1946,9 +1959,19 @@ class AnthropicApiProvider(BaseProvider):
 
         resolved = ClaudeCliProvider._ALIASES.get((model or "").lower(), model) or "claude-sonnet-4-6"
 
-        # Build messages array.
+        # QQ42 (v2.66.117) — multimodal in streaming: extract inline images.
+        clean_prompt, images = _extract_inline_images(prompt)
         if messages is None:
-            msgs: list[dict] = [{"role": "user", "content": prompt}]
+            if images:
+                user_content: list = [{"type": "text", "text": clean_prompt or "(image)"}]
+                for img in images:
+                    user_content.append({
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": img["mime"], "data": img["base64"]},
+                    })
+                msgs: list[dict] = [{"role": "user", "content": user_content}]
+            else:
+                msgs = [{"role": "user", "content": prompt}]
         else:
             msgs = list(messages)
 
