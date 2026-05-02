@@ -85,6 +85,31 @@ def _run_cancellable(cmd, *, cwd=None, timeout=300, run_id=""):
         return (None, "", str(e), False)
 
 
+_DATA_IMAGE_RE = re.compile(
+    r"!\[[^\]]*\]\((data:(image/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+))\)"
+)
+
+
+def _extract_inline_images(prompt: str) -> tuple[str, list[dict]]:
+    """QQ40 (v2.66.115) — pull `![alt](data:image/...;base64,...)` patterns
+    out of *prompt* and return (text_without_them, [{mime, base64, data_url}]).
+
+    Used by multimodal providers. Returns the original prompt unchanged
+    when no image data URLs are present so the hot path stays cheap.
+    """
+    if "data:image/" not in prompt:
+        return prompt, []
+    images: list[dict] = []
+    def _take(m: re.Match) -> str:
+        full_url, mime, b64 = m.group(1), m.group(2), m.group(3)
+        # Drop whitespace inside the base64 (we may have soft-wrapped on send).
+        b64_clean = "".join(b64.split())
+        images.append({"mime": mime, "base64": b64_clean, "data_url": full_url})
+        return ""
+    cleaned = _DATA_IMAGE_RE.sub(_take, prompt).strip()
+    return cleaned, images
+
+
 def _which(name: str) -> str:
     """PATH 기반 탐지 → 실패 시 통상 설치 경로 fallback."""
     found = shutil.which(name)
@@ -1081,10 +1106,23 @@ class OpenAIApiProvider(BaseProvider):
             )
 
         model = model or "gpt-4.1-mini"
+        # QQ40 (v2.66.115) — multimodal: extract inline base64 images
+        # and emit them as `image_url` content blocks. Empty list keeps
+        # the legacy plain-string content for cache-friendliness.
+        clean_prompt, images = _extract_inline_images(prompt)
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
+        if images:
+            user_content: list = [{"type": "text", "text": clean_prompt or "(image)"}]
+            for img in images:
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": img["data_url"]},
+                })
+            messages.append({"role": "user", "content": user_content})
+        else:
+            messages.append({"role": "user", "content": prompt})
 
         body = json.dumps({
             "model": model,
@@ -1349,8 +1387,13 @@ class GeminiApiProvider(BaseProvider):
         model = model or "gemini-2.5-flash"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self._api_key}"
 
+        # QQ40 (v2.66.115) — multimodal: extract images as inline_data parts.
+        clean_prompt, images = _extract_inline_images(prompt)
+        parts: list = [{"text": clean_prompt or "(image)"}]
+        for img in images:
+            parts.append({"inline_data": {"mime_type": img["mime"], "data": img["base64"]}})
         body_obj: dict = {
-            "contents": [{"parts": [{"text": prompt}]}],
+            "contents": [{"parts": parts}],
         }
         if system_prompt:
             body_obj["systemInstruction"] = {"parts": [{"text": system_prompt}]}
@@ -1807,10 +1850,27 @@ class AnthropicApiProvider(BaseProvider):
             )
 
         resolved = ClaudeCliProvider._ALIASES.get((model or "").lower(), model) or "claude-sonnet-4-6"
+        # QQ40 (v2.66.115) — multimodal: extract inline base64 images
+        # and emit them as Anthropic image content blocks.
+        clean_prompt, images = _extract_inline_images(prompt)
+        if images:
+            user_content: list = [{"type": "text", "text": clean_prompt or "(image)"}]
+            for img in images:
+                user_content.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": img["mime"],
+                        "data": img["base64"],
+                    },
+                })
+            messages_payload = [{"role": "user", "content": user_content}]
+        else:
+            messages_payload = [{"role": "user", "content": prompt}]
         body_obj: dict = {
             "model": resolved,
             "max_tokens": int((extra or {}).get("max_tokens", 4096)),
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages_payload,
         }
         if system_prompt:
             body_obj["system"] = system_prompt
