@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.39] — 2026-05-02
+
+### Added
+- 🗺 **`Cmd/Ctrl + M` toggles the minimap** (LL10). Choice
+  persists in localStorage so users who don't want the floating
+  minimap don't have to re-hide it every session.
+
+---
 ## [2.66.38] — 2026-05-02
 
 ### Added
