@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.55] — 2026-05-02
+
+### Changed
+- 🔍 **Workflow list search uses fuzzy matching** (LL26).
+  Same subsequence + substring algorithm as the canvas node
+  search. CJK falls back to substring.
+
+---
 ## [2.66.54] — 2026-05-02
 
 ### Changed
