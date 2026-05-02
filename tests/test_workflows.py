@@ -287,3 +287,61 @@ class TestStickyAnnotations:
         assert item["nodeCount"] == 2  # start + session
         assert item["stickyCount"] == 1
         assert item["edgeCount"] == 1
+
+
+class TestPinData:
+    """QQ20 — n8n's 'Pin Data' feature. A session/subagent node with
+    data.pinned=True and a non-empty data.pinnedOutput should bypass
+    the provider entirely and return the pinned text. This is what
+    makes downstream-debug iteration cheap — we don't want a refactor
+    to silently break it."""
+
+    def test_short_circuits_with_pinned_output(self):
+        n = wf._sanitize_node({
+            "id": "n-pin", "type": "session", "x": 0, "y": 0,
+            "data": {
+                "subject": "would-be-prompt",
+                "assignee": "claude:opus",
+                "pinned": True,
+                "pinnedOutput": "frozen value",
+            },
+        })
+        assert n["data"]["pinned"] is True
+        assert n["data"]["pinnedOutput"] == "frozen value"
+        r = wf._execute_node(n, ["upstream input ignored"])
+        assert r["status"] == "ok"
+        assert r["output"] == "frozen value"
+        assert r["provider"] == "pinned"
+        assert r["model"] == "pinned"
+        assert r["tokensIn"] == 0
+        assert r["tokensOut"] == 0
+        assert r["cost"] == 0.0
+        assert r.get("pinned") is True
+
+    def test_blank_pinnedoutput_keeps_data_but_does_not_short_circuit(self):
+        """Toggling pinned on without recording an output must NOT
+        silently turn the node into a no-op. The guard checks for
+        a non-empty stripped output."""
+        n = wf._sanitize_node({
+            "id": "n-pin2", "type": "session", "x": 0, "y": 0,
+            "data": {
+                "subject": "x",
+                "pinned": True,
+                "pinnedOutput": "   ",  # whitespace only
+            },
+        })
+        assert n["data"]["pinned"] is True
+        # The guard `data.get("pinnedOutput") or "").strip()` evaluates
+        # the empty whitespace to False — so the pin shortcut is skipped.
+        assert n["data"]["pinnedOutput"].strip() == ""
+
+    def test_sanitize_clamps_pinnedoutput_to_32k(self):
+        """pinnedOutput is capped at 32 KB to keep the workflow JSON
+        small enough to round-trip without bloating saves."""
+        big = "x" * 50000
+        n = wf._sanitize_node({
+            "id": "n-pin3", "type": "session", "x": 0, "y": 0,
+            "data": {"subject": "x", "pinned": True, "pinnedOutput": big},
+        })
+        assert n["data"]["pinned"] is True
+        assert len(n["data"]["pinnedOutput"]) == 32000

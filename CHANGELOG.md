@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.19] — 2026-05-02
+
+### Verified
+- ✅ **Pin Data regression suite** (QQ82). New `TestPinData` class
+  covering QQ20's signature feature:
+  1. Session node with `pinned=True` + non-empty `pinnedOutput`
+     short-circuits to `provider="pinned"`, zero tokens, zero cost.
+  2. Whitespace-only `pinnedOutput` does NOT short-circuit (avoids
+     accidentally turning a node into a no-op).
+  3. `_sanitize_node` clamps `pinnedOutput` to 32 KB.
+
+  All 26 workflow tests pass.
+
+---
 ## [2.67.18] — 2026-05-02
 
 ### Cleaned
