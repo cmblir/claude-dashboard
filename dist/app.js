@@ -26962,6 +26962,23 @@ AFTER.lazyclawTerm = () => {
       e.preventDefault();
       _lcTermReverseSearch();
     }
+    // QQ12 (v2.66.87) — Tab autocomplete against the whitelist.
+    // Single match → fill in the rest. Multiple → render the
+    // candidate list as an output line so the user can refine.
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const cur = inp.value;
+      const candidates = _lcTermSuggest(cur);
+      if (candidates.length === 1) {
+        inp.value = candidates[0];
+        setTimeout(() => inp.setSelectionRange(inp.value.length, inp.value.length), 0);
+      } else if (candidates.length > 1) {
+        const log = _lcTermLoadLog();
+        log.push({ kind: 'cmd', text: cur, ts: Date.now() });
+        log.push({ kind: 'out', text: '  ' + candidates.join('   '), ts: Date.now() });
+        _lcTermSaveLog(log); _lcTermRender();
+      }
+    }
   });
   setTimeout(() => inp.focus(), 50);
   _lcTermRender();
@@ -27031,6 +27048,33 @@ window._lcTermPickHistory = function (cmd) {
     setTimeout(() => inp.setSelectionRange(cmd.length, cmd.length), 0);
   }
 };
+
+// QQ12 (v2.66.87) — return list of matching whitelist commands for a
+// given input prefix. Mirrors the server-side WHITELIST in
+// server/actions.py::api_lazyclaw_term. Keep in sync when the
+// server list changes.
+function _lcTermSuggest(prefix) {
+  const ALL = [
+    'claude --version', 'claude --help', 'claude config list', 'claude config get ',
+    'ollama --version', 'ollama list', 'ollama ps', 'ollama show ',
+    'gemini --version', 'gemini --help',
+    'codex --version', 'codex --help',
+    'lazyclaude status', 'lazyclaude version', 'lazyclaude --version', 'lazyclaude --help',
+    'git status', 'git status -s', 'git status -sb',
+    'git log -5', 'git log --oneline -10', 'git log --oneline -20',
+    'git remote -v', 'git branch --show-current',
+    'git diff --stat', 'git diff --cached --stat',
+    'which claude', 'which ollama', 'which gemini', 'which codex',
+    'which lazyclaude', 'which git', 'which node', 'which python3', 'which docker',
+    'node --version', 'python3 --version',
+    'uname -a', 'uname -s', 'uname -m',
+    'uptime', 'df -h',
+    'docker --version', 'docker ps', 'docker images',
+  ];
+  const p = (prefix || '').trim().toLowerCase();
+  if (!p) return [];
+  return ALL.filter(c => c.toLowerCase().startsWith(p));
+}
 
 window._lcTermHealthCheck = async function () {
   const cmds = [
