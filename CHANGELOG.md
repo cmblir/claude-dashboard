@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.120] — 2026-05-02
+
+### Fixed
+- 🔎 **Cmd+K chat search now finds per-session histories** (QQ45).
+  The search modal previously scanned only the legacy
+  `cc.lazyclawChat.history.<assignee>` keys, so any conversation
+  saved under the per-session `cc.lc.hist.<sid>` schema (used by
+  QQ23 branching and QQ24 lineage) was invisible. Search now scans
+  both keyspaces, labels each hit with the source session name,
+  and the result button switches to the correct session before
+  scrolling to the matched message.
+
+---
 ## [2.66.119] — 2026-05-02
 
 ### Added

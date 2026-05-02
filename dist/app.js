@@ -27528,40 +27528,67 @@ window._lcChatDoRegenerate = function (msgIdx, assignee) {
 window._lcChatSearch = function () {
   // QQ16 (v2.66.91) — search modal now offers a ⭐ filter that
   // restricts results to starred messages.
+  // QQ45 (v2.66.120) — search now scans both legacy
+  // `cc.lazyclawChat.history.<assignee>` and new
+  // `cc.lc.hist.<sid>` keys so per-session histories (added in
+  // QQ23 branching) are findable.
+  const sessionsById = (() => {
+    try {
+      const arr = JSON.parse(localStorage.getItem('cc.lc.sessions') || '[]');
+      const m = {};
+      for (const s of arr) m[s.id] = s;
+      return m;
+    } catch (_) { return {}; }
+  })();
   const renderModal = (q, starredOnly) => {
     const queryLower = (q || '').toLowerCase();
     const hits = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k || !k.startsWith('cc.lazyclawChat.history.')) continue;
-      const assignee = k.slice('cc.lazyclawChat.history.'.length);
-      let history;
-      try { history = JSON.parse(localStorage.getItem(k) || '[]'); } catch (_) { continue; }
+    const collect = (history, source, label) => {
       for (let mi = 0; mi < history.length; mi++) {
         const m = history[mi];
         if (!m) continue;
         if (starredOnly && !m.starred) continue;
         const text = (m && m.text) || '';
         if (queryLower && !text.toLowerCase().includes(queryLower)) continue;
-        if (!queryLower && !starredOnly && hits.length >= 30) break;
+        if (!queryLower && !starredOnly && hits.length >= 30) return false;
         let snippet = text.slice(0, 120);
         if (queryLower) {
           const idx = text.toLowerCase().indexOf(queryLower);
           if (idx > 30) snippet = '…' + text.slice(idx - 30, idx + 90);
           else snippet = text.slice(0, 120);
         }
-        hits.push({ assignee, msgIdx: mi, role: m.role, text: snippet, full: text, starred: !!m.starred });
-        if (hits.length >= 50) break;
+        hits.push({ source, label, msgIdx: mi, role: m.role, text: snippet, full: text, starred: !!m.starred });
+        if (hits.length >= 50) return false;
       }
-      if (hits.length >= 50) break;
+      return true;
+    };
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.startsWith('cc.lazyclawChat.history.')) {
+        const assignee = k.slice('cc.lazyclawChat.history.'.length);
+        let history;
+        try { history = JSON.parse(localStorage.getItem(k) || '[]'); } catch (_) { continue; }
+        if (!collect(history, { kind: 'legacy', assignee }, assignee)) break;
+      } else if (k.startsWith('cc.lc.hist.')) {
+        const sid = k.slice('cc.lc.hist.'.length);
+        let history;
+        try { history = JSON.parse(localStorage.getItem(k) || '[]'); } catch (_) { continue; }
+        const sess = sessionsById[sid];
+        const label = (sess && sess.label) || sid.slice(0, 12);
+        if (!collect(history, { kind: 'session', sid }, label)) break;
+      }
     }
-    const rows = hits.length ? hits.map(h =>
-      `<button class="card p-2 text-left w-full mb-1" style="background:transparent;border:1px solid var(--border);cursor:pointer;"
-        onclick="_lcChatJumpToMatch('${escapeHtml(h.assignee)}', ${h.msgIdx})">
-        <div class="text-[10px] text-[var(--text-dim)]">${h.starred ? '⭐ ' : ''}${h.role === 'user' ? '🧑' : '🤖'} ${escapeHtml(h.assignee)}</div>
+    const rows = hits.length ? hits.map(h => {
+      const arg = h.source.kind === 'session'
+        ? `'session','${h.source.sid}',${h.msgIdx}`
+        : `'legacy','${escapeHtml(h.source.assignee).replace(/'/g, "\\'")}',${h.msgIdx}`;
+      return `<button class="card p-2 text-left w-full mb-1" style="background:transparent;border:1px solid var(--border);cursor:pointer;"
+        onclick="_lcChatJumpToMatch(${arg})">
+        <div class="text-[10px] text-[var(--text-dim)]">${h.starred ? '⭐ ' : ''}${h.role === 'user' ? '🧑' : '🤖'} ${escapeHtml(h.label)}</div>
         <div class="text-xs mt-1" style="white-space:pre-wrap;line-height:1.4;">${escapeHtml(h.text)}</div>
-      </button>`
-    ).join('') : `<div class="empty">${escapeHtml(starredOnly ? t('별 표시한 메시지 없음') : (q ? t('일치하는 메시지 없음') : t('검색어를 입력하세요')))}</div>`;
+      </button>`;
+    }).join('') : `<div class="empty">${escapeHtml(starredOnly ? t('별 표시한 메시지 없음') : (q ? t('일치하는 메시지 없음') : t('검색어를 입력하세요')))}</div>`;
     showModal(`
       <div class="modal p-4" style="max-width:640px;">
         <div class="flex items-center gap-2 mb-3">
@@ -27590,9 +27617,26 @@ window._lcChatSearch = function () {
   renderModal('', false);
 };
 
-window._lcChatJumpToMatch = function (assignee, msgIdx) {
+window._lcChatJumpToMatch = function (kind, key, msgIdx) {
   closeModal();
-  // Switch assignee dropdown if needed.
+  // QQ45 — accept either ('session', sid, idx) or ('legacy', assignee, idx).
+  if (kind === 'session') {
+    if (typeof _lcSwitchSession === 'function') {
+      _lcSwitchSession(key);
+    } else {
+      try { localStorage.setItem('cc.lc.current', key); } catch (_) {}
+      if (typeof _lcChatRender === 'function') _lcChatRender();
+    }
+    setTimeout(() => {
+      const log = document.getElementById('lcChatLog');
+      if (!log) return;
+      const items = log.children;
+      if (items && items[msgIdx]) items[msgIdx].scrollIntoView({ block: 'center' });
+    }, 100);
+    return;
+  }
+  // Legacy by-assignee.
+  const assignee = key;
   const sel = document.getElementById('lcChatAssignee');
   if (sel && sel.value !== assignee) {
     if (![...sel.options].some(o => o.value === assignee)) {
