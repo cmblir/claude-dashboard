@@ -274,6 +274,10 @@ NEW_EN: dict[str, str] = {
     "이미지 붙여넣음": "image(s) pasted",
     # QQ44 — vision warning
     "선택된 모델이 vision 미지원일 수 있습니다 — 이미지가 무시될 수 있어요": "Selected model may not support vision — images could be ignored",
+    # QQ46 — last-run mini Gantt
+    "마지막 실행 — 노드별 소요": "Last run — per-node duration",
+    "합계": "Total",
+    "상위": "Top",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -542,4 +546,8 @@ NEW_ZH: dict[str, str] = {
     "이미지 붙여넣음": "张图片已粘贴",
     # QQ44
     "선택된 모델이 vision 미지원일 수 있습니다 — 이미지가 무시될 수 있어요": "所选模型可能不支持视觉 — 图片可能被忽略",
+    # QQ46
+    "마지막 실행 — 노드별 소요": "上次运行 — 各节点耗时",
+    "합계": "合计",
+    "상위": "前",
 }

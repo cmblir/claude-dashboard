@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.121] — 2026-05-02
+
+### Added
+- 📊 **Last-run mini Gantt in workflow inspector** (QQ46). After a
+  workflow run completes, the inspector renders a per-node duration
+  bar chart sorted descending — top 12 nodes, total time at the
+  header, blue bars for normal runs, red for errors, amber for
+  pinned (QQ20). Click a row to jump-select that node. Quick way
+  to spot the slowest step without combing through `nodeResults`.
+
+---
 ## [2.66.120] — 2026-05-02
 
 ### Fixed
