@@ -2089,7 +2089,7 @@ VIEWS.workflows = async () => {
     <div id="wfRoot">
       <div id="wfList" class="card">
         <button class="btn-primary btn text-sm w-full mb-2" style="justify-content:center;" onclick="_wfCreateNew()">＋ ${t('새 워크플로우')}</button>
-        <input id="wfSearch" class="input w-full mb-2" placeholder="${t('검색…')}" style="font-size:13px;">
+        <input id="wfSearch" class="input w-full mb-2" placeholder="${t('검색…')}" style="font-size:13px;" onkeydown="if(event.key==='Escape'){this.value='';__wf.search='';_wfRenderList();}">
         <div id="wfTagFilter" class="flex flex-wrap gap-1 mb-2" style="display:none;"></div>
         <div id="wfListItems" class="flex flex-col gap-1"></div>
       </div>
