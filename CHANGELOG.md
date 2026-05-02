@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.129] — 2026-05-02
+
+### Fixed
+- 🧹 **Session delete now actually frees history + draft bytes**
+  (QQ54). The old cleanup loop matched only keys ending in
+  `:<sid>`, but the active schema is `cc.lc.hist.<sid>` and
+  `cc.lc.draft.<sid>` — neither ends in a colon. Result: deleting
+  a session left megabytes of orphan history in localStorage,
+  silently shrinking the budget for new conversations and
+  triggering QQ53 quota recovery prematurely. Cleanup now matches
+  the real keys (and keeps the legacy suffix path as a fallback).
+
+---
 ## [2.66.128] — 2026-05-02
 
 ### Fixed
