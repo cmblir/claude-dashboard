@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.117] — 2026-05-02
+
+### Fixed
+- 🖼 **Vision routing now also works for streaming responses** (QQ42).
+  QQ40 wired multimodal images into the one-shot `execute()` paths
+  but missed the streaming `execute_stream()` paths used by the
+  lazyclaw chat (default route). OpenAI, Anthropic, and Gemini
+  streaming now also call `_extract_inline_images()` and emit
+  the appropriate image content blocks. Without this fix, dropping
+  an image into the chat would only reach the model when the user
+  ran a non-streaming workflow node.
+
+---
 ## [2.66.116] — 2026-05-02
 
 ### Added
