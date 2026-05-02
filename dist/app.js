@@ -4834,6 +4834,25 @@ function _wfShowNodeContextMenu(nid, x, y) {
       } },
     // PP2 (v2.66.72) — toggle node enabled / disabled
     { icon: '⏸', label: t('비활성화 토글'), shortcut: 'D', fn: () => _wfToggleNodeDisabled(nid) },
+    // QQ19 (v2.66.94) — single-node execution from context menu (n8n parity)
+    ...((() => {
+      const sn = (__wf.current && __wf.current.nodes || []).find(x => x.id === nid);
+      const t2 = sn && sn.type;
+      if (t2 !== 'session' && t2 !== 'subagent') return [];
+      return [{ icon: '▶', label: t('단독 실행'), shortcut: '', fn: () => _wfRunSingleNode(nid) }];
+    })()),
+    // QQ19 — copy last output (only if there is one)
+    ...((() => {
+      const r = (__wf.lastRunResults || {})[nid];
+      const out = r && (r.output || r.error);
+      if (!out) return [];
+      return [{ icon: '📋', label: t('출력 복사'), shortcut: '', fn: () => {
+        navigator.clipboard.writeText(String(out)).then(
+          () => toast(t('출력 복사됨'), 'ok'),
+          () => toast(t('복사 실패'), 'err'),
+        );
+      } }];
+    })()),
     { sep: true },
     { icon: '🗑', label: t('삭제'), shortcut: '⌫', danger: true, fn: () => _wfDeleteSelectedNode() },
   ];
