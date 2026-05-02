@@ -285,6 +285,9 @@ NEW_EN: dict[str, str] = {
     "전송": "Send",
     "줄바꿈": "Newline",
     "이미지 paste / drop 으로 첨부": "Paste / drop an image to attach",
+    # QQ61 — file picker
+    "이미지 첨부 (paste/drop 도 지원)": "Attach image (paste/drop also works)",
+    "이미지 파일이 없거나 8MB 초과": "No image files (or larger than 8MB)",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -564,4 +567,7 @@ NEW_ZH: dict[str, str] = {
     "전송": "发送",
     "줄바꿈": "换行",
     "이미지 paste / drop 으로 첨부": "粘贴 / 拖放图片以附加",
+    # QQ61
+    "이미지 첨부 (paste/drop 도 지원)": "附加图片（也支持粘贴/拖放）",
+    "이미지 파일이 없거나 8MB 초과": "没有图片文件或超过 8MB",
 }

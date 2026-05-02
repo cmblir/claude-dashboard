@@ -3312,6 +3312,8 @@
   "이미지 paste / drop 으로 첨부": "Paste / drop an image to attach",
   "이미지 또는 PDF 를 선택하세요": "Choose an image or a PDF",
   "이미지 붙여넣음": "image(s) pasted",
+  "이미지 첨부 (paste/drop 도 지원)": "Attach image (paste/drop also works)",
+  "이미지 파일이 없거나 8MB 초과": "No image files (or larger than 8MB)",
   "이미지 픽셀 처리 용량 3.3× 증가 (4.6 대비)": "Image pixel processing 3.3× increase (vs 4.6)",
   "이미지(PNG/JPG/WebP/GIF) 또는 PDF 를 올리고 같은 질문을 Opus / Sonnet / Haiku 3 모델에 병렬 전송 → 응답을 나란히 비교합니다.": "Drop an image (PNG/JPG/WebP/GIF) or PDF and ask the same question to Opus / Sonnet / Haiku in parallel. Compare responses side by side.",
   "이미지/PDF → Opus·Sonnet·Haiku 3 모델 병렬 비교": "Image/PDF → parallel comparison across Opus · Sonnet · Haiku",
