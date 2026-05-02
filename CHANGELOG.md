@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.90] — 2026-05-02
+
+### Added
+- ⭐ **Star toggle on chat messages** (QQ15). Click the
+  ☆/⭐ button next to copy/regenerate to mark a message as
+  starred — visualised with an amber outer ring on the
+  bubble. State (`m.starred`) persists with the message so
+  it travels through export and search.
+
+---
 ## [2.66.89] — 2026-05-02
 
 ### Added
