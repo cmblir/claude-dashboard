@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.77] — 2026-05-02
+
+### Added
+- ⌨ **터미널 tab in LazyClaw mode** — whitelisted read-only
+  commands so the user can check CLI / provider state without
+  opening a real Terminal (QQ2). Examples:
+  `claude --version`, `claude config list`, `claude config get <key>`,
+  `ollama list`, `ollama ps`, `gemini --version`, `codex --version`,
+  `lazyclaude status`, `git status`, `git log -5`, `which …`,
+  `node --version`, `python3 --version`. Shell metacharacters
+  rejected. 15 s timeout. Write commands (`config set`, install,
+  login) intentionally blocked — use the Settings tab.
+- 📋 Server endpoint `POST /api/lazyclaw/term` enforces the
+  whitelist and runs the matched binary via `subprocess.run`
+  (stdin DEVNULL, output truncated to 32 KB stdout / 8 KB stderr).
+- ⌨ History recall (Up arrow on empty input), command echo
+  with green `$`, mac-term-style log pane.
+
+---
 ## [2.66.76] — 2026-05-02
 
 ### Added

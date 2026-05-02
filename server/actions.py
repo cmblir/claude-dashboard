@@ -313,6 +313,72 @@ def handle_lazyclaw_chat_stream(handler: "Handler", body: dict) -> None:
         _sse("error", json.dumps({"error": str(e)}, ensure_ascii=False))
 
 
+def api_lazyclaw_term(body: dict) -> dict:
+    """QQ2 (v2.66.77) — whitelisted read-only terminal for lazyclaw
+    settings inspection. Lets the user run e.g. `claude --version`
+    or `ollama list` from the dashboard without opening a real
+    Terminal. Write paths (config set, install, login) are NOT
+    accepted here — use the dedicated Settings/Auth tabs instead.
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    cmd = (body.get("command") or "").strip()
+    if not cmd:
+        return {"ok": False, "error": "empty command"}
+    BAD = set("|&;`$<>(){}[]\\\"'*?")
+    if any(ch in BAD for ch in cmd):
+        return {"ok": False, "error": "shell metacharacters not allowed"}
+    parts = cmd.split()
+    if not parts:
+        return {"ok": False, "error": "empty"}
+    head = parts[0]
+    rest = parts[1:]
+    WHITELIST: dict[str, list[list[str]]] = {
+        "claude":      [["--version"], ["--help"], ["config", "list"], ["config", "get"]],
+        "ollama":      [["--version"], ["list"], ["ps"], ["show"]],
+        "gemini":      [["--version"], ["--help"]],
+        "codex":       [["--version"], ["--help"]],
+        "lazyclaude":  [["status"], ["version"], ["--version"], ["--help"]],
+        "git":         [["log", "-5"], ["log", "--oneline", "-10"], ["status"], ["status", "-s"], ["remote", "-v"], ["branch", "--show-current"]],
+        "which":       [["claude"], ["ollama"], ["gemini"], ["codex"], ["lazyclaude"], ["git"], ["node"], ["python3"]],
+        "node":        [["--version"]],
+        "python3":     [["--version"]],
+    }
+    allowed_args = WHITELIST.get(head)
+    if not allowed_args:
+        return {"ok": False, "error": f"command not allowed: {head}"}
+    matches = False
+    for prefix in allowed_args:
+        if rest[: len(prefix)] == prefix:
+            extra = rest[len(prefix):]
+            if not extra:
+                matches = True; break
+            if prefix == ["config", "get"] and len(extra) == 1 and re.match(r"^[A-Za-z0-9._-]+$", extra[0]):
+                matches = True; break
+            if prefix == ["show"] and len(extra) == 1 and re.match(r"^[A-Za-z0-9._:/-]+$", extra[0]):
+                matches = True; break
+    if not matches:
+        return {"ok": False, "error": "argument combination not in whitelist"}
+    bin_path = shutil.which(head)
+    if not bin_path:
+        return {"ok": False, "error": f"{head} not installed"}
+    try:
+        proc = subprocess.run(
+            [bin_path] + rest, capture_output=True, text=True,
+            timeout=15, stdin=subprocess.DEVNULL,
+        )
+        return {
+            "ok": True,
+            "rc": proc.returncode,
+            "stdout": (proc.stdout or "")[-32_000:],
+            "stderr": (proc.stderr or "")[-8_000:],
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "timeout (15s)"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def api_lazyclaw_chat(body: dict) -> dict:
     """OO1 (v2.66.64) — direct multi-provider chat. Pick any registered
     provider:model via `assignee`, send a message, get a response.

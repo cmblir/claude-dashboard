@@ -12,7 +12,8 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .actions import (
-    api_chat, api_lazyclaw_chat, api_session_spawn, handle_chat_stream,
+    api_chat, api_lazyclaw_chat, api_lazyclaw_term,
+    api_session_spawn, handle_chat_stream,
     handle_lazyclaw_chat_stream,
     open_folder_action, open_session_action,
 )
@@ -542,6 +543,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/marketplaces/remove": api_marketplace_remove,
     "/api/chat": api_chat,
     "/api/lazyclaw/chat": api_lazyclaw_chat,
+    "/api/lazyclaw/term": api_lazyclaw_term,
     "/api/workflows/save": api_workflow_save,
     "/api/workflows/patch": api_workflow_patch,
     "/api/workflows/delete": api_workflow_delete,
