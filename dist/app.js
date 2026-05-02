@@ -2111,6 +2111,16 @@ VIEWS.workflows = async () => {
           <button id="wfGroupBtn" class="btn text-xs" onclick="_wfCreateGroup()" title="${t('선택 노드 그룹 만들기 (Shift+클릭)')}" aria-label="${t('그룹 만들기')}" style="display:none;">📦 ${t('그룹')}</button>
         </div>
         <div id="wfCanvasHost">
+          <!-- QQ8 (v2.66.83) — floating workflow-description tag in
+               the top-left of the canvas. Shows workflow name +
+               truncated description so the user remembers what
+               this workflow does without opening the inspector.
+               Click to expand into the inspector's description
+               textarea. -->
+          <div id="wfDescTag" style="position:absolute;left:14px;top:12px;z-index:5;max-width:42%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:11px;line-height:1.4;backdrop-filter:blur(4px);box-shadow:0 4px 14px rgba(0,0,0,0.35);cursor:pointer;display:none;" onclick="_wfFocusDescription()">
+            <div id="wfDescTagName" class="font-semibold" style="margin-bottom:2px;"></div>
+            <div id="wfDescTagBody" class="text-[10px]" style="color:var(--text-dim);max-height:48px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;"></div>
+          </div>
           <div class="wf-floating-right">
             <button class="btn text-xs" id="wfInspectorToggle" onclick="_wfToggleInspector()" title="${t('메타 패널 보이기/가리기')}">📋 ${t('메타')}</button>
           </div>
@@ -3475,6 +3485,42 @@ function _wfUpdateToolbarSchedule() {
   });
 }
 function _wfUpdateToolbar() { _wfUpdateToolbarSchedule(); }
+// QQ8 (v2.66.83) — sync the floating description tag with the
+// current workflow. Hides itself for nameless / description-less
+// workflows.
+function _wfRenderDescTag() {
+  const tag = document.getElementById('wfDescTag');
+  if (!tag) return;
+  const cur = __wf.current;
+  const name = (cur && cur.name || '').trim();
+  const desc = (cur && cur.description || '').trim();
+  if (!name && !desc) { tag.style.display = 'none'; return; }
+  const nameEl = document.getElementById('wfDescTagName');
+  const bodyEl = document.getElementById('wfDescTagBody');
+  if (nameEl) nameEl.textContent = name || '(Untitled)';
+  if (bodyEl) bodyEl.textContent = desc || '';
+  tag.style.display = desc ? '' : 'none';  // skip when desc empty (name shown in toolbar already)
+}
+
+window._wfFocusDescription = function () {
+  // Open the inspector if hidden, then scroll the description
+  // textarea into view + focus it.
+  const ins = document.getElementById('wfInspector');
+  if (ins && ins.classList.contains('wf-collapsed')) {
+    if (typeof _wfToggleInspector === 'function') _wfToggleInspector();
+  }
+  setTimeout(() => {
+    const tas = document.querySelectorAll('#wfInspector textarea');
+    for (const ta of tas) {
+      if (ta.previousElementSibling && /설명/.test(ta.previousElementSibling.textContent || '')) {
+        ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        ta.focus();
+        return;
+      }
+    }
+  }, 80);
+};
+
 function _wfUpdateToolbarImpl() {
   const nameEl = document.getElementById('wfCurName');
   const dirtyEl = document.getElementById('wfDirty');
@@ -3490,6 +3536,8 @@ function _wfUpdateToolbarImpl() {
     // LL28 (v2.66.57) — schedule autosave whenever the toolbar reports
     // dirty state (rAF-coalesced, so this fires once per frame at most).
     if (__wf.dirty && typeof _wfScheduleAutosave === 'function') _wfScheduleAutosave();
+    // QQ8 — keep the floating description tag in sync.
+    if (typeof _wfRenderDescTag === 'function') _wfRenderDescTag();
   }
   // v2.33.6 — undo 스택 깊이 표시
   const undoBtn = document.getElementById('wfUndoBtn');
