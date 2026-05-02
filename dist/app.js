@@ -5817,7 +5817,7 @@ function _wfRenderInspector(opts) {
       <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('설명')}</label>
       <textarea class="input w-full mt-1" rows="2" oninput="__wf.current.description=this.value;__wf.dirty=true;_wfUpdateToolbar();">${escapeHtml(__wf.current.description||'')}</textarea>
       <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('태그 (쉼표 구분, 최대 10개)')}</label>
-      <input class="input w-full mt-1 text-[11px]" value="${escapeHtml(((__wf.current.tags||[]).join(', ')))}" placeholder="prod, demo, ai" oninput="(function(v){__wf.current.tags=v.split(',').map(s=>s.trim().toLowerCase()).filter((s,i,a)=>s&&a.indexOf(s)===i).slice(0,10);__wf.dirty=true;_wfUpdateToolbar();var w=(__wf.workflows||[]).find(x=>x.id===__wf.current.id);if(w)w.tags=__wf.current.tags.slice();_wfRenderList();})(this.value)">
+      <input class="input w-full mt-1 text-[11px]" value="${escapeHtml(((__wf.current.tags||[]).join(', ')))}" placeholder="prod, demo, ai" onfocus="this.select()" oninput="(function(v){__wf.current.tags=v.split(',').map(s=>s.trim().toLowerCase()).filter((s,i,a)=>s&&a.indexOf(s)===i).slice(0,10);__wf.dirty=true;_wfUpdateToolbar();var w=(__wf.workflows||[]).find(x=>x.id===__wf.current.id);if(w)w.tags=__wf.current.tags.slice();_wfRenderList();})(this.value)">
     </div>
 
     <div class="mb-4 pt-3 border-t border-[var(--border)]">

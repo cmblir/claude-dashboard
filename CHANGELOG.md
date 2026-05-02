@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.26] — 2026-05-02
+
+### Added
+- ⌨ **Tag input selects on focus** (QQ89). Clicking the inspector
+  tag field now auto-selects existing tags, so retyping a fresh
+  set just works (no manual select-all). Standard form-field UX.
+
+---
 ## [2.67.25] — 2026-05-02
 
 ### Fixed
