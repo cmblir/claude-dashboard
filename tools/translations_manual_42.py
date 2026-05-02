@@ -228,6 +228,8 @@ NEW_EN: dict[str, str] = {
     "메시지": "messages",
     # QQ24 — branch lineage in sidebar
     "부모 세션으로 이동": "Jump to parent session",
+    # QQ26 — token usage badge
+    "총 토큰 사용량": "Total tokens used",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -450,4 +452,6 @@ NEW_ZH: dict[str, str] = {
     "메시지": "条消息",
     # QQ24
     "부모 세션으로 이동": "跳转到父会话",
+    # QQ26
+    "총 토큰 사용량": "总令牌使用量",
 }

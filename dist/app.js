@@ -26391,16 +26391,24 @@ function _lcRenderSessions() {
   // QQ24 (v2.66.99) — branch-lineage hint. If session has parentId,
   // show a small ↳ arrow + parent label so users see the lineage.
   const byId = Object.fromEntries(allSessions.map(x => [x.id, x]));
+  // QQ26 (v2.66.101) — per-session token usage badge.
+  const fmtTok = n => n >= 1000 ? (n/1000).toFixed(n>=10000?0:1) + 'k' : String(n);
   list.innerHTML = sessions.map(s => {
     const active = s.id === cur;
     const pin = s.pinned ? '📌 ' : '';
     const parent = s.parentId && byId[s.parentId];
     const lineage = parent ? `<div style="font-size:9px;color:var(--accent);margin-top:2px;cursor:pointer;" title="${t('부모 세션으로 이동')}" onclick="event.stopPropagation();_lcSwitchSession('${parent.id}')">↳ ${escapeHtml((parent.label||t('새 대화')).slice(0,28))} #${(s.branchedAt!=null?s.branchedAt+1:'')}</div>` : '';
+    let tokSum = 0;
+    try {
+      const h = _lcGetHistory(s.id);
+      for (const m of h) tokSum += (m.tokensIn || 0) + (m.tokensOut || 0);
+    } catch (_) {}
+    const tokBadge = tokSum > 0 ? `<span style="font-size:9px;color:var(--text-dim);background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:8px;font-variant-numeric:tabular-nums;" title="${t('총 토큰 사용량')}">🔤 ${fmtTok(tokSum)}</span>` : '';
     return `<div oncontextmenu="event.preventDefault();_lcSessionContextMenu('${s.id}', event.clientX, event.clientY);" onclick="_lcSwitchSession('${s.id}')" style="cursor:pointer;padding:8px 10px;border-radius:7px;margin:1px 2px;border:1px solid ${active ? 'rgba(217,119,87,0.5)' : 'transparent'};background:${active ? 'rgba(217,119,87,0.1)' : 'transparent'};">
       <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${active ? 'var(--accent)' : 'var(--text)'};">${pin}${escapeHtml(s.label || t('새 대화'))}</div>
       ${s.preview ? `<div style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dim);margin-top:2px;">${escapeHtml(s.preview)}</div>` : ''}
       ${lineage}
-      <div style="font-size:9px;color:var(--text-dim);margin-top:3px;">${relTime(s.ts)}</div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:3px;display:flex;align-items:center;gap:6px;"><span>${relTime(s.ts)}</span>${tokBadge}</div>
     </div>`;
   }).join('');
 }
