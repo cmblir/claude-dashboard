@@ -27064,7 +27064,12 @@ AFTER.lazyclawChat = () => {
     // Multiple files OK; binary files skipped with a warning toast.
     ta.addEventListener('dragover', (e) => {
       e.preventDefault();
-      ta.style.outline = '2px dashed rgba(217,119,87,0.6)';
+      // QQ57 (v2.66.132) — show a stronger visual cue when images
+      // are being dragged in (so the user knows vision attach is supported).
+      const types = (e.dataTransfer && e.dataTransfer.types) || [];
+      const hasImage = Array.from(types).some(t => t === 'Files');
+      ta.style.outline = '2px dashed ' + (hasImage ? 'rgba(96,165,250,0.7)' : 'rgba(217,119,87,0.6)');
+      ta.style.outlineOffset = '-2px';
     });
     ta.addEventListener('dragleave', () => { ta.style.outline = ''; });
     ta.addEventListener('drop', async (e) => {
