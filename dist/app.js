@@ -4107,6 +4107,13 @@ function _wfRenderNode(n) {
         <rect width="18" height="18" rx="9" ry="9" fill="rgba(120,120,120,0.85)" stroke="rgba(255,255,255,0.45)"/>
         <text x="9" y="13" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">⏸</text>
       </g>
+      <!-- QQ20 — pin badge (n8n parity); shown only for pinned nodes -->
+      ${(n.data && n.data.pinned && (n.data.pinnedOutput||'').trim()) ? `
+        <g class="wf-node-pin-badge" transform="translate(${WF_NODE_W - 46}, 6)">
+          <rect width="18" height="18" rx="9" ry="9" fill="rgba(245,158,11,0.9)" stroke="rgba(255,255,255,0.55)"/>
+          <text x="9" y="13" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">📌</text>
+          <title>${t('핀: 마지막 출력 재사용 (프로바이더 호출 없음)')}</title>
+        </g>` : ''}
       <text class="wf-node-icon" x="14" y="30">${meta.icon}</text>
       <text class="wf-node-title" x="40" y="28">${escapeHtml(n.title || meta.label)}</text>
       <text class="wf-node-elapsed" x="${WF_NODE_W-12}" y="${WF_NODE_H-8}" text-anchor="end"></text>
@@ -4853,6 +4860,19 @@ function _wfShowNodeContextMenu(nid, x, y) {
         );
       } }];
     })()),
+    // QQ20 (v2.66.95) — pin/unpin data (n8n parity)
+    ...((() => {
+      const sn = (__wf.current && __wf.current.nodes || []).find(x => x.id === nid);
+      if (!sn || (sn.type !== 'session' && sn.type !== 'subagent')) return [];
+      const isPinned = !!(sn.data && sn.data.pinned && (sn.data.pinnedOutput || '').trim());
+      if (isPinned) {
+        return [{ icon: '📌', label: t('핀 해제'), shortcut: '', fn: () => _wfTogglePin(nid, false) }];
+      }
+      const r = (__wf.lastRunResults || {})[nid];
+      const out = r && r.output;
+      if (!out) return [];
+      return [{ icon: '📌', label: t('마지막 출력 핀 설정'), shortcut: '', fn: () => _wfTogglePin(nid, true) }];
+    })()),
     { sep: true },
     { icon: '🗑', label: t('삭제'), shortcut: '⌫', danger: true, fn: () => _wfDeleteSelectedNode() },
   ];
@@ -5029,6 +5049,37 @@ async function _wfRunSingleNode(nid) {
   __wf.lastRunResults[nid] = r;
   __wf._inspectorDirty = true;
   _wfRenderInspector();
+}
+
+// QQ20 (v2.66.95) — pin/unpin node data (n8n "Pin Data" parity).
+// Pinning freezes the last output so subsequent runs return it without
+// invoking the provider — saves cost + lets users iterate downstream
+// nodes without re-running expensive LLM calls.
+function _wfTogglePin(nid, pin) {
+  if (!__wf.current) return;
+  const n = __wf.current.nodes.find(x => x.id === nid);
+  if (!n) return;
+  n.data = n.data || {};
+  if (pin) {
+    const r = (__wf.lastRunResults || {})[nid];
+    const out = r && r.output;
+    if (!out) {
+      toast(t('핀할 마지막 출력이 없습니다 — 먼저 실행하세요'), 'warn');
+      return;
+    }
+    n.data.pinned = true;
+    n.data.pinnedOutput = String(out).slice(0, 32000);
+    toast(`📌 ${t('핀 설정됨')} — ${escapeHtml(n.title || n.id)}`, 'ok');
+  } else {
+    n.data.pinned = false;
+    n.data.pinnedOutput = '';
+    toast(`${t('핀 해제됨')} — ${escapeHtml(n.title || n.id)}`, 'ok');
+  }
+  __wf.dirty = true;
+  if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
+  __wf._inspectorDirty = true;
+  _wfRenderInspector();
+  _wfUpdateToolbar();
 }
 
 // LL20 (v2.66.49) — edge context menu (Delete only, for now).

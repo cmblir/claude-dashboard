@@ -211,6 +211,13 @@ NEW_EN: dict[str, str] = {
     # QQ19 — context-menu actions
     "출력 복사": "Copy output",
     "출력 복사됨": "Output copied",
+    # QQ20 — pin data (n8n parity)
+    "핀 해제": "Unpin",
+    "마지막 출력 핀 설정": "Pin last output",
+    "핀 설정됨": "Pinned",
+    "핀 해제됨": "Unpinned",
+    "핀할 마지막 출력이 없습니다 — 먼저 실행하세요": "No last output to pin — run first",
+    "핀: 마지막 출력 재사용 (프로바이더 호출 없음)": "Pinned: reuses last output (no provider call)",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -416,4 +423,11 @@ NEW_ZH: dict[str, str] = {
     # QQ19
     "출력 복사": "复制输出",
     "출력 복사됨": "已复制输出",
+    # QQ20
+    "핀 해제": "取消固定",
+    "마지막 출력 핀 설정": "固定上次输出",
+    "핀 설정됨": "已固定",
+    "핀 해제됨": "已取消固定",
+    "핀할 마지막 출력이 없습니다 — 먼저 실행하세요": "没有可固定的上次输出 — 请先运行",
+    "핀: 마지막 출력 재사용 (프로바이더 호출 없음)": "已固定：复用上次输出（不调用提供者）",
 }

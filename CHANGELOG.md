@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.95] — 2026-05-02
+
+### Added
+- 📌 **Pin Data on workflow nodes** (QQ20, n8n signature feature).
+  Right-click any session/subagent node with a recorded last output
+  and choose `📌 마지막 출력 핀 설정`. Subsequent runs short-circuit
+  inside `_execute_node` — the pinned text is returned immediately
+  with `provider="pinned"` and zero cost/tokens, no LLM call. Lets
+  users freeze an expensive upstream result and iterate downstream
+  nodes for free. Pinned nodes show an amber 📌 badge on the canvas.
+  Persisted via `data.pinned` + `data.pinnedOutput` (32 KB cap).
+
+---
 ## [2.66.94] — 2026-05-02
 
 ### Added
