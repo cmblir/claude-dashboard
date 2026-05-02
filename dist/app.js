@@ -4315,6 +4315,7 @@ function _wfShowShortcutHelp() {
     { key: 'Ctrl+E / Enter', desc: t('선택 노드 편집창 열기') },
     { key: 'Ctrl+Enter', desc: t('워크플로우 실행 / 중단') },
     { key: 'Ctrl+N', desc: t('새 노드 추가') },
+    { key: 'Ctrl+[ / ]', desc: t('이전 / 다음 워크플로우로 전환') },
     { key: 'Ctrl+0', desc: t('화면 맞춤') },
     { key: 'Ctrl+1', desc: t('100% 줌으로 리셋') },
     { key: 'Ctrl++ / -', desc: t('줌 인/아웃') },
@@ -4959,6 +4960,22 @@ function _wfShowEdgeContextMenu(eid, x, y) {
         const si = document.getElementById('wfNodeSearch');
         if (si) { e.preventDefault(); si.focus(); return true; }
         return;
+      }
+
+      // LL27 (v2.66.56) — Cmd/Ctrl + [ / ] — switch to previous /
+      // next workflow in the sidebar list (n8n parity for editor
+      // tab switching, adapted for our list).
+      if (mod && (e.key === '[' || e.key === ']') && !inInput) {
+        const all = (__wf.workflows || []);
+        if (all.length >= 2) {
+          e.preventDefault();
+          const ids = all.map(w => w.id);
+          let idx = __wf.current ? ids.indexOf(__wf.current.id) : -1;
+          if (e.key === '[') idx = (idx <= 0) ? ids.length - 1 : idx - 1;
+          else               idx = (idx < 0 || idx >= ids.length - 1) ? 0 : idx + 1;
+          _wfOpen(ids[idx]);
+          return true;
+        }
       }
 
       // LL16 (v2.66.45) — Cmd/Ctrl + N — open the new-node editor.
