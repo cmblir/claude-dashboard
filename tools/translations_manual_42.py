@@ -155,6 +155,8 @@ NEW_EN: dict[str, str] = {
     "고정 해제": "Unpin",
     "새 이름 입력:": "New name:",
     "이 대화를 삭제할까요?": "Delete this conversation?",
+    # QQ11
+    "격자 표시 토글": "Toggle grid",
     # QQ1
     "시스템 프롬프트 설정됨": "System prompt set",
     "시스템 프롬프트 초기화됨": "System prompt cleared",
@@ -337,6 +339,8 @@ NEW_ZH: dict[str, str] = {
     "고정 해제": "取消置顶",
     "새 이름 입력:": "输入新名称：",
     "이 대화를 삭제할까요?": "删除此对话？",
+    # QQ11
+    "격자 표시 토글": "切换网格",
     # QQ1
     "시스템 프롬프트 설정됨": "已设置系统提示",
     "시스템 프롬프트 초기화됨": "已清空系统提示",
