@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.10] — 2026-05-02
+
+### Added
+- 📅 **Today's spend split out next to total** (QQ100). The QQ99
+  total-spend header now reads `오늘 $0.123 · 총 누적 $0.482`
+  when there's any spend today and the day total is below the
+  all-time total. Filtering uses `m.ts >= startOfDay`. Falls back
+  to the QQ99 `총 누적: $X` format when only today has spend (no
+  history yet) or when nothing happened today.
+
+---
 ## [2.68.9] — 2026-05-02
 
 ### Added
