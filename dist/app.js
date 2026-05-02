@@ -5313,27 +5313,37 @@ function _wfShowEdgeContextMenu(eid, x, y) {
         e.preventDefault(); _wfUndo(); return true;
       }
 
-      // Ctrl+C — copy node
+      // Ctrl+C — copy node(s). QQ29 (v2.66.104) — multi-select aware.
+      // When __wfMultiSelected has entries, copies all of them plus the
+      // internal edges that connect within the selection so paste keeps
+      // the cluster wired up (n8n parity).
       if (mod && e.key === 'c' && !inInput) {
-        if (__wf.current && __wf.selectedNodeId) {
-          const node = __wf.current.nodes.find(n => n.id === __wf.selectedNodeId);
-          if (node) {
-            __wf._clipboard = [JSON.parse(JSON.stringify(node))];
-            toast(t('노드 복사됨'), 'ok');
-          }
-        }
+        if (!__wf.current) return true;
+        const ids = (__wfMultiSelected && __wfMultiSelected.size > 0)
+          ? Array.from(__wfMultiSelected)
+          : (__wf.selectedNodeId ? [__wf.selectedNodeId] : []);
+        if (!ids.length) return true;
+        const idSet = new Set(ids);
+        const nodes = __wf.current.nodes.filter(n => idSet.has(n.id));
+        const edges = (__wf.current.edges || []).filter(ed => idSet.has(ed.from) && idSet.has(ed.to));
+        __wf._clipboard = nodes.map(n => JSON.parse(JSON.stringify(n)));
+        __wf._clipboardEdges = edges.map(ed => JSON.parse(JSON.stringify(ed)));
+        toast(`${nodes.length} ${t('노드 복사됨')}${edges.length?` · ${edges.length} ${t('엣지')}`:''}`, 'ok');
         return true;
       }
 
-      // Ctrl+V — paste node
+      // Ctrl+V — paste node(s) with edges remapped.
       if (mod && e.key === 'v' && !inInput) {
-        if (__wf.current && __wf._clipboard.length) {
+        if (__wf.current && __wf._clipboard && __wf._clipboard.length) {
           e.preventDefault();
           _wfPushUndo();
+          const idMap = new Map();
           const pasted = [];
           __wf._clipboard.forEach(src => {
-            const nid = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+            const nid = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+              + pasted.length;
             const clone = JSON.parse(JSON.stringify(src));
+            idMap.set(clone.id, nid);
             clone.id = nid;
             clone.x = (clone.x || 0) + 40;
             clone.y = (clone.y || 0) + 40;
@@ -5341,11 +5351,29 @@ function _wfShowEdgeContextMenu(eid, x, y) {
             __wf.current.nodes.push(clone);
             pasted.push(clone);
           });
-          __wf._clipboard = pasted.map(n => JSON.parse(JSON.stringify(n)));
+          // Remap internal edges to the new node ids.
+          const pastedEdges = [];
+          for (const ed of (__wf._clipboardEdges || [])) {
+            const from = idMap.get(ed.from);
+            const to = idMap.get(ed.to);
+            if (!from || !to) continue;
+            const newEd = JSON.parse(JSON.stringify(ed));
+            newEd.id = 'e-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+              + pastedEdges.length;
+            newEd.from = from; newEd.to = to;
+            __wf.current.edges = __wf.current.edges || [];
+            __wf.current.edges.push(newEd);
+            pastedEdges.push(newEd);
+          }
+          // Make pasted set the new multi-selection so user can immediately
+          // drag the cluster (composes with QQ28 group drag).
+          __wfMultiSelected.clear();
+          for (const n of pasted) __wfMultiSelected.add(n.id);
           __wf.selectedNodeId = pasted[pasted.length - 1].id;
           __wf.dirty = true;
           _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
-          toast(t('노드 붙여넣기 완료'), 'ok');
+          if (typeof _wfSyncMultiSelectClasses === 'function') _wfSyncMultiSelectClasses();
+          toast(`${pasted.length} ${t('노드 붙여넣기 완료')}${pastedEdges.length?` · ${pastedEdges.length} ${t('엣지')}`:''}`, 'ok');
         }
         return true;
       }

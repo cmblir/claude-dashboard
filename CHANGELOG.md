@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.104] — 2026-05-02
+
+### Added
+- 📋 **Multi-node copy/paste with internal edges** (QQ29, n8n parity).
+  Cmd+C now copies every node in `__wfMultiSelected` (or just the
+  single selection if multi is empty) plus every edge whose endpoints
+  both fall inside the set. Cmd+V remaps the edge endpoints to fresh
+  node ids so the cluster pastes wired up. Pasted nodes become the
+  new multi-selection so QQ28 group-drag immediately applies — lasso,
+  copy, paste, drag the duplicate cluster anywhere.
+
+---
 ## [2.66.103] — 2026-05-02
 
 ### Added
