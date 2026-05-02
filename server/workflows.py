@@ -2919,9 +2919,14 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
             level_results[nid] = res
         else:
             # 여러 노드 병렬 실행
+            # MM2 (v2.66.59) — manual pool lifecycle so we can shutdown
+            # without waiting on in-flight futures the moment the first
+            # err arrives. The terminating subprocess (MM1) lets the
+            # background threads exit on their own afterwards.
             max_w = min(_MAX_PARALLEL_WORKERS, len(active_nodes))
-            with ThreadPoolExecutor(max_workers=max_w) as pool:
-                futures = {pool.submit(_run_single_node, nid): nid for nid in active_nodes}
+            pool = ThreadPoolExecutor(max_workers=max_w)
+            futures = {pool.submit(_run_single_node, nid): nid for nid in active_nodes}
+            try:
                 for future in as_completed(futures):
                     try:
                         nid, res = future.result()
@@ -2932,6 +2937,17 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                             "status": "err", "output": "", "error": str(e),
                             "durationMs": 0, "sessionId": "",
                         }
+                    # Fail-fast: bail the moment any sibling errored.
+                    if level_results[nid].get("status") == "err":
+                        try: _terminate_run_procs(runId)
+                        except Exception: pass
+                        break
+            finally:
+                # wait=False: stop blocking on still-running threads.
+                # Their subprocess is already SIGTERM'd; the threads
+                # exit on their own (and as daemons, won't outlive
+                # the process anyway).
+                pool.shutdown(wait=False, cancel_futures=True)
 
         # 결과 기록 + branch 처리
         had_error = False

@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.59] — 2026-05-02
+
+### Fixed
+- 🛑🛑 **Fail-fast actually fast now** (MM2). MM1 in v2.66.58
+  added `SIGTERM` of sibling subprocesses on first error, but the
+  outer `with ThreadPoolExecutor:` context still blocked on the
+  in-flight thread — the thread's provider would `cancelled by
+  sibling failure` retry through fallback chain, taking 60-90s.
+  Switched to a manual `pool.shutdown(wait=False, cancel_futures=True)`
+  so `_run_one_iteration` returns the moment the err is detected.
+  **Measured: 89s → 0.01s** (≈10000× faster) on a 2-node parallel
+  level where one fails immediately and the sibling was hanging.
+
+---
 ## [2.66.58] — 2026-05-02
 
 ### Fixed
