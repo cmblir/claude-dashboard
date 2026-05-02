@@ -26888,7 +26888,7 @@ VIEWS.lazyclawChat = async () => {
       <div style="padding:8px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:4px;">
         <button class="btn-primary btn text-xs" style="width:100%;justify-content:center;" onclick="_lcNewSession()">＋ ${t('새 대화')}</button>
         <!-- QQ9 (v2.66.84) — quick filter for the session list -->
-        <input id="lcSessionFilter" class="input text-[11px]" placeholder="${t('대화 필터…')}" style="padding:4px 8px;" oninput="_lcRenderSessions()">
+        <input id="lcSessionFilter" class="input text-[11px]" placeholder="${t('대화 필터…')}" style="padding:4px 8px;" oninput="_lcRenderSessions()" onkeydown="if(event.key==='Escape'){this.value='';_lcRenderSessions();}">
       </div>
       <div id="lcSessionList" style="flex:1;overflow-y:auto;padding:4px 2px;"></div>
     </div>
