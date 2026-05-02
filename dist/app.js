@@ -26798,7 +26798,16 @@ function _lcRenderSessions() {
     return Math.floor(d / 86400000) + t('일 전');
   };
   if (!sessions.length) {
-    list.innerHTML = `<div style="padding:20px 8px;text-align:center;font-size:11px;color:var(--text-dim);">${q ? t('일치하는 대화 없음') : t('아직 대화가 없습니다')}</div>`;
+    // QQ90 (v2.67.27) — empty-state CTA: when sessions list is empty
+    // and no filter is active, surface a button to create the first one.
+    if (q) {
+      list.innerHTML = `<div style="padding:20px 8px;text-align:center;font-size:11px;color:var(--text-dim);">${t('일치하는 대화 없음')}</div>`;
+    } else {
+      list.innerHTML = `<div style="padding:18px 10px;text-align:center;">
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">${t('아직 대화가 없습니다')}</div>
+        <button class="btn-primary btn text-xs" style="padding:5px 12px;" onclick="_lcNewSession()">＋ ${t('새 대화')}</button>
+      </div>`;
+    }
     return;
   }
   // QQ24 (v2.66.99) — branch-lineage hint. If session has parentId,
