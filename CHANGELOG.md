@@ -10,6 +10,26 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.58] — 2026-05-02
+
+### Fixed
+- 🛑 **Workflow fail-fast: any node fail = whole-run stop** (MM1).
+  Previously, when one node in a parallel topological level failed
+  (e.g. GPT 401), sibling nodes (Claude / Gemini CLIs) kept hanging
+  for their own 60–300s subprocess timeout — the user saw `Claude
+  1024s ⏱` ticking forever while GPT was already red. Three-layer
+  fix:
+  1. New `_PROC_REGISTRY` keyed by `runId` in `workflows.py` —
+     every CLI provider's live `Popen` is registered there.
+  2. `_run_one_iteration` calls `_terminate_run_procs(runId)` the
+     instant a sibling node returns `status='err'`. Sibling
+     subprocesses get `SIGTERM` (then `SIGKILL` after 2s).
+  3. Providers (`ClaudeCli`, `GeminiCli`, `Codex`) switched from
+     `subprocess.run` to `Popen + communicate(timeout)` via a new
+     `_run_cancellable` helper. A signal-killed process is reported
+     as `cancelled by sibling-node failure` instead of timeout.
+
+---
 ## [2.66.57] — 2026-05-02
 
 ### Added
