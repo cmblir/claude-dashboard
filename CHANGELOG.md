@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.42] — 2026-05-02
+
+### Added
+- ▶ **`Cmd/Ctrl + Enter` runs the workflow** (or cancels it if
+  already running) (LL13, n8n parity). Avoids the browser-reload
+  conflict of `Cmd+R`. Uses the existing `_wfRunOrCancel` toggle
+  so the same key starts and stops a run.
+
+---
 ## [2.66.41] — 2026-05-02
 
 ### Added

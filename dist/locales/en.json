@@ -3023,6 +3023,7 @@
   "워크플로우 생성됨 — 실행 시작": "Workflow created — starting run",
   "워크플로우 실패": "Workflow Failed",
   "워크플로우 실행": "Run Workflow",
+  "워크플로우 실행 / 중단": "Run / stop workflow",
   "워크플로우 실행 계획": "Workflow execution plan",
   "워크플로우 실행 실패": "Workflow Failed",
   "워크플로우 실행 완료": "Workflow Completed",
