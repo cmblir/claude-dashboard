@@ -26801,6 +26801,20 @@ function _lcRenderSessions() {
   const byId = Object.fromEntries(allSessions.map(x => [x.id, x]));
   // QQ26 (v2.66.101) — per-session token usage badge.
   const fmtTok = n => n >= 1000 ? (n/1000).toFixed(n>=10000?0:1) + 'k' : String(n);
+  // QQ86 (v2.67.23) — after render, scroll the active session row
+  // into view if it's currently off-screen (e.g. after QQ50 keyboard
+  // session switch in a long sidebar list).
+  setTimeout(() => {
+    try {
+      const active = list.querySelector('[data-active="1"]');
+      if (active && typeof active.scrollIntoView === 'function') {
+        const rect = active.getBoundingClientRect();
+        const parent = list.getBoundingClientRect();
+        const off = rect.top < parent.top || rect.bottom > parent.bottom;
+        if (off) active.scrollIntoView({ block: 'nearest' });
+      }
+    } catch (_) {}
+  }, 0);
   list.innerHTML = sessions.map(s => {
     const active = s.id === cur;
     const pin = s.pinned ? '📌 ' : '';
@@ -26812,7 +26826,7 @@ function _lcRenderSessions() {
       for (const m of h) tokSum += (m.tokensIn || 0) + (m.tokensOut || 0);
     } catch (_) {}
     const tokBadge = tokSum > 0 ? `<span style="font-size:9px;color:var(--text-dim);background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:8px;font-variant-numeric:tabular-nums;" title="${t('총 토큰 사용량')}">🔤 ${fmtTok(tokSum)}</span>` : '';
-    return `<div oncontextmenu="event.preventDefault();_lcSessionContextMenu('${s.id}', event.clientX, event.clientY);" onclick="_lcSwitchSession('${s.id}')" style="cursor:pointer;padding:8px 10px;border-radius:7px;margin:1px 2px;border:1px solid ${active ? 'rgba(217,119,87,0.5)' : 'transparent'};background:${active ? 'rgba(217,119,87,0.1)' : 'transparent'};">
+    return `<div ${active?'data-active="1"':''} oncontextmenu="event.preventDefault();_lcSessionContextMenu('${s.id}', event.clientX, event.clientY);" onclick="_lcSwitchSession('${s.id}')" style="cursor:pointer;padding:8px 10px;border-radius:7px;margin:1px 2px;border:1px solid ${active ? 'rgba(217,119,87,0.5)' : 'transparent'};background:${active ? 'rgba(217,119,87,0.1)' : 'transparent'};">
       <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${active ? 'var(--accent)' : 'var(--text)'};">${pin}${escapeHtml(s.label || t('새 대화'))}</div>
       ${s.preview ? `<div style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dim);margin-top:2px;">${escapeHtml(s.preview)}</div>` : ''}
       ${lineage}
