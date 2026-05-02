@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.82] — 2026-05-02
+
+### Changed
+- 🔗 **Auto-place + auto-wire on new node spawn** (QQ7, n8n parity).
+  When a node is selected and the user adds a new one, the new
+  node lands +260px to the right at the same Y, and an edge is
+  drawn from the selected node automatically. Branch nodes use
+  the `out_y` port; `start` / `output` types skip auto-wire.
+
+---
 ## [2.66.81] — 2026-05-02
 
 ### Added

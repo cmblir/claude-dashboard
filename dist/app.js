@@ -6389,13 +6389,38 @@ function _wfSaveNodeEditor(winId) {
   const draft = w._wfDraft;
   if (!draft.type) { toast(t('카테고리를 선택하세요'), 'warn'); return; }
   if (w._wfIsNew) {
-    // 캔버스 중앙에 좌표 계산
-    const view = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
-    const host = document.getElementById('wfCanvasHost');
-    const rect = host ? host.getBoundingClientRect() : { width:600, height:400 };
-    draft.x = Math.round((rect.width/2 - (view.panX||0)) / (view.zoom||1) - WF_NODE_W/2);
-    draft.y = Math.round((rect.height/2 - (view.panY||0)) / (view.zoom||1) - WF_NODE_H/2);
+    // QQ7 (v2.66.82) — n8n-style spawn: drop the new node directly
+    // to the right of the previously-selected node (if any) and
+    // auto-wire it. Falls back to canvas-centre when nothing is
+    // selected. Skips auto-wire for `start` (no inbound) / `output`
+    // (no outbound) types.
+    const sourceNode = (w._wfSpawnFromNid)
+      ? __wf.current.nodes.find(n => n.id === w._wfSpawnFromNid)
+      : (__wf.selectedNodeId
+          ? __wf.current.nodes.find(n => n.id === __wf.selectedNodeId)
+          : null);
+    if (sourceNode) {
+      const SNAP = 10;
+      draft.x = Math.round((sourceNode.x + (typeof WF_NODE_W !== 'undefined' ? WF_NODE_W : 200) + 60) / SNAP) * SNAP;
+      draft.y = Math.round(sourceNode.y / SNAP) * SNAP;
+    } else {
+      const view = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
+      const host = document.getElementById('wfCanvasHost');
+      const rect = host ? host.getBoundingClientRect() : { width:600, height:400 };
+      draft.x = Math.round((rect.width/2 - (view.panX||0)) / (view.zoom||1) - WF_NODE_W/2);
+      draft.y = Math.round((rect.height/2 - (view.panY||0)) / (view.zoom||1) - WF_NODE_H/2);
+    }
     __wf.current.nodes.push(draft);
+    // QQ7 — auto-wire when source exists and types make sense.
+    if (sourceNode && draft.type !== 'start' && sourceNode.type !== 'output') {
+      const eid = 'e-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+      const fromPort = (sourceNode.type === 'branch') ? 'out_y' : 'out';
+      __wf.current.edges = __wf.current.edges || [];
+      __wf.current.edges.push({
+        id: eid, from: sourceNode.id, to: draft.id,
+        fromPort, toPort: 'in',
+      });
+    }
     __wf.selectedNodeId = draft.id;
     toast(t('노드 추가됨'), 'ok');
   } else {
