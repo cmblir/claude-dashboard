@@ -748,6 +748,19 @@ class Handler(BaseHTTPRequestHandler):
                 data = fp.read_bytes()
             except Exception:
                 self.send_response(500); self.end_headers(); return
+            # KK2 (v2.66.29) — when serving index.html, rewrite the
+            # `<script src="/app.js">` reference to include a version
+            # query string derived from app.js's own mtime. Combined
+            # with the immutable Cache-Control on `?v=` URLs below,
+            # the browser skips even 304 revalidation on subsequent
+            # loads. URL changes automatically when app.js does.
+            if rel == "index.html":
+                try:
+                    app_mtime = (DIST / "app.js").stat().st_mtime
+                    tag = f'src="/app.js?v={int(app_mtime)}"'
+                    data = data.replace(b'src="/app.js"', tag.encode())
+                except Exception:
+                    pass
             # gzip pays for itself only on compressible types.
             if ct.startswith(("text/", "application/javascript", "application/json", "image/svg+xml")):
                 import gzip
@@ -779,13 +792,17 @@ class Handler(BaseHTTPRequestHandler):
         # HH4 (v2.66.23) — files under /vendor/ are content-addressable
         # (we manage the URLs ourselves; bumping the path is a code
         # change). Mark them immutable so the browser skips revalidation
-        # entirely on subsequent loads. Everything else stays
-        # `no-cache, must-revalidate` (etag-driven).
+        # entirely on subsequent loads.
+        # KK2 (v2.66.29) — also any URL with `?v=` query string; the
+        # bundle-ref rewrite above gives /app.js a versioned URL that
+        # changes whenever app.js's mtime does, so it's safe to mark
+        # immutable too.
         is_vendor = path.startswith("/vendor/")
+        has_versioned = "?v=" in (self.path or "")
         self.send_response(200)
         self.send_header("Content-Type", ct)
         self.send_header("Content-Length", str(len(body)))
-        if is_vendor:
+        if is_vendor or has_versioned:
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         else:
             self.send_header("Cache-Control", "no-cache, must-revalidate")
