@@ -3522,6 +3522,7 @@
   "적용할 노드가 없습니다": "No node available",
   "전": "ago",
   "전송": "Send",
+  "전송 (Enter)": "Send (Enter)",
   "전역": "Global",
   "전역 (~/.claude/agents)": "Global (~/.claude/agents)",
   "전역 CLAUDE.md 작성": "Write a global CLAUDE.md",

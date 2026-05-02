@@ -290,6 +290,8 @@ NEW_EN: dict[str, str] = {
     "이미지 파일이 없거나 8MB 초과": "No image files (or larger than 8MB)",
     # QQ64 — Esc cancels stream
     "스트리밍 중단됨": "Stream cancelled",
+    # QQ68 — send button tooltip
+    "전송 (Enter)": "Send (Enter)",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -574,4 +576,6 @@ NEW_ZH: dict[str, str] = {
     "이미지 파일이 없거나 8MB 초과": "没有图片文件或超过 8MB",
     # QQ64
     "스트리밍 중단됨": "已取消流式输出",
+    # QQ68
+    "전송 (Enter)": "发送 (Enter)",
 }
