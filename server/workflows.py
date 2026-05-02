@@ -47,7 +47,10 @@ _NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
                # command inside a container with explicit volume + env. No
                # network by default. Falls back to error (not host shell)
                # when docker CLI is missing — never silently elevates.
-               "docker_run"}
+               "docker_run",
+               # QQ36 (v2.66.111) — sticky note for canvas annotations
+               # (n8n parity). Pass-through executor; no ports.
+               "sticky"}
 _INPUT_MODES = {"concat", "first", "json"}
 _ASSIGNEES = {"opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
@@ -689,6 +692,17 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
         out["data"] = {
             "workflowId": _clamp_str(d.get("workflowId"), 60),
             "passInput": bool(d.get("passInput", True)),
+        }
+    elif ntype == "sticky":
+        # QQ36 (v2.66.111) — sticky note (n8n parity).
+        # Free-floating markdown annotation. Has no ports; engine
+        # treats it as a pass-through that returns nothing.
+        color = d.get("color") if d.get("color") in ("yellow", "blue", "green", "pink", "gray") else "yellow"
+        out["data"] = {
+            "text": _clamp_str(d.get("text"), 4000),
+            "color": color,
+            "width": max(120, min(800, int(d.get("width") or 220))),
+            "height": max(80, min(800, int(d.get("height") or 140))),
         }
     elif ntype == "embedding":
         out["data"] = {
@@ -1562,6 +1576,10 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
         return int(time.time() * 1000) - t0
 
     if ntype == "start":
+        return {"status": "ok", "output": "", "durationMs": _elapsed(), "sessionId": ""}
+
+    if ntype == "sticky":
+        # QQ36 — annotation node, no execution. Pass-through.
         return {"status": "ok", "output": "", "durationMs": _elapsed(), "sessionId": ""}
 
     if ntype == "aggregate":

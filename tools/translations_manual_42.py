@@ -255,6 +255,17 @@ NEW_EN: dict[str, str] = {
     "정렬됨": "Aligned",
     # QQ35 — scroll to bottom
     "최신 메시지로": "Jump to latest",
+    # QQ36 — sticky note
+    "주석": "Annotation",
+    "실행에 영향 없는 캔버스 메모": "Canvas memos that don't affect execution",
+    "캔버스 주석용 스티키 노트. 마크다운 텍스트 + 색상 5종(노랑/파랑/초록/분홍/회색). 실행에 영향 없음 (n8n parity).": "Sticky note for canvas annotations. Markdown text + 5 colors (yellow/blue/green/pink/gray). Doesn't affect execution (n8n parity).",
+    "메모 입력...": "Type a note...",
+    "메모 텍스트 (마크다운)": "Note text (markdown)",
+    "메모 제목": "Note title",
+    "내용...": "Content...",
+    "색상": "Color",
+    "너비": "Width",
+    "높이": "Height",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -504,4 +515,15 @@ NEW_ZH: dict[str, str] = {
     "정렬됨": "已对齐",
     # QQ35
     "최신 메시지로": "跳到最新消息",
+    # QQ36
+    "주석": "注释",
+    "실행에 영향 없는 캔버스 메모": "不影响执行的画布备忘",
+    "캔버스 주석용 스티키 노트. 마크다운 텍스트 + 색상 5종(노랑/파랑/초록/분홍/회색). 실행에 영향 없음 (n8n parity).": "画布注释用便利贴。Markdown 文本 + 5 种颜色（黄/蓝/绿/粉/灰）。不影响执行（n8n 等价）。",
+    "메모 입력...": "输入备忘...",
+    "메모 텍스트 (마크다운)": "备忘文本（Markdown）",
+    "메모 제목": "备忘标题",
+    "내용...": "内容...",
+    "색상": "颜色",
+    "너비": "宽度",
+    "높이": "高度",
 }

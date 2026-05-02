@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.111] — 2026-05-02
+
+### Added
+- 🟨 **Sticky note nodes on workflow canvas** (QQ36, n8n parity).
+  New `sticky` node type — free-floating markdown annotations that
+  don't affect execution. 5 colors (yellow / blue / green / pink /
+  gray), resizable (120-800 px width, 80-800 px height), markdown
+  rendered via `marked.parse`. Server-side: registered in
+  `_NODE_TYPES`, sanitized with text / color / width / height,
+  executor returns instantly with empty output. Client-side: new
+  "주석" palette category, custom SVG renderer using
+  `<foreignObject>`, color picker + dimension inputs in the editor.
+
+---
 ## [2.66.110] — 2026-05-02
 
 ### Added
