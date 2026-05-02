@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.96] — 2026-05-02
+
+### Added
+- 📌 **Pin status panel in inspector** (QQ21). Selected pinned nodes
+  now expose an amber expandable panel showing pinned content
+  (preview, char count, unpin button) directly in the inspector — no
+  longer hidden behind right-click. Discoverability fix for QQ20.
+
+---
 ## [2.66.95] — 2026-05-02
 
 ### Added

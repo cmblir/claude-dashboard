@@ -5813,6 +5813,13 @@ function _wfRenderInspector(opts) {
             <textarea class="input w-full text-[11px] mt-1" rows="2" placeholder="${t('이 노드에 대한 짧은 메모 (캔버스 hover 시 표시)')}"
               oninput="(function(el){var nn=__wf.current.nodes.find(x=>x.id==='${n.id}');if(!nn)return;nn.data=nn.data||{};nn.data.notes=el.value;__wf.dirty=true;_wfUpdateToolbar();})(this)">${escapeHtml(d.notes||'')}</textarea>
           </details>
+          ${((n.type==='session'||n.type==='subagent') && d.pinned && (d.pinnedOutput||'').trim()) ? `
+            <!-- QQ21 (v2.66.96) — pin status visible in inspector. -->
+            <details class="mt-2" style="border:1px solid rgba(245,158,11,0.35);border-radius:6px;background:rgba(245,158,11,0.06);padding:6px 8px;">
+              <summary class="text-[10px] cursor-pointer" style="color:#fbbf24;">📌 ${t('핀 설정됨')} · ${(d.pinnedOutput||'').length.toLocaleString()} ${t('자')}</summary>
+              <pre class="text-[10px] mt-2 max-h-40 overflow-auto" style="white-space:pre-wrap;word-break:break-word;color:var(--text-mute);">${escapeHtml((d.pinnedOutput||'').slice(0,2000))}${(d.pinnedOutput||'').length>2000?'…':''}</pre>
+              <button class="btn text-[10px] mt-2" onclick="_wfTogglePin('${n.id}', false)">${t('핀 해제')}</button>
+            </details>` : ''}
         </div>
       `;
     }
