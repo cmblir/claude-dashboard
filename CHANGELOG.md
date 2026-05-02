@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.27] — 2026-05-02
+
+### Added
+- ＋ **Empty-state CTA in chat sidebar** (QQ90). When there are no
+  sessions and no filter is active, the sidebar now shows a
+  "＋ 새 대화" button below the empty-state message instead of
+  just the text. One-click first-session creation. Filter
+  active → unchanged "no match" message.
+
+---
 ## [2.67.26] — 2026-05-02
 
 ### Added
