@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.9] — 2026-05-02
+
+### Verified
+- ✅ **Multimodal extractor regression suite** (QQ72). New
+  `TestExtractInlineImages` class in `tests/test_ai_providers.py`
+  pins down `_extract_inline_images()` behavior — the shared
+  helper that QQ40-QQ43 (vision routing), QQ49 / QQ55 (claude-cli
+  scrubbing), and QQ58 reuse. Coverage:
+  1. No `data:image/` → short-circuit returns prompt unchanged.
+  2. Single image extracted with mime + base64 + data_url shape.
+  3. Multiple images, base64 whitespace + newlines stripped.
+  4. `data:application/json` and other non-image data URLs are
+     left alone.
+
+  37 ai-provider + workflow tests pass.
+
+---
 ## [2.67.8] — 2026-05-02
 
 ### Verified
