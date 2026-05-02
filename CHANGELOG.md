@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.122] — 2026-05-02
+
+### Fixed
+- 📊 **Gantt panel refreshes as run progresses** (QQ47, follow-up to
+  QQ46). The inspector mini Gantt previously stayed stale during a
+  run because the run-status apply path only invalidated the canvas
+  cache, not `__wf._inspectorDirty`. The status-sig diff in the SSE
+  apply loop now also marks the inspector dirty and re-renders it,
+  so the duration bars grow live as nodes complete.
+
+---
 ## [2.66.121] — 2026-05-02
 
 ### Added
