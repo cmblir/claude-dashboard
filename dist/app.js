@@ -3475,6 +3475,9 @@ function _wfUpdateToolbarImpl() {
     dirtyEl.innerHTML = __wf.dirty
       ? `<span class="wf-dirty-dot"></span>${t('변경사항 있음')}`
       : `<span class="wf-ok-dot"></span>${t('저장됨')}`;
+    // LL28 (v2.66.57) — schedule autosave whenever the toolbar reports
+    // dirty state (rAF-coalesced, so this fires once per frame at most).
+    if (__wf.dirty && typeof _wfScheduleAutosave === 'function') _wfScheduleAutosave();
   }
   // v2.33.6 — undo 스택 깊이 표시
   const undoBtn = document.getElementById('wfUndoBtn');
@@ -6459,7 +6462,40 @@ function _wfMultiAssigneeRowHtml(nid, idx, val, removable) {
 }
 
 // ─── 저장 / 실행 / spawn ───────────────────────────────────
+// LL28 (v2.66.57) — autosave. Whenever something marks __wf.dirty=true
+// (toolbar refresh side-effect), schedule a deferred save 30s out. A
+// fresh dirty event resets the timer so we never save mid-edit. The
+// beforeunload guard (LL15) still fires for tabs closed inside that
+// window. Hook is installed once on first use.
+function _wfScheduleAutosave() {
+  if (typeof __wf === 'undefined') return;
+  if (__wf._autosaveTimer) clearTimeout(__wf._autosaveTimer);
+  __wf._autosaveTimer = setTimeout(() => {
+    __wf._autosaveTimer = null;
+    if (!__wf.current || !__wf.dirty) return;
+    if (typeof _wfSave === 'function') {
+      // toast() inside _wfSave fires "저장됨"; this is a quiet save —
+      // suppress that toast for autosave so the user isn't spammed.
+      const _origToast = window.toast;
+      window.toast = (msg, kind) => {
+        if (msg === t('저장됨')) {
+          // soft hint: tiny inline indicator instead of toast
+          const dirtyEl = document.getElementById('wfDirty');
+          if (dirtyEl) dirtyEl.title = t('자동 저장됨') + ' · ' + new Date().toLocaleTimeString();
+          return;
+        }
+        return _origToast(msg, kind);
+      };
+      Promise.resolve(_wfSave()).finally(() => { window.toast = _origToast; });
+    }
+  }, 30000);
+}
+
 async function _wfSave() {
+  // Cancel a pending autosave when the user saves explicitly.
+  if (typeof __wf !== 'undefined' && __wf._autosaveTimer) {
+    clearTimeout(__wf._autosaveTimer); __wf._autosaveTimer = null;
+  }
   if (!__wf.current) return;
   const body = {
     id: __wf.current.id,

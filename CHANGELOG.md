@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.57] — 2026-05-02
+
+### Added
+- 💾 **Workflow autosave (debounced 30s)** (LL28). Whenever the
+  user marks the workflow dirty, an autosave timer is scheduled
+  30 seconds out; further edits reset the timer so we never save
+  mid-typing. Explicit `Cmd+S` cancels any pending autosave.
+  The "저장됨" toast is suppressed for autosaves — instead the
+  toolbar dirty indicator's tooltip records the timestamp
+  (`자동 저장됨 · HH:MM:SS`) so the user can see it happened
+  without being interrupted.
+
+---
 ## [2.66.56] — 2026-05-02
 
 ### Added
