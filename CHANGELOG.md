@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.21] — 2026-05-02
+
+### Added
+- 🗑 **Session delete confirm shows the label** (QQ84). The session
+  delete prompt now appends `<label>` so users see exactly which
+  conversation is about to disappear — mistakes were easy when
+  several sessions shared similar truncated previews.
+
+---
 ## [2.67.20] — 2026-05-02
 
 ### Fixed

@@ -26910,7 +26910,12 @@ window._lcSessionTogglePin = function (sid) {
 };
 
 window._lcSessionDelete = function (sid) {
-  if (!confirm(t('이 대화를 삭제할까요?'))) return;
+  // QQ84 (v2.67.21) — include the session label in the confirm so
+  // users see what they're deleting (mistakes are easy when several
+  // sessions share similar previews).
+  const sess = _lcGetSessions().find(s => s.id === sid);
+  const label = (sess && sess.label) || sid.slice(0, 12);
+  if (!confirm(`${t('이 대화를 삭제할까요?')}\n\n${label}`)) return;
   const sessions = _lcGetSessions().filter(x => x.id !== sid);
   _lcSaveSessions(sessions);
   // Drop history + draft payload too. QQ54 (v2.66.129) — earlier
