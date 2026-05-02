@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.22] — 2026-05-02
+
+### Fixed
+- ⌨ **History-recall cursor resets on user typing** (QQ85). After a
+  Cmd+↑ recalled an old user message, typing additional characters
+  used to leave the recall cursor at its old index — pressing
+  Cmd+↑ again would unexpectedly skip ahead. Now any user input
+  resets the cursor (shell-style); the recall handler itself sets
+  a one-tick guard so its own dispatched `input` event doesn't
+  clobber the index.
+
+---
 ## [2.67.21] — 2026-05-02
 
 ### Added
