@@ -54,6 +54,8 @@ NEW_EN: dict[str, str] = {
     "노드 복제됨": "Node duplicated",
     # LL6
     "노드 선택됨": "nodes selected",
+    # LL8
+    "자동 정렬 완료": "Layout aligned",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -103,4 +105,6 @@ NEW_ZH: dict[str, str] = {
     "노드 복제됨": "节点已复制",
     # LL6
     "노드 선택됨": "节点已选中",
+    # LL8
+    "자동 정렬 완료": "已自动排列",
 }
