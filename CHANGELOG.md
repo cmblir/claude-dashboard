@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.62] — 2026-05-02
+
+### Changed
+- 🎨 **Active sessions panel uses amber for auto-cancelled rows**
+  (NN3). Sibling-cancelled nodes (MM1) now show
+  `⏹ 형제 노드 실패로 자동 취소됨` in amber, matching the
+  run-result modal's distinction. Real errors keep `⚠` red.
+
+---
 ## [2.66.61] — 2026-05-02
 
 ### Changed
