@@ -249,3 +249,41 @@ class TestStickyAnnotations:
         assert clean["edges"][0]["from"] == "n-a"
         assert clean["edges"][0]["to"] == "n-b"
 
+
+    def test_list_api_splits_sticky_from_node_count(self, monkeypatch, tmp_path):
+        """QQ79 — api_workflow_list returns nodeCount = (total - sticky) and
+        a separate stickyCount field so the sidebar reads
+        '5 노드 + 2 🟨' instead of bundling them."""
+        # Redirect the workflows store to a temp file so the test is isolated.
+        store_file = tmp_path / "wf-q79.json"
+        monkeypatch.setattr(wf, "WORKFLOWS_PATH", store_file)
+        # Invalidate the in-memory load cache so the patched path is honored.
+        with wf._LOAD_CACHE["lock"]:
+            wf._LOAD_CACHE["data"] = None
+            wf._LOAD_CACHE["mtime"] = 0
+        # Build a minimal store with one workflow holding 1 sticky + 2 real.
+        wf._dump_all({
+            "workflows": {
+                "wf-q79": {
+                    "id": "wf-q79", "name": "q79-test",
+                    "createdAt": 1, "updatedAt": 1,
+                    "nodes": [
+                        {"id": "n-stk", "type": "sticky", "x": 0, "y": 0, "data": {}},
+                        {"id": "n-start", "type": "start", "x": 100, "y": 0, "data": {}},
+                        {"id": "n-s", "type": "session", "x": 200, "y": 0, "data": {}},
+                    ],
+                    "edges": [
+                        {"id": "e1", "from": "n-start", "fromPort": "out", "to": "n-s", "toPort": "in"},
+                    ],
+                },
+            },
+            "runs": {},
+        })
+        out = wf.api_workflows_list()
+        assert out["ok"] is True
+        items = [w for w in out["workflows"] if w["id"] == "wf-q79"]
+        assert len(items) == 1
+        item = items[0]
+        assert item["nodeCount"] == 2  # start + session
+        assert item["stickyCount"] == 1
+        assert item["edgeCount"] == 1

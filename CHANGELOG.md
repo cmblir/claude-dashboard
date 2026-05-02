@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.17] — 2026-05-02
+
+### Verified
+- ✅ **Regression test for QQ79 sticky/node split** (QQ80). New
+  `test_list_api_splits_sticky_from_node_count` in
+  `tests/test_workflows.py` builds a temp store with 1 sticky + 2
+  executable nodes and asserts `api_workflows_list()` returns
+  `nodeCount=2, stickyCount=1, edgeCount=1`. Pins down the QQ79
+  semantic so future refactors can't bundle them again silently.
+  All 23 workflow tests pass.
+
+---
 ## [2.67.16] — 2026-05-02
 
 ### Changed
