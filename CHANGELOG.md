@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.25] — 2026-05-02
+
+### Fixed
+- 🧹 **Workflow tab background activity leak** (II2). Leaving the tab
+  while a run was in flight kept SSE, the elapsed-time ticker, and the
+  poll fallback running in the background — they kept fetching
+  `/api/workflows/run-status` and DOM-mutating an invisible tab. The
+  hashchange handler now closes them when `state.view` transitions
+  away from `workflows`. Auto-restore re-attaches when the user
+  returns. Same pattern was already in place for the Ralph tab.
+
+---
 ## [2.66.24] — 2026-05-02
 
 ### Performance — split the bundle

@@ -1006,6 +1006,19 @@ window.addEventListener('hashchange', () => {
   const h = location.hash.replace(/^#\//, '') || 'overview';
   if (h !== state.view) {
     if (state.view === 'rtk' && h !== 'rtk' && typeof _rtkStopPolling === 'function') _rtkStopPolling();
+    // II2 (v2.66.25) — leaving the workflow tab while a run was in
+    // flight: tear down SSE / poll / ticker so they don't keep firing
+    // in the background and rebuild DOM on a tab the user can't see.
+    // Auto-restore re-attaches when the user comes back.
+    if (state.view === 'workflows' && h !== 'workflows') {
+      try {
+        if (typeof _wfStopSSE === 'function') _wfStopSSE();
+        if (typeof _wfStopElapsedTicker === 'function') _wfStopElapsedTicker();
+        if (typeof __wf !== 'undefined' && __wf.pollTimer) {
+          clearInterval(__wf.pollTimer); __wf.pollTimer = null;
+        }
+      } catch (_) {}
+    }
     state.view = h; renderNav(); renderView();
   }
 });
