@@ -26925,9 +26925,26 @@ AFTER.lazyclawChat = () => {
     window.__lcSearchKeyBound = true;
     document.addEventListener('keydown', (e) => {
       if (state.view !== 'lazyclawChat') return;
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
         if (typeof _lcChatSearch === 'function') _lcChatSearch();
+        return;
+      }
+      // QQ50 (v2.66.125) — Cmd+Shift+[ / ] — prev/next chat session
+      // (mirrors workflow Cmd+[/]). Skips when typing in an input.
+      if (mod && e.shiftKey && (e.key === '[' || e.key === ']' || e.key === '{' || e.key === '}')) {
+        const tag = (e.target && e.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        const all = _lcGetSessions();
+        if (all.length < 2) return;
+        e.preventDefault();
+        const ids = all.map(s => s.id);
+        let idx = ids.indexOf(_lcCurrentId());
+        const back = (e.key === '[' || e.key === '{');
+        if (back) idx = idx <= 0 ? ids.length - 1 : idx - 1;
+        else      idx = (idx < 0 || idx >= ids.length - 1) ? 0 : idx + 1;
+        _lcSwitchSession(ids[idx]);
       }
     });
   }
