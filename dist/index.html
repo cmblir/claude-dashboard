@@ -763,7 +763,12 @@ window._loadVendor = (() => {
 
   body.theme-light .wf-pal-cat { background: rgba(0,0,0,0.02); }
   body.theme-light .wf-pal-cat-body { background: rgba(0,0,0,0.04); }
-  .wf-node { cursor: grab; }
+  /* JJ1 (v2.66.26) — CSS containment for workflow nodes. Each node
+     becomes its own paint/layout boundary so per-node attribute
+     mutations (data-status, transform, .wf-node-elapsed text) don't
+     trigger a relayout cascade across siblings. Significant on
+     20+ node graphs during a live run. */
+  .wf-node { cursor: grab; contain: layout paint; will-change: transform; }
   .wf-node:active { cursor: grabbing; }
   .wf-node-body { fill: var(--card); stroke: var(--border); stroke-width: 1; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); }
   .wf-node.selected .wf-node-body { stroke: var(--accent); stroke-width: 2; }
