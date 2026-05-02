@@ -1979,7 +1979,7 @@ function renderNav() {
         if (MODE_TABS.claude.has(n.id))    tags.push({ k:'C',  c:'#a78bfa', t:'Claude' });
         if (MODE_TABS.workflow.has(n.id))  tags.push({ k:'W',  c:'#60a5fa', t:'Workflow' });
         if (MODE_TABS.providers.has(n.id)) tags.push({ k:'P',  c:'#fbbf24', t:'Providers' });
-        if (MODE_TABS.lazyclaw.has(n.id))  tags.push({ k:'O',  c:'#fb7185', t:'LazyClaw' });
+        if (MODE_TABS.lazyclaw.has(n.id))  tags.push({ k:'L',  c:'#fb7185', t:'LazyClaw' });
         if (tags.length) {
           modeBadges = '<div class="nav-mode-badges" style="display:inline-flex;gap:2px;margin-left:4px;">'
             + tags.map(x => `<span title="${x.t}" style="font-size:8px;padding:1px 3px;border-radius:3px;background:${x.c}22;color:${x.c};font-weight:600;line-height:1;">${x.k}</span>`).join('')
@@ -4716,6 +4716,9 @@ function _wfRenderCanvas() {
   const edgesG = document.getElementById('wfEdges');
   const vp = document.getElementById('wfViewport');
   if (!nodesG || !edgesG || !vp) return;
+  // Y2 (v2.66.11) — invalidate the per-tick node-element cache; rebuilt
+  // lazily on the next _wfApplyRunStatus call.
+  __wf._nodeElsMap = null;
   if (!__wf.current) {
     nodesG.innerHTML = ''; edgesG.innerHTML = '';
     __wf._nodeEls.clear(); __wf._nodeSnapshot.clear();
@@ -7103,17 +7106,42 @@ function _wfApplyRunStatus(run) {
   const results = run.nodeResults || {};
   __wf.lastRunResults = results;
   __wf.lastRun = run;
-  document.querySelectorAll('.wf-node').forEach(el => {
-    const nid = el.getAttribute('data-node');
-    const r = results[nid];
-    if (r) el.setAttribute('data-status', r.status);
-    // running 노드 라벨 옆 elapsed 초 업데이트
+  // Y2 (v2.66.11) — diff-only DOM scan. Build a lightweight signature
+  // (nodeId → status mapping) and compare to last applied; only
+  // re-attribute when the per-node status actually changed. Cuts the
+  // O(N) querySelectorAll scan from "every tick" to "only when needed".
+  // Always re-paint the running node's elapsed-seconds label since that
+  // changes by definition each tick.
+  const sig = Object.entries(results)
+    .map(([nid, r]) => `${nid}:${(r && r.status) || '_'}`)
+    .sort().join('|');
+  const changed = sig !== __wf._lastResultsSig;
+  __wf._lastResultsSig = sig;
+  // Cache node element map once per canvas render (built at _wfRenderCanvas)
+  // so we skip the querySelectorAll on every tick. Lazy-build if missing.
+  if (!__wf._nodeElsMap) {
+    __wf._nodeElsMap = new Map();
+    document.querySelectorAll('.wf-node').forEach(el => {
+      const nid = el.getAttribute('data-node');
+      if (nid) __wf._nodeElsMap.set(nid, el);
+    });
+  }
+  for (const [nid, r] of Object.entries(results)) {
+    const el = __wf._nodeElsMap.get(nid);
+    if (!el) continue;
+    if (changed && r) {
+      const cur = el.getAttribute('data-status');
+      if (cur !== r.status) el.setAttribute('data-status', r.status);
+    }
     if (r && r.status === 'running' && r.startedAt) {
       const secs = Math.max(0, Math.floor((Date.now() - r.startedAt) / 1000));
       const el2 = el.querySelector('.wf-node-elapsed');
-      if (el2) el2.textContent = '⏱ ' + secs + 's';
+      if (el2) {
+        const txt = '⏱ ' + secs + 's';
+        if (el2.textContent !== txt) el2.textContent = txt;
+      }
     }
-  });
+  }
   _wfRenderRunBanner(run);
   _wfRenderInspector();
   // 미니맵 상태 색 반영 (색상만 갱신 — 저비용 재렌더)
@@ -7154,34 +7182,63 @@ function _wfRenderRunBanner(run) {
     return;
   }
 
+  // Y2 (v2.66.11) — Build banner DOM once, then patch only the values
+  // that actually change on each tick. Cuts the per-tick layout/paint
+  // cost (which fired every 0.5 s SSE / 1.2 s poll) — was the second-
+  // biggest cause of reported workflow-run lag.
   if (!el) {
     el = document.createElement('div');
     el.id = 'wfRunBanner';
+    el.innerHTML = `
+      <div class="wfrb-row">
+        <span class="wfrb-icon" style="font-size:16px;"></span>
+        <span class="wfrb-title-text"></span>
+        <span class="wfrb-subject" style="color:var(--accent)"></span>
+        <span class="wfrb-meta wfrb-meta-text"></span>
+        <button class="wfrb-focus" style="display:none;">📍 ${t('위치로 이동')}</button>
+        <button class="wfrb-close" onclick="_wfHideRunBanner()" title="${t('닫기')}">×</button>
+      </div>
+      <div class="wfrb-row">
+        <div class="wfrb-bar"><div class="wfrb-bar-fill"></div></div>
+        <span class="wfrb-meta wfrb-pct"></span>
+      </div>`;
     host.appendChild(el);
+    // Cache refs.
+    el._refs = {
+      icon:    el.querySelector('.wfrb-icon'),
+      titleT:  el.querySelector('.wfrb-title-text'),
+      subject: el.querySelector('.wfrb-subject'),
+      meta:    el.querySelector('.wfrb-meta-text'),
+      focus:   el.querySelector('.wfrb-focus'),
+      barFill: el.querySelector('.wfrb-bar-fill'),
+      pct:     el.querySelector('.wfrb-pct'),
+    };
   }
 
-  let icon = '⏳';
-  let stateClass = '';
-  let title = t('실행 중');
+  let icon = '⏳', stateClass = '', title = t('실행 중');
   if (status === 'ok') { icon = '✅'; stateClass = 'state-ok'; title = t('완료'); }
   else if (status === 'err') { icon = '❌'; stateClass = 'state-err'; title = t('실패'); }
 
-  el.className = 'visible ' + stateClass;
-  el.innerHTML = `
-    <div class="wfrb-row">
-      <span style="font-size:16px;">${icon}</span>
-      <span class="wfrb-title">${title}: <span style="color:var(--accent)">${escapeHtml(subject)}</span></span>
-      <span class="wfrb-meta">${done}/${total} · ${elapsedStr}</span>
-      ${status === 'running' && runningNid
-        ? `<button class="wfrb-focus" onclick="_wfFocusNode('${runningNid}')">📍 ${t('위치로 이동')}</button>`
-        : ''}
-      <button class="wfrb-close" onclick="_wfHideRunBanner()" title="${t('닫기')}">×</button>
-    </div>
-    <div class="wfrb-row">
-      <div class="wfrb-bar"><div class="wfrb-bar-fill" style="width:${pct}%"></div></div>
-      <span class="wfrb-meta">${pct}%</span>
-    </div>
-  `;
+  // Diff-patch — only writes that actually changed, no innerHTML reset.
+  if (el.className !== 'visible ' + stateClass) {
+    el.className = 'visible ' + stateClass;
+  }
+  const r = el._refs;
+  if (r.icon.textContent    !== icon)         r.icon.textContent = icon;
+  if (r.titleT.textContent  !== title + ': ') r.titleT.textContent = title + ': ';
+  if (r.subject.textContent !== subject)      r.subject.textContent = subject;
+  const metaStr = `${done}/${total} · ${elapsedStr}`;
+  if (r.meta.textContent !== metaStr)         r.meta.textContent = metaStr;
+  // Focus button toggles based on running state
+  const showFocus = (status === 'running' && runningNid);
+  r.focus.style.display = showFocus ? '' : 'none';
+  if (showFocus) {
+    r.focus.onclick = () => _wfFocusNode(runningNid);
+  }
+  const widthStr = pct + '%';
+  if (r.barFill.style.width !== widthStr)     r.barFill.style.width = widthStr;
+  const pctStr = pct + '%';
+  if (r.pct.textContent !== pctStr)           r.pct.textContent = pctStr;
 
   // 완료/실패 3.5초 후 자동 숨김
   if (status === 'ok' || status === 'err') {
