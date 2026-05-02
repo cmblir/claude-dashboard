@@ -118,6 +118,64 @@ def _build_chat_system_prompt() -> str:
 def _CHAT_SYSTEM_PROMPT() -> str:  # type: ignore[misc]
     return _build_chat_system_prompt()
 
+def api_lazyclaw_chat(body: dict) -> dict:
+    """OO1 (v2.66.64) — direct multi-provider chat. Pick any registered
+    provider:model via `assignee`, send a message, get a response.
+    Reuses the entire ProviderRegistry stack (FF1 fallback chain,
+    MM1 fail-fast subprocess control, etc).
+
+    body: { assignee: "claude:opus" | "openai:gpt-4.1-mini" | …,
+            message: str,
+            history: [{role, text}, …] }  -- optional, last few messages
+    returns: { ok, output, error, provider, model, durationMs }
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    assignee = (body.get("assignee") or "").strip()
+    message = (body.get("message") or "").strip()
+    if not message:
+        return {"ok": False, "error": "empty message"}
+    history = body.get("history") or []
+    # Compose a chat-style prompt from the recent history.
+    parts: list[str] = []
+    for h in history[-12:]:
+        role = h.get("role", "")
+        text = (h.get("text") or "").strip()
+        if not text:
+            continue
+        if role == "user":
+            parts.append(f"User: {text}")
+        elif role == "assistant":
+            parts.append(f"Assistant: {text}")
+    if parts:
+        prompt = "\n".join(parts) + "\n\nAssistant:"
+    else:
+        prompt = message
+    try:
+        from .ai_providers import execute_with_assignee
+        resp = execute_with_assignee(
+            assignee or "claude-cli", prompt,
+            timeout=180, fallback=True,
+        )
+    except Exception as e:
+        return {"ok": False, "error": f"internal: {e}"}
+    if resp.status == "ok":
+        return {
+            "ok": True,
+            "output": resp.output or "",
+            "provider": resp.provider or "",
+            "model": resp.model or "",
+            "durationMs": resp.duration_ms or 0,
+        }
+    return {
+        "ok": False,
+        "error": resp.error or "unknown",
+        "provider": resp.provider or "",
+        "model": resp.model or "",
+        "durationMs": resp.duration_ms or 0,
+    }
+
+
 def api_chat(body: dict) -> dict:
     """챗봇 API — 사용자 질문을 받아 대시보드 안내 답변 반환."""
     from .errors import err, ERROR_MESSAGES
