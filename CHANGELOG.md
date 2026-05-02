@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.116] — 2026-05-02
+
+### Added
+- 🖼 **Ollama vision routing** (QQ41). `OllamaApiProvider.execute()`
+  now also runs through `_extract_inline_images()` and forwards the
+  base64 strings as the Ollama `/api/generate` `images` field —
+  the format vision-capable local models (llava, llama3.2-vision,
+  bakllava, etc.) expect. Closes the multimodal loop for local
+  models alongside the cloud providers covered in QQ40.
+
+---
 ## [2.66.115] — 2026-05-02
 
 ### Added
