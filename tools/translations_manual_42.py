@@ -45,6 +45,11 @@ NEW_EN: dict[str, str] = {
     "적용 + 재실행": "Apply + re-run",
     "프로바이더를 선택하세요": "Pick a provider",
     "적용됨, 재실행합니다": "applied — re-running",
+    # GG (v2.66.19) — per-node session terminate
+    "이 노드의 실행 세션 종료": "Terminate this node's run session",
+    "이 노드의 실행을 중단하시겠습니까? (워크플로우 전체 실행이 다음 레벨에서 멈춥니다)": "Stop this node's run? (the whole workflow run halts at the next level boundary)",
+    "세션 종료 요청됨": "Termination requested",
+    "진행 중인 실행이 없습니다": "No run in progress",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -85,4 +90,9 @@ NEW_ZH: dict[str, str] = {
     "적용 + 재실행": "应用 + 重新运行",
     "프로바이더를 선택하세요": "请选择提供商",
     "적용됨, 재실행합니다": "已应用 — 重新运行",
+    # GG (v2.66.19)
+    "이 노드의 실행 세션 종료": "终止此节点的运行会话",
+    "이 노드의 실행을 중단하시겠습니까? (워크플로우 전체 실행이 다음 레벨에서 멈춥니다)": "停止此节点的运行？（整个工作流运行将在下一层级边界处停止）",
+    "세션 종료 요청됨": "已请求终止",
+    "진행 중인 실행이 없습니다": "没有正在进行的运行",
 }

@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.19] — 2026-05-02
+
+### Performance — workflow tab feels lag-free
+- 🚀 **Replaced cdn.tailwindcss.com (1MB JIT runtime that re-compiles
+  CSS on every DOM mutation) with a pre-built 26KB stylesheet** at
+  `dist/vendor/tailwind.css`. This is the single largest win — Tailwind
+  Play CDN runs the entire compiler in the browser, scanning every DOM
+  change and emitting CSS, which dominates main-thread time during a
+  workflow run.
+- 📦 **Self-hosted chart.js / vis-network / marked** under
+  `dist/vendor/`. No more cross-origin DNS lookups on every page load,
+  works offline, survives CDN failures.
+- 📊 Measured (Playwright):
+  - DOMContentLoaded: 823 ms → **405 ms (−51%)**
+  - networkidle:      2947 ms → **2403 ms (−18%)**
+  - Long tasks (>50ms): 172+62 ms → **67 ms** (¼ of before)
+
+### Added
+- ⏹ **Per-node session terminate button** on the active sessions panel
+  (GG1). Red ⏹ next to running rows; confirms with a dialog and POSTs
+  `/api/workflows/run-cancel` to halt the run at the next level
+  boundary. Per-image user feedback.
+
+---
 ## [2.66.18] — 2026-05-02
 
 ### Fixed
