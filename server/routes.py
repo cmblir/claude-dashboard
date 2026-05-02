@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from .actions import (
     api_chat, api_lazyclaw_chat, api_session_spawn, handle_chat_stream,
+    handle_lazyclaw_chat_stream,
     open_folder_action, open_session_action,
 )
 from .agents import (
@@ -937,6 +938,9 @@ class Handler(BaseHTTPRequestHandler):
         # chat/stream 은 SSE 응답 — dict 외 Handler 를 직접 받음
         if path == "/api/chat/stream":
             handle_chat_stream(self, self._read_body())
+            return
+        if path == "/api/lazyclaw/chat/stream":
+            handle_lazyclaw_chat_stream(self, self._read_body())
             return
         # Slack Events — needs raw body for HMAC signature verification.
         if path == "/api/slack/events":

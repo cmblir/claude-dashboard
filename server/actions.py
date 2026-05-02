@@ -118,6 +118,168 @@ def _build_chat_system_prompt() -> str:
 def _CHAT_SYSTEM_PROMPT() -> str:  # type: ignore[misc]
     return _build_chat_system_prompt()
 
+def handle_lazyclaw_chat_stream(handler: "Handler", body: dict) -> None:
+    """OO3 (v2.66.66) — SSE streaming chat for claude-cli assignees.
+    Falls back to one-shot api_lazyclaw_chat for non-claude providers
+    (their CLIs / HTTP APIs don't expose token-level streaming uniformly
+    enough to bother right now).
+    """
+    if not isinstance(body, dict):
+        handler.send_response(400); handler.end_headers(); return
+    assignee = (body.get("assignee") or "").strip()
+    message = (body.get("message") or "").strip()
+    if not message:
+        handler.send_response(400); handler.end_headers(); return
+
+    # Decide whether claude-cli streaming is appropriate.
+    is_claude = (
+        assignee.startswith("claude:") or
+        assignee in ("opus", "sonnet", "haiku") or
+        assignee.startswith("opus") or assignee.startswith("sonnet") or assignee.startswith("haiku") or
+        not assignee  # default
+    )
+
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
+    handler.send_header("Cache-Control", "no-cache")
+    handler.send_header("Connection", "keep-alive")
+    handler.send_header("X-Accel-Buffering", "no")
+    handler.end_headers()
+    def _sse(event: str, data: str) -> bool:
+        try:
+            chunk = f"event: {event}\ndata: {data}\n\n"
+            handler.wfile.write(chunk.encode("utf-8"))
+            handler.wfile.flush()
+            return True
+        except Exception:
+            return False
+
+    system_prompt = (body.get("systemPrompt") or "").strip()
+
+    if not is_claude:
+        # Non-claude — call the one-shot endpoint and emit in chunks.
+        import threading as _threading
+        import queue as _queue
+        q: "_queue.Queue[dict]" = _queue.Queue()
+        def _run_blocking() -> None:
+            try:
+                r = api_lazyclaw_chat(body)
+                q.put(r)
+            except Exception as exc:
+                q.put({"ok": False, "error": str(exc)})
+        t = _threading.Thread(target=_run_blocking, daemon=True)
+        t.start()
+        # Send a "thinking" heartbeat every second while waiting.
+        import time as _time
+        t_start = _time.time()
+        while t.is_alive():
+            try:
+                r = q.get_nowait()
+                break
+            except _queue.Empty:
+                elapsed = int(_time.time() - t_start)
+                _sse("heartbeat", json.dumps({"elapsed": elapsed}, ensure_ascii=False))
+                _time.sleep(0.8)
+        else:
+            r = q.get()
+        if r.get("ok") and r.get("output"):
+            # Emit in small chunks so the frontend streams it character by char.
+            chunk_size = 8
+            text = r["output"]
+            for i in range(0, len(text), chunk_size):
+                if not _sse("token", json.dumps({"text": text[i:i+chunk_size]}, ensure_ascii=False)):
+                    return
+        _sse("done", json.dumps({
+            "ok": bool(r.get("ok")), "error": r.get("error", ""),
+            "provider": r.get("provider", ""), "model": r.get("model", ""),
+            "durationMs": r.get("durationMs", 0),
+        }, ensure_ascii=False))
+        return
+
+    # claude-cli stream-json
+    claude_bin = shutil.which("claude")
+    if not claude_bin:
+        _sse("error", json.dumps({"error": "claude CLI not found"}, ensure_ascii=False))
+        return
+
+    # Build prompt from history + current message (chat-style).
+    history = body.get("history") or []
+    parts = []
+    if system_prompt:
+        parts.append(f"[System instructions: {system_prompt}]\n")
+    for h in history[-16:]:
+        role = h.get("role", ""); text = (h.get("text") or "").strip()
+        if not text: continue
+        if role == "user": parts.append(f"User: {text}")
+        elif role == "assistant": parts.append(f"Assistant: {text}")
+    if parts:
+        prompt = "\n".join(parts) + f"\n\nUser: {message}\n\nAssistant:"
+    else:
+        prompt = message
+
+    # Resolve model: assignee 'claude:opus' → 'opus' alias for the CLI.
+    model_alias = ""
+    if ":" in assignee:
+        model_alias = assignee.split(":", 1)[1].strip()
+    elif assignee in ("opus", "sonnet", "haiku") or assignee.startswith(("opus", "sonnet", "haiku")):
+        model_alias = assignee
+    # Map full names to aliases (FF1 fix).
+    cli_alias_map = {
+        "claude-opus-4-7": "opus", "claude-opus-4-6": "opus",
+        "claude-sonnet-4-6": "sonnet", "claude-sonnet-4-5": "sonnet",
+        "claude-haiku-4-5": "haiku",
+    }
+    if model_alias in cli_alias_map:
+        model_alias = cli_alias_map[model_alias]
+    elif model_alias and model_alias not in ("opus", "sonnet", "haiku"):
+        # Unknown — strip to generic
+        model_alias = ""
+
+    cmd = [claude_bin, "-p", prompt, "--output-format", "stream-json",
+           "--include-partial-messages", "--verbose"]
+    if model_alias:
+        cmd += ["--model", model_alias]
+
+    proc = None
+    try:
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL, text=True, bufsize=1,
+        )
+        # Stream stdout line by line.
+        full_text = ""
+        if proc.stdout is None:
+            _sse("error", json.dumps({"error": "no stdout"}, ensure_ascii=False))
+            return
+        for line in proc.stdout:
+            line = line.strip()
+            if not line: continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            if obj.get("type") == "stream_event":
+                ev = obj.get("event") or {}
+                if ev.get("type") == "content_block_delta":
+                    delta = (ev.get("delta") or {}).get("text") or ""
+                    if delta:
+                        full_text += delta
+                        if not _sse("token", json.dumps({"text": delta}, ensure_ascii=False)):
+                            try: proc.kill()
+                            except Exception: pass
+                            return
+        proc.wait(timeout=2)
+        _sse("done", json.dumps({
+            "ok": True, "provider": "claude-cli",
+            "model": model_alias or "default",
+        }, ensure_ascii=False))
+    except Exception as e:
+        if proc:
+            try: proc.kill()
+            except Exception: pass
+        _sse("error", json.dumps({"error": str(e)}, ensure_ascii=False))
+
+
 def api_lazyclaw_chat(body: dict) -> dict:
     """OO1 (v2.66.64) — direct multi-provider chat. Pick any registered
     provider:model via `assignee`, send a message, get a response.

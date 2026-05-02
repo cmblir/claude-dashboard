@@ -80,6 +80,33 @@ _CANCEL_REQUESTED: set[str] = set()
 # terminate them immediately instead of waiting for their own timeout.
 _PROC_REGISTRY: dict[str, list] = {}
 
+# PP1 (v2.66.66) — push-based SSE: each run gets a threading.Event so SSE
+# listeners wake immediately on state change instead of waiting for the
+# 0.5s poll interval. Eliminates all SSE lag on node transitions.
+_RUN_EVENTS: dict[str, "threading.Event"] = {}
+_RUN_EVENTS_LOCK = threading.Lock()
+
+
+def _get_run_event(runId: str) -> "threading.Event":
+    """Get (or create) the change-signal Event for a run."""
+    with _RUN_EVENTS_LOCK:
+        if runId not in _RUN_EVENTS:
+            _RUN_EVENTS[runId] = threading.Event()
+        return _RUN_EVENTS[runId]
+
+
+def _signal_run_changed(runId: str) -> None:
+    """Wake any SSE listener waiting on this run's event."""
+    with _RUN_EVENTS_LOCK:
+        ev = _RUN_EVENTS.get(runId)
+    if ev:
+        ev.set()
+
+
+def _clear_run_event(runId: str) -> None:
+    with _RUN_EVENTS_LOCK:
+        _RUN_EVENTS.pop(runId, None)
+
 
 def register_proc(runId: str, proc) -> None:
     """Add a subprocess.Popen to the run's cancel registry."""
@@ -154,6 +181,7 @@ def _runs_cache_set(runId: str, run: dict) -> None:
     """Insert/replace the in-memory run entry."""
     with _RUNS_LOCK:
         _RUNS_CACHE[runId] = run
+    _signal_run_changed(runId)
 
 
 def _runs_cache_get(runId: str) -> Optional[dict]:
@@ -183,7 +211,9 @@ def _runs_cache_update(runId: str, mutator) -> Optional[dict]:
         nr = r.get("nodeResults")
         if isinstance(nr, dict):
             out["nodeResults"] = dict(nr)
-        return out
+    # PP1 — signal change outside the lock to avoid potential deadlock.
+    _signal_run_changed(runId)
+    return out
 
 
 def _runs_cache_pop(runId: str) -> Optional[dict]:
@@ -2965,6 +2995,14 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                 err_nid = nid
                 err_msg = res.get("error", "")
                 err_dur = res.get("durationMs", 0)
+                now_ms_err = int(time.time() * 1000)
+                # PP1 — collect all nodes not yet finished (running siblings +
+                # all future nodes) so the UI never shows stale "running" state.
+                finished_nids = set(results.keys()) | {err_nid}
+                pending_nids = [n for n in order if n not in finished_nids and n not in disabled]
+                # Also mark any "running" sibling that didn't get a result yet.
+                sibling_nids = [n for n in active_nodes if n not in level_results and n != err_nid]
+
                 def _mark_err(r: dict) -> None:
                     nr = r.setdefault("nodeResults", {})
                     nr[err_nid] = {
@@ -2972,9 +3010,13 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                         "error": err_msg,
                         "durationMs": err_dur,
                     }
+                    # Cancel in-progress siblings and downstream nodes.
+                    for _n in sibling_nids + pending_nids:
+                        if _n not in nr or nr[_n].get("status") == "running":
+                            nr[_n] = {"status": "cancelled", "durationMs": 0}
                     r["status"] = "err"
                     r["error"] = f"node {err_nid}: {err_msg}"
-                    r["finishedAt"] = int(time.time() * 1000)
+                    r["finishedAt"] = now_ms_err
                 _runs_cache_update(runId, _mark_err)
                 _persist_run(runId)  # terminal failure: flush before returning
                 # MM1 (v2.66.58) — FAIL-FAST. Kill any sibling subprocesses
@@ -3564,28 +3606,33 @@ def handle_workflow_run_stream(handler, query: dict) -> None:
             return False
 
     prev_snapshot = ""
-    max_polls = 3600  # 최대 30분 (0.5초 × 3600)
+    # PP1 — event-driven push: wake immediately on state change.
+    # Falls back to a 250ms poll so we never miss a final transition.
+    ev = _get_run_event(rid)
+    deadline = time.time() + 1800  # 30-minute hard cap
 
-    for _ in range(max_polls):
+    while time.time() < deadline:
         snap = _run_status_snapshot(rid)
         snap_json = json.dumps(snap, ensure_ascii=False)
 
-        # 변경 있을 때만 전송 (대역폭 절약)
         if snap_json != prev_snapshot:
             if not _sse("status", snap_json):
-                return  # 클라이언트 연결 끊김
+                _clear_run_event(rid)
+                return  # client disconnected
             prev_snapshot = snap_json
 
-        # 완료 체크
         run = snap.get("run") or {}
         status = run.get("status", "")
         if status in ("ok", "err"):
             _sse("done", snap_json)
+            _clear_run_event(rid)
             return
 
-        time.sleep(0.5)
+        # Wait for next change signal (up to 250ms), then re-check.
+        ev.wait(timeout=0.25)
+        ev.clear()
 
-    # 타임아웃
+    _clear_run_event(rid)
     _sse("timeout", json.dumps({"error": "stream timeout"}))
 
 

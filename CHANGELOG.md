@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.66] — 2026-05-02
+
+### Added
+- 🌊 **Streaming chat response** for Claude assignees (OO3).
+  `POST /api/lazyclaw/chat/stream` runs `claude-cli` with
+  `--output-format stream-json --include-partial-messages`,
+  parses `content_block_delta` lines, and relays them as SSE
+  `token` events. Client uses `fetch + ReadableStream` to mutate
+  the assistant message in-place, throttled to 30Hz so heavy
+  streams don't thrash the DOM.
+- 🪝 Non-Claude providers fall through to the one-shot
+  `/api/lazyclaw/chat` endpoint and emit a single `token` event
+  so the UI path stays uniform.
+
+---
 ## [2.66.65] — 2026-05-02
 
 ### Added (LazyClaw 채팅 polish)
