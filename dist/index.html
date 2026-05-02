@@ -3389,7 +3389,8 @@ VIEWS.workflows = async () => {
           <button id="wfUndoBtn" class="btn text-xs" onclick="_wfUndo()" title="${t('실행 취소')} (⌘Z)" aria-label="${t('실행 취소')}" disabled>↶ <span id="wfUndoCount">0</span></button>
           <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn" aria-label="${t('워크플로우 저장')}">💾 ${t('저장')}</button>
           <button class="btn text-xs" onclick="_wfDryRun()" id="wfDryRunBtn" title="${t('실제 호출 없이 실행 계획만 확인')}" aria-label="${t('드라이런')}">🧪 ${t('드라이런')}</button>
-          <button class="btn-primary btn text-xs" onclick="_wfRunOrCancel()" id="wfRunBtn" aria-label="${t('워크플로우 실행')}">▶ ${t('실행')}</button>
+          <button class="btn-primary btn text-xs" onclick="_wfRunOrCancel()" id="wfRunBtn" title="${t('워크플로우 실행')}" aria-label="${t('워크플로우 실행')}">▶ ${t('실행')}</button>
+          <button class="btn text-xs" onclick="_wfToggleSessionsPanel()" id="wfSessionsBtn" title="${t('실행 중·완료된 노드 세션 목록 (sessionId, 이어쓰기, 보기)')}">🪟 ${t('세션')} <span id="wfSessionsBadge" style="display:none;background:var(--accent);color:#fff;border-radius:8px;padding:0 5px;font-size:9px;margin-left:2px;">0</span></button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
           <button class="btn text-xs" onclick="_wfExport()" title="${t('JSON 파일로 내보내기')}" aria-label="${t('내보내기')}">📦 ${t('내보내기')}</button>
           <label class="btn text-xs cursor-pointer" title="${t('JSON 파일에서 가져오기')}">📥 ${t('가져오기')}<input type="file" accept=".json,application/json" style="display:none;" onchange="_wfImport(event)"></label>
@@ -5637,6 +5638,7 @@ function _wfBindCanvas() {
       // 다중 선택 클리어
       if (__wfMultiSelected.size > 0) { __wfMultiSelected.clear(); _wfSyncMultiSelectClasses(); }
       __wf.selectedNodeId = nid; __wf.selectedEdgeId = null;
+      __wf._lastInspSig = null; // DD3 — force inspector refresh on next tick
       _wfPushUndo();
       __wf.drag = { kind: 'node', nodeId: nid, origX: node.x, origY: node.y, startX: pt.x, startY: pt.y, _node: node };
       // 전체 re-render 대신 selected 클래스만 토글 (깜빡임 방지)
@@ -7269,11 +7271,15 @@ function _wfSetRunButtonState(running) {
   const btn = document.getElementById('wfRunBtn');
   if (!btn) return;
   if (running) {
-    btn.innerHTML = '■ ' + t('중단');
+    btn.innerHTML = '■ ' + t('실행 중단');
+    btn.title = t('현재 워크플로우 실행을 안전하게 중단합니다 (진행 중인 노드는 마무리)');
+    btn.setAttribute('aria-label', t('워크플로우 실행 중단'));
     btn.classList.remove('btn-primary');
     btn.classList.add('btn-danger');
   } else {
     btn.innerHTML = '▶ ' + t('실행');
+    btn.title = t('워크플로우 실행');
+    btn.setAttribute('aria-label', t('워크플로우 실행'));
     btn.classList.remove('btn-danger');
     btn.classList.add('btn-primary');
   }
@@ -7307,6 +7313,8 @@ function _wfApplyRunStatus(run) {
   // (banner + per-node) directly from cached state, so the timer never
   // freezes when the run is mid-flight and the server is quiet.
   _wfStartElapsedTicker();
+  // DD2 — refresh sessions panel (badge always; body only if open)
+  _wfRenderSessionsPanel(false);
   // Y2 (v2.66.11) — diff-only DOM scan. Build a lightweight signature
   // (nodeId → status mapping) and compare to last applied; only
   // re-attribute when the per-node status actually changed. Cuts the
@@ -7344,10 +7352,26 @@ function _wfApplyRunStatus(run) {
     }
   }
   _wfRenderRunBanner(run);
-  _wfRenderInspector();
-  // 미니맵 상태 색 반영 (색상만 갱신 — 저비용 재렌더)
-  if (_wfMinimapTimer) cancelAnimationFrame(_wfMinimapTimer);
-  _wfMinimapTimer = requestAnimationFrame(() => { _wfMinimapTimer = null; _wfRenderMinimap(); });
+  // DD3 (v2.66.15) — only re-render the inspector if the *selected*
+  // node's status actually changed. Previously fired on every tick and
+  // rebuilt the entire side-panel — biggest remaining lag source during
+  // multi-node parallel runs.
+  const sel = __wf.selectedNodeId;
+  if (sel) {
+    const selRes = results[sel];
+    const selSig = selRes ? `${selRes.status}:${selRes.startedAt || 0}:${selRes.finishedAt || 0}` : '_';
+    if (__wf._lastInspSig !== selSig) {
+      __wf._lastInspSig = selSig;
+      _wfRenderInspector();
+    }
+  }
+  // DD3 — minimap only repaints when the level-status signature changes.
+  // The rAF-coalesced repaint still runs each tick today; that's wasted
+  // work when nothing in the topology view changed.
+  if (changed) {
+    if (_wfMinimapTimer) cancelAnimationFrame(_wfMinimapTimer);
+    _wfMinimapTimer = requestAnimationFrame(() => { _wfMinimapTimer = null; _wfRenderMinimap(); });
+  }
   // Task 3: 브라우저 Notification — 실행 완료/실패 알림
   if (run.status === 'ok') {
     const wfName = (__wf.current && __wf.current.name) || t('워크플로우');
@@ -7503,6 +7527,96 @@ function _wfStopElapsedTicker() {
     clearInterval(__wf._elapsedTicker);
     __wf._elapsedTicker = null;
   }
+}
+
+// DD2 (v2.66.15) — 활성 세션 패널. 워크플로우 캔버스 우측 하단에 떠있는
+// 카드. 실행 중/완료된 노드의 sessionId, assignee, status 를 한 눈에
+// 보여주고, 인라인 mac-term viewer 열기 / sessionId 복사 / 다른 노드의
+// resume 필드에 붙여넣기 액션을 제공한다.
+function _wfToggleSessionsPanel() {
+  const open = document.getElementById('wfSessionsPanel');
+  if (open) { open.remove(); return; }
+  _wfRenderSessionsPanel(true);
+}
+
+function _wfRenderSessionsPanel(forceShow) {
+  const host = document.getElementById('wfCanvasHost');
+  if (!host) return;
+  let panel = document.getElementById('wfSessionsPanel');
+  const results = __wf.lastRunResults || {};
+  const nodes = (__wf.current && __wf.current.nodes) || [];
+  const rows = [];
+  for (const n of nodes) {
+    const r = results[n.id];
+    if (!r) continue;
+    const sid = r.sessionId || '';
+    const assignee = (n.data && n.data.assignee) || '';
+    const status = r.status || '';
+    rows.push({ nid: n.id, title: n.title || n.id, assignee, status, sid, output: r.output || '', error: r.error || '' });
+  }
+  // Update badge regardless of panel state
+  const badge = document.getElementById('wfSessionsBadge');
+  if (badge) {
+    const live = rows.filter(r => r.status === 'running').length;
+    const total = rows.length;
+    if (total > 0) {
+      badge.style.display = '';
+      badge.textContent = live > 0 ? (live + '/' + total) : String(total);
+      badge.style.background = live > 0 ? '#ef4444' : 'var(--accent)';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  if (!forceShow && !panel) return; // 토글로 닫혔으면 다시 만들지 않음
+  // DD3 — skip innerHTML rebuild if the visible signature didn't change
+  const sig = rows.map(r => `${r.nid}:${r.status}:${r.sid.slice(0,8)}`).join('|');
+  if (panel && panel._lastSig === sig) return;
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'wfSessionsPanel';
+    panel.style.cssText = 'position:absolute;right:14px;bottom:14px;width:340px;max-height:60vh;'
+      + 'background:var(--surface,#1c1c1e);border:1px solid var(--border);border-radius:10px;'
+      + 'box-shadow:0 10px 30px rgba(0,0,0,0.4);z-index:50;display:flex;flex-direction:column;'
+      + 'font-size:12px;overflow:hidden;';
+    host.appendChild(panel);
+  }
+  const STATUS_BADGE = {
+    running: '<span style="color:#fbbf24">● ' + t('실행 중') + '</span>',
+    ok:      '<span style="color:#4ade80">✓ ' + t('완료') + '</span>',
+    err:     '<span style="color:#f87171">✗ ' + t('실패') + '</span>',
+    skipped: '<span style="color:#6b6b6f">— ' + t('건너뜀') + '</span>',
+  };
+  const list = rows.length ? rows.map(r => {
+    const sidShort = r.sid ? r.sid.slice(0, 12) + '…' : '<span style="opacity:0.5">' + t('세션 없음') + '</span>';
+    const sidEsc = r.sid ? r.sid.replace(/'/g, '&#39;') : '';
+    const sidActions = r.sid ? `
+      <button class="btn text-[10px]" title="${t('Session ID 복사')}" onclick="_copyToClipboard(this, '${sidEsc}')">📋</button>
+      <button class="btn text-[10px]" title="${t('다른 노드의 resume 필드에 붙여넣기')}" onclick="_wfUseAsResume('${r.nid}','${sidEsc}')">↪</button>
+    ` : '';
+    const errLine = r.error ? `<div style="color:#f87171;font-size:10px;margin-top:2px;">⚠ ${escapeHtml(r.error.slice(0,140))}</div>` : '';
+    return `<div style="padding:8px 10px;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="flex:1;font-weight:600;">${escapeHtml(r.title)}</span>
+        ${STATUS_BADGE[r.status] || escapeHtml(r.status)}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:3px;color:var(--text-dim);font-size:10px;">
+        <span>${escapeHtml(r.assignee || '—')}</span>
+        <span style="flex:1;font-family:ui-monospace,monospace;">${sidShort}</span>
+        <button class="btn text-[10px]" title="${t('인라인 터미널 보기')}" onclick="_wfSpawnSession('${r.nid}')">🪟</button>
+        ${sidActions}
+      </div>
+      ${errLine}
+    </div>`;
+  }).join('') : `<div style="padding:14px;color:var(--text-dim);text-align:center;">${t('아직 실행된 노드가 없습니다')}</div>`;
+  panel.innerHTML = `
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02);">
+      <span style="flex:1;font-weight:700;">🪟 ${t('실행 세션')}</span>
+      <span style="font-size:10px;color:var(--text-dim);">${rows.length}</span>
+      <button class="btn text-[10px]" onclick="_wfToggleSessionsPanel()" title="${t('닫기')}">×</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;">${list}</div>`;
+  panel._lastSig = sig;
+  _translateDOM(panel);
 }
 
 // v2.10.2 — 노드 hover 결과 tooltip
