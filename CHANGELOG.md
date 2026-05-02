@@ -10,6 +10,38 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.17] — 2026-05-02
+
+### Fixed
+- 🛠 **`node n-fe: all providers failed` actually fixed end-to-end** —
+  team-dev workflow now completes (verified `ok: True` for every node)
+  even when claude-cli sonnet hangs. Six independent issues stacked on
+  top of each other; this release fixes them all (FF1).
+  1. **claude-cli `--model claude-sonnet-4-6` deterministically hangs**
+     (Anthropic backend). Same call with `--model sonnet` (alias)
+     completes in ~30 s. Fix: `ClaudeCliProvider._resolve_model` now maps
+     full model names back to CLI-friendly aliases.
+  2. **Subprocess hang on stdin** — added `stdin=subprocess.DEVNULL` so
+     claude-cli never waits for tty input even with `-p`.
+  3. **Default node timeout 300 s wastes user time** — reduced to 180 s,
+     and split into ≤4 retries of 60 s each, killing the hung process
+     between attempts.
+  4. **Wasted timeout on in-family swap during a hang** — when the
+     primary error is a timeout (vs. a transient rate-limit), skip the
+     opus → haiku → sonnet model dance and jump straight to the
+     cross-provider chain. Saves up to 6 minutes per failed node.
+  5. **Cross-provider fallback passed the wrong model** (e.g. asked
+     ollama to run `gemini-2.5-flash` → 404). Now the model field is
+     reset to empty when crossing providers, so each picks its own
+     default.
+  6. **Codex CLI `-q` flag removed upstream** → `exit 1: unexpected
+     argument '-q'`. Switched to the new `codex exec [PROMPT]` form.
+- 🔁 **Default fallback chain extended**: `claude-cli → anthropic-api →
+  openai-api → gemini-api → gemini-cli → codex → ollama`. Local Ollama
+  ensures a workflow always has *something* that can answer when API
+  keys are missing and CLIs hang.
+
+---
 ## [2.66.16] — 2026-05-02
 
 ### Investigation
