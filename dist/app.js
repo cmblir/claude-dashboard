@@ -25960,6 +25960,11 @@ function _lcChatRender() {
   log.scrollTop = log.scrollHeight;
 }
 
+// OO3 (v2.66.66) — streaming chat send. POSTs to
+// /api/lazyclaw/chat/stream and renders tokens as they arrive via
+// fetch+ReadableStream. Falls back to one-shot /api/lazyclaw/chat on
+// connection failure. The assistant message is appended once
+// (placeholder), then mutated in-place as tokens stream in.
 async function _lcChatSend() {
   const ta = document.getElementById('lcChatInput');
   const sel = document.getElementById('lcChatAssignee');
@@ -25972,27 +25977,86 @@ async function _lcChatSend() {
   ta.value = '';
   const history = _lcChatLoad();
   history.push({ role: 'user', text, assignee, ts: Date.now() });
+  // Placeholder assistant message — text grows as tokens stream in.
+  const reply = { role: 'assistant', text: '', assignee, ts: Date.now() };
+  history.push(reply);
   _lcChatSave(history);
   _lcChatRender();
   if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳'; }
+  const t0 = Date.now();
   try {
-    const r = await api('/api/lazyclaw/chat', {
+    const resp = await fetch('/api/lazyclaw/chat/stream', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        assignee,
-        message: text,
-        history: history.slice(-12), // last 12 messages for context
+        assignee, message: text,
+        history: history.slice(0, -1).slice(-12),
       }),
     });
-    const out = (r && r.ok && r.output) ? r.output : ('⚠ ' + (r.error || t('응답 실패')));
-    const meta = r && r.ok ? `${r.provider || ''}${r.model ? ' · ' + r.model : ''}${r.durationMs ? ' · ' + (r.durationMs/1000).toFixed(1) + 's' : ''}` : '';
-    history.push({ role: 'assistant', text: out, assignee, meta, ts: Date.now() });
-    _lcChatSave(history);
-    _lcChatRender();
+    if (!resp.ok || !resp.body) throw new Error('stream not available');
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    let lastRender = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      // Parse SSE blocks separated by blank lines.
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const block = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        const lines = block.split('\n');
+        let event = 'message', data = '';
+        for (const ln of lines) {
+          if (ln.startsWith('event:')) event = ln.slice(6).trim();
+          else if (ln.startsWith('data:')) data = ln.slice(5).trim();
+        }
+        if (!data) continue;
+        if (event === 'token') {
+          try {
+            const o = JSON.parse(data);
+            if (o.text) {
+              reply.text += o.text;
+              // Throttle renders to ~30Hz so we don't thrash on
+              // very chatty streams.
+              const now = performance.now();
+              if (now - lastRender > 33) {
+                _lcChatSave(history); _lcChatRender();
+                lastRender = now;
+              }
+            }
+          } catch (_) {}
+        } else if (event === 'done') {
+          try {
+            const o = JSON.parse(data);
+            const dur = ((Date.now() - t0) / 1000).toFixed(1);
+            reply.meta = `${o.provider || ''}${o.model ? ' · ' + o.model : ''} · ${dur}s`;
+          } catch (_) {}
+        } else if (event === 'error') {
+          try {
+            const o = JSON.parse(data);
+            reply.text = (reply.text || '') + '\n⚠ ' + (o.error || 'error');
+          } catch (_) { reply.text += '\n⚠ stream error'; }
+        }
+      }
+    }
+    _lcChatSave(history); _lcChatRender();
   } catch (e) {
-    history.push({ role: 'assistant', text: '⚠ ' + (e && e.message || e), assignee, ts: Date.now() });
-    _lcChatSave(history);
-    _lcChatRender();
+    // Fallback: one-shot.
+    try {
+      const r = await api('/api/lazyclaw/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignee, message: text, history: history.slice(0, -1).slice(-12) }),
+      });
+      reply.text = (r && r.ok && r.output) ? r.output : ('⚠ ' + (r.error || t('응답 실패')));
+      if (r && r.ok) {
+        reply.meta = `${r.provider || ''}${r.model ? ' · ' + r.model : ''}${r.durationMs ? ' · ' + (r.durationMs/1000).toFixed(1) + 's' : ''}`;
+      }
+    } catch (e2) {
+      reply.text = '⚠ ' + (e2 && e2.message || e2);
+    }
+    _lcChatSave(history); _lcChatRender();
   } finally {
     if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '📨 ' + t('전송'); }
     setTimeout(() => ta.focus(), 30);
