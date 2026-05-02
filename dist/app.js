@@ -26715,11 +26715,50 @@ VIEWS.lazyclawTerm = async () => {
 AFTER.lazyclawTerm = () => {
   const inp = document.getElementById('lcTermInput');
   if (!inp) return;
+  // QQ6 (v2.66.81) — full bash-style history navigation:
+  //   Up   → go back through history (resets when input is non-empty)
+  //   Down → go forward (or restore the in-flight draft)
+  //   Ctrl+R → simple reverse-i-search (popup of matches)
+  // Cursor position is preserved at end of line on each navigation.
+  let histIdx = -1;       // -1 = nothing recalled; 0 = newest
+  let draft = '';         // user's in-progress text before recall
+  function _hist() {
+    try { return JSON.parse(localStorage.getItem('cc.lazyclawTerm.history') || '[]'); }
+    catch (_) { return []; }
+  }
+  inp.addEventListener('input', () => {
+    if (histIdx === -1) draft = inp.value;
+  });
   inp.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); _lcTermRun(); }
-    else if (e.key === 'ArrowUp' && !inp.value) {
-      const hist = JSON.parse(localStorage.getItem('cc.lazyclawTerm.history') || '[]');
-      if (hist.length) inp.value = hist[hist.length - 1];
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      _lcTermRun();
+      histIdx = -1; draft = '';
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      const h = _hist();
+      if (!h.length) return;
+      e.preventDefault();
+      if (histIdx === -1) draft = inp.value;
+      histIdx = Math.min(histIdx + 1, h.length - 1);
+      inp.value = h[h.length - 1 - histIdx];
+      setTimeout(() => inp.setSelectionRange(inp.value.length, inp.value.length), 0);
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      if (histIdx <= -1) return;
+      const h = _hist();
+      e.preventDefault();
+      histIdx -= 1;
+      if (histIdx < 0) { inp.value = draft; histIdx = -1; }
+      else inp.value = h[h.length - 1 - histIdx];
+      setTimeout(() => inp.setSelectionRange(inp.value.length, inp.value.length), 0);
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R')) {
+      e.preventDefault();
+      _lcTermReverseSearch();
     }
   });
   setTimeout(() => inp.focus(), 50);
@@ -26735,6 +26774,60 @@ AFTER.lazyclawTerm = () => {
       _lcTermHealthCheck();
     }
   } catch (_) {}
+};
+
+// QQ6 (v2.66.81) — Ctrl+R reverse-i-search like bash. Opens a tiny
+// modal with a search input; live-filters history. Enter selects.
+window._lcTermReverseSearch = function () {
+  let hist;
+  try { hist = JSON.parse(localStorage.getItem('cc.lazyclawTerm.history') || '[]'); }
+  catch (_) { hist = []; }
+  const render = (q) => {
+    const ql = (q || '').toLowerCase();
+    const matches = hist.filter(c => !ql || c.toLowerCase().includes(ql)).slice(-30).reverse();
+    const rows = matches.length ? matches.map(c =>
+      `<button class="card p-2 text-left w-full mb-1 font-mono text-xs"
+        style="background:transparent;border:1px solid var(--border);cursor:pointer;"
+        onclick="_lcTermPickHistory('${escapeHtml(c).replace(/'/g,'&#39;')}')">${escapeHtml(c)}</button>`
+    ).join('') : `<div class="empty">${t('일치하는 명령 없음')}</div>`;
+    showModal(`
+      <div class="modal p-4" style="max-width:560px;">
+        <div class="flex items-center gap-2 mb-3">
+          <input id="lcTermRSInput" class="input flex-1 font-mono text-xs" placeholder="${t('명령 history 검색 (reverse-i-search)')}" value="${escapeHtml(q || '')}" autofocus>
+          <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+        </div>
+        <div style="max-height:60vh;overflow-y:auto;">${rows}</div>
+      </div>
+    `);
+    setTimeout(() => {
+      const inp = document.getElementById('lcTermRSInput');
+      if (!inp) return;
+      inp.focus();
+      let timer;
+      inp.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => render(inp.value), 80);
+      });
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          // Pick the first match.
+          const m = matches[0]; if (m) _lcTermPickHistory(m);
+        }
+      });
+    }, 30);
+  };
+  render('');
+};
+
+window._lcTermPickHistory = function (cmd) {
+  closeModal();
+  const inp = document.getElementById('lcTermInput');
+  if (inp) {
+    inp.value = cmd;
+    inp.focus();
+    setTimeout(() => inp.setSelectionRange(cmd.length, cmd.length), 0);
+  }
 };
 
 window._lcTermHealthCheck = async function () {

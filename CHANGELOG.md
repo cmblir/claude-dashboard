@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.81] — 2026-05-02
+
+### Added
+- ⌨ **Bash-style history navigation in the terminal** (QQ6).
+  - `↑` / `↓` walk through prior commands; in-flight draft is
+    preserved when you hit `↑` and restored when you scroll
+    past the bottom of the stack with `↓`.
+  - `Ctrl+R` opens a reverse-i-search popup that live-filters
+    history; `Enter` picks the top match.
+
+---
 ## [2.66.80] — 2026-05-02
 
 ### Changed
