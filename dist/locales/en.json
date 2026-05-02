@@ -2046,6 +2046,7 @@
   "문서를 붙여넣으세요": "Paste a document",
   "문서를 입력하세요": "Enter a document",
   "문서를 제공하고 citations.enabled 로 정확한 인용 span 이 포함된 답변을 받습니다. 답변의 [N] 를 hover 하면 문서의 해당 구간이 하이라이트됩니다.": "Provide a document and use citations.enabled to get answers with precise citation spans. Hover [N] in the answer to highlight the matching range in the source.",
+  "미니맵 토글": "Toggle minimap",
   "미니맵 표시": "Show minimap",
   "미드나이트": "Midnight",
   "미드나잇": "Midnight",

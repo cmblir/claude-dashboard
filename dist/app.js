@@ -4207,6 +4207,7 @@ function _wfShowShortcutHelp() {
     { key: 'Ctrl+S', desc: t('워크플로우 저장') },
     { key: 'Ctrl+F', desc: t('노드 검색 포커스') },
     { key: 'Ctrl+I', desc: t('인스펙터 패널 토글') },
+    { key: 'Ctrl+M', desc: t('미니맵 토글') },
     { key: 'Ctrl+0', desc: t('화면 맞춤') },
     { key: 'Ctrl+1', desc: t('100% 줌으로 리셋') },
     { key: 'Ctrl++ / -', desc: t('줌 인/아웃') },
@@ -4307,6 +4308,13 @@ function _wfBindCanvas() {
   svg.__wfBound = true;
   // v2.46.0 perf — cache viewport <g> ref for pan/wheel/fit handlers.
   __wf._viewportEl = document.getElementById('wfViewport');
+  // LL10 — restore persisted minimap visibility
+  try {
+    if (localStorage.getItem('cc.wfMinimapHidden') === '1') {
+      const cvs = document.getElementById('wfMinimap');
+      if (cvs) cvs.style.display = 'none';
+    }
+  } catch (_) {}
 
   // 좌표 변환 — 스크린 좌표를 SVG 뷰포트 좌표(팬/줌 적용 후)로
   function svgPt(evt) {
@@ -4616,6 +4624,20 @@ function _wfBindCanvas() {
         const si = document.getElementById('wfNodeSearch');
         if (si) { e.preventDefault(); si.focus(); return true; }
         return;
+      }
+
+      // LL10 (v2.66.39) — Cmd/Ctrl + M — toggle minimap visibility.
+      // Persists in localStorage so the user's preference sticks.
+      if (mod && (e.key === 'm' || e.key === 'M') && !inInput) {
+        e.preventDefault();
+        const cvs = document.getElementById('wfMinimap');
+        if (cvs) {
+          const hidden = cvs.style.display === 'none';
+          cvs.style.display = hidden ? '' : 'none';
+          try { localStorage.setItem('cc.wfMinimapHidden', hidden ? '0' : '1'); } catch (_) {}
+          if (hidden && typeof _wfRenderMinimap === 'function') _wfRenderMinimap();
+        }
+        return true;
       }
 
       // LL8 (v2.66.37) — Shift + L — auto-layout (Beautify) without
