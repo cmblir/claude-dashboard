@@ -26728,10 +26728,15 @@ window._lcSwitchSession = function (id) {
   // QQ65 (v2.67.2) — restore the session's last-used assignee so each
   // session keeps its own model selection. Falls back to the dropdown's
   // current value if the session has no recorded assignee.
+  // QQ67 (v2.67.4) — also persist the new assignee onto the session
+  // entry if the session was created without one (legacy sessions
+  // pre-QQ65 had no assignee field set on creation).
   try {
     const sess = _lcGetSessions().find(s => s.id === id);
     const sel = document.getElementById('lcChatAssignee');
-    if (sess && sess.assignee && sel && sel.value !== sess.assignee) {
+    if (sess && !sess.assignee && sel && sel.value) {
+      _lcUpdateSessionMeta(id, sel.value, undefined);
+    } else if (sess && sess.assignee && sel && sel.value !== sess.assignee) {
       // Add option if it's not currently in the dropdown.
       if (![...sel.options].some(o => o.value === sess.assignee)) {
         const opt = document.createElement('option');

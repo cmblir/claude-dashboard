@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.4] — 2026-05-02
+
+### Fixed
+- 🔁 **Backfill assignee on legacy sessions** (QQ67). QQ65 restored
+  the session's stored assignee on switch, but legacy sessions
+  created before the assignee field was set kept jumping to "no
+  selection" until the user picked a model again. Switching to a
+  legacy session now writes the dropdown's current assignee onto
+  the session entry, so the session keeps its choice from then on.
+
+### Verified
+- ✅ Workflow + orchestrator tests: **43 passed** after QQ59-QQ66.
+
+---
 ## [2.67.3] — 2026-05-02
 
 ### Fixed
