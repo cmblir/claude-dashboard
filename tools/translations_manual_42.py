@@ -128,6 +128,8 @@ NEW_EN: dict[str, str] = {
     "일치하는 메시지 없음": "No matching messages",
     "검색어를 입력하세요": "Type a query",
     "건": "hits",
+    "파일 첨부됨": "file(s) attached",
+    "파일은 텍스트가 아니라 첨부 안됨": "file(s) skipped — not text",
     # NN1
     "형제 노드 실패로 자동 취소됨": "Auto-cancelled because a sibling node failed",
     "자동 취소됨": "auto-cancelled",
@@ -259,6 +261,8 @@ NEW_ZH: dict[str, str] = {
     "일치하는 메시지 없음": "无匹配消息",
     "검색어를 입력하세요": "请输入搜索词",
     "건": "条",
+    "파일 첨부됨": "个文件已附加",
+    "파일은 텍스트가 아니라 첨부 안됨": "个文件已跳过（非文本）",
     # NN1
     "형제 노드 실패로 자동 취소됨": "因同级节点失败而自动取消",
     "자동 취소됨": "自动取消",

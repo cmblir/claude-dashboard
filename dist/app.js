@@ -26056,6 +26056,39 @@ AFTER.lazyclawChat = () => {
       ta.style.height = 'auto';
       ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
     });
+    // OO7 (v2.66.71) — drag & drop text/code files into the input.
+    // The file content is appended as a fenced code block (```ext …).
+    // Multiple files OK; binary files skipped with a warning toast.
+    ta.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      ta.style.outline = '2px dashed rgba(217,119,87,0.6)';
+    });
+    ta.addEventListener('dragleave', () => { ta.style.outline = ''; });
+    ta.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      ta.style.outline = '';
+      const files = Array.from(e.dataTransfer && e.dataTransfer.files || []);
+      if (!files.length) return;
+      const TEXT_EXT = /\.(txt|md|json|jsonl|ya?ml|toml|csv|tsv|log|html?|xml|svg|css|scss|less|js|mjs|cjs|ts|tsx|jsx|py|rb|go|rs|java|c|cc|cpp|h|hpp|sh|bash|zsh|fish|sql|graphql|gql|env|gitignore|dockerfile|makefile|conf|ini|properties|patch|diff)$/i;
+      let appended = 0, skipped = 0;
+      for (const f of files) {
+        const isText = (f.type && f.type.startsWith('text/')) || TEXT_EXT.test(f.name) || (f.size < 2 * 1024 * 1024 && f.type === '');
+        if (!isText) { skipped++; continue; }
+        try {
+          const text = await f.text();
+          const ext = (f.name.split('.').pop() || '').toLowerCase();
+          const hint = ext.replace(/[^a-z0-9]/g, '').slice(0, 12);
+          const block = `\n\n\`\`\`${hint}\n// ${f.name} · ${f.size}B\n${text.slice(0, 100000)}\n\`\`\`\n`;
+          ta.value = (ta.value || '') + block;
+          appended++;
+        } catch (err) { skipped++; }
+      }
+      // Re-fire input → resize.
+      ta.dispatchEvent(new Event('input'));
+      if (appended) toast(`📎 ${appended} ${t('파일 첨부됨')}` + (skipped ? ` · ${skipped} ${t('건너뜀')}` : ''), 'ok');
+      else if (skipped) toast(`${skipped} ${t('파일은 텍스트가 아니라 첨부 안됨')}`, 'warn');
+      ta.focus();
+    });
     setTimeout(() => ta.focus(), 50);
   }
   const sel = document.getElementById('lcChatAssignee');
@@ -26464,27 +26497,34 @@ window._lcChatJumpToMatch = function (assignee, msgIdx) {
 
 window._lcChatClear = function () {
   if (!confirm(t('이 대화를 비우시겠습니까?'))) return;
-  _lcChatSave([]);
+  const id = _lcCurrentId();
+  _lcSaveHistory(id, []);
   _lcChatRender();
 };
 
 // OO2 (v2.66.65) — download conversation as a markdown file. Useful for
 // turning a chat into a permanent artifact (notion/obsidian/git etc).
 window._lcChatExport = function () {
-  const history = _lcChatLoad();
+  const id = _lcCurrentId();
+  const history = _lcGetHistory(id);
   if (!history.length) { toast(t('내보낼 대화가 없습니다'), 'warn'); return; }
   const sel = document.getElementById('lcChatAssignee');
   const assignee = (sel && sel.value) || 'lazyclaw';
-  const lines = [`# AI Chat — ${assignee}`, '', `_${new Date().toISOString()}_`, ''];
+  const sessions = _lcGetSessions();
+  const ses = sessions.find(s => s.id === id);
+  const title = (ses && ses.label) || assignee;
+  const lines = [`# ${title}`, '', `_${new Date().toISOString()}_`, '', `**Model:** ${assignee}`, ''];
   for (const m of history) {
-    const role = m.role === 'user' ? '🧑 You' : `🤖 ${m.assignee || assignee}`;
-    lines.push(`### ${role}`, '', m.text || '', '');
+    const role = m.role === 'user' ? '### 🧑 You' : `### 🤖 ${m.assignee || assignee}`;
+    lines.push(role, '', m.text || '');
+    if (m.meta) lines.push('', `> ${m.meta}`);
+    lines.push('');
   }
   const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `lazyclaw-chat-${assignee.replace(/[:/]/g,'_')}-${new Date().toISOString().slice(0,16).replace(/[T:]/g,'-')}.md`;
+  a.download = `lazyclaw-${title.slice(0,30).replace(/[^a-zA-Z0-9가-힣]/g,'-')}-${new Date().toISOString().slice(0,10)}.md`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast(t('내보내기 완료'), 'ok');
