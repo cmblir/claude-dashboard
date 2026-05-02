@@ -55,7 +55,7 @@ _WF_ID_RE = re.compile(r"^wf-[0-9]{10,14}-[a-z0-9]{3,6}$")
 _NODE_ID_RE = re.compile(r"^n-[A-Za-z0-9_-]{1,40}$")
 _RUN_ID_RE = re.compile(r"^run-[0-9]{10,14}-[a-z0-9]{3,8}$")
 
-_DEFAULT_NODE_TIMEOUT = int(os.environ.get("WORKFLOW_NODE_TIMEOUT", "300"))
+_DEFAULT_NODE_TIMEOUT = int(os.environ.get("WORKFLOW_NODE_TIMEOUT", "180"))
 _DEFAULT_TOTAL_TIMEOUT = int(os.environ.get("WORKFLOW_TOTAL_TIMEOUT", "1800"))
 
 # Run 엔진용 동시성 — 서버 프로세스 안에서 run 을 돌려야 하므로 lock 필요

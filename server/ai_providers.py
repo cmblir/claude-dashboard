@@ -297,10 +297,26 @@ class ClaudeCliProvider(BaseProvider):
     def list_models(self) -> list[ModelInfo]:
         return list(self._MODELS)
 
+    # FF1 (v2.66.17) — claude-cli hangs indefinitely when given a full
+    # model name like "claude-sonnet-4-6" via --model, but works in ~30s
+    # with the short alias "sonnet". Verified empirically. Map full names
+    # back to aliases before passing to the CLI.
+    _CLI_FLAG_ALIASES = {
+        "claude-opus-4-7":   "opus",
+        "claude-opus-4-6":   "opus",
+        "claude-sonnet-4-6": "sonnet",
+        "claude-sonnet-4-5": "sonnet",
+        "claude-haiku-4-5":  "haiku",
+    }
+
     def _resolve_model(self, model: str) -> str:
         if not model:
             return ""
-        return self._ALIASES.get(model.lower(), model)
+        # First normalise short aliases to full names (kept for cost /
+        # telemetry consumers that key off the canonical id)…
+        full = self._ALIASES.get(model.lower(), model)
+        # …then convert back to a CLI-friendly alias for the --model flag.
+        return self._CLI_FLAG_ALIASES.get(full, full)
 
     def execute(
         self,
@@ -341,18 +357,38 @@ class ClaudeCliProvider(BaseProvider):
                 }[opt_key]
                 cmd += [flag, val]
 
-        try:
-            r = subprocess.run(
-                cmd, cwd=cwd_safe, capture_output=True, text=True, timeout=timeout,
-            )
-        except subprocess.TimeoutExpired:
+        # FF1 (v2.66.17) — claude-cli (Anthropic backend) sporadically
+        # hangs on otherwise-valid requests; the SAME prompt+model pair
+        # has been measured at 28s OK / 180s TIMEOUT / 28s OK in three
+        # consecutive workflow runs. Mitigation: short per-attempt
+        # timeout (60s default) with up to 4 retries, killing the hung
+        # subprocess on each timeout. Successful calls return in ≈30s,
+        # so 4 attempts cap end-to-end at ~4 min for the worst case.
+        per_attempt = max(45, min(timeout, 60))
+        max_attempts = max(2, min(5, timeout // per_attempt))
+        last_err = ""
+        r = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                r = subprocess.run(
+                    cmd, cwd=cwd_safe, capture_output=True, text=True,
+                    timeout=per_attempt,
+                    # FF1 — claude-cli (and some other CLIs) block on
+                    # stdin even with `-p`; explicitly close it so the
+                    # process never waits for tty input.
+                    stdin=subprocess.DEVNULL,
+                )
+                last_err = ""
+                break
+            except subprocess.TimeoutExpired:
+                last_err = f"timeout after {per_attempt}s (attempt {attempt}/{max_attempts})"
+                continue
+            except Exception as e:
+                last_err = str(e)
+                break
+        if r is None:
             return AIResponse(
-                status="err", error=f"timeout after {timeout}s",
-                provider=self.provider_id, duration_ms=int(time.time() * 1000) - t0,
-            )
-        except Exception as e:
-            return AIResponse(
-                status="err", error=str(e),
+                status="err", error=last_err or "unknown error",
                 provider=self.provider_id, duration_ms=int(time.time() * 1000) - t0,
             )
 
@@ -652,9 +688,12 @@ class CodexProvider(BaseProvider):
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n{prompt}"
 
-        cmd = [b, "-q", full_prompt]  # -q = quiet (non-interactive)
+        # FF1 (v2.66.17) — Codex CLI dropped the `-q` flag; non-interactive
+        # mode is now `codex exec [PROMPT]`. The prompt is positional.
+        cmd = [b, "exec"]
         if model:
-            cmd += ["--model", model]
+            cmd += ["-c", f'model="{model}"']
+        cmd += [full_prompt]
 
         try:
             r = subprocess.run(
@@ -1773,6 +1812,35 @@ class ProviderRegistry:
             log.warning("provider %s failed: %s — trying fallback",
                         provider_id, primary_resp.error)
 
+        # FF1 (v2.66.17) — when claude-cli's primary error is a timeout
+        # (verified Anthropic-backend hang), DON'T waste another full
+        # timeout window on a different Claude model — those tend to
+        # hang together. Skip straight to the cross-provider chain
+        # (gemini-cli / codex / ollama). Only do the in-family swap
+        # for non-timeout errors (e.g. transient rate-limit).
+        if fallback and provider_id == "claude-cli" and primary_resp and primary_resp.status == "err":
+            err_lower = (primary_resp.error or "").lower()
+            is_hang = "timeout" in err_lower
+            if not is_hang:
+                model_chain: list[str] = []
+                cur = (model or "").lower()
+                if "sonnet" in cur:
+                    model_chain = ["opus", "haiku"]
+                elif "haiku" in cur:
+                    model_chain = ["sonnet", "opus"]
+                elif "opus" in cur:
+                    model_chain = ["sonnet", "haiku"]
+                for alt_model in model_chain:
+                    log.info("claude-cli model fallback: %s → %s", model, alt_model)
+                    alt_resp = p.execute(
+                        prompt, system_prompt=system_prompt, model=alt_model,
+                        cwd=cwd, timeout=timeout, extra=extra,
+                    )
+                    if alt_resp.status == "ok":
+                        alt_resp.error = (alt_resp.error or "") + f" (auto-fallback: {model} → {alt_model})"
+                        return alt_resp
+                    attempts.append(f"claude-cli/{alt_model}: {(alt_resp.error or 'err')[:120]}")
+
         # 폴백 체인
         if fallback and self._fallback_chain:
             for fid in self._fallback_chain:
@@ -1785,9 +1853,14 @@ class ProviderRegistry:
                 if not fp.is_available():
                     attempts.append(f"{fid}: unavailable (no key / not installed)")
                     continue
-                log.info("fallback to provider: %s", fid)
+                # FF1 (v2.66.17) — when crossing providers, the original
+                # `model` argument is rarely valid for the new provider
+                # (e.g. asking ollama to run "gemini-2.5-flash" → 404).
+                # Pass empty model so each provider picks its own default.
+                xprovider_model = "" if fid != provider_id else model
+                log.info("fallback to provider: %s (model→default)", fid)
                 resp = fp.execute(
-                    prompt, system_prompt=system_prompt, model=model,
+                    prompt, system_prompt=system_prompt, model=xprovider_model,
                     cwd=cwd, timeout=timeout, extra=extra,
                 )
                 if resp.status == "ok":
@@ -1957,8 +2030,14 @@ def get_registry() -> ProviderRegistry:
     except Exception as e:
         log.warning("api keys load failed: %s", e)
 
-    # 기본 폴백 체인: Claude CLI → Anthropic API → OpenAI API
-    reg.set_fallback_chain(["claude-cli", "anthropic-api", "openai-api", "gemini-api"])
+    # 기본 폴백 체인: Claude CLI → Anthropic API → OpenAI API → Gemini API → Ollama
+    # FF1 (v2.66.17) — append `ollama` so workflows still complete when
+    # claude-cli hangs and no API keys are configured. Local model
+    # produces lower-quality output but is always available.
+    reg.set_fallback_chain([
+        "claude-cli", "anthropic-api", "openai-api", "gemini-api",
+        "gemini-cli", "codex", "ollama",
+    ])
 
     _REGISTRY = reg
     return reg
