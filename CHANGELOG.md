@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.14] — 2026-05-02
+
+### Fixed
+- 💬 **QQ76 placeholder no longer persists if the tab closes mid-
+  request** (QQ77). The pre-token "_…_" bubble was being written to
+  localStorage immediately on push. If the user closed the tab
+  before the first SSE token arrived, the placeholder was frozen
+  forever in saved history. Now `_lcSaveHistory()` filters out
+  entries with `pending: true` before persisting, so the
+  placeholder is only kept in the live in-memory `history` array
+  for the current page; refreshing the tab (with no completed
+  reply) starts clean.
+
+---
 ## [2.67.13] — 2026-05-02
 
 ### Added
