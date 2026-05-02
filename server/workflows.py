@@ -1183,12 +1183,19 @@ def api_workflows_list(query: dict | None = None) -> dict:
             if r.get("status") == "running":
                 active_run_id = r.get("id") or r.get("runId") or ""
                 break
+        # QQ79 (v2.67.16) — split sticky annotations from the executable
+        # node count so the sidebar can show "5 + 2 메모" instead of
+        # bundling them.
+        all_nodes = wf.get("nodes", []) or []
+        sticky_count = sum(1 for n in all_nodes if n.get("type") == "sticky")
+        exec_count = len(all_nodes) - sticky_count
         out.append({
             "id": wfId,
             "name": wf.get("name", "Untitled"),
             "description": wf.get("description", ""),
             "tags":  wf.get("tags") or [],  # QQ38
-            "nodeCount": len(wf.get("nodes", [])),
+            "nodeCount":   exec_count,
+            "stickyCount": sticky_count,
             "edgeCount": len(wf.get("edges", [])),
             "createdAt": wf.get("createdAt", 0),
             "updatedAt": wf.get("updatedAt", 0),

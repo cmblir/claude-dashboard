@@ -3242,7 +3242,7 @@ function _wfRenderList() {
         <div class="min-w-0 flex-1">
           <div class="text-sm font-medium truncate">${escapeHtml(w.name || 'Untitled')}</div>
           <div class="text-[10px] text-[var(--text-dim)] mt-0.5">
-            ${w.nodeCount} ${t('노드')} · ${w.edgeCount} ${t('연결')} · ${fmtRel(w.updatedAt)}
+            ${w.nodeCount} ${t('노드')}${w.stickyCount?` + ${w.stickyCount} 🟨`:''} · ${w.edgeCount} ${t('연결')} · ${fmtRel(w.updatedAt)}
           </div>
           ${tagChips ? `<div class="flex flex-wrap gap-1 mt-1">${tagChips}</div>` : ''}
           <div class="flex items-center gap-1.5 mt-1">

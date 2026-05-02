@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.16] — 2026-05-02
+
+### Changed
+- 🟨 **Sticky annotations counted separately from executable nodes**
+  (QQ79). The workflow list API now returns
+  `nodeCount = (total - sticky)` and a new `stickyCount` field. The
+  sidebar row now reads `5 노드 + 2 🟨 · 7 연결` instead of bundling
+  the sticky into `nodeCount`. Matches users' mental model — sticky
+  is a comment, not a step.
+
+---
 ## [2.67.15] — 2026-05-02
 
 ### Added
