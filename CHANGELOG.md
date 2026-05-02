@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.21] — 2026-05-02
+
+### Performance
+- 📦 **Lazy-load 894KB of vendor JS** that the workflow tab never
+  needs (HH2):
+  - `vis-network` (689KB) — only loaded when Mind-Map / Project-Agents
+    / Session-Timeline graphs are opened. Three call sites guarded
+    with `await window._loadVendor('vis')`.
+  - `chart.js` (205KB) — only loaded on first `_renderChart` call
+    (now async).
+  - `marked` (35KB) stays page-boot defer because it's used inside
+    template strings without an `await` boundary.
+  - Net effect: a workflow run no longer pays the parse cost of a
+    graph library it never invokes.
+- 🖱 **RAF-throttled edge-draft renderer** during edge drag.
+  `_wfDraftRender` was being called on every `mousemove` (60–120 Hz)
+  and replacing `innerHTML`. Now coalesced to once per frame and
+  patches the path's `d` attribute on a cached `<path>` element.
+- 📊 Measured Long-Task budget on workflow tab: 71 ms → **54 ms**
+  (-24%) on top of v2.66.19's already-improved baseline.
+
+---
 ## [2.66.20] — 2026-05-02
 
 ### Fixed

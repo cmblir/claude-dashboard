@@ -36,12 +36,44 @@
        /tmp/tailwindcss-v3 -c tools/tailwind.config.js \
          -i tools/tailwind.input.css -o dist/vendor/tailwind.css --minify -->
 <link rel="stylesheet" href="/vendor/tailwind.css">
-<!-- v2.66.19 — self-hosted vendor libs (was: jsdelivr/unpkg CDN). Eliminates
-     DNS lookup + cross-origin handshake on every page load and survives
-     network failures. Files in dist/vendor/. -->
-<script src="/vendor/chart.umd.min.js" defer></script>
-<script src="/vendor/vis-network.min.js" defer></script>
+<!-- HH2 (v2.66.21) — vendor libs are now LAZY-LOADED on first use, not on
+     page boot. Saves ~900KB of parse + execute cost when the user
+     never opens the chart/graph/markdown-rendering tabs.
+     `_loadVendor('chart')`, `_loadVendor('vis')`, `_loadVendor('marked')`
+     return a Promise that resolves after the script tag loads. Marked
+     is small (35KB) but loaded on demand for symmetry. -->
+<!-- Marked is small (35KB) and used inside template strings (e.g.
+     `marked.parse(raw)` in CLAUDE.md preview); keep it page-boot
+     with `defer` so it's available without a top-level await. -->
 <script src="/vendor/marked.min.js" defer></script>
+<script>
+window._loadVendor = (() => {
+  const URLS = {
+    chart:  '/vendor/chart.umd.min.js',
+    vis:    '/vendor/vis-network.min.js',
+    marked: '/vendor/marked.min.js',
+  };
+  const CHECKS = {
+    chart:  () => typeof Chart !== 'undefined',
+    vis:    () => typeof vis !== 'undefined' && !!vis.Network,
+    marked: () => typeof marked !== 'undefined',
+  };
+  const cache = {};
+  return function (key) {
+    if (CHECKS[key] && CHECKS[key]()) return Promise.resolve();
+    if (cache[key]) return cache[key];
+    cache[key] = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = URLS[key];
+      s.async = false;
+      s.onload = () => resolve();
+      s.onerror = (e) => { delete cache[key]; reject(e); };
+      document.head.appendChild(s);
+    });
+    return cache[key];
+  };
+})();
+</script>
 <style>
   :root, body.theme-dark {
     --bg: #000000;
@@ -2330,8 +2362,13 @@ const _chartInstances = window._chartInstances || (window._chartInstances = new 
 // If a chart already exists for this canvas id and matches the requested type,
 // data is patched in place and `update('none')` runs for animation-free refresh.
 // Otherwise the old instance is destroyed and a fresh chart is created.
-function _renderChart(canvasEl, cfg) {
-  if (!canvasEl || typeof Chart === 'undefined') return null;
+async function _renderChart(canvasEl, cfg) {
+  if (!canvasEl) return null;
+  // HH2 — load Chart.js on first call, then proceed.
+  if (typeof Chart === 'undefined') {
+    try { await window._loadVendor('chart'); } catch (_) { return null; }
+  }
+  if (typeof Chart === 'undefined') return null;
   const id = canvasEl.id;
   if (!id) {
     // Fallback for unidentified canvases — behave like the old destroy+new flow
@@ -5880,12 +5917,29 @@ function _wfBindCanvas() {
   }, { passive: false });
 }
 
+// HH2 (v2.66.21) — RAF-throttled draft renderer. mousemove fires at
+// 60–120 Hz; without coalescing, each event re-set innerHTML on the
+// draft <g>. Now coalesced to once per frame, with the path element
+// cached so we patch its `d` attribute instead of replacing the node.
+let _wfDraftRafId = 0;
 function _wfDraftRender() {
-  const g = document.getElementById('wfDraft');
-  if (!g) return;
-  if (!__wf.edgeDraft) { g.innerHTML = ''; return; }
-  const d = __wf.edgeDraft;
-  g.innerHTML = `<path class="wf-edge-draft" d="${_wfBezier(d.x1, d.y1, d.x2, d.y2)}"></path>`;
+  if (_wfDraftRafId) return;
+  _wfDraftRafId = requestAnimationFrame(() => {
+    _wfDraftRafId = 0;
+    const g = document.getElementById('wfDraft');
+    if (!g) return;
+    if (!__wf.edgeDraft) { if (g.firstChild) g.replaceChildren(); return; }
+    const d = __wf.edgeDraft;
+    const dStr = _wfBezier(d.x1, d.y1, d.x2, d.y2);
+    let p = g.firstElementChild;
+    if (!p || p.tagName !== 'path') {
+      g.replaceChildren();
+      p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('class', 'wf-edge-draft');
+      g.appendChild(p);
+    }
+    p.setAttribute('d', dStr);
+  });
 }
 
 function _wfSchedulePatch() {
@@ -10681,9 +10735,13 @@ window._arSubmit = _arSubmit;
 window._arCancel = _arCancel;
 window._arLoad   = _arLoad;
 
-function drawSessionTimeline(tl) {
+async function drawSessionTimeline(tl) {
   const el = document.getElementById('sessionTimelineGraph');
-  if (!el || typeof vis === 'undefined') return;
+  if (!el) return;
+  if (typeof vis === 'undefined') {
+    try { await window._loadVendor('vis'); } catch (_) { return; }
+  }
+  if (typeof vis === 'undefined') return;
   const colorByKind = {
     session: { background:'#d97757', border:'#fb923c', font:'#fff' },
     prompt:  { background:'#7dd3fc', border:'#38bdf8', font:'#0c4a6e' },
@@ -11082,7 +11140,14 @@ function aggregateAgentCalls(graph) {
   });
   return counts;
 }
-function drawAgentGraph(g) {
+async function drawAgentGraph(g) {
+  if (typeof vis === 'undefined') {
+    try { await window._loadVendor('vis'); } catch (_) { return; }
+  }
+  if (typeof vis === 'undefined') return;
+  return _drawAgentGraphImpl(g);
+}
+function _drawAgentGraphImpl(g) {
   const container = document.getElementById('agentNetwork');
   if (!container || !window.vis) return;
   const nodes = new vis.DataSet((g.nodes||[]).map(n => ({
@@ -16903,7 +16968,11 @@ AFTER.projectAgents = () => {
 
 async function paRefreshViz() {
   const container = document.getElementById('paNetwork');
-  if (!container || !window.vis) return;
+  if (!container) return;
+  if (!window.vis) {
+    try { await window._loadVendor('vis'); } catch (_) { return; }
+  }
+  if (!window.vis) return;
   const cwd = window.__paCwd;
   if (!cwd) return;
   const r = await api('/api/project-agents/list?cwd=' + encodeURIComponent(cwd));
