@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.14] — 2026-05-02
+
+### Fixed
+- 🤖 **QQ91 model badge keeps full model spec** (QQ104). The
+  per-session sidebar model chip used `split(':').pop()` which
+  reduced `ollama:llama3.1:8b` to just `8b`. The chip now strips
+  only the first `provider:` prefix, so tagged variants
+  (`llama3.1:8b`, `mistral:7b-instruct`, etc.) display
+  recognizably.
+
+---
 ## [2.68.13] — 2026-05-02
 
 ### Fixed
