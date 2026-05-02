@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.46] — 2026-05-02
+
+### Added
+- 🔍 **n8n-style floating zoom cluster** in the canvas bottom-right
+  (LL17). `−` zoom out, current % (click to reset to 100%), `+`
+  zoom in. Always visible — the user no longer needs to remember
+  `Cmd+0` / `Cmd+1` to recover from a stray pinch. Label updates
+  live during wheel zoom too.
+
+---
 ## [2.66.45] — 2026-05-02
 
 ### Added

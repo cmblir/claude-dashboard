@@ -2103,7 +2103,15 @@ VIEWS.workflows = async () => {
             <button class="btn text-xs" id="wfInspectorToggle" onclick="_wfToggleInspector()" title="${t('메타 패널 보이기/가리기')}">📋 ${t('메타')}</button>
           </div>
           <div class="wf-floating">
-            <button class="btn text-xs" onclick="_wfFitView()" title="${t('자동 정렬 + 화면 맞춤')}">🎯 ${t('맞춤')}</button>
+            <!-- LL17 (v2.66.46) — n8n-style zoom controls. Always visible
+                 in the bottom-right so a user who zoomed too far has an
+                 obvious recovery path without learning Cmd+0. -->
+            <div class="wf-zoom-cluster" style="display:flex;align-items:stretch;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--card);box-shadow:0 4px 14px rgba(0,0,0,0.4);">
+              <button class="btn text-xs" style="border:0;border-radius:0;box-shadow:none;background:transparent;" onclick="_wfZoomStep(-1)" title="${t('줌 아웃')} (Ctrl+-)">−</button>
+              <button class="btn text-xs" style="border:0;border-radius:0;box-shadow:none;background:transparent;min-width:44px;font-variant-numeric:tabular-nums;" id="wfZoomLabel" onclick="_wfZoomReset()" title="${t('100% 줌으로 리셋')} (Ctrl+1)">100%</button>
+              <button class="btn text-xs" style="border:0;border-radius:0;box-shadow:none;background:transparent;" onclick="_wfZoomStep(1)" title="${t('줌 인')} (Ctrl++)">+</button>
+            </div>
+            <button class="btn text-xs" onclick="_wfFitView()" title="${t('자동 정렬 + 화면 맞춤')} (Ctrl+0)">🎯</button>
             <button class="btn text-xs" onclick="_wfShowShortcutHelp()" title="${t('키보드 단축키')} (?)">⌨️</button>
             <input id="wfNodeSearch" class="input text-xs" placeholder="${t('노드 검색...')}" style="width:130px;padding:3px 8px;font-size:11px;margin-left:4px;" oninput="_wfNodeSearchFilter(this.value)">
           </div>
@@ -4075,6 +4083,36 @@ function _wfBeautifyLayout() {
 
 // 모든 노드 bounding box 를 캔버스에 맞춰 pan/zoom 을 계산해 적용.
 // + 자동 정렬(beautify) — 여기저기 흩어진 노드를 DAG 레이어 기반으로 정돈.
+// LL17 (v2.66.46) — n8n-style floating zoom controls.
+function _wfZoomStep(direction) {
+  if (!__wf.current) return;
+  const v = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
+  const factor = direction > 0 ? 1.15 : 0.85;
+  v.zoom = Math.max(0.3, Math.min(2.5, (v.zoom || 1) * factor));
+  __wf.current.viewport = v;
+  const vp = __wf._viewportEl || document.getElementById('wfViewport');
+  if (vp) vp.setAttribute('transform', `translate(${v.panX || 0},${v.panY || 0}) scale(${v.zoom || 1})`);
+  _wfUpdateZoomLabel();
+  if (typeof _wfRenderMinimap === 'function') _wfRenderMinimap();
+}
+
+function _wfZoomReset() {
+  if (!__wf.current) return;
+  __wf.current.viewport = { panX: 0, panY: 0, zoom: 1 };
+  const vp = __wf._viewportEl || document.getElementById('wfViewport');
+  if (vp) vp.setAttribute('transform', 'translate(0,0) scale(1)');
+  _wfUpdateZoomLabel();
+  if (typeof _wfRenderMinimap === 'function') _wfRenderMinimap();
+}
+
+function _wfUpdateZoomLabel() {
+  const el = document.getElementById('wfZoomLabel');
+  if (!el || !__wf.current) return;
+  const z = (__wf.current.viewport && __wf.current.viewport.zoom) || 1;
+  const txt = Math.round(z * 100) + '%';
+  if (el.textContent !== txt) el.textContent = txt;
+}
+
 function _wfFitView() {
   if (!__wf.current) return;
   const nodes = __wf.current.nodes || [];
@@ -4935,8 +4973,11 @@ function _wfCloseNodeContextMenu() {
     if (vp) vp.setAttribute('transform',
       `translate(${view.panX || 0},${view.panY || 0}) scale(${view.zoom || 1})`);
     _wfSchedulePatch();
-    if (isZoom && _wfMinimapTimer == null) {
-      _wfMinimapTimer = requestAnimationFrame(() => { _wfMinimapTimer = null; _wfRenderMinimap(); });
+    if (isZoom) {
+      if (typeof _wfUpdateZoomLabel === 'function') _wfUpdateZoomLabel();
+      if (_wfMinimapTimer == null) {
+        _wfMinimapTimer = requestAnimationFrame(() => { _wfMinimapTimer = null; _wfRenderMinimap(); });
+      }
     }
   }, { passive: false });
 }

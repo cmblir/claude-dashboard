@@ -3524,6 +3524,8 @@
   "주황 out-port 에서 보라 in-port 로 드래그하면 베지어 곡선 + 방향 화살표가 자동 생성. DAG 사이클은 즉시 거부.": "Drag from orange out-port to purple in-port — a bezier curve with an arrow appears. DAG cycles are rejected on the spot.",
   "준비 중...": "Preparing...",
   "줄 바꿈 많이": "Many line breaks",
+  "줌 아웃": "Zoom out",
+  "줌 인": "Zoom in",
   "줌 인/아웃": "Zoom in / out",
   "중간에 쓰려면": "To use in the middle, use",
   "중간에 창 닫으면 중단": "Closing window stops the process",

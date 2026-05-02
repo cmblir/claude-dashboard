@@ -73,6 +73,8 @@ NEW_EN: dict[str, str] = {
     "미니맵 토글": "Toggle minimap",
     "다음 / 이전 노드 선택": "Select next / previous node",
     "선택 노드 편집창 열기": "Open editor for selected node",
+    "줌 아웃": "Zoom out",
+    "줌 인": "Zoom in",
     "워크플로우 실행 / 중단": "Run / stop workflow",
     # LL16 already covered: 새 노드 추가 — exists.
 }
@@ -143,5 +145,7 @@ NEW_ZH: dict[str, str] = {
     "미니맵 토글": "切换迷你地图",
     "다음 / 이전 노드 선택": "选择下一个 / 上一个节点",
     "선택 노드 편집창 열기": "打开所选节点的编辑器",
+    "줌 아웃": "缩小",
+    "줌 인": "放大",
     "워크플로우 실행 / 중단": "运行 / 停止工作流",
 }
