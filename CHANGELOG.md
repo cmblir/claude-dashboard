@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.34] — 2026-05-02
+
+### Added
+- 📑 **`Cmd/Ctrl + D` duplicates the selected node** (LL5, n8n parity).
+  Cloned at +40px offset; the new node becomes the selection so a
+  user can immediately drag it into place or edit.
+
+---
 ## [2.66.33] — 2026-05-02
 
 ### Added

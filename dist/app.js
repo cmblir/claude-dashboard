@@ -4604,6 +4604,29 @@ function _wfBindCanvas() {
         return;
       }
 
+      // LL5 (v2.66.34) — Cmd/Ctrl + D — duplicate selected node in
+      // place (n8n parity). New node lands +40px offset and becomes
+      // the selection.
+      if (mod && e.key === 'd' && !inInput && __wf.current && __wf.selectedNodeId) {
+        e.preventDefault();
+        const src = __wf.current.nodes.find(n => n.id === __wf.selectedNodeId);
+        if (src) {
+          if (typeof _wfPushUndo === 'function') _wfPushUndo();
+          const clone = JSON.parse(JSON.stringify(src));
+          clone.id = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+          clone.x = (clone.x || 0) + 40;
+          clone.y = (clone.y || 0) + 40;
+          __wf.current.nodes.push(clone);
+          __wf.selectedNodeId = clone.id;
+          __wf.dirty = true;
+          if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
+          if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
+          _wfUpdateToolbar();
+          if (typeof toast === 'function') toast(t('노드 복제됨'), 'ok');
+        }
+        return true;
+      }
+
       // Delete / Backspace — remove
       if (['Delete','Backspace'].includes(e.key) && !inInput) {
         if (__wf.selectedNodeId) { e.preventDefault(); _wfDeleteSelectedNode(); return true; }
