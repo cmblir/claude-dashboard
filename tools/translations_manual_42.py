@@ -84,6 +84,7 @@ NEW_EN: dict[str, str] = {
     "노드 검색 (예: fy / ses)": "Search nodes (e.g. fy / ses)",
     "이름·타입·assignee·역할 fuzzy 검색": "Fuzzy search across name / type / assignee / role",
     "검색 지우기": "Clear search",
+    "이전 / 다음 워크플로우로 전환": "Switch to previous / next workflow",
     "워크플로우 실행 / 중단": "Run / stop workflow",
     # LL16 already covered: 새 노드 추가 — exists.
 }
@@ -165,5 +166,6 @@ NEW_ZH: dict[str, str] = {
     "노드 검색 (예: fy / ses)": "搜索节点（例如 fy / ses）",
     "이름·타입·assignee·역할 fuzzy 검색": "在名称 / 类型 / 执行者 / 角色中模糊搜索",
     "검색 지우기": "清除搜索",
+    "이전 / 다음 워크플로우로 전환": "切换到上一个 / 下一个工作流",
     "워크플로우 실행 / 중단": "运行 / 停止工作流",
 }

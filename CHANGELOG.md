@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.56] — 2026-05-02
+
+### Added
+- ⌨ **`Cmd/Ctrl + [` and `Cmd/Ctrl + ]` cycle workflows**
+  (LL27, n8n parity for editor tab switching). Previous /
+  next entry in the sidebar list. Wraps. Skipped when only
+  one workflow exists.
+
+---
 ## [2.66.55] — 2026-05-02
 
 ### Changed
