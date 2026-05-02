@@ -818,6 +818,7 @@
   "err_workflow_stale": "检测到并发修改 — 请刷新后重试",
   "everything-claude-code 플러그인 설치 → 실전 기능 확보": "安装 everything-claude-code 插件 → 获取生产级能力",
   "extended thinking 10,000 토큰 이하로 제한. 무제한은 가성비 나쁨.": "将扩展思考限制在 10,000 tokens 以内。无上限性价比差。",
+  "fallback": "回退",
   "fallback_chain": "🔄 降级链",
   "fallback_chain_desc": "工作流节点失败时自动切换到下一个供应商。",
   "feedbackNodeId": "反馈节点 ID",
