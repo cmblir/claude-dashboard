@@ -163,6 +163,8 @@ NEW_EN: dict[str, str] = {
     # QQ14
     "자": "chars",
     "토큰": "tokens",
+    # QQ15
+    "즐겨찾기": "Favourite",
     # QQ1
     "시스템 프롬프트 설정됨": "System prompt set",
     "시스템 프롬프트 초기화됨": "System prompt cleared",
@@ -353,6 +355,8 @@ NEW_ZH: dict[str, str] = {
     # QQ14
     "자": "字",
     "토큰": "tokens",
+    # QQ15
+    "즐겨찾기": "收藏",
     # QQ1
     "시스템 프롬프트 설정됨": "已设置系统提示",
     "시스템 프롬프트 초기화됨": "已清空系统提示",
