@@ -52,6 +52,8 @@ NEW_EN: dict[str, str] = {
     "진행 중인 실행이 없습니다": "No run in progress",
     # LL5
     "노드 복제됨": "Node duplicated",
+    # LL6
+    "노드 선택됨": "nodes selected",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -99,4 +101,6 @@ NEW_ZH: dict[str, str] = {
     "진행 중인 실행이 없습니다": "没有正在进行的运行",
     # LL5
     "노드 복제됨": "节点已复制",
+    # LL6
+    "노드 선택됨": "节点已选中",
 }

@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.35] — 2026-05-02
+
+### Added
+- 🎯 **`Cmd/Ctrl + A` selects every node** in the active workflow
+  (LL6, n8n parity). Populates the existing multi-select set so
+  `Cmd+C`, `Delete`, and the arrow-key nudge all operate on the
+  whole graph at once.
+
+---
 ## [2.66.34] — 2026-05-02
 
 ### Added
