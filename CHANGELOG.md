@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.24] — 2026-05-02
+
+### Performance — split the bundle
+- 🏗 **Inline `<script>` (1.2MB / ~25K lines) extracted to `/app.js`**
+  (II1). The HTML body is now 178KB instead of 1.4MB; the browser
+  finishes parsing the document an order of magnitude sooner and the
+  app code arrives in parallel. The first inline block (lazy-loader,
+  ~800 bytes) stays inline because `app.js` depends on it via
+  `window._loadVendor`.
+
+### Measured (Playwright on workflow tab)
+| Metric | v2.66.18 | v2.66.24 | Cumulative |
+|---|---|---|---|
+| DOMContentLoaded | 823 ms | **59 ms** | **−93%** |
+| networkidle | 2947 ms | **1427 ms** | −52% |
+| index.html bytes | 1.6 MB | **178 KB** | −89% |
+| inline JS bytes | 1.2 MB | **827 bytes** | −99.9% |
+| Long tasks | 234 ms | **0** | — |
+
+Single-file deployment is preserved — `dist/app.js` ships in the
+same dist/ directory and the existing static-serving path picks it
+up. No build step added.
+
+---
 ## [2.66.23] — 2026-05-02
 
 ### Performance
