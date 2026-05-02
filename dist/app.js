@@ -4319,6 +4319,7 @@ function _wfShowShortcutHelp() {
     { key: 'Ctrl+F', desc: t('노드 검색 포커스') },
     { key: 'Ctrl+I', desc: t('인스펙터 패널 토글') },
     { key: 'Ctrl+M', desc: t('미니맵 토글') },
+    { key: 'D', desc: t('선택 노드 비활성화 / 활성화') },
     { key: 'Tab / Shift+Tab', desc: t('다음 / 이전 노드 선택') },
     { key: 'Ctrl+E / Enter', desc: t('선택 노드 편집창 열기') },
     { key: 'Ctrl+Enter', desc: t('워크플로우 실행 / 중단') },
@@ -5509,8 +5510,13 @@ function _wfRenderInspector(opts) {
             <div class="text-[11px] text-[var(--text-mute)]">${preview}</div>
             ${runInfoBlock}
           </div>
-          <div class="flex gap-2 flex-wrap">
+          <div class="flex gap-2 flex-wrap items-center">
             <button class="btn-primary btn text-xs flex-1" onclick="_wfOpenNodeEditor('${n.id}')" aria-label="${t('노드 편집')}">✏️ ${t('편집')}</button>
+            <!-- PP3 (v2.66.73) — quick disable toggle right inside the inspector. -->
+            <label class="flex items-center gap-1 text-[10px] cursor-pointer" title="${t('비활성화 (D)')}">
+              <input type="checkbox" ${d.disabled?'checked':''} onchange="_wfToggleNodeDisabled('${n.id}')">
+              ${t('비활성')}
+            </label>
             <button class="btn text-xs" onclick="_wfDeleteSelectedNode()" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);" aria-label="${t('노드 삭제')}">🗑️</button>
           </div>
         </div>

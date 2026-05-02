@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.73] — 2026-05-02
+
+### Changed
+- 📖 **`D` shortcut now visible in `?` help** (PP3).
+- ⏸ **Inspector got a quick "비활성" checkbox** next to the
+  edit / delete buttons so users who don't know the shortcut
+  can still toggle disable from the side panel.
+
+---
 ## [2.66.72] — 2026-05-02
 
 ### Added
