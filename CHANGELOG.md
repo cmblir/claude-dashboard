@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.86] — 2026-05-02
+
+### Added
+- ⊞ **Canvas dot-grid toggle** (QQ11). New `⊞` button in the
+  bottom-right floating cluster toggles a subtle 20px-step
+  dot grid behind the workflow canvas — visual guide for the
+  10px node-snap step. Preference persisted in localStorage.
+
+---
 ## [2.66.85] — 2026-05-02
 
 ### Fixed

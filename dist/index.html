@@ -646,6 +646,19 @@ window._loadVendor = (() => {
   }
   #wfCanvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; user-select: none; }
   #wfCanvas:active { cursor: grabbing; }
+  /* QQ11 (v2.66.86) — optional dot grid behind the canvas. Helps the
+     user line nodes up to the 10px grid snap. Toggle via the
+     ⊞ button on the bottom-right floating cluster. */
+  #wfCanvasHost.wf-grid-on::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 20px 20px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  #wfCanvasHost { position: relative; }
+  #wfCanvasHost > svg { position: relative; z-index: 1; }
   #wfInspector { width: 320px; flex-shrink: 0; overflow-y: auto; padding: 12px; position: relative; }
   /* LL23 (v2.66.52) — n8n-style draggable resize handle on the
      inspector's left edge. Width persists in localStorage. */

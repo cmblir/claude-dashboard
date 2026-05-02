@@ -2134,6 +2134,7 @@ VIEWS.workflows = async () => {
               <button class="btn text-xs" style="border:0;border-radius:0;box-shadow:none;background:transparent;" onclick="_wfZoomStep(1)" title="${t('줌 인')} (Ctrl++)">+</button>
             </div>
             <button class="btn text-xs" onclick="_wfFitView()" title="${t('자동 정렬 + 화면 맞춤')} (Ctrl+0)">🎯</button>
+            <button class="btn text-xs" onclick="_wfToggleGrid()" id="wfGridBtn" title="${t('격자 표시 토글')}">⊞</button>
             <button class="btn text-xs" onclick="_wfShowShortcutHelp()" title="${t('키보드 단축키')} (?)">⌨️</button>
             <!-- LL25 (v2.66.54) — search wrapper with built-in clear button.
                  Esc inside the input or × button clears the query so the
@@ -3485,6 +3486,23 @@ function _wfUpdateToolbarSchedule() {
   });
 }
 function _wfUpdateToolbar() { _wfUpdateToolbarSchedule(); }
+// QQ11 (v2.66.86) — canvas grid toggle (persisted in localStorage).
+window._wfToggleGrid = function () {
+  const host = document.getElementById('wfCanvasHost');
+  if (!host) return;
+  const next = !host.classList.contains('wf-grid-on');
+  host.classList.toggle('wf-grid-on', next);
+  try { localStorage.setItem('cc.wfGrid', next ? '1' : '0'); } catch (_) {}
+};
+function _wfRestoreGrid() {
+  try {
+    if (localStorage.getItem('cc.wfGrid') === '1') {
+      const host = document.getElementById('wfCanvasHost');
+      if (host) host.classList.add('wf-grid-on');
+    }
+  } catch (_) {}
+}
+
 // QQ8 (v2.66.83) — sync the floating description tag with the
 // current workflow. Hides itself for nameless / description-less
 // workflows.
@@ -4498,6 +4516,8 @@ function _wfBindCanvas() {
   // on first canvas mount. Without this, the label reads "100%" even
   // when the workflow opens at a fit-to-screen zoom of, say, 0.78.
   if (typeof _wfUpdateZoomLabel === 'function') _wfUpdateZoomLabel();
+  // QQ11 — restore grid visibility preference.
+  if (typeof _wfRestoreGrid === 'function') _wfRestoreGrid();
 
   // LL23 (v2.66.52) — restore inspector width + bind resize handle.
   try {
