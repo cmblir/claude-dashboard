@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.43] — 2026-05-02
+
+### Added
+- 🖱 **Right-click on a node opens a context menu** (LL14, n8n
+  parity). Edit / Duplicate / Delete with keyboard shortcuts
+  shown alongside. Auto-positions to stay inside the viewport;
+  closes on outside-click or Esc.
+
+---
 ## [2.66.42] — 2026-05-02
 
 ### Added

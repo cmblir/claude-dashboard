@@ -4478,6 +4478,86 @@ function _wfBindCanvas() {
     // (n8n parity). Recovers from a stuck pan/zoom in one motion.
     if (typeof _wfFitView === 'function') _wfFitView();
   });
+
+  // LL14 (v2.66.43) — right-click on a node opens a context menu
+  // (n8n parity). Edit / Duplicate / Delete; closes on outside-click
+  // or Esc. Anchored at the cursor.
+  svg.addEventListener('contextmenu', (e) => {
+    const g = e.target.closest && e.target.closest('.wf-node');
+    if (!g) return;
+    e.preventDefault();
+    const nid = g.getAttribute('data-node');
+    if (!nid) return;
+    __wf.selectedNodeId = nid; __wf.selectedEdgeId = null;
+    if (typeof _wfSyncSelectionClasses === 'function') _wfSyncSelectionClasses();
+    if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
+    _wfShowNodeContextMenu(nid, e.clientX, e.clientY);
+  });
+
+function _wfShowNodeContextMenu(nid, x, y) {
+  // Remove any existing menu first.
+  const old = document.getElementById('wfNodeCtxMenu');
+  if (old) old.remove();
+  const menu = document.createElement('div');
+  menu.id = 'wfNodeCtxMenu';
+  menu.style.cssText = 'position:fixed;z-index:10000;min-width:160px;'
+    + 'background:var(--surface,#1c1c1e);border:1px solid var(--border);'
+    + 'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.35);'
+    + 'padding:4px 0;font-size:12px;left:' + x + 'px;top:' + y + 'px;';
+  const items = [
+    { icon: '✏️', label: t('편집'),   shortcut: '⏎',  fn: () => _wfOpenNodeEditor(nid) },
+    { icon: '📑', label: t('복제'),   shortcut: '⌘D', fn: () => {
+        const src = (__wf.current.nodes || []).find(n => n.id === nid);
+        if (!src) return;
+        _wfPushUndo();
+        const clone = JSON.parse(JSON.stringify(src));
+        clone.id = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+        clone.x = (clone.x || 0) + 40; clone.y = (clone.y || 0) + 40;
+        __wf.current.nodes.push(clone); __wf.selectedNodeId = clone.id;
+        __wf.dirty = true;
+        _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
+      } },
+    { sep: true },
+    { icon: '🗑', label: t('삭제'), shortcut: '⌫', danger: true, fn: () => _wfDeleteSelectedNode() },
+  ];
+  for (const item of items) {
+    if (item.sep) {
+      const s = document.createElement('div');
+      s.style.cssText = 'height:1px;background:var(--border);margin:4px 0;';
+      menu.appendChild(s);
+      continue;
+    }
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;'
+      + 'padding:6px 12px;cursor:pointer;color:' + (item.danger ? '#fca5a5' : 'var(--text)') + ';';
+    row.innerHTML = `<span>${item.icon}</span><span style="flex:1">${escapeHtml(item.label)}</span><span style="opacity:0.55;font-size:10px;">${item.shortcut || ''}</span>`;
+    row.onmouseenter = () => row.style.background = 'rgba(255,255,255,0.06)';
+    row.onmouseleave = () => row.style.background = '';
+    row.onclick = () => { try { item.fn(); } catch(e) {} _wfCloseNodeContextMenu(); };
+    menu.appendChild(row);
+  }
+  document.body.appendChild(menu);
+  // Reposition if it spills off the viewport.
+  const r = menu.getBoundingClientRect();
+  if (r.right > window.innerWidth) menu.style.left = (window.innerWidth - r.width - 8) + 'px';
+  if (r.bottom > window.innerHeight) menu.style.top = (window.innerHeight - r.height - 8) + 'px';
+  // Close on outside click or Esc.
+  setTimeout(() => {
+    const closer = (ev) => {
+      if (!menu.contains(ev.target)) _wfCloseNodeContextMenu();
+    };
+    document.addEventListener('mousedown', closer, { once: true });
+    document.addEventListener('keydown', function k(ev) {
+      if (ev.key === 'Escape') { _wfCloseNodeContextMenu(); document.removeEventListener('keydown', k); }
+    });
+  }, 0);
+}
+
+function _wfCloseNodeContextMenu() {
+  const m = document.getElementById('wfNodeCtxMenu');
+  if (m) m.remove();
+}
+
   document.addEventListener('mousemove', (e) => {
     if (!__wf.drag) return;
     onMove(e, false);
