@@ -3741,6 +3741,7 @@
   "총": "Total",
   "총 {n} 건을 {model} 로 제출합니다. Anthropic API 요금이 발생할 수 있습니다. 계속할까요?": "Submitting {n} prompts with {model}. Anthropic API charges may apply. Continue?",
   "총 {n} 회 API 호출을 수행합니다 ({p} 프롬프트 × {m} 모델). 계속할까요?": "Will make {n} API calls ({p} prompts × {m} models). Continue?",
+  "총 누적": "Total",
   "총 누적 비용 한도 (도달 시 정지)": "Cumulative cost cap (stops on hit)",
   "총 도구 호출": "Total Tool Calls",
   "총 백업": "Total backups",

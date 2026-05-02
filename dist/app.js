@@ -26836,6 +26836,23 @@ function _lcRenderSessions() {
   // QQ24 (v2.66.99) — branch-lineage hint. If session has parentId,
   // show a small ↳ arrow + parent label so users see the lineage.
   const byId = Object.fromEntries(allSessions.map(x => [x.id, x]));
+  // QQ99 (v2.68.9) — compute cumulative spend across ALL sessions.
+  try {
+    let grand = 0;
+    for (const s of allSessions) {
+      const h = _lcGetHistory(s.id);
+      for (const m of h) if (typeof m.costUsd === 'number') grand += m.costUsd;
+    }
+    const totEl = document.getElementById('lcTotalSpend');
+    if (totEl) {
+      if (grand > 0) {
+        totEl.style.display = '';
+        totEl.textContent = `${t('총 누적')}: $${grand.toFixed(grand < 0.01 ? 4 : 3)}`;
+      } else {
+        totEl.style.display = 'none';
+      }
+    }
+  } catch (_) {}
   // QQ26 (v2.66.101) — per-session token usage badge.
   const fmtTok = n => n >= 1000 ? (n/1000).toFixed(n>=10000?0:1) + 'k' : String(n);
   // QQ86 (v2.67.23) — after render, scroll the active session row
@@ -27027,6 +27044,8 @@ VIEWS.lazyclawChat = async () => {
         <button class="btn-primary btn text-xs" style="width:100%;justify-content:center;" onclick="_lcNewSession()">＋ ${t('새 대화')}</button>
         <!-- QQ9 (v2.66.84) — quick filter for the session list -->
         <input id="lcSessionFilter" class="input text-[11px]" placeholder="${t('대화 필터…')}" style="padding:4px 8px;" oninput="_lcRenderSessions()" onkeydown="if(event.key==='Escape'){this.value='';_lcRenderSessions();}">
+        <!-- QQ99 (v2.68.9) — total cumulative spend across all sessions. -->
+        <div id="lcTotalSpend" style="font-size:9px;color:var(--text-dim);text-align:center;padding-top:2px;display:none;"></div>
       </div>
       <div id="lcSessionList" style="flex:1;overflow-y:auto;padding:4px 2px;"></div>
     </div>

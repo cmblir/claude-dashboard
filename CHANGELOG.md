@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.9] — 2026-05-02
+
+### Added
+- 💰 **Total cumulative spend in chat sidebar header** (QQ99). Above
+  the session list, a `총 누적: $0.482` line aggregates `m.costUsd`
+  across every session's history. Hides when zero. Refreshes on
+  every `_lcRenderSessions()` call (after send, switch, delete).
+  Light-touch budget visibility without leaving the chat tab.
+
+---
 ## [2.68.8] — 2026-05-02
 
 ### Added
