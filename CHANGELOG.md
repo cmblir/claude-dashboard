@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.0] — 2026-05-03
+
+**QQ91–QQ107 rollup** — third tier of Q-series work since v2.68.0.
+Backwards-compatible. Major theme: **chat cost visibility +
+ergonomic polish across the four input surfaces**.
+
+### Cost visibility (3-layer)
+- Per-turn cost in the assistant meta line (QQ97).
+- Per-session cumulative cost chip in sidebar (QQ98).
+- Sidebar header today/total spend (QQ99, QQ100), guarded by
+  `cc.lc.hasCost` flag so free-tier users pay zero render cost
+  (QQ101). Composer footer shows the active session's cumulative
+  spend (QQ102).
+
+### Sidebar polish
+- Per-session model badge keeps full tag (`llama3.1:8b`) (QQ91,
+  QQ104). Filter-match count surfaces alongside spend (QQ107).
+- `_lcGetSessions` / `_lcSaveSessions` defensive normalization
+  (QQ83, QQ103).
+- `_wfOpen` clears stale `lastRunResults` (QQ87).
+
+### Esc-clears-input convention across all 4 input surfaces
+- Chat sidebar filter (QQ58), chat composer in-stream cancel
+  (QQ64), workflow sidebar search (QQ95), terminal input (QQ106).
+
+### Workflow
+- ▶ 단독 실행 offers auto-save on dirty (QQ94).
+- ↻ fallback chip surfaces policy fallback usage (QQ105).
+- Tag input selects on focus (QQ89).
+
+### Chat composer ergonomics
+- Pre-token "_…_" placeholder (QQ76) that doesn't persist on tab
+  close (QQ77).
+- Image attach 📎 button (QQ61) with stronger drag cue (QQ57)
+  and aria-label (QQ96).
+- Live `📷 N` image counter (QQ92), clickable to clear all
+  attachments (QQ93).
+- Always jump to bottom on send (QQ88), shell-style history
+  recall reset on input (QQ85), markdown export drops base64
+  to placeholders (QQ75).
+
+---
 ## [2.68.17] — 2026-05-03
 
 ### Added
