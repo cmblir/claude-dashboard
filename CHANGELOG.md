@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.23] — 2026-05-02
+
+### Performance
+- 🔒 **`/vendor/*` served with `Cache-Control: public, max-age=31536000,
+  immutable`** (HH4). The dashboard ships its own copies of Chart.js,
+  vis-network, marked, Tailwind CSS, and Pretendard, so URLs only ever
+  change on a code update. Marking them immutable means the browser
+  skips even the 304 revalidation round-trip on subsequent loads.
+  Effective only after one warm load — first visit unchanged.
+
+---
 ## [2.66.22] — 2026-05-02
 
 ### Performance — first-paint
