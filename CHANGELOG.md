@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.128] — 2026-05-02
+
+### Fixed
+- 💾 **Chat history quota recovery for embedded images** (QQ53). After
+  QQ39 added base64 image attachments, a single chat session can
+  push past localStorage's ~5–10 MB cap. `_lcSaveHistory()` now
+  catches `QuotaExceededError` and recovers in two stages: (1)
+  replace `data:image/…` URLs in the heaviest message with
+  `_[image dropped to fit storage]_`, retry; (2) drop the oldest
+  message; (3) repeat. Conversation text + recent images are
+  preserved while ancient image bytes get evicted first.
+
+---
 ## [2.66.127] — 2026-05-02
 
 ### Added
