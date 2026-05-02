@@ -95,6 +95,9 @@ NEW_EN: dict[str, str] = {
     "이어서 사용할 세션을 선택하세요": "Pick a session to resume",
     "개": "items",
     "session_id 적용됨": "session_id applied",
+    # NN1
+    "형제 노드 실패로 자동 취소됨": "Auto-cancelled because a sibling node failed",
+    "자동 취소됨": "auto-cancelled",
     "워크플로우 실행 / 중단": "Run / stop workflow",
     # LL16 already covered: 새 노드 추가 — exists.
 }
@@ -187,5 +190,8 @@ NEW_ZH: dict[str, str] = {
     "이어서 사용할 세션을 선택하세요": "选择要继续的会话",
     "개": "项",
     "session_id 적용됨": "已应用 session_id",
+    # NN1
+    "형제 노드 실패로 자동 취소됨": "因同级节点失败而自动取消",
+    "자동 취소됨": "自动取消",
     "워크플로우 실행 / 중단": "运行 / 停止工作流",
 }

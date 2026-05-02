@@ -7320,8 +7320,22 @@ async function _wfShowRunResult(run) {
     const node = (__wf.current.nodes || []).find(n => n.id === nid) || {};
     const icon = (WF_TYPE_MAP[node.type]||{}).icon || '•';
     const preview = (r.output||'').slice(0, 500);
-    const err = r.error ? `<div class="text-[11px] text-red-400 mt-1">⚠ ${escapeHtml(r.error)}</div>` : '';
-    const switchUI = (r.status === 'err' && (node.type === 'session' || node.type === 'subagent'))
+    // NN1 (v2.66.61) — distinguish "cancelled by sibling-node failure"
+    // from a genuine err. Sibling-cancelled nodes weren't the real
+    // problem; the user shouldn't be tempted to switch their provider.
+    const errStr = r.error || '';
+    const isSiblingCancel = errStr.includes('cancelled by sibling-node failure');
+    let err = '';
+    if (errStr) {
+      if (isSiblingCancel) {
+        err = `<div class="text-[11px] mt-1" style="color:#fbbf24;">⏹ ${t('형제 노드 실패로 자동 취소됨')}</div>`;
+      } else {
+        err = `<div class="text-[11px] text-red-400 mt-1">⚠ ${escapeHtml(errStr)}</div>`;
+      }
+    }
+    // Only offer the switch-provider UI on a *genuine* err.
+    const switchUI = (r.status === 'err' && !isSiblingCancel
+                      && (node.type === 'session' || node.type === 'subagent'))
       ? _switchSelectFor(nid, (node.data || {}).assignee || '') : '';
     const sid = r.sessionId || '';
     const sidRow = sid ? `
@@ -7331,9 +7345,11 @@ async function _wfShowRunResult(run) {
         <button class="btn text-[10px]" onclick="_copyToClipboard(this, ${JSON.stringify(sid).replace(/"/g,'&quot;')})">📋</button>
         <button class="btn text-[10px]" onclick="_wfUseAsResume('${nid}', ${JSON.stringify(sid).replace(/"/g,'&quot;')})" title="${t('다른 노드의 resume 필드에 붙여넣기')}">↪ ${t('이어쓰기')}</button>
       </div>` : '';
-    return `<div class="card p-3">
+    const statusLabel = isSiblingCancel ? t('자동 취소됨') : (r.status || '');
+    const statusColor = isSiblingCancel ? '#fbbf24' : 'var(--text-dim)';
+    return `<div class="card p-3" ${isSiblingCancel ? 'style="border-color:rgba(251,191,36,0.35);"' : ''}>
       <div class="flex items-center justify-between mb-1">
-        <div class="text-xs font-semibold">${icon} ${escapeHtml(node.title||nid)} <span class="text-[10px] text-[var(--text-dim)]">(${r.status})</span></div>
+        <div class="text-xs font-semibold">${icon} ${escapeHtml(node.title||nid)} <span class="text-[10px]" style="color:${statusColor};">(${statusLabel})</span></div>
         <div class="text-[10px] text-[var(--text-dim)]">${r.durationMs||0}ms</div>
       </div>
       ${preview ? `<pre class="text-[11px] whitespace-pre-wrap break-words" style="max-height:160px;overflow-y:auto;">${escapeHtml(preview)}</pre>` : ''}
