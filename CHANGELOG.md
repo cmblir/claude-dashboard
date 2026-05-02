@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.85] — 2026-05-02
+
+### Fixed
+- 🛎 **De-duplicated workflow completion notifications** (QQ10).
+  Previously the browser notification + result modal could each
+  fire on every SSE poll while the run was already terminal,
+  spamming the user. Now sentinel `__wf._lastCompletedRunId`
+  guarantees one fire per run id.
+- 📋 **Fail-fast summary toast on err** (QQ10). When a run ends
+  in `err` and at least one node was sibling-cancelled, an
+  inline toast surfaces the breakdown:
+  `🔴 N 실제 실패 · ⏹ M 자동 취소됨 · ✓ K 완료`.
+
+---
 ## [2.66.84] — 2026-05-02
 
 ### Added
