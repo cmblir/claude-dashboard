@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.70] — 2026-05-02
+
+### Changed
+- 🟠 **Workflow nodes auto-cancelled by fail-fast (MM1) get an
+  amber dashed border** instead of a hard red one (PP1).
+  `data-status="cancelled"` is mapped client-side from
+  `(status='err' && error contains 'cancelled by sibling-node failure')`.
+  Real failures keep the red border. Same red/amber distinction
+  as the run-result modal (NN1) and the active sessions panel
+  (NN3) — now also on the canvas itself.
+
+---
 ## [2.66.69] — 2026-05-02
 
 ### Added

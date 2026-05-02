@@ -6750,7 +6750,14 @@ function _wfApplyRunStatus(run) {
     if (!el) continue;
     if (changed && r) {
       const cur = el.getAttribute('data-status');
-      if (cur !== r.status) el.setAttribute('data-status', r.status);
+      // PP1 (v2.66.70) — promote sibling-cancelled to its own visual
+      // status so the canvas shows amber-dashed border instead of
+      // a hard red one (which implies the user should debug it).
+      let visStatus = r.status;
+      if (visStatus === 'err' && r.error && r.error.includes('cancelled by sibling-node failure')) {
+        visStatus = 'cancelled';
+      }
+      if (cur !== visStatus) el.setAttribute('data-status', visStatus);
     }
     if (r && r.status === 'running' && r.startedAt) {
       const secs = Math.max(0, Math.floor((Date.now() - r.startedAt) / 1000));
@@ -26137,7 +26144,7 @@ window._lcRegenerate = async function (idx) {
 let _lcChatAbortCtrl = null;
 
 async function _lcChatSend() {
-  // If a stream is in flight, this button click means CANCEL.
+  // OO5 (v2.66.68) — session-aware send with token stats, auto-labelling, regenerate.
   if (_lcChatAbortCtrl) {
     try { _lcChatAbortCtrl.abort(); } catch (_) {}
     return;
@@ -26150,25 +26157,34 @@ async function _lcChatSend() {
   if (!text) return;
   const assignee = sel.value || '';
   if (!assignee) { toast(t('프로바이더를 선택하세요'), 'warn'); return; }
-  ta.value = '';
-  // Pull system prompt (per-assignee).
+  ta.value = ''; ta.style.height = 'auto';
   let sysPrompt = '';
   try {
     const sysTa = document.getElementById('lcSysPrompt');
     if (sysTa && sysTa.value.trim()) sysPrompt = sysTa.value.trim();
     else sysPrompt = localStorage.getItem('cc.lazyclawChat.sys.' + assignee) || '';
   } catch (_) {}
-  const history = _lcChatLoad();
+
+  const sessionId = _lcEnsureSession(assignee);
+  const history = _lcGetHistory(sessionId);
   history.push({ role: 'user', text, assignee, ts: Date.now() });
-  // Placeholder assistant message — text grows as tokens stream in.
+  // Auto-label session from first user message.
+  const sessions = _lcGetSessions();
+  const ses = sessions.find(s => s.id === sessionId);
+  if (ses && (!ses.label || ses.label === t('새 대화'))) {
+    ses.label = text.slice(0, 40);
+    _lcSaveSessions(sessions);
+    _lcRenderSessions();
+  }
   const reply = { role: 'assistant', text: '', assignee, ts: Date.now() };
   history.push(reply);
-  _lcChatSave(history);
+  _lcSaveHistory(sessionId, history);
   _lcChatRender();
   if (sendBtn) {
     sendBtn.classList.remove('btn-primary');
     sendBtn.classList.add('btn-danger');
-    sendBtn.textContent = '■ ' + t('중단');
+    sendBtn.textContent = '■';
+    sendBtn.title = t('중단');
   }
   _lcChatAbortCtrl = new AbortController();
   const t0 = Date.now();
@@ -26176,9 +26192,8 @@ async function _lcChatSend() {
     const resp = await fetch('/api/lazyclaw/chat/stream', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        assignee, message: text,
-        systemPrompt: sysPrompt,
-        history: history.slice(0, -1).slice(-12),
+        assignee, message: text, systemPrompt: sysPrompt,
+        history: history.slice(0, -1).slice(-16),
       }),
       signal: _lcChatAbortCtrl.signal,
     });
@@ -26191,7 +26206,6 @@ async function _lcChatSend() {
       const { done, value } = await reader.read();
       if (done) break;
       buf += dec.decode(value, { stream: true });
-      // Parse SSE blocks separated by blank lines.
       let idx;
       while ((idx = buf.indexOf('\n\n')) >= 0) {
         const block = buf.slice(0, idx);
@@ -26208,11 +26222,10 @@ async function _lcChatSend() {
             const o = JSON.parse(data);
             if (o.text) {
               reply.text += o.text;
-              // Throttle renders to ~30Hz so we don't thrash on
-              // very chatty streams.
               const now = performance.now();
-              if (now - lastRender > 33) {
-                _lcChatSave(history); _lcChatRender();
+              if (now - lastRender > 30) {
+                _lcSaveHistory(sessionId, history);
+                _lcChatRender();
                 lastRender = now;
               }
             }
@@ -26221,43 +26234,41 @@ async function _lcChatSend() {
           try {
             const o = JSON.parse(data);
             const dur = ((Date.now() - t0) / 1000).toFixed(1);
-            reply.meta = `${o.provider || ''}${o.model ? ' · ' + o.model : ''} · ${dur}s`;
+            reply.meta = [o.provider, o.model, dur + 's'].filter(Boolean).join(' · ');
+            if (o.tokensIn) reply.tokensIn = o.tokensIn;
+            if (o.tokensOut) reply.tokensOut = o.tokensOut;
           } catch (_) {}
         } else if (event === 'error') {
-          try {
-            const o = JSON.parse(data);
-            reply.text = (reply.text || '') + '\n⚠ ' + (o.error || 'error');
-          } catch (_) { reply.text += '\n⚠ stream error'; }
+          try { const o = JSON.parse(data); reply.text = (reply.text || '') + '\n⚠ ' + (o.error || 'error'); }
+          catch (_) { reply.text += '\n⚠ stream error'; }
         }
       }
     }
-    _lcChatSave(history); _lcChatRender();
+    _lcSaveHistory(sessionId, history); _lcChatRender();
+    _lcUpdateSessionMeta(sessionId, assignee, reply.text.slice(0, 55));
+    _lcRenderSessions();
   } catch (e) {
     if (e && e.name === 'AbortError') {
-      reply.text = (reply.text || '') + '\n\n⏹ ' + t('사용자가 중단함');
-      _lcChatSave(history); _lcChatRender();
+      reply.text = (reply.text || '') + (reply.text ? '\n\n' : '') + '⏹ ' + t('중단됨');
+      _lcSaveHistory(sessionId, history); _lcChatRender();
     } else {
-      // Fallback: one-shot.
       try {
         const r = await api('/api/lazyclaw/chat', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ assignee, message: text, systemPrompt: sysPrompt, history: history.slice(0, -1).slice(-12) }),
+          body: JSON.stringify({ assignee, message: text, systemPrompt: sysPrompt, history: history.slice(0, -1).slice(-16) }),
         });
         reply.text = (r && r.ok && r.output) ? r.output : ('⚠ ' + (r.error || t('응답 실패')));
-        if (r && r.ok) {
-          reply.meta = `${r.provider || ''}${r.model ? ' · ' + r.model : ''}${r.durationMs ? ' · ' + (r.durationMs/1000).toFixed(1) + 's' : ''}`;
-        }
-      } catch (e2) {
-        reply.text = '⚠ ' + (e2 && e2.message || e2);
-      }
-      _lcChatSave(history); _lcChatRender();
+        if (r && r.ok) reply.meta = [r.provider, r.model, r.durationMs ? (r.durationMs/1000).toFixed(1)+'s' : ''].filter(Boolean).join(' · ');
+      } catch (e2) { reply.text = '⚠ ' + (e2 && e2.message || e2); }
+      _lcSaveHistory(sessionId, history); _lcChatRender();
     }
   } finally {
     _lcChatAbortCtrl = null;
     if (sendBtn) {
       sendBtn.classList.remove('btn-danger');
       sendBtn.classList.add('btn-primary');
-      sendBtn.textContent = '📨 ' + t('전송');
+      sendBtn.textContent = '↑';
+      sendBtn.title = t('전송') + ' (Enter)';
     }
     setTimeout(() => ta.focus(), 30);
   }

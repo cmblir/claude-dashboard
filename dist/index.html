@@ -807,6 +807,10 @@ window._loadVendor = (() => {
   .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2.5; animation: wfPulse 1.2s infinite; filter: drop-shadow(0 0 8px rgba(167,139,250,0.6)); }
   .wf-node[data-status="ok"] .wf-node-body { stroke: #4ade80; stroke-width: 2; }
   .wf-node[data-status="err"] .wf-node-body { stroke: #f87171; stroke-width: 2; }
+  /* PP1 (v2.66.70) — sibling-cancelled (auto-cancel) gets amber dashed
+     border to distinguish from real failures. The cancel state is set
+     server-side when a node's subprocess is SIGTERM'd via MM1 fail-fast. */
+  .wf-node[data-status="cancelled"] .wf-node-body { stroke: #fbbf24; stroke-width: 2; stroke-dasharray: 6 3; }
   .wf-node[data-status="skipped"] .wf-node-body { stroke: rgba(255,255,255,0.1); stroke-dasharray: 4 4; }
   /* 회전하는 점선 외곽 링 — running 상태만 표시 */
   .wf-node-ring { stroke: #a78bfa; stroke-width: 2; stroke-dasharray: 6 6; fill: none; opacity: 0; pointer-events: none; }
