@@ -26718,8 +26718,48 @@ AFTER.lazyclawTerm = () => {
     }
   });
   setTimeout(() => inp.focus(), 50);
-  // Restore log
   _lcTermRender();
+  // QQ4 (v2.66.79) — first visit of the day → run a quick health
+  // check so the user immediately sees provider state. Stored
+  // timestamp prevents re-running on every tab visit.
+  try {
+    const last = parseInt(localStorage.getItem('cc.lazyclawTerm.healthCheckedAt') || '0', 10);
+    const HOUR = 3600 * 1000;
+    if (Date.now() - last > HOUR && !_lcTermLoadLog().length) {
+      localStorage.setItem('cc.lazyclawTerm.healthCheckedAt', String(Date.now()));
+      _lcTermHealthCheck();
+    }
+  } catch (_) {}
+};
+
+window._lcTermHealthCheck = async function () {
+  const cmds = [
+    'claude --version',
+    'ollama list',
+    'gemini --version',
+    'codex --version',
+    'git status -sb',
+  ];
+  const log = _lcTermLoadLog();
+  log.push({ kind: 'out', text: '── ' + t('헬스체크 시작') + ' ──', ts: Date.now() });
+  _lcTermSaveLog(log); _lcTermRender();
+  for (const c of cmds) {
+    log.push({ kind: 'cmd', text: c, ts: Date.now() });
+    _lcTermSaveLog(log); _lcTermRender();
+    try {
+      const r = await api('/api/lazyclaw/term', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: c }),
+      });
+      if (r.ok) log.push({ kind: 'out', text: ((r.stdout || '') + (r.stderr ? '\n' + r.stderr : '')).trim() || '(no output)', ts: Date.now() });
+      else      log.push({ kind: 'err', text: '⚠ ' + (r.error || 'unknown'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    _lcTermSaveLog(log); _lcTermRender();
+  }
+  log.push({ kind: 'out', text: '── ' + t('헬스체크 완료') + ' ──', ts: Date.now() });
+  _lcTermSaveLog(log); _lcTermRender();
 };
 
 function _lcTermLoadLog() {
