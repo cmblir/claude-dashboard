@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.13] — 2026-05-02
+
+### Added
+- 💬 **Pre-token `…` placeholder in streaming chat** (QQ76). The empty
+  assistant bubble used to look broken between request send and the
+  first SSE token (especially noticeable for cold-start models).
+  The bubble now starts with a `_…_` italic placeholder that the
+  first real token replaces. Cleared also on abort (Esc) and
+  fallback paths so it never lingers.
+
+---
 ## [2.67.12] — 2026-05-02
 
 ### Fixed
