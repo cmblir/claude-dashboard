@@ -2510,6 +2510,7 @@
   "선택…": "Select…",
   "선택된 노드": "Selected node",
   "선택된 노드/엣지 삭제": "Delete selected node/edge",
+  "선택된 모델이 vision 미지원일 수 있습니다 — 이미지가 무시될 수 있어요": "Selected model may not support vision — images could be ignored",
   "선택된 버전 비교": "Compare Selected Versions",
   "선택된 파일": "Selected file",
   "선택됨": "Selected",

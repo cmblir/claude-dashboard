@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.119] — 2026-05-02
+
+### Added
+- ⚠ **Soft vision warning when sending images to non-vision models**
+  (QQ44). If the composer text contains a base64 image but the
+  assignee id doesn't match a vision-capable substring (`opus`,
+  `sonnet`, `haiku`, `gpt-4/5/o`, `gemini`, `llava`, `vision`,
+  `claude-`), the user gets a one-time-per-session toast warning.
+  Stored in `sessionStorage` so the banner doesn't pile up if the
+  same session repeatedly attaches images.
+
+---
 ## [2.66.118] — 2026-05-02
 
 ### Fixed

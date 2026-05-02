@@ -27292,6 +27292,21 @@ async function _lcChatSend() {
   }
   const assignee = sel.value || '';
   if (!assignee) { toast(t('프로바이더를 선택하세요'), 'warn'); return; }
+  // QQ44 (v2.66.119) — soft vision warning. If the prompt contains
+  // a base64 image but the assignee doesn't look vision-capable,
+  // show a one-time warning per session. Heuristic — vision models
+  // we expect to handle inline images by name or id substring.
+  if (/!\[[^\]]*\]\(data:image\//.test(text)) {
+    const lower = assignee.toLowerCase();
+    const looksVision = /(opus|sonnet|haiku|gpt-4|gpt-5|gpt-o|gemini|llava|vision|claude-)/.test(lower);
+    if (!looksVision) {
+      const warnKey = 'cc.lc.visionWarn.' + _lcCurrentId();
+      if (!sessionStorage.getItem(warnKey)) {
+        sessionStorage.setItem(warnKey, '1');
+        toast(`⚠ ${t('선택된 모델이 vision 미지원일 수 있습니다 — 이미지가 무시될 수 있어요')}`, 'warn');
+      }
+    }
+  }
   ta.value = ''; ta.style.height = 'auto';
   // QQ33 — drop the draft once we send.
   try { localStorage.removeItem('cc.lc.draft.' + _lcCurrentId()); } catch (_) {}

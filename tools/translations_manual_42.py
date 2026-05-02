@@ -272,6 +272,8 @@ NEW_EN: dict[str, str] = {
     # QQ39 — image attach
     "이미지": "images",
     "이미지 붙여넣음": "image(s) pasted",
+    # QQ44 — vision warning
+    "선택된 모델이 vision 미지원일 수 있습니다 — 이미지가 무시될 수 있어요": "Selected model may not support vision — images could be ignored",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -538,4 +540,6 @@ NEW_ZH: dict[str, str] = {
     # QQ39
     "이미지": "张图片",
     "이미지 붙여넣음": "张图片已粘贴",
+    # QQ44
+    "선택된 모델이 vision 미지원일 수 있습니다 — 이미지가 무시될 수 있어요": "所选模型可能不支持视觉 — 图片可能被忽略",
 }
