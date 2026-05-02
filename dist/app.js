@@ -2113,7 +2113,13 @@ VIEWS.workflows = async () => {
             </div>
             <button class="btn text-xs" onclick="_wfFitView()" title="${t('자동 정렬 + 화면 맞춤')} (Ctrl+0)">🎯</button>
             <button class="btn text-xs" onclick="_wfShowShortcutHelp()" title="${t('키보드 단축키')} (?)">⌨️</button>
-            <input id="wfNodeSearch" class="input text-xs" placeholder="${t('노드 검색...')}" style="width:130px;padding:3px 8px;font-size:11px;margin-left:4px;" oninput="_wfNodeSearchFilter(this.value)">
+            <!-- LL25 (v2.66.54) — search wrapper with built-in clear button.
+                 Esc inside the input or × button clears the query so the
+                 user can resume browsing without dimmed nodes. -->
+            <span style="position:relative;display:inline-block;margin-left:4px;">
+              <input id="wfNodeSearch" class="input text-xs" placeholder="${t('노드 검색 (예: fy / ses)')}" title="${t('이름·타입·assignee·역할 fuzzy 검색')}" style="width:160px;padding:3px 22px 3px 8px;font-size:11px;" oninput="_wfNodeSearchFilter(this.value);_wfSearchClearVis()" onkeydown="if(event.key==='Escape'){this.value='';_wfNodeSearchFilter('');_wfSearchClearVis();}">
+              <button id="wfNodeSearchClear" type="button" onclick="document.getElementById('wfNodeSearch').value='';_wfNodeSearchFilter('');_wfSearchClearVis()" title="${t('검색 지우기')}" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:var(--text-dim);cursor:pointer;font-size:14px;line-height:1;padding:0 4px;display:none;">×</button>
+            </span>
           </div>
           <svg id="wfCanvas" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -3669,6 +3675,12 @@ let __wfNodeSearchQuery = '';
 function _wfNodeSearchFilter(q) {
   __wfNodeSearchQuery = (q || '').trim().toLowerCase();
   _wfApplyNodeSearchHighlight();
+}
+function _wfSearchClearVis() {
+  const inp = document.getElementById('wfNodeSearch');
+  const btn = document.getElementById('wfNodeSearchClear');
+  if (!inp || !btn) return;
+  btn.style.display = inp.value ? '' : 'none';
 }
 // LL24 (v2.66.53) — fuzzy node-search matching (n8n parity).
 // "fy" matches "frontend", "ses" matches "session", etc. Falls back

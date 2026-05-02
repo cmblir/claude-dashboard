@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.54] — 2026-05-02
+
+### Changed
+- 🔍 **Node search input gets a clear button + Esc support**
+  (LL25). Placeholder text now hints at fuzzy syntax
+  (`예: fy / ses`). The `×` button shows up only when a
+  query is active; pressing `Esc` inside the field also clears.
+
+---
 ## [2.66.53] — 2026-05-02
 
 ### Changed
