@@ -4609,6 +4609,27 @@ function _wfBindCanvas() {
         if (__wf.selectedNodeId) { e.preventDefault(); _wfDeleteSelectedNode(); return true; }
         if (__wf.selectedEdgeId) { e.preventDefault(); _wfDeleteSelectedEdge(); return true; }
       }
+
+      // LL4 (v2.66.33) — n8n-style arrow-key node nudging.
+      //   ←↑→↓        : 10 px (matches grid snap step)
+      //   Shift+arrow : 1 px (fine adjust)
+      //   Hold mod    : ignored (browser scroll / shortcuts)
+      if (!mod && !inInput && __wf.current && __wf.selectedNodeId) {
+        const ARROWS = { ArrowLeft: [-1,0], ArrowRight: [1,0], ArrowUp: [0,-1], ArrowDown: [0,1] };
+        const dir = ARROWS[e.key];
+        if (dir) {
+          e.preventDefault();
+          const step = e.shiftKey ? 1 : 10;
+          const node = __wf.current.nodes.find(n => n.id === __wf.selectedNodeId);
+          if (node) {
+            node.x = (node.x || 0) + dir[0] * step;
+            node.y = (node.y || 0) + dir[1] * step;
+            if (typeof _wfUpdateNodeTransform === 'function') _wfUpdateNodeTransform(node.id);
+            __wf.dirty = true; _wfUpdateToolbar(); _wfSchedulePatch();
+          }
+          return true;
+        }
+      }
     });
   }
 
