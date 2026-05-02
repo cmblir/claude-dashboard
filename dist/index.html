@@ -811,6 +811,11 @@ window._loadVendor = (() => {
      border to distinguish from real failures. The cancel state is set
      server-side when a node's subprocess is SIGTERM'd via MM1 fail-fast. */
   .wf-node[data-status="cancelled"] .wf-node-body { stroke: #fbbf24; stroke-width: 2; stroke-dasharray: 6 3; }
+  /* PP2 (v2.66.72) — manually-disabled nodes (data.disabled === true)
+     render at half opacity with grayscale so the user can see them in
+     context but knows they will be skipped on the next run. n8n parity. */
+  .wf-node.wf-disabled { opacity: 0.45; filter: grayscale(0.7); }
+  .wf-node.wf-disabled .wf-node-body { stroke-dasharray: 4 3; }
   .wf-node[data-status="skipped"] .wf-node-body { stroke: rgba(255,255,255,0.1); stroke-dasharray: 4 4; }
   /* 회전하는 점선 외곽 링 — running 상태만 표시 */
   .wf-node-ring { stroke: #a78bfa; stroke-width: 2; stroke-dasharray: 6 6; fill: none; opacity: 0; pointer-events: none; }

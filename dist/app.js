@@ -4026,7 +4026,7 @@ function _wfRenderNode(n) {
         <text x="10" y="15" text-anchor="middle" font-size="12" pointer-events="none">🖥️</text>
       </g>` : '';
   return `
-    <g class="wf-node${sel}" data-node="${n.id}" data-type="${n.type}" transform="translate(${n.x},${n.y})">
+    <g class="wf-node${sel}${(n.data&&n.data.disabled)?' wf-disabled':''}" data-node="${n.id}" data-type="${n.type}" transform="translate(${n.x},${n.y})">
       <rect class="wf-node-body" width="${WF_NODE_W}" height="${WF_NODE_H}" rx="12" ry="12"></rect>
       <rect class="wf-node-ring" x="-4" y="-4" width="${WF_NODE_W+8}" height="${WF_NODE_H+8}" rx="14" ry="14"></rect>
       <text class="wf-node-icon" x="14" y="30">${meta.icon}</text>
@@ -4747,6 +4747,8 @@ function _wfShowNodeContextMenu(nid, x, y) {
         __wf.dirty = true;
         _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
       } },
+    // PP2 (v2.66.72) — toggle node enabled / disabled
+    { icon: '⏸', label: t('비활성화 토글'), shortcut: 'D', fn: () => _wfToggleNodeDisabled(nid) },
     { sep: true },
     { icon: '🗑', label: t('삭제'), shortcut: '⌫', danger: true, fn: () => _wfDeleteSelectedNode() },
   ];
@@ -4786,6 +4788,20 @@ function _wfShowNodeContextMenu(nid, x, y) {
 function _wfCloseNodeContextMenu() {
   const m = document.getElementById('wfNodeCtxMenu');
   if (m) m.remove();
+}
+
+// PP2 (v2.66.72) — toggle node disabled state. Disabled nodes skip on
+// the next run and render at half opacity / grayscale on the canvas.
+function _wfToggleNodeDisabled(nid) {
+  if (!__wf.current) return;
+  const n = __wf.current.nodes.find(x => x.id === nid);
+  if (!n) return;
+  n.data = n.data || {};
+  n.data.disabled = !n.data.disabled;
+  __wf.dirty = true;
+  if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
+  _wfUpdateToolbar();
+  toast(n.data.disabled ? `⏸ ${t('비활성화됨')}` : `▶ ${t('활성화됨')}`, 'ok');
 }
 
 // LL20 (v2.66.49) — edge context menu (Delete only, for now).
@@ -5093,6 +5109,16 @@ function _wfShowEdgeContextMenu(eid, x, y) {
           if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
           if (typeof toast === 'function') toast(`${__wfMultiSelected.size} ${t('노드 선택됨')}`, 'ok');
         }
+        return true;
+      }
+
+      // PP2 (v2.66.72) — `D` (no modifier) — toggle disabled on
+      // selected node (n8n parity). Cmd/Ctrl+D below stays as
+      // duplicate.
+      if (!mod && (e.key === 'd' || e.key === 'D') && !inInput
+          && __wf.current && __wf.selectedNodeId) {
+        e.preventDefault();
+        _wfToggleNodeDisabled(__wf.selectedNodeId);
         return true;
       }
 

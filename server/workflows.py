@@ -2917,8 +2917,16 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                 return (True, results, final_out)
 
         # disabled 노드 제외
-        active_nodes = [nid for nid in level if nid not in disabled]
-        skipped_nodes = [nid for nid in level if nid in disabled]
+        # PP2 (v2.66.72) — also honour user-marked disabled flag
+        # (node.data.disabled === true) so a node can be muted without
+        # deleting it (n8n parity). Skipped nodes still propagate
+        # downstream — same as branch-skip behaviour.
+        manually_disabled = {n["id"] for n in nodes
+                              if (n.get("data") or {}).get("disabled") is True}
+        active_nodes = [nid for nid in level
+                        if nid not in disabled and nid not in manually_disabled]
+        skipped_nodes = [nid for nid in level
+                         if nid in disabled or nid in manually_disabled]
 
         # skip 기록 — cache only.
         if skipped_nodes:
