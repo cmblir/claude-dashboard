@@ -17587,7 +17587,7 @@ VIEWS.aiProviders = async () => {
           </div>
         </div>
         <div class="flex items-center gap-2">
-          ${chip} ${keyChip} ${testBtn}
+          ${chip} ${keyChip} ${testBtn} ${chatBtn}
         </div>
       </div>
       ${p.homepage ? `<a href="${escapeHtml(p.homepage)}" target="_blank" class="text-xs" style="color:var(--cyan)">${escapeHtml(p.homepage)}</a>` : ''}
@@ -18024,6 +18024,13 @@ AFTER.aiProviders = () => {
     _ollamaLoadCatalog(),
     _ollamaLoadInstalled(),
   ]).catch(() => {});
+};
+
+// QQ97 (v2.68.7) — jump from a provider card to lazyclawChat with that
+// provider's first model pre-selected. Called from the 💬 채팅 button.
+window._providerOpenChat = (assignee) => {
+  try { localStorage.setItem('cc.lazyclawChat.assignee', assignee); } catch (_) {}
+  go('lazyclawChat');
 };
 
 // 프로바이더 헬스 체크
@@ -26850,12 +26857,19 @@ function _lcRenderSessions() {
     const pin = s.pinned ? '📌 ' : '';
     const parent = s.parentId && byId[s.parentId];
     const lineage = parent ? `<div style="font-size:9px;color:var(--accent);margin-top:2px;cursor:pointer;" title="${t('부모 세션으로 이동')}" onclick="event.stopPropagation();_lcSwitchSession('${parent.id}')">↳ ${escapeHtml((parent.label||t('새 대화')).slice(0,28))} #${(s.branchedAt!=null?s.branchedAt+1:'')}</div>` : '';
-    let tokSum = 0;
+    let tokSum = 0, costSum = 0;
     try {
       const h = _lcGetHistory(s.id);
-      for (const m of h) tokSum += (m.tokensIn || 0) + (m.tokensOut || 0);
+      for (const m of h) {
+        tokSum += (m.tokensIn || 0) + (m.tokensOut || 0);
+        if (typeof m.costUsd === 'number') costSum += m.costUsd;
+      }
     } catch (_) {}
     const tokBadge = tokSum > 0 ? `<span style="font-size:9px;color:var(--text-dim);background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:8px;font-variant-numeric:tabular-nums;" title="${t('총 토큰 사용량')}">🔤 ${fmtTok(tokSum)}</span>` : '';
+    // QQ98 (v2.68.8) — cumulative spend per session (USD).
+    const costBadge = costSum > 0
+      ? `<span style="font-size:9px;color:#f59e0b;background:rgba(245,158,11,0.10);padding:1px 5px;border-radius:8px;font-variant-numeric:tabular-nums;" title="${t('세션 누적 비용')}">$${costSum.toFixed(costSum < 0.01 ? 4 : 3)}</span>`
+      : '';
     // QQ91 (v2.68.1) — show the session's stored assignee as a tiny
     // chip so users can see which model each session is wired to
     // without switching to it (pairs with QQ65 per-session model).
@@ -26865,7 +26879,7 @@ function _lcRenderSessions() {
       <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${active ? 'var(--accent)' : 'var(--text)'};">${pin}${escapeHtml(s.label || t('새 대화'))}</div>
       ${s.preview ? `<div style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dim);margin-top:2px;">${escapeHtml(s.preview)}</div>` : ''}
       ${lineage}
-      <div style="font-size:9px;color:var(--text-dim);margin-top:3px;display:flex;align-items:center;gap:6px;"><span>${relTime(s.ts)}</span>${aBadge}${tokBadge}</div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span>${relTime(s.ts)}</span>${aBadge}${tokBadge}${costBadge}</div>
     </div>`;
   }).join('');
 }
