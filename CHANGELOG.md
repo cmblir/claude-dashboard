@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.123] — 2026-05-02
+
+### Performance
+- 🚀 **Throttle inspector re-render under SSE bursts** (QQ48). QQ47
+  re-renders the inspector on every status-sig change so the Gantt
+  stays live, but a fast workflow (10+ nodes finishing within a
+  second) would rebuild the inspector HTML 10× — visible lag on
+  large boards. The trigger now keeps the dirty flag flip but only
+  actually calls `_wfRenderInspector()` at most once every 250 ms
+  (≤4 fps). User-driven renders bypass the throttle (they go through
+  the normal `_wfRenderInspector({force:true})` paths).
+
+---
 ## [2.66.122] — 2026-05-02
 
 ### Fixed
