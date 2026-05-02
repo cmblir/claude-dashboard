@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.53] — 2026-05-02
+
+### Changed
+- 🔍 **Node search uses fuzzy matching** (LL24, n8n parity).
+  Subsequence match + substring across title / type / label /
+  assignee / agentRole. Typing "fy" highlights "frontend",
+  "ses" highlights "session". Korean / Chinese queries fall
+  back to substring (subsequence is meaningless for CJK).
+
+---
 ## [2.66.52] — 2026-05-02
 
 ### Added
