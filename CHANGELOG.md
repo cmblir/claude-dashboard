@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.125] — 2026-05-02
+
+### Added
+- ⌨ **Cmd/Ctrl+Shift+[ / ] — prev/next chat session** (QQ50). Mirrors
+  the workflow Cmd+[/] navigation (LL27) so users with many parallel
+  conversations can jump session-to-session without leaving the
+  keyboard. Skipped when focus is in an input/textarea so it doesn't
+  hijack `[` typing in messages.
+
+---
 ## [2.66.124] — 2026-05-02
 
 ### Fixed
