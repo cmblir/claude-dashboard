@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.126] — 2026-05-02
+
+### Added
+- ⌨ **Shell-history recall in chat composer** (QQ51). Cmd/Ctrl+↑
+  pulls the previous user message into the composer; repeated
+  presses walk back through the session's user messages.
+  Cmd/Ctrl+↓ walks forward / clears back to a blank draft. The
+  index resets on each send. Lets users tweak and resend a
+  variation of an earlier prompt without scrolling and copying.
+
+---
 ## [2.66.125] — 2026-05-02
 
 ### Added
