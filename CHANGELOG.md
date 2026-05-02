@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.68] — 2026-05-02
+
+### Added
+- 🔄 **Regenerate assistant reply with another model** (OO5).
+  Hovering an assistant message exposes a `🔄` button that opens
+  a provider:model picker; selecting one drops the old reply and
+  re-sends the original user message under the new assignee.
+  Lightweight side-by-side comparison without leaving the chat.
+
+---
 ## [2.66.67] — 2026-05-02
 
 ### Added

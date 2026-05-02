@@ -117,6 +117,10 @@ NEW_EN: dict[str, str] = {
     "시스템 프롬프트 설정": "Set system prompt",
     "시스템 프롬프트 (예: 너는 친절한 한국어 도우미다)": "System prompt (e.g. 'You are a helpful Korean assistant')",
     "사용자가 중단함": "Cancelled by user",
+    # OO5
+    "다른 모델로 재생성": "Regenerate with another model",
+    "이전 사용자 메시지를 찾을 수 없습니다": "Could not find the prior user message",
+    "같은 사용자 메시지를 선택한 모델로 재요청합니다": "Resend the same user message to the picked model",
     # NN1
     "형제 노드 실패로 자동 취소됨": "Auto-cancelled because a sibling node failed",
     "자동 취소됨": "auto-cancelled",
@@ -237,6 +241,10 @@ NEW_ZH: dict[str, str] = {
     "시스템 프롬프트 설정": "设置系统提示",
     "시스템 프롬프트 (예: 너는 친절한 한국어 도우미다)": "系统提示（例如：你是一个友好的中文助手）",
     "사용자가 중단함": "用户已中断",
+    # OO5
+    "다른 모델로 재생성": "用其他模型重新生成",
+    "이전 사용자 메시지를 찾을 수 없습니다": "未找到上一条用户消息",
+    "같은 사용자 메시지를 선택한 모델로 재요청합니다": "用所选模型重新请求同一条用户消息",
     # NN1
     "형제 노드 실패로 자동 취소됨": "因同级节点失败而自动取消",
     "자동 취소됨": "自动取消",
