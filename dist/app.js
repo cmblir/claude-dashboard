@@ -26746,7 +26746,10 @@ VIEWS.lazyclawChat = async () => {
       </div>
 
       <!-- Messages area -->
-      <div id="lcChatLog" style="flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px;"></div>
+      <div style="flex:1;position:relative;display:flex;flex-direction:column;min-height:0;">
+        <div id="lcChatLog" style="flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px;"></div>
+        <button id="lcScrollBottom" onclick="(function(){var l=document.getElementById('lcChatLog');if(l)l.scrollTop=l.scrollHeight;})()" title="${t('최신 메시지로')}" style="display:none;position:absolute;right:14px;bottom:14px;width:36px;height:36px;border-radius:50%;background:var(--accent,#d97757);color:#fff;border:0;cursor:pointer;font-size:18px;line-height:1;box-shadow:0 4px 12px rgba(0,0,0,0.35);z-index:5;">⬇</button>
+      </div>
 
       <!-- Input -->
       <div style="padding:10px 12px 4px;border-top:1px solid var(--border);display:flex;align-items:flex-end;gap:8px;">
@@ -26766,6 +26769,19 @@ AFTER.lazyclawChat = () => {
   // Render sessions sidebar and current session messages.
   _lcRenderSessions();
   _lcChatRender();
+  // QQ35 (v2.66.110) — show ⬇ scroll-to-bottom button when scrolled
+  // off the latest message.
+  (function() {
+    const log = document.getElementById('lcChatLog');
+    const btn = document.getElementById('lcScrollBottom');
+    if (!log || !btn) return;
+    const update = () => {
+      const off = log.scrollHeight - log.scrollTop - log.clientHeight;
+      btn.style.display = off > 120 ? 'block' : 'none';
+    };
+    log.addEventListener('scroll', update, { passive: true });
+    setTimeout(update, 100);
+  })();
   // OO6 — Cmd/Ctrl+K opens search across all chat histories.
   if (!window.__lcSearchKeyBound) {
     window.__lcSearchKeyBound = true;

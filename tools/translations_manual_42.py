@@ -253,6 +253,8 @@ NEW_EN: dict[str, str] = {
     "가로 균등 분산": "Distribute horizontally",
     "세로 균등 분산": "Distribute vertically",
     "정렬됨": "Aligned",
+    # QQ35 — scroll to bottom
+    "최신 메시지로": "Jump to latest",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -500,4 +502,6 @@ NEW_ZH: dict[str, str] = {
     "가로 균등 분산": "水平等距分布",
     "세로 균등 분산": "垂直等距分布",
     "정렬됨": "已对齐",
+    # QQ35
+    "최신 메시지로": "跳到最新消息",
 }

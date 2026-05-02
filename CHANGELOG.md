@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.110] — 2026-05-02
+
+### Added
+- ⬇ **Scroll-to-bottom button in chat** (QQ35). When the chat log is
+  scrolled more than 120 px above the latest message, a circular ⬇
+  button appears at the bottom-right. Clicking jumps to the newest
+  message. Hides automatically when at the bottom. Essential for
+  long sessions where streaming output pushes content past the
+  fold.
+
+---
 ## [2.66.109] — 2026-05-02
 
 ### Added
