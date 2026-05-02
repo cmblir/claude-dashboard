@@ -22,9 +22,19 @@ def _db() -> sqlite3.Connection:
 
     Note: WAL pragma is set once in _db_init(); journal_mode is a database-level
     setting and persists across connections.
+
+    FF3 (v2.66.18) — explicit `timeout=10.0` and `PRAGMA busy_timeout=10000`
+    so a long-held write lock from the session-indexer thread can't hang
+    a workflow's post-run cost write indefinitely. Without this, contention
+    has been observed to leave a workflow stuck at "currentNodeId=n-o,
+    status=running" forever.
     """
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(DB_PATH), timeout=10.0)
     conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA busy_timeout=10000")
+    except Exception:
+        pass
     return conn
 
 
