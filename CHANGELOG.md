@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.92] — 2026-05-02
+
+### Added
+- ⏱ **Per-command elapsed time in the lazyclaw terminal** (QQ17).
+  `api_lazyclaw_term` now returns `durationMs`; client appends
+  `(123ms)` to the output line. Useful for spotting slow CLI
+  invocations (claude cold start, ollama list scan).
+
+---
 ## [2.66.91] — 2026-05-02
 
 ### Added
