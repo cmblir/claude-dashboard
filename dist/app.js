@@ -4420,6 +4420,7 @@ function _wfShowShortcutHelp() {
     { key: 'Wheel', desc: t('캔버스 패닝') },
     { key: 'Ctrl+Wheel', desc: t('커서 기준 줌') },
     { key: 'Alt+드래그', desc: t('grid snap 우회') },
+    { key: 'Shift+드래그 (빈 영역)', desc: t('러버밴드 다중 선택') },
     { key: t('우클릭'), desc: t('노드/엣지 컨텍스트 메뉴') },
     { key: t('미니맵 클릭'), desc: t('해당 위치로 캔버스 이동') },
     { key: '더블클릭 (빈 영역)', desc: t('화면 맞춤') },
@@ -4690,7 +4691,28 @@ function _wfBindCanvas() {
       _wfRenderInspector();
       return;
     }
-    // 빈 영역 → 팬 + 선택 해제
+    // 빈 영역 → Shift 누른 경우 러버밴드, 아니면 pan + 선택 해제.
+    // QQ27 (v2.66.102) — n8n-style rubber-band drag selection.
+    if (e.shiftKey && !touch) {
+      __wf.drag = { kind: 'rubber', startX: pt.x, startY: pt.y, curX: pt.x, curY: pt.y };
+      let rectEl = document.getElementById('wfRubberRect');
+      if (!rectEl) {
+        rectEl = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rectEl.id = 'wfRubberRect';
+        rectEl.setAttribute('fill', 'rgba(96,165,250,0.10)');
+        rectEl.setAttribute('stroke', '#60a5fa');
+        rectEl.setAttribute('stroke-width', '1');
+        rectEl.setAttribute('stroke-dasharray', '4 3');
+        rectEl.setAttribute('pointer-events', 'none');
+        const vp = document.getElementById('wfViewport');
+        if (vp) vp.appendChild(rectEl);
+      }
+      rectEl.setAttribute('x', pt.x); rectEl.setAttribute('y', pt.y);
+      rectEl.setAttribute('width', 0); rectEl.setAttribute('height', 0);
+      rectEl.style.display = '';
+      try { e.preventDefault(); } catch(_) {}
+      return;
+    }
     __wf.selectedNodeId = null; __wf.selectedEdgeId = null;
     const view = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
     __wf.drag = { kind: 'pan', startX: e.clientX, startY: e.clientY, origPanX: view.panX||0, origPanY: view.panY||0 };
@@ -4741,11 +4763,42 @@ function _wfBindCanvas() {
       __wf.edgeDraft.x2 = pt.x; __wf.edgeDraft.y2 = pt.y;
       _wfDraftRender();
       if (touch) { try{e.preventDefault();}catch(_){} }
+    } else if (__wf.drag.kind === 'rubber') {
+      __wf.drag.curX = pt.x; __wf.drag.curY = pt.y;
+      const rectEl = document.getElementById('wfRubberRect');
+      if (rectEl) {
+        const x = Math.min(__wf.drag.startX, pt.x);
+        const y = Math.min(__wf.drag.startY, pt.y);
+        const w = Math.abs(pt.x - __wf.drag.startX);
+        const h = Math.abs(pt.y - __wf.drag.startY);
+        rectEl.setAttribute('x', x); rectEl.setAttribute('y', y);
+        rectEl.setAttribute('width', w); rectEl.setAttribute('height', h);
+      }
     }
   }
 
   function onUp(e, touch) {
     if (!__wf.drag) return;
+    if (__wf.drag.kind === 'rubber') {
+      const x1 = Math.min(__wf.drag.startX, __wf.drag.curX);
+      const y1 = Math.min(__wf.drag.startY, __wf.drag.curY);
+      const x2 = Math.max(__wf.drag.startX, __wf.drag.curX);
+      const y2 = Math.max(__wf.drag.startY, __wf.drag.curY);
+      const W = (typeof WF_NODE_W !== 'undefined') ? WF_NODE_W : 200;
+      const H = (typeof WF_NODE_H !== 'undefined') ? WF_NODE_H : 80;
+      let added = 0;
+      for (const n of (__wf.current && __wf.current.nodes || [])) {
+        if (n.x + W >= x1 && n.x <= x2 && n.y + H >= y1 && n.y <= y2) {
+          if (!__wfMultiSelected.has(n.id)) { __wfMultiSelected.add(n.id); added++; }
+        }
+      }
+      if (typeof _wfSyncMultiSelectClasses === 'function') _wfSyncMultiSelectClasses();
+      const rectEl = document.getElementById('wfRubberRect');
+      if (rectEl) rectEl.style.display = 'none';
+      if (added > 0) toast(`${__wfMultiSelected.size} ${t('노드 선택됨')}`, 'ok');
+      __wf.drag = null;
+      return;
+    }
     if (__wf.drag.kind === 'edge') {
       // 드롭 타겟 검사 — touch 면 changedTouches 사용
       let tx, ty;

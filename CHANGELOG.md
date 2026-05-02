@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.102] — 2026-05-02
+
+### Added
+- 🟦 **Rubber-band drag selection on workflow canvas** (QQ27, n8n
+  parity). Hold Shift and drag on an empty area of the canvas to
+  draw a dashed selection rectangle. On release, all nodes whose
+  bounding box intersects the rectangle are added to the multi-
+  selection (composes with existing Shift+click). Cmd+A still
+  selects-all. Replaces the missing "drag-to-select" gap that was
+  the most-asked n8n feature.
+
+---
 ## [2.66.101] — 2026-05-02
 
 ### Added
