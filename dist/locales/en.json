@@ -3507,6 +3507,7 @@
   "저장 완료": "Saved",
   "저장 위치": "Save location",
   "저장되지 않은 변경 — 먼저 저장하세요": "Unsaved changes — save first",
+  "저장되지 않은 변경 — 지금 저장하고 단독 실행할까요?": "Unsaved changes — save and run this node?",
   "저장된 버전 목록 보기": "View Saved Versions",
   "저장된 버전이 없습니다": "No saved versions",
   "저장된 커스텀 템플릿이 없습니다": "No custom templates saved",

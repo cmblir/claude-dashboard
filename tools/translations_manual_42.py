@@ -294,6 +294,9 @@ NEW_EN: dict[str, str] = {
     "전송 (Enter)": "Send (Enter)",
     # QQ93 — clear images
     "이미지 모두 제거": "Clear all images",
+    # QQ94 — auto-save before single-node run
+    "저장되지 않은 변경 — 지금 저장하고 단독 실행할까요?": "Unsaved changes — save and run this node?",
+    "저장 실패": "Save failed",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -582,4 +585,7 @@ NEW_ZH: dict[str, str] = {
     "전송 (Enter)": "发送 (Enter)",
     # QQ93
     "이미지 모두 제거": "清除所有图片",
+    # QQ94
+    "저장되지 않은 변경 — 지금 저장하고 단독 실행할까요?": "未保存的更改 — 现在保存并运行该节点？",
+    "저장 실패": "保存失败",
 }

@@ -5179,8 +5179,14 @@ async function _wfRunSingleNode(nid) {
     return;
   }
   if (__wf.dirty) {
-    toast(t('저장되지 않은 변경 — 먼저 저장하세요'), 'warn');
-    return;
+    // QQ94 (v2.68.4) — offer to auto-save the dirty workflow so users
+    // don't have to bounce out, save, and come back to retry.
+    if (confirm(t('저장되지 않은 변경 — 지금 저장하고 단독 실행할까요?'))) {
+      try { await _wfSave(); } catch (_) {}
+      if (__wf.dirty) { toast(t('저장 실패'), 'err'); return; }
+    } else {
+      return;
+    }
   }
   const btnLabel = `▶ ${t('단독 실행')}`;
   toast(`⏳ ${escapeHtml(n.title || n.id)} ${t('실행 중...')}`, 'info');
