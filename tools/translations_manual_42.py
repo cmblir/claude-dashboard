@@ -288,6 +288,8 @@ NEW_EN: dict[str, str] = {
     # QQ61 — file picker
     "이미지 첨부 (paste/drop 도 지원)": "Attach image (paste/drop also works)",
     "이미지 파일이 없거나 8MB 초과": "No image files (or larger than 8MB)",
+    # QQ64 — Esc cancels stream
+    "스트리밍 중단됨": "Stream cancelled",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -570,4 +572,6 @@ NEW_ZH: dict[str, str] = {
     # QQ61
     "이미지 첨부 (paste/drop 도 지원)": "附加图片（也支持粘贴/拖放）",
     "이미지 파일이 없거나 8MB 초과": "没有图片文件或超过 8MB",
+    # QQ64
+    "스트리밍 중단됨": "已取消流式输出",
 }

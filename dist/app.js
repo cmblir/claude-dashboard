@@ -27010,6 +27010,16 @@ AFTER.lazyclawChat = () => {
         if (typeof _lcChatSearch === 'function') _lcChatSearch();
         return;
       }
+      // QQ64 (v2.67.1) — Esc cancels active chat streaming.
+      if (e.key === 'Escape' && _lcChatAbortCtrl) {
+        const tag = (e.target && e.target.tagName) || '';
+        // Don't steal Esc when clearing an input/filter.
+        if (tag === 'INPUT') return;
+        e.preventDefault();
+        try { _lcChatAbortCtrl.abort(); } catch (_) {}
+        toast(t('스트리밍 중단됨'), 'warn');
+        return;
+      }
       // QQ50 (v2.66.125) — Cmd+Shift+[ / ] — prev/next chat session
       // (mirrors workflow Cmd+[/]). Skips when typing in an input.
       if (mod && e.shiftKey && (e.key === '[' || e.key === ']' || e.key === '{' || e.key === '}')) {

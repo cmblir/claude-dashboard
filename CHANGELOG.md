@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.1] — 2026-05-02
+
+### Added
+- ⌨ **Esc cancels active chat streaming** (QQ64). Pressing Esc while
+  the assistant is streaming aborts the in-flight `fetch` via
+  `_lcChatAbortCtrl.abort()` and flashes a "스트리밍 중단됨" toast.
+  Skipped when focus is in an `INPUT` so the QQ58 sidebar
+  filter Esc-clear still works.
+
+---
 ## [2.67.0] — 2026-05-02
 
 **Q-series rollup** — milestone marker for the cumulative work landed
