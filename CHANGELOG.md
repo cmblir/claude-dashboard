@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.60] — 2026-05-02
+
+### Added
+- 📂 **Multi-Claude session reuse picker** in the workflow node
+  inspector (CC5). Next to the `session_id 직접 입력` field is a
+  `📂 최근` button that opens a modal listing the 30 most recent
+  Claude sessions (project, started-ago, first-prompt preview).
+  One click writes the session_id back into the draft so the node
+  resumes that conversation instead of spawning a fresh one. The
+  per-node Active-Sessions panel from DD2 already shows live
+  in-flight sessions; this closes the gap for picking historical
+  ones.
+
+---
 ## [2.66.59] — 2026-05-02
 
 ### Fixed

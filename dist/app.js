@@ -5959,9 +5959,12 @@ function _wfRenderEditorBody(winId) {
             <span>${t('연결된 이전 노드의 session_id 자동 이어받기')}</span>
           </label>
           <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('또는 session_id 직접 입력')}</label>
-          <input class="input w-full mt-1" value="${escapeHtml(d.resumeSessionId||'')}"
-            placeholder="abc123-..."
-            oninput="_wfDraftSetData('${winId}','resumeSessionId',this.value)">
+          <div class="flex items-center gap-1 mt-1">
+            <input class="input flex-1" value="${escapeHtml(d.resumeSessionId||'')}"
+              placeholder="abc123-..."
+              oninput="_wfDraftSetData('${winId}','resumeSessionId',this.value)">
+            <button class="btn text-[10px]" onclick="_wfPickRecentSession('${winId}')" title="${t('최근 세션 목록에서 선택')}">📂 ${t('최근')}</button>
+          </div>
           ${(d.lastRun && d.lastRun.sessionId) ? `
             <div class="text-[10px] text-[var(--text-dim)] mt-2">
               ${t('마지막 실행 session_id')}: <code style="color:#c4b5fd;">${escapeHtml(d.lastRun.sessionId)}</code>
@@ -7376,6 +7379,59 @@ async function _wfSwitchProvider(nid) {
   closeModal();
   await _wfRun();
 }
+
+// CC5 (v2.66.60) — pick a recent Claude session for this node's resume
+// field. Loads /api/sessions/list, shows a modal, sets resumeSessionId
+// on the draft when the user clicks a row.
+async function _wfPickRecentSession(winId) {
+  let r;
+  try {
+    r = await api('/api/sessions/list?limit=30');
+  } catch (e) {
+    toast(t('세션 목록을 불러올 수 없습니다'), 'err'); return;
+  }
+  const sessions = (r && r.sessions) || [];
+  if (!sessions.length) {
+    toast(t('이전 세션이 없습니다 (~/.claude 인덱싱 후 다시 시도)'), 'warn');
+    return;
+  }
+  const rows = sessions.slice(0, 30).map(s => {
+    const sid = s.session_id || s.sessionId || '';
+    const sidShort = sid.slice(0, 12) + '…';
+    const proj = s.project || (s.project_dir || '').split('/').slice(-2).join('/');
+    const when = s.started_at || s.startedAt;
+    const ago = when ? fmtRel(when) : '';
+    const preview = (s.first_user_prompt || s.firstUserPrompt || '').slice(0, 80);
+    return `<button class="card p-2 text-left w-full mb-1" style="cursor:pointer;border:1px solid var(--border);"
+              onclick="_wfApplyRecentSession('${winId}','${sid}')">
+      <div class="flex items-center gap-2">
+        <code style="color:#c4b5fd;font-size:10px;">${escapeHtml(sidShort)}</code>
+        <span class="text-[10px] text-[var(--text-dim)] flex-1 truncate">${escapeHtml(proj)}</span>
+        <span class="text-[10px] text-[var(--text-dim)]">${escapeHtml(ago)}</span>
+      </div>
+      ${preview ? `<div class="text-[11px] mt-1 truncate" style="color:var(--text-mute);">${escapeHtml(preview)}</div>` : ''}
+    </button>`;
+  }).join('');
+  showModal(`
+    <div class="modal p-5" style="max-width:640px;">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">📂 ${t('최근 Claude 세션')}</h2>
+        <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+      </div>
+      <div class="text-[11px] text-[var(--text-dim)] mb-2">${t('이어서 사용할 세션을 선택하세요')} · ${sessions.length} ${t('개')}</div>
+      <div style="max-height:60vh;overflow-y:auto;">${rows}</div>
+    </div>
+  `);
+}
+
+window._wfApplyRecentSession = function(winId, sid) {
+  if (!sid) return;
+  if (typeof _wfDraftSetData === 'function') _wfDraftSetData(winId, 'resumeSessionId', sid);
+  // Re-render the editor so the input shows the new value
+  if (typeof _wfRenderEditorBody === 'function') _wfRenderEditorBody(winId);
+  closeModal();
+  toast(t('session_id 적용됨') + ': ' + sid.slice(0, 12) + '…', 'ok');
+};
 
 async function _wfUseAsResume(sourceNid, sessionId) {
   if (!__wf.current) return;
