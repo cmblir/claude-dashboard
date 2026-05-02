@@ -27608,7 +27608,8 @@ async function _lcChatSend() {
     sendBtn.classList.remove('btn-primary');
     sendBtn.classList.add('btn-danger');
     sendBtn.textContent = '■';
-    sendBtn.title = t('중단');
+    // QQ69 (v2.67.6) — surface the QQ64 Esc shortcut in the tooltip.
+    sendBtn.title = t('중단') + ' (Esc)';
   }
   _lcChatAbortCtrl = new AbortController();
   const t0 = Date.now();

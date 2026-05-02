@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.6] — 2026-05-02
+
+### Added
+- ⌨ **Stop-button tooltip surfaces Esc shortcut** (QQ69). When chat is
+  streaming, the ■ stop button's tooltip now reads "중단 (Esc)" so
+  users discover the QQ64 Esc-cancel without reading the changelog.
+
+---
 ## [2.67.5] — 2026-05-02
 
 ### Added
