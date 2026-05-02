@@ -1360,11 +1360,36 @@ def _run_status_snapshot(runId: str, *, full: bool = False) -> dict:
     # to disk for completed runs (cache is dropped on completion) and for
     # any run that started before a process restart.
     # Y2 (v2.66.11) — by default, truncate every node's `output` to 2 KB
-    # for the polling/SSE path. The canvas tooltip only renders 160 chars
-    # anyway. Pass full=True to get the un-truncated version (used by the
-    # run-detail modal). Cuts payload from 10s of KB per tick to a few KB.
+    # for the polling/SSE path.
+    # HH1 (v2.66.20) — server-side zombie detection. When the cache says
+    # status='running' but every node has reached a terminal state, the
+    # post-run hook hung (SQLite contention, etc.). Promote the run
+    # ourselves so the next snapshot reports the real outcome instead of
+    # an eternal "실행 중". Idempotent.
     cached = _runs_cache_get(runId)
     if cached is not None:
+        if cached.get("status") == "running":
+            nr = cached.get("nodeResults") or {}
+            if nr and all(
+                isinstance(r, dict) and r.get("status") in ("ok", "err", "skipped")
+                for r in nr.values()
+            ):
+                any_err = any(r.get("status") == "err" for r in nr.values())
+                final = "err" if any_err else "ok"
+                def _self_heal(r: dict) -> None:
+                    r["status"] = final
+                    r["finishedAt"] = int(time.time() * 1000)
+                    r["currentNodeId"] = None
+                _runs_cache_update(runId, _self_heal)
+                try:
+                    _persist_run(runId)
+                    _runs_cache_pop(runId)
+                except Exception:
+                    pass
+                healed = _runs_cache_get(runId) or _runs_db_load(run_id=runId).get(runId) or cached
+                healed["status"] = final
+                healed["finishedAt"] = healed.get("finishedAt") or int(time.time() * 1000)
+                return {"ok": True, "run": _maybe_truncate_run(healed, full)}
         return {"ok": True, "run": _maybe_truncate_run(cached, full)}
     # v2.47.0 — completed runs live in SQLite. Cache misses fall through here.
     loaded = _runs_db_load(run_id=runId)

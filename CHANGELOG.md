@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.20] — 2026-05-02
+
+### Fixed
+- 🩹 **Workflow tab kept "auto-zooming-out"** because every wheel
+  event — including normal trackpad two-finger scrolling — multiplied
+  zoom by 0.9. Replaced with **n8n-style controls** (HH1):
+  - `Ctrl/Cmd + wheel` → zoom (cursor-anchored, exponential to deltaY
+    so trackpads no longer leap 10% per micro-event).
+  - plain `wheel` → pan; `Shift + wheel` swaps axes.
+- 🩹 **Reopening a completed workflow snapped back to "실행 중"**
+  with a fresh polling subscription (the source of "클릭하면 갑자기
+  실행중으로 바뀌면서 렉이 급증" symptom). The auto-restore now
+  fetches `run-status` once and only attaches polling if the server
+  still says `running`. The server itself now **self-heals zombie
+  runs in `_run_status_snapshot`**: when cache.status='running' but
+  every node has reached a terminal state, promote to ok/err and
+  drop the cache entry. Idempotent.
+
+---
 ## [2.66.19] — 2026-05-02
 
 ### Performance — workflow tab feels lag-free
