@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.7] — 2026-05-02
+
+### Fixed
+- 💾 **Slash commands clear the draft too** (QQ70). QQ33 draft
+  autosave was only cleared in the regular send path. Running
+  `/clear`, `/help`, etc. emptied the textarea but the draft
+  localStorage entry stayed, so refreshing the tab restored the
+  slash-command text. Now also cleared in the slash-command
+  branch.
+
+---
 ## [2.67.6] — 2026-05-02
 
 ### Added

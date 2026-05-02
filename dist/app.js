@@ -27549,6 +27549,9 @@ async function _lcChatSend() {
   // QQ1 — slash commands intercept before sending to provider.
   if (text.startsWith('/') && _lcChatSlashCommand(text)) {
     ta.value = ''; ta.style.height = 'auto';
+    // QQ70 (v2.67.7) — also drop the QQ33 draft so a refresh after
+    // a slash command doesn't restore the slashed-out text.
+    try { localStorage.removeItem('cc.lc.draft.' + _lcCurrentId()); } catch (_) {}
     setTimeout(() => ta.focus(), 30);
     return;
   }
