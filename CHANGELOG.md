@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.130] — 2026-05-02
+
+### Fixed
+- 🛡 **Strip base64 images from the help-bot chat prompt too** (QQ55).
+  QQ49 cleaned `handle_lazyclaw_chat_stream`, but the older help-bot
+  SSE endpoint (line ~542 of `actions.py`) still piped the full
+  prompt — including any image markdown forwarded from the chat —
+  to `claude -p`. Now scrubbed via the same
+  `_extract_inline_images()` helper.
+
+---
 ## [2.66.129] — 2026-05-02
 
 ### Fixed
