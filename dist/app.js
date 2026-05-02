@@ -27039,7 +27039,7 @@ VIEWS.lazyclawChat = async () => {
       <div style="padding:10px 12px 4px;border-top:1px solid var(--border);display:flex;align-items:flex-end;gap:8px;">
         <!-- QQ61 (v2.66.136) — explicit image attach button (paste/drop alternative). -->
         <input id="lcAttachInput" type="file" accept="image/*" multiple style="display:none;" onchange="_lcAttachFiles(this.files);this.value='';">
-        <button class="btn" style="padding:8px 10px;font-size:1.05rem;align-self:flex-end;" title="${t('이미지 첨부 (paste/drop 도 지원)')}" onclick="document.getElementById('lcAttachInput').click()">📎</button>
+        <button class="btn" style="padding:8px 10px;font-size:1.05rem;align-self:flex-end;" title="${t('이미지 첨부 (paste/drop 도 지원)')}" aria-label="${t('이미지 첨부 (paste/drop 도 지원)')}" onclick="document.getElementById('lcAttachInput').click()">📎</button>
         <textarea id="lcChatInput" class="input flex-1 text-sm" rows="2" placeholder="${t('메시지를 입력하세요…')}" style="resize:none;font-family:inherit;line-height:1.5;max-height:200px;"></textarea>
         <button id="lcChatSend" class="btn-primary btn" style="padding:8px 16px;font-size:1.1rem;align-self:flex-end;" onclick="_lcChatSend()" title="${t('전송 (Enter)')}">↑</button>
       </div>
