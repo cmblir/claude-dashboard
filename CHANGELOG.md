@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.127] — 2026-05-02
+
+### Added
+- 📖 **Keyboard shortcuts surfaced in `/help`** (QQ52). The `/help`
+  slash command now lists the QQ50 session-nav keys, QQ51 history
+  recall, Cmd+K search, Enter / Shift+Enter, and the QQ39 image
+  paste/drop tip alongside the existing slash commands. Helps new
+  users discover the recently-added shortcuts without spelunking
+  the changelog.
+
+---
 ## [2.66.126] — 2026-05-02
 
 ### Added
