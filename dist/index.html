@@ -3168,6 +3168,11 @@ const __wf = {
   // v2.44.1 — keyed-diff canvas renderer (perf): see _wfRenderCanvas comment.
   _nodeEls: new Map(),         // node id → live <g.wf-node> element in #wfNodes
   _nodeSnapshot: new Map(),    // node id → JSON of fields that affect rendering
+  // AA1 (v2.66.13) — same keyed-diff for edges so port hover / drag doesn't
+  // tear down every <path>. Snapshot includes endpoint positions so if
+  // either endpoint node moved we re-emit only that edge's path.
+  _edgeEls: new Map(),         // edge id → live <path.wf-edge> in #wfEdges
+  _edgeSnapshot: new Map(),    // edge id → snap key string
   _forceFullCanvasRebuild: true, // when true, _wfRenderCanvas falls back to innerHTML rebuild
   // v2.46.0 perf — cache the <g id="wfViewport"> element so pan/wheel/fit
   // handlers don't have to call getElementById on every event. Set in
@@ -4755,6 +4760,7 @@ function _wfRenderCanvas() {
   if (!__wf.current) {
     nodesG.innerHTML = ''; edgesG.innerHTML = '';
     __wf._nodeEls.clear(); __wf._nodeSnapshot.clear();
+    __wf._edgeEls.clear(); __wf._edgeSnapshot.clear();
     _wfRenderMinimap(); return;
   }
   const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
@@ -4816,11 +4822,52 @@ function _wfRenderCanvas() {
     for (const el of __wf._nodeEls.values()) el.style.display = '';
   }
 
-  // Z3 (v2.66.12) — Edges with O(1) node lookup. Build a Map once and
-  // pass it into _wfRenderEdge so we skip the per-edge linear find()
-  // that becomes O(E·N) at scale.
+  // Z3 + AA1 (v2.66.13) — keyed-diff for edges. Build a node-position
+  // map for O(1) port lookup, then snapshot each edge's render-relevant
+  // state (endpoints + positions + selection). Only rebuild paths whose
+  // snapshot changed; reuse existing <path> for unchanged edges.
   const _nodeMap = new Map(__wf.current.nodes.map(n => [n.id, n]));
-  edgesG.innerHTML = edges.map(e => _wfRenderEdge(e, _nodeMap)).join('');
+  const _edgeSnap = (e) => {
+    const f = _nodeMap.get(e.from), to = _nodeMap.get(e.to);
+    const fpos = f ? `${f.x},${f.y}` : '?';
+    const tpos = to ? `${to.x},${to.y}` : '?';
+    const sel = __wf.selectedEdgeId === e.id ? '1' : '0';
+    return `${e.from}/${e.fromPort||'out'}@${fpos}|${e.to}/${e.toPort||'in'}@${tpos}|${sel}`;
+  };
+  if (__wf._forceFullCanvasRebuild) {
+    edgesG.innerHTML = edges.map(e => _wfRenderEdge(e, _nodeMap)).join('');
+    __wf._edgeEls.clear(); __wf._edgeSnapshot.clear();
+    edgesG.querySelectorAll('.wf-edge').forEach(el => {
+      const eid = el.getAttribute('data-edge');
+      if (eid) __wf._edgeEls.set(eid, el);
+    });
+    edges.forEach(e => __wf._edgeSnapshot.set(e.id, _edgeSnap(e)));
+  } else {
+    const liveIds = new Set(edges.map(e => e.id));
+    // Remove edges that no longer exist.
+    for (const [eid, el] of __wf._edgeEls) {
+      if (!liveIds.has(eid)) {
+        el.remove();
+        __wf._edgeEls.delete(eid);
+        __wf._edgeSnapshot.delete(eid);
+      }
+    }
+    // Add or update.
+    for (const e of edges) {
+      const newSnap = _edgeSnap(e);
+      const oldSnap = __wf._edgeSnapshot.get(e.id);
+      const existing = __wf._edgeEls.get(e.id);
+      if (oldSnap === newSnap && existing) continue;     // unchanged → reuse
+      const html = _wfRenderEdge(e, _nodeMap);
+      if (!html) continue;
+      const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      tmp.innerHTML = html;
+      const newEl = tmp.firstElementChild;
+      if (existing) existing.replaceWith(newEl); else edgesG.appendChild(newEl);
+      __wf._edgeEls.set(e.id, newEl);
+      __wf._edgeSnapshot.set(e.id, newSnap);
+    }
+  }
 
   // 선택 상태 동기화 (재생성된 노드의 .selected class 반영)
   _wfSyncSelectionClasses();
@@ -6866,16 +6913,53 @@ function _wfRenderEditorBody(winId) {
   formHost.innerHTML = body;
 }
 
+// AA3 (v2.66.13) — debounced auto-save. Every keystroke schedules a
+// silent save 800 ms later. Closing the window mid-edit no longer
+// loses changes. Saves only when the editor is for an existing node;
+// new-node drafts must still be explicitly saved (since adding a node
+// is an explicit user intent).
 function _wfDraftSet(winId, field, value) {
   const w = document.getElementById(winId);
   if (!w) return;
   w._wfDraft[field] = value;
+  _wfScheduleAutoSave(winId);
 }
 function _wfDraftSetData(winId, field, value) {
   const w = document.getElementById(winId);
   if (!w) return;
   w._wfDraft.data = w._wfDraft.data || {};
   w._wfDraft.data[field] = value;
+  _wfScheduleAutoSave(winId);
+}
+
+function _wfScheduleAutoSave(winId) {
+  const w = document.getElementById(winId);
+  if (!w || w._wfIsNew) return;            // explicit save for new nodes
+  if (w._wfAutoSaveTimer) clearTimeout(w._wfAutoSaveTimer);
+  w._wfAutoSaveTimer = setTimeout(() => {
+    w._wfAutoSaveTimer = null;
+    if (!document.body.contains(w)) return; // window closed in flight
+    try {
+      _wfSaveNodeEditorSilent(winId);
+    } catch (e) { /* silent — explicit save will surface errors */ }
+  }, 800);
+}
+
+// Variant of _wfSaveNodeEditor that skips the close + toast — used by
+// auto-save so the user keeps typing without window flicker.
+function _wfSaveNodeEditorSilent(winId) {
+  const w = document.getElementById(winId);
+  if (!w || !__wf.current) return;
+  const draft = w._wfDraft;
+  if (!draft.type) return;        // can't save a typeless node
+  // Replace existing node in the workflow array
+  const idx = __wf.current.nodes.findIndex(x => x.id === draft.id);
+  if (idx < 0) return;             // not in canvas yet
+  __wf.current.nodes[idx] = JSON.parse(JSON.stringify(draft));
+  __wf.dirty = true;
+  // Trigger re-render of just that node + workflow-level save.
+  if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
+  if (typeof _wfSave === 'function') _wfSave({ silent: true }).catch(() => {});
 }
 
 function _wfSaveNodeEditor(winId) {
@@ -7448,9 +7532,21 @@ function _wfStartPolling() {
 
   if (!__wf.runId) return;
 
+  // AA2 (v2.66.13) — Prefer SSE; only fall back to polling if SSE
+  // genuinely gives up (CLOSED state after one or more reconnection
+  // attempts), never on the first transient onerror. Browser-native
+  // EventSource auto-reconnects internally; we just need not to race
+  // with that by spawning a parallel poller.
+  let _sseEverOpen = false;
+  let _sseErrorStrikes = 0;
   try {
     const sse = new EventSource('/api/workflows/run-stream?runId=' + encodeURIComponent(__wf.runId));
     __wf._sse = sse;
+
+    sse.addEventListener('open', () => {
+      _sseEverOpen = true;
+      _sseErrorStrikes = 0;
+    });
 
     sse.addEventListener('status', (e) => {
       try {
@@ -7472,7 +7568,7 @@ function _wfStartPolling() {
     });
 
     sse.addEventListener('error', (e) => {
-      // SSE 프로토콜 에러 이벤트 (커스텀)
+      // Custom server-emitted error event (has .data with details)
       if (e.data) {
         try {
           const data = JSON.parse(e.data);
@@ -7480,10 +7576,6 @@ function _wfStartPolling() {
         } catch(ex) { toast(t('실행 오류'), 'err'); }
         __wf.runId = null;
         _wfStopSSE();
-      } else {
-        // 연결 실패 — 폴링 fallback
-        _wfStopSSE();
-        _wfStartPollingFallback();
       }
     });
 
@@ -7493,16 +7585,18 @@ function _wfStartPolling() {
       _wfStopSSE();
     });
 
-    // 연결 실패 시 onerror 로 fallback
     sse.onerror = () => {
-      if (sse.readyState === EventSource.CLOSED || sse.readyState === EventSource.CONNECTING) {
-        // SSE 불가 — 폴링 fallback
+      // The browser's EventSource auto-retries on transient errors. Only
+      // fall back to polling once we've seen ≥3 strikes AND the source is
+      // CLOSED. CONNECTING is normal for the first ~1s of life.
+      _sseErrorStrikes++;
+      if (sse.readyState === EventSource.CLOSED && _sseErrorStrikes >= 3) {
         _wfStopSSE();
         if (__wf.runId) _wfStartPollingFallback();
       }
     };
   } catch(e) {
-    // EventSource 생성 자체 실패 — 폴링 fallback
+    // EventSource constructor itself threw — fall back immediately
     _wfStartPollingFallback();
   }
 }
