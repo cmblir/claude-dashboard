@@ -27667,12 +27667,16 @@ async function _lcChatSend() {
   // look broken before the first token arrives. Cleared by the first
   // 'token' SSE event (see the streaming loop below).
   // QQ77 (v2.67.14) — render the placeholder but don't persist it.
-  // If the user closes the tab before the stream starts, the
-  // pending bubble vanishes on next load instead of being frozen
-  // in saved history forever.
   const reply = { role: 'assistant', text: '_…_', assignee, ts: Date.now(), pending: true };
   history.push(reply);
   _lcChatRender();
+  // QQ88 (v2.67.25) — always jump to bottom when the user sends so
+  // they see their own new message + the placeholder, even if they
+  // had scrolled up to reread earlier context.
+  setTimeout(() => {
+    const log = document.getElementById('lcChatLog');
+    if (log) log.scrollTop = log.scrollHeight;
+  }, 0);
   if (sendBtn) {
     sendBtn.classList.remove('btn-primary');
     sendBtn.classList.add('btn-danger');
