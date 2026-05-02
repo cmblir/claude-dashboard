@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.72] — 2026-05-02
+
+### Added
+- ⏸ **Disable / enable nodes** without deleting them (PP2,
+  n8n parity).
+  - `D` key on the workflow canvas toggles `data.disabled` for
+    the selected node. Same in the right-click context menu.
+  - Disabled nodes render at half opacity with grayscale +
+    dashed border so the user sees them in context.
+  - Server-side, `_run_one_iteration` skips them with
+    `status='skipped'` — no subprocess fired, no cost incurred.
+
+---
 ## [2.66.71] — 2026-05-02
 
 ### Added

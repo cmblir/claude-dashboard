@@ -130,6 +130,10 @@ NEW_EN: dict[str, str] = {
     "건": "hits",
     "파일 첨부됨": "file(s) attached",
     "파일은 텍스트가 아니라 첨부 안됨": "file(s) skipped — not text",
+    # PP2
+    "비활성화 토글": "Toggle disable",
+    "비활성화됨": "Disabled",
+    "활성화됨": "Enabled",
     # NN1
     "형제 노드 실패로 자동 취소됨": "Auto-cancelled because a sibling node failed",
     "자동 취소됨": "auto-cancelled",
@@ -263,6 +267,10 @@ NEW_ZH: dict[str, str] = {
     "건": "条",
     "파일 첨부됨": "个文件已附加",
     "파일은 텍스트가 아니라 첨부 안됨": "个文件已跳过（非文本）",
+    # PP2
+    "비활성화 토글": "切换禁用",
+    "비활성화됨": "已禁用",
+    "활성화됨": "已启用",
     # NN1
     "형제 노드 실패로 자동 취소됨": "因同级节点失败而自动取消",
     "자동 취소됨": "自动取消",
