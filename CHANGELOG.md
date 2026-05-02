@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.88] — 2026-05-02
+
+### Added
+- 🖱 **Empty-canvas right-click context menu** (QQ13). Quick
+  actions when nothing is selected:
+  - ＋ 새 노드 추가 · 📋 붙여넣기 (greyed when clipboard empty)
+  - 🎯 화면 맞춤 · ⊞ 격자 표시 · 📋 인스펙터 토글
+  Mirrors n8n's right-click background menu.
+
+---
 ## [2.66.87] — 2026-05-02
 
 ### Added

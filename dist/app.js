@@ -4802,7 +4802,11 @@ function _wfBindCanvas() {
       if (typeof _wfSyncSelectionClasses === 'function') _wfSyncSelectionClasses();
       if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
       _wfShowEdgeContextMenu(eid, e.clientX, e.clientY);
+      return;
     }
+    // QQ13 (v2.66.88) — empty-canvas right-click → quick actions menu.
+    e.preventDefault();
+    _wfShowEmptyCanvasContextMenu(e.clientX, e.clientY);
   });
 
 function _wfShowNodeContextMenu(nid, x, y) {
@@ -4869,6 +4873,58 @@ function _wfShowNodeContextMenu(nid, x, y) {
 function _wfCloseNodeContextMenu() {
   const m = document.getElementById('wfNodeCtxMenu');
   if (m) m.remove();
+}
+
+// QQ13 (v2.66.88) — empty-canvas context menu. Fast access to:
+// add node, paste, fit, toggle grid, toggle inspector.
+function _wfShowEmptyCanvasContextMenu(x, y) {
+  const old = document.getElementById('wfNodeCtxMenu');
+  if (old) old.remove();
+  const menu = document.createElement('div');
+  menu.id = 'wfNodeCtxMenu';
+  menu.style.cssText = 'position:fixed;z-index:10000;min-width:170px;'
+    + 'background:var(--surface,#1c1c1e);border:1px solid var(--border);'
+    + 'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.35);'
+    + 'padding:4px 0;font-size:12px;left:' + x + 'px;top:' + y + 'px;';
+  const hasClipboard = (__wf._clipboard && __wf._clipboard.length > 0);
+  const items = [
+    { icon: '＋', label: t('새 노드 추가'), shortcut: '⌘N', fn: () => _wfOpenNodeEditor(null) },
+    { icon: '📋', label: t('붙여넣기'), shortcut: '⌘V', disabled: !hasClipboard,
+      fn: () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', metaKey: true })); } },
+    { sep: true },
+    { icon: '🎯', label: t('화면 맞춤'), shortcut: '⌘0', fn: () => _wfFitView && _wfFitView() },
+    { icon: '⊞',  label: t('격자 표시 토글'), fn: () => _wfToggleGrid && _wfToggleGrid() },
+    { icon: '📋', label: t('인스펙터 토글'), shortcut: '⌘I', fn: () => _wfToggleInspector && _wfToggleInspector() },
+  ];
+  for (const item of items) {
+    if (item.sep) {
+      const s = document.createElement('div');
+      s.style.cssText = 'height:1px;background:var(--border);margin:4px 0;';
+      menu.appendChild(s); continue;
+    }
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;'
+      + 'padding:6px 12px;cursor:' + (item.disabled ? 'default' : 'pointer') + ';'
+      + 'opacity:' + (item.disabled ? 0.45 : 1) + ';color:var(--text);';
+    row.innerHTML = `<span>${item.icon}</span><span style="flex:1">${escapeHtml(item.label)}</span><span style="opacity:0.55;font-size:10px;">${item.shortcut || ''}</span>`;
+    if (!item.disabled) {
+      row.onmouseenter = () => row.style.background = 'rgba(255,255,255,0.06)';
+      row.onmouseleave = () => row.style.background = '';
+      row.onclick = () => { try { item.fn(); } catch (e) {} _wfCloseNodeContextMenu(); };
+    }
+    menu.appendChild(row);
+  }
+  document.body.appendChild(menu);
+  const r = menu.getBoundingClientRect();
+  if (r.right > window.innerWidth) menu.style.left = (window.innerWidth - r.width - 8) + 'px';
+  if (r.bottom > window.innerHeight) menu.style.top = (window.innerHeight - r.height - 8) + 'px';
+  setTimeout(() => {
+    const closer = (ev) => { if (!menu.contains(ev.target)) _wfCloseNodeContextMenu(); };
+    document.addEventListener('mousedown', closer, { once: true });
+    document.addEventListener('keydown', function k(ev) {
+      if (ev.key === 'Escape') { _wfCloseNodeContextMenu(); document.removeEventListener('keydown', k); }
+    });
+  }, 0);
 }
 
 // PP2 (v2.66.72) — toggle node disabled state. Disabled nodes skip on
