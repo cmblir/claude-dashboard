@@ -24,6 +24,10 @@ NEW_EN: dict[str, str] = {
     # Z2 (v2.66.12) — n8n-style palette
     "일치하는 노드 없음": "No matching node",
     "왼쪽 패널에서 노드 타입을 선택하세요": "Pick a node type from the left panel",
+    # CC (v2.66.14) — workflow run cancel + inline mac-term + sidebar
+    "실행 취소 요청됨": "Cancel requested",
+    "중단": "Stop",
+    "(아직 실행 결과 없음 — 워크플로우를 실행하면 여기에 표시됨)": "(no run output yet — execute the workflow to populate this)",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -43,4 +47,8 @@ NEW_ZH: dict[str, str] = {
     # Z2
     "일치하는 노드 없음": "没有匹配的节点",
     "왼쪽 패널에서 노드 타입을 선택하세요": "请从左侧面板选择节点类型",
+    # CC (v2.66.14)
+    "실행 취소 요청됨": "已请求取消",
+    "중단": "停止",
+    "(아직 실행 결과 없음 — 워크플로우를 실행하면 여기에 표시됨)": "(尚无运行结果 — 执行工作流后将显示在此)",
 }

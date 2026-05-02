@@ -986,6 +986,15 @@ tailwind.config = {
   body.sb-collapsed #sidebar-foot #cliStatus .cli-body,
   body.sb-collapsed #sidebar-foot #cliStatus .flex.items-center.justify-between > span:first-child { display: none; }
   body.sb-collapsed #sidebar-foot #cliStatus .flex { justify-content: center !important; margin: 0 !important; }
+  /* CC7 (v2.66.14) — collapsed sidebar: keep "최근 사용 / 즐겨찾기" tidy.
+     Hide the "최근 사용 5" header text (only the clock icon stays as a
+     visual hint) and center+truncate the quick-link items so the 78px
+     rail doesn't show wrapping text. */
+  body.sb-collapsed #sidebar .nav-quick-header > span:not(:first-child) { display: none; }
+  body.sb-collapsed #sidebar .nav-quick-header { justify-content: center; padding: 4px 0; }
+  body.sb-collapsed #sidebar .nav-quick-item { justify-content: center; padding: 0.4rem 0.3rem; gap: 0; }
+  body.sb-collapsed #sidebar .nav-quick-item > *:not(.nav-quick-icon) { display: none; }
+  body.sb-collapsed #sidebar .nav-quick-block { padding: 4px 0 6px; margin-bottom: 6px; }
   #sidebar { transition: width 0.18s ease; }
   #content { transition: margin-left 0.18s ease; }
 
@@ -3380,7 +3389,7 @@ VIEWS.workflows = async () => {
           <button id="wfUndoBtn" class="btn text-xs" onclick="_wfUndo()" title="${t('실행 취소')} (⌘Z)" aria-label="${t('실행 취소')}" disabled>↶ <span id="wfUndoCount">0</span></button>
           <button class="btn text-xs" onclick="_wfSave()" id="wfSaveBtn" aria-label="${t('워크플로우 저장')}">💾 ${t('저장')}</button>
           <button class="btn text-xs" onclick="_wfDryRun()" id="wfDryRunBtn" title="${t('실제 호출 없이 실행 계획만 확인')}" aria-label="${t('드라이런')}">🧪 ${t('드라이런')}</button>
-          <button class="btn-primary btn text-xs" onclick="_wfRun()" id="wfRunBtn" aria-label="${t('워크플로우 실행')}">▶ ${t('실행')}</button>
+          <button class="btn-primary btn text-xs" onclick="_wfRunOrCancel()" id="wfRunBtn" aria-label="${t('워크플로우 실행')}">▶ ${t('실행')}</button>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
           <button class="btn text-xs" onclick="_wfExport()" title="${t('JSON 파일로 내보내기')}" aria-label="${t('내보내기')}">📦 ${t('내보내기')}</button>
           <label class="btn text-xs cursor-pointer" title="${t('JSON 파일에서 가져오기')}">📥 ${t('가져오기')}<input type="file" accept=".json,application/json" style="display:none;" onchange="_wfImport(event)"></label>
@@ -7231,6 +7240,45 @@ async function _wfDryRun() {
 }
 window._wfDryRun = _wfDryRun;
 
+// CC3 (v2.66.14) — n8n-style toggle. The same primary button starts an
+// execution when idle, or sends a cooperative cancel when a run is in
+// flight. The button label / class flips in `_wfSetRunButtonState`.
+async function _wfRunOrCancel() {
+  if (__wf.runId) {
+    await _wfCancelRun();
+  } else {
+    await _wfRun();
+  }
+}
+
+async function _wfCancelRun() {
+  if (!__wf.runId) return;
+  const rid = __wf.runId;
+  const r = await api('/api/workflows/run-cancel', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ runId: rid }),
+  });
+  if (r.ok) {
+    toast(t('실행 취소 요청됨'), 'warn');
+  } else {
+    toast(errMsg(r) || t('취소 실패'), 'err');
+  }
+}
+
+function _wfSetRunButtonState(running) {
+  const btn = document.getElementById('wfRunBtn');
+  if (!btn) return;
+  if (running) {
+    btn.innerHTML = '■ ' + t('중단');
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-danger');
+  } else {
+    btn.innerHTML = '▶ ' + t('실행');
+    btn.classList.remove('btn-danger');
+    btn.classList.add('btn-primary');
+  }
+}
+
 async function _wfRun() {
   if (!__wf.current) return;
   // 저장 먼저
@@ -7242,6 +7290,7 @@ async function _wfRun() {
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
   toast(t('실행 시작됨'), 'ok');
   __wf.runId = r.runId;
+  _wfSetRunButtonState(true);
   // 노드 상태 초기화
   document.querySelectorAll('.wf-node').forEach(el => el.removeAttribute('data-status'));
   // 폴링 시작
@@ -7252,6 +7301,12 @@ function _wfApplyRunStatus(run) {
   const results = run.nodeResults || {};
   __wf.lastRunResults = results;
   __wf.lastRun = run;
+  // CC2 (v2.66.14) — start the independent elapsed-time ticker. SSE only
+  // pushes when *server-side* status changes, but elapsed seconds change
+  // every wall-clock second. The ticker patches just the elapsed labels
+  // (banner + per-node) directly from cached state, so the timer never
+  // freezes when the run is mid-flight and the server is quiet.
+  _wfStartElapsedTicker();
   // Y2 (v2.66.11) — diff-only DOM scan. Build a lightweight signature
   // (nodeId → status mapping) and compare to last applied; only
   // re-attribute when the per-node status actually changed. Cuts the
@@ -7396,6 +7451,58 @@ function _wfRenderRunBanner(run) {
 function _wfHideRunBanner() {
   const el = document.getElementById('wfRunBanner');
   if (el) el.classList.remove('visible');
+  _wfStopElapsedTicker();
+}
+
+// CC2 (v2.66.14) — wall-clock elapsed-time ticker. Runs at 1Hz while a run
+// is in-flight; patches text content of already-mounted DOM nodes only —
+// no layout, no paint cascade. Stops itself when the run is done.
+function _wfStartElapsedTicker() {
+  if (__wf._elapsedTicker) return; // already running
+  __wf._elapsedTicker = setInterval(() => {
+    const run = __wf.lastRun;
+    if (!run || (run.status !== 'running' && run.status !== 'queued')) {
+      _wfStopElapsedTicker();
+      return;
+    }
+    // Banner elapsed
+    const banner = document.getElementById('wfRunBanner');
+    if (banner && banner._refs) {
+      const startedAt = run.startedAt || 0;
+      if (startedAt) {
+        const ms = Date.now() - startedAt;
+        const elapsedStr = (ms / 1000).toFixed(1) + 's';
+        const results = run.nodeResults || {};
+        const total = (__wf.current && __wf.current.nodes || []).length;
+        const done = Object.values(results).filter(r => r && (r.status === 'ok' || r.status === 'err' || r.status === 'skipped')).length;
+        const metaStr = `${done}/${total} · ${elapsedStr}`;
+        if (banner._refs.meta && banner._refs.meta.textContent !== metaStr) {
+          banner._refs.meta.textContent = metaStr;
+        }
+      }
+    }
+    // Per-node elapsed
+    const results = run.nodeResults || {};
+    if (__wf._nodeElsMap) {
+      for (const [nid, r] of Object.entries(results)) {
+        if (!(r && r.status === 'running' && r.startedAt)) continue;
+        const el = __wf._nodeElsMap.get(nid);
+        if (!el) continue;
+        const el2 = el.querySelector('.wf-node-elapsed');
+        if (!el2) continue;
+        const secs = Math.max(0, Math.floor((Date.now() - r.startedAt) / 1000));
+        const txt = '⏱ ' + secs + 's';
+        if (el2.textContent !== txt) el2.textContent = txt;
+      }
+    }
+  }, 1000);
+}
+
+function _wfStopElapsedTicker() {
+  if (__wf._elapsedTicker) {
+    clearInterval(__wf._elapsedTicker);
+    __wf._elapsedTicker = null;
+  }
 }
 
 // v2.10.2 — 노드 hover 결과 tooltip
@@ -7564,6 +7671,7 @@ function _wfStartPolling() {
         _wfShowRunResult(run);
       } catch(ex) { /* silent */ }
       __wf.runId = null;
+      _wfSetRunButtonState(false);
       _wfStopSSE();
     });
 
@@ -7582,6 +7690,7 @@ function _wfStartPolling() {
     sse.addEventListener('timeout', (e) => {
       toast(t('실행 시간 초과'), 'warn');
       __wf.runId = null;
+      _wfSetRunButtonState(false);
       _wfStopSSE();
     });
 
@@ -7616,6 +7725,7 @@ function _wfStartPollingFallback() {
         clearInterval(__wf.pollTimer); __wf.pollTimer = null;
         _wfShowRunResult(run);
         __wf.runId = null;
+        _wfSetRunButtonState(false);
       }
     } catch (e) { /* silent */ }
   }, 1200);
@@ -7691,35 +7801,88 @@ async function _wfUseAsResume(sourceNid, sessionId) {
   _wfRenderInspector();
 }
 
+// CC1 (v2.66.14) — clicking the screen icon on a workflow node opens the
+// inline mac-style viewer (NOT a real Terminal.app window). Shows the
+// node's prompt + the latest run's per-node output if any. A
+// "↗ Real terminal" button keeps the old escape hatch one click away.
 async function _wfSpawnSession(nid) {
   if (!__wf.current) return;
   const n = __wf.current.nodes.find(x => x.id === nid);
   if (!n) return;
   const d = n.data || {};
   const cwd = d.cwd || '~';
-  const prompt = [d.subject, d.description].filter(Boolean).join('\n\n');
-  const body = {
-    cwd, prompt,
-    assignee:            d.assignee || '',
-    systemPrompt:        d.systemPrompt || '',
-    appendSystemPrompt:  d.appendSystemPrompt || '',
-    allowedTools:        d.allowedTools || '',
-    disallowedTools:     d.disallowedTools || '',
-    resumeSessionId:     d.resumeSessionId || '',
-  };
+  const subject = d.subject || n.title || n.id;
+  const description = d.description || '';
+  const assignee = d.assignee || '';
+  const lastResults = (__wf.lastRunResults && __wf.lastRunResults[nid]) || null;
+
+  const lines = [];
+  lines.push(`<div class="mac-term-line meta">$ ${escapeHtml(assignee || 'session')} — ${escapeHtml(subject)}</div>`);
+  lines.push(`<div class="mac-term-line meta">cwd: ${escapeHtml(cwd)}</div>`);
+  if (n.type)        lines.push(`<div class="mac-term-line meta">type: ${escapeHtml(n.type)}</div>`);
+  if (lastResults) {
+    lines.push(`<div class="mac-term-line meta">status: ${escapeHtml(lastResults.status || '')}${lastResults.startedAt ? ' · ' + new Date(lastResults.startedAt).toLocaleTimeString() : ''}</div>`);
+  }
+  lines.push(`<div class="mac-term-line meta">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>`);
+  if (subject)     lines.push(`<div class="mac-term-line user"><span class="mac-prompt">▸</span> ${escapeHtml(subject)}</div>`);
+  if (description) lines.push(`<div class="mac-term-line assist">${escapeHtml(description)}</div>`);
+  if (lastResults && lastResults.output) {
+    lines.push(`<div class="mac-term-line meta">─── ${t('출력')} ───</div>`);
+    const out = String(lastResults.output).slice(0, 8000);
+    out.split('\n').forEach(ln => lines.push(`<div class="mac-term-line assist">${escapeHtml(ln)}</div>`));
+  } else if (lastResults && lastResults.error) {
+    lines.push(`<div class="mac-term-line meta" style="color:#f87171">⚠ ${escapeHtml(lastResults.error)}</div>`);
+  } else {
+    lines.push(`<div class="mac-term-line meta">${t('(아직 실행 결과 없음 — 워크플로우를 실행하면 여기에 표시됨)')}</div>`);
+  }
+
+  // Stash node id so the "real terminal" button can pick the spawn body.
+  window.__wfMacTermNid = nid;
+
+  showModal(`
+    <div class="mac-term">
+      <div class="mac-term-titlebar">
+        <span class="mac-term-dot mac-dot-red" onclick="closeModal()"></span>
+        <span class="mac-term-dot mac-dot-yellow"></span>
+        <span class="mac-term-dot mac-dot-green"></span>
+        <span class="mac-term-title">${t('노드')} · ${escapeHtml(n.id)}${assignee ? ' · ' + escapeHtml(assignee) : ''}</span>
+        <button class="mac-term-spawn" onclick="_wfMacTermSpawnReal()" title="${t('실제 터미널에서 이어서 열기')}">↗ ${t('실제 터미널')}</button>
+      </div>
+      <div class="mac-term-body">
+        ${lines.join('')}
+      </div>
+    </div>
+  `, { wide: true });
+  setTimeout(() => {
+    const b = document.querySelector('.mac-term-body');
+    if (b) b.scrollTop = b.scrollHeight;
+  }, 80);
+}
+
+window._wfMacTermSpawnReal = async function() {
+  const nid = window.__wfMacTermNid;
+  if (!nid || !__wf.current) return;
+  const n = __wf.current.nodes.find(x => x.id === nid);
+  if (!n) return;
+  const d = n.data || {};
   const r = await api('/api/session/spawn', {
     method: 'POST', headers: { 'Content-Type':'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      cwd: d.cwd || '~',
+      prompt: [d.subject, d.description].filter(Boolean).join('\n\n'),
+      assignee:            d.assignee || '',
+      systemPrompt:        d.systemPrompt || '',
+      appendSystemPrompt:  d.appendSystemPrompt || '',
+      allowedTools:        d.allowedTools || '',
+      disallowedTools:     d.disallowedTools || '',
+      resumeSessionId:     d.resumeSessionId || '',
+    }),
   });
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
   const PROVIDER_LABELS = { 'claude-cli':'Claude', 'gemini-cli':'Gemini', 'ollama':'Ollama', 'codex':'Codex' };
   const label = PROVIDER_LABELS[r.provider] || 'Claude';
-  if (r.fallbackReason) {
-    toast(`⚠️ ${label} ${t('세션 시작됨')} — ${r.fallbackReason}`, 'warn');
-  } else {
-    toast(`${label} ${t('세션 시작됨')}${r.model ? ' (' + r.model + ')' : ''}`, 'ok');
-  }
-}
+  toast(`${label} ${t('세션 시작됨')}${r.model ? ' (' + r.model + ')' : ''}`, 'ok');
+};
 
 // ─── 워크플로우 템플릿 ───────────────────────────────────────
 // 자주 쓰는 DAG 패턴을 원클릭으로 생성. 각 템플릿은 _wfBeautifyLayout 이
