@@ -199,6 +199,15 @@ NEW_EN: dict[str, str] = {
     "자동 취소된 노드는 본인 잘못이 아닙니다 — 빨간 노드를 먼저 고치세요": "Auto-cancelled nodes aren't the cause — fix the red node(s) first",
     "워크플로우 실행 / 중단": "Run / stop workflow",
     # LL16 already covered: 새 노드 추가 — exists.
+    # QQ18 — single-node execution (n8n parity)
+    "단독 실행": "Run alone",
+    "이 노드만 실행": "Run this node only",
+    "이 노드만 실행 (n8n parity)": "Run this node only (n8n parity)",
+    "단독 실행 결과": "Single-node result",
+    "단독 실행은 session/subagent 노드만 지원": "Single-node run supports session/subagent only",
+    "저장되지 않은 변경 — 먼저 저장하세요": "Unsaved changes — save first",
+    "실행 중...": "Running...",
+    "실행 실패": "Execution failed",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -392,4 +401,13 @@ NEW_ZH: dict[str, str] = {
     "실제 실패": "实际失败",
     "자동 취소된 노드는 본인 잘못이 아닙니다 — 빨간 노드를 먼저 고치세요": "自动取消的节点并非根因 — 请先修复红色节点",
     "워크플로우 실행 / 중단": "运行 / 停止工作流",
+    # QQ18 — single-node execution (n8n parity)
+    "단독 실행": "单独执行",
+    "이 노드만 실행": "仅运行此节点",
+    "이 노드만 실행 (n8n parity)": "仅运行此节点（n8n 等价）",
+    "단독 실행 결과": "单独执行结果",
+    "단독 실행은 session/subagent 노드만 지원": "单独执行仅支持 session/subagent 节点",
+    "저장되지 않은 변경 — 먼저 저장하세요": "存在未保存的更改 — 请先保存",
+    "실행 중...": "正在执行...",
+    "실행 실패": "执行失败",
 }

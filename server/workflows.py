@@ -3508,6 +3508,40 @@ def api_workflow_run_force_finish(body: dict) -> dict:
     return {"ok": True, "runId": rid, "status": final_status}
 
 
+def api_workflow_run_node(body: dict) -> dict:
+    """QQ18 (v2.66.93) — single-node execution for debugging.
+    Lets the user fire one node in isolation (no upstream collection,
+    no downstream propagation) and see the raw response.
+
+    body: {wfId, nodeId, inputs?: list[str]}
+    returns: AIResponse-shape dict + node id.
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    wf_id = (body.get("wfId") or "").strip()
+    node_id = (body.get("nodeId") or "").strip()
+    if not wf_id or not node_id:
+        return {"ok": False, "error": "wfId + nodeId required"}
+    s = _load_all()
+    wf = (s.get("workflows") or {}).get(wf_id)
+    if not wf:
+        return {"ok": False, "error": "wf not found"}
+    node = next((n for n in (wf.get("nodes") or []) if n.get("id") == node_id), None)
+    if not node:
+        return {"ok": False, "error": "node not found"}
+    if node.get("type") not in ("session", "subagent"):
+        return {"ok": False, "error": "single-node run only supports session / subagent"}
+    inputs = body.get("inputs") if isinstance(body.get("inputs"), list) else []
+    inputs = [str(x) for x in inputs if isinstance(x, (str, int, float))]
+    # Use a synthetic run id so the subprocess registry keeps working.
+    rid = "single-" + uuid.uuid4().hex[:10]
+    try:
+        res = _execute_node(node, inputs, run_id=rid)
+    except Exception as e:
+        return {"ok": False, "error": f"internal: {e}"}
+    return {"ok": True, "nodeId": node_id, "result": res}
+
+
 def api_workflow_preflight(body: dict) -> dict:
     """POST /api/workflows/preflight — pre-run provider availability check.
 

@@ -4941,6 +4941,77 @@ function _wfToggleNodeDisabled(nid) {
   toast(n.data.disabled ? `⏸ ${t('비활성화됨')}` : `▶ ${t('활성화됨')}`, 'ok');
 }
 
+// QQ18 (v2.66.93) — single-node execution (n8n "Execute Node" parity).
+// Fires one session/subagent node in isolation and shows the raw response
+// in a modal so users can iterate without running the whole DAG.
+async function _wfRunSingleNode(nid) {
+  if (!__wf.current) return;
+  const n = __wf.current.nodes.find(x => x.id === nid);
+  if (!n) return;
+  if (n.type !== 'session' && n.type !== 'subagent') {
+    toast(t('단독 실행은 session/subagent 노드만 지원'), 'warn');
+    return;
+  }
+  if (__wf.dirty) {
+    toast(t('저장되지 않은 변경 — 먼저 저장하세요'), 'warn');
+    return;
+  }
+  const btnLabel = `▶ ${t('단독 실행')}`;
+  toast(`⏳ ${escapeHtml(n.title || n.id)} ${t('실행 중...')}`, 'info');
+  let res;
+  try {
+    res = await fetch('/api/workflows/run-node', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wfId: __wf.current.id, nodeId: nid, inputs: [] }),
+    }).then(r => r.json());
+  } catch (e) {
+    toast(`❌ ${t('실행 실패')}: ${e.message || e}`, 'err');
+    return;
+  }
+  if (!res || !res.ok) {
+    toast(`❌ ${t('실행 실패')}: ${escapeHtml((res && res.error) || 'unknown')}`, 'err');
+    return;
+  }
+  const r = res.result || {};
+  const out = r.output || r.error || '(empty)';
+  const provider = r.provider || r.providerId || '';
+  const model = r.model || '';
+  const dur = r.durationMs ? fmtDur(r.durationMs) : '';
+  const tokens = r.tokens || r.tokenCount || '';
+  const cost = r.cost != null ? ('$' + Number(r.cost).toFixed(4)) : '';
+  const ok = r.success !== false && !r.error;
+  const html = `
+    <div style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.remove()">
+      <div class="card" style="max-width:760px;width:100%;max-height:80vh;overflow:auto;padding:16px;">
+        <div class="flex items-center gap-2 mb-2">
+          <span style="font-size:1.3rem;">${ok ? '✅' : '❌'}</span>
+          <div class="text-sm font-semibold flex-1 truncate">${escapeHtml(n.title || n.id)} — ${t('단독 실행 결과')}</div>
+          <button class="btn text-xs" onclick="this.closest('[style*=\\'z-index:99999\\']').remove()">✕</button>
+        </div>
+        <div class="flex flex-wrap gap-1 mb-2 text-[10px]">
+          ${provider ? `<span class="chip">${escapeHtml(provider)}</span>` : ''}
+          ${model ? `<span class="chip">${escapeHtml(model)}</span>` : ''}
+          ${dur ? `<span class="chip">⏱ ${dur}</span>` : ''}
+          ${tokens ? `<span class="chip">🔤 ${typeof tokens==='number'?tokens.toLocaleString():tokens}</span>` : ''}
+          ${cost ? `<span class="chip chip-warn">${cost}</span>` : ''}
+        </div>
+        <pre style="background:var(--code-bg);border:1px solid var(--border);padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto;">${escapeHtml(String(out))}</pre>
+        <div class="flex gap-2 mt-3">
+          <button class="btn text-xs" onclick="navigator.clipboard.writeText(${JSON.stringify(String(out))}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
+        </div>
+      </div>
+    </div>`;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap.firstElementChild);
+  // Mirror into lastRunResults so the inspector chip strip refreshes too.
+  __wf.lastRunResults = __wf.lastRunResults || {};
+  __wf.lastRunResults[nid] = r;
+  __wf._inspectorDirty = true;
+  _wfRenderInspector();
+}
+
 // LL20 (v2.66.49) — edge context menu (Delete only, for now).
 function _wfShowEdgeContextMenu(eid, x, y) {
   const old = document.getElementById('wfNodeCtxMenu');
@@ -5657,6 +5728,7 @@ function _wfRenderInspector(opts) {
           </div>
           <div class="flex gap-2 flex-wrap items-center">
             <button class="btn-primary btn text-xs flex-1" onclick="_wfOpenNodeEditor('${n.id}')" aria-label="${t('노드 편집')}">✏️ ${t('편집')}</button>
+            ${(n.type === 'session' || n.type === 'subagent') ? `<button class="btn text-xs" onclick="_wfRunSingleNode('${n.id}')" title="${t('이 노드만 실행 (n8n parity)')}" aria-label="${t('이 노드만 실행')}">▶ ${t('단독 실행')}</button>` : ''}
             <!-- PP3 (v2.66.73) — quick disable toggle right inside the inspector. -->
             <label class="flex items-center gap-1 text-[10px] cursor-pointer" title="${t('비활성화 (D)')}">
               <input type="checkbox" ${d.disabled?'checked':''} onchange="_wfToggleNodeDisabled('${n.id}')">

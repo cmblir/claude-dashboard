@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.93] — 2026-05-02
+
+### Added
+- ▶ **Single-node execution in workflow inspector** (QQ18, n8n parity).
+  When a `session`/`subagent` node is selected, the inspector now shows
+  a `▶ 단독 실행` button next to `편집`. Clicking it POSTs to the new
+  `/api/workflows/run-node` endpoint, which executes that one node in
+  isolation (no upstream collection, no downstream propagation) and
+  returns the raw provider response. Result is shown in a modal with
+  provider/model/duration/tokens/cost chips and a copy button. Mirrors
+  n8n's "Execute Node" debug feature — lets users iterate on a single
+  prompt without re-running the whole DAG. Server-side reuses
+  `_execute_node` with a synthetic `single-<hex>` run id so the
+  cancellable-subprocess registry still applies.
+
+---
 ## [2.66.92] — 2026-05-02
 
 ### Added
