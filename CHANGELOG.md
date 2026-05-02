@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.0] — 2026-05-02
+
+**QQ64–QQ90 rollup** — milestone for the second tier of Q-series work
+since the v2.67.0 marker. Backwards-compatible. Test suite: **441
+passed** (excluding 2 pre-existing FF1-obsoleted assertions in
+`test_provider_error_passthrough.py`).
+
+### Chat polish
+- Esc cancels active stream (QQ64), surfaced in stop-button
+  tooltip (QQ69).
+- Per-session assignee restored on switch + backfilled for legacy
+  rows (QQ65, QQ67); send-button tooltip shows the active model
+  (QQ68).
+- Auto-label across locales + image-stripped seed (QQ66); slash
+  commands clear the QQ33 draft (QQ70); Tab autocompletes slash
+  commands (QQ62).
+- Pre-token "_…_" placeholder that doesn't persist on tab close
+  (QQ76, QQ77); always jump to bottom on send (QQ88).
+- Code-block copy buttons (QQ31), collapsible long messages (QQ32),
+  scroll-to-bottom button (QQ35).
+- Image attach via paste/drop/picker (QQ39, QQ61) with stronger
+  drag cue (QQ57) and quota recovery (QQ53).
+- Cmd+Shift+[/] session nav (QQ50) + history-recall cursor reset
+  on typing (QQ85), active session auto-scrolls into view
+  (QQ86); empty-state CTA (QQ90); session delete confirms with
+  label (QQ84); Esc clears sidebar filter (QQ58).
+- Markdown export drops base64 to placeholders (QQ75); orphan
+  history/draft sweep guarded once-per-session (QQ74); session
+  delete frees its history+draft (QQ54); `_lcGetSessions`
+  defensive-normalizes corrupted payloads (QQ83).
+
+### Workflow polish
+- `_wfOpen()` clears stale `lastRunResults` so the QQ46 mini-Gantt
+  doesn't carry over (QQ87); inspector tag input selects on
+  focus (QQ89); recency-weighted success-rate badge in sidebar
+  (QQ78); sticky split out from `nodeCount` (QQ79); dry-run also
+  skips sticky annotations (QQ81); sticky-attached edges dropped
+  at save (QQ63) and execution (QQ59).
+
+### Test coverage
+- Sticky annotations (QQ71): preserve, clamp, skip, edge-drop.
+- Pin Data (QQ82): short-circuit, blank guard, 32 KB clamp.
+- `_extract_inline_images` (QQ72): no-op, single, multi, non-image
+  data URLs.
+- `api_workflows_list` sticky split (QQ80): nodeCount + stickyCount
+  correctness.
+
+---
 ## [2.67.27] — 2026-05-02
 
 ### Added
