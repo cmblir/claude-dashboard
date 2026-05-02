@@ -566,8 +566,12 @@ tailwind.config = {
   .input:hover { background: rgba(255,255,255,0.06); }
   .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,119,87,0.18); background: rgba(255,255,255,0.07); }
   .input::placeholder { color: var(--text-dim); opacity: 0.7; }
-  /* number/password/text 등 모든 input 타입에 다크 테마 강제 */
-  input.input, select.input { background: rgba(255,255,255,0.04) !important; color: var(--text) !important; color-scheme: dark; }
+  /* number/password/text 등 모든 input 타입에 다크 테마 강제.
+     X4 (v2.66.10) — Tailwind's `forms` plugin resets border-radius on
+     bare <input>/<select>/<textarea>. Our .input class adds 8px back,
+     but on equal specificity Tailwind wins. Bump the radius to a
+     tag+class selector so it always lands. */
+  input.input, select.input, textarea.input { background: rgba(255,255,255,0.04) !important; color: var(--text) !important; color-scheme: dark; border-radius: 8px !important; }
   input.input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px rgba(10,10,10,1) inset !important; -webkit-text-fill-color: var(--text) !important; }
   body.theme-light input.input, body.theme-light select.input { background: rgba(255,255,255,0.7) !important; color: var(--text) !important; color-scheme: light; }
   body.theme-light input.input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px rgba(245,245,240,1) inset !important; }
@@ -15468,14 +15472,14 @@ async function openRalphRecommend(cwd) {
         ${t('rationale')}: ${escapeHtml(rec.rationale || '')}
         <span class="ml-2">CLAUDE.md ${sources.hasClaudeMd?'✓':'·'} · git ${sources.gitLogLines||0} commits · dirty ${sources.dirtyFiles||0} · TODOs ${sources.todoCount||0}</span>
       </div>
-      <textarea id="ralphRecPrompt" rows="14" class="w-full text-[11px] bg-transparent border" style="font-family:ui-monospace,monospace;">${escapeHtml(rec.promptMd || '')}</textarea>
+      <textarea id="ralphRecPrompt" rows="14" class="input text-xs" style="font-family:ui-monospace,monospace;">${escapeHtml(rec.promptMd || '')}</textarea>
       <div class="flex items-center gap-2 mt-3">
         <label class="text-[11px]"><input type="checkbox" id="ralphRecPolish" ${state.data._ralphPolish?'checked':''} onclick="state.data._ralphPolish=this.checked;openRalphRecommend(${JSON.stringify(cwd)})"> ${t('LLM 다듬기')}</label>
         <label class="text-[11px] flex-1">${t('Max iter')}
-          <input id="ralphRecMax" type="number" value="25" min="1" max="200" class="bg-transparent border-b text-[11px] w-16">
+          <input id="ralphRecMax" type="number" value="25" min="1" max="200" class="input text-xs" style="width:72px;">
         </label>
         <label class="text-[11px] flex-1">${t('예산 USD')}
-          <input id="ralphRecBudget" type="number" value="5" min="0.01" max="100" step="0.5" class="bg-transparent border-b text-[11px] w-16">
+          <input id="ralphRecBudget" type="number" value="5" min="0.01" max="100" step="0.5" class="input text-xs" style="width:72px;">
         </label>
         <button class="chip text-[10px]" onclick="closeModal()">${t('취소')}</button>
         <button class="chip text-[10px]" onclick="_ralphRecStart(${JSON.stringify(cwd)})">🚀 ${t('Ralph 시작')}</button>
@@ -16749,7 +16753,7 @@ VIEWS.aiProviders = async () => {
         <!-- Step 1: Provider Selection -->
         <div class="mb-4">
           <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('Step 1:')} ${t('어떤 AI를 사용하시겠습니까?')}</div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="wizardProviderCards">
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" id="wizardProviderCards">
             <div class="card p-4 text-center cursor-pointer hover-lift" onclick="_wizardSelectProvider('claude')" data-wiz-provider="claude">
               <div style="font-size:2rem;">🟠</div>
               <div class="text-sm font-semibold mt-2" style="color:var(--text)">Claude</div>
@@ -16760,6 +16764,11 @@ VIEWS.aiProviders = async () => {
               <div class="text-sm font-semibold mt-2" style="color:var(--text)">OpenAI</div>
               <div class="text-[10px]" style="color:var(--text-dim)">GPT API</div>
             </div>
+            <div class="card p-4 text-center cursor-pointer hover-lift" onclick="_wizardSelectProvider('codex')" data-wiz-provider="codex">
+              <div style="font-size:2rem;">🧬</div>
+              <div class="text-sm font-semibold mt-2" style="color:var(--text)">Codex</div>
+              <div class="text-[10px]" style="color:var(--text-dim)">OpenAI CLI</div>
+            </div>
             <div class="card p-4 text-center cursor-pointer hover-lift" onclick="_wizardSelectProvider('gemini')" data-wiz-provider="gemini">
               <div style="font-size:2rem;">🔵</div>
               <div class="text-sm font-semibold mt-2" style="color:var(--text)">Gemini</div>
@@ -16769,6 +16778,21 @@ VIEWS.aiProviders = async () => {
               <div style="font-size:2rem;">🦙</div>
               <div class="text-sm font-semibold mt-2" style="color:var(--text)">Ollama</div>
               <div class="text-[10px]" style="color:var(--text-dim)">${t('로컬 LLM')}</div>
+            </div>
+            <div class="card p-4 text-center cursor-pointer hover-lift" onclick="_wizardSelectProvider('groq')" data-wiz-provider="groq">
+              <div style="font-size:2rem;">⚡</div>
+              <div class="text-sm font-semibold mt-2" style="color:var(--text)">Groq</div>
+              <div class="text-[10px]" style="color:var(--text-dim)">Fast LPU</div>
+            </div>
+            <div class="card p-4 text-center cursor-pointer hover-lift" onclick="_wizardSelectProvider('deepseek')" data-wiz-provider="deepseek">
+              <div style="font-size:2rem;">🐳</div>
+              <div class="text-sm font-semibold mt-2" style="color:var(--text)">DeepSeek</div>
+              <div class="text-[10px]" style="color:var(--text-dim)">V3 / R1</div>
+            </div>
+            <div class="card p-4 text-center cursor-pointer hover-lift" onclick="_wizardSelectProvider('mistral')" data-wiz-provider="mistral">
+              <div style="font-size:2rem;">🌬️</div>
+              <div class="text-sm font-semibold mt-2" style="color:var(--text)">Mistral</div>
+              <div class="text-[10px]" style="color:var(--text-dim)">La Plateforme</div>
             </div>
           </div>
         </div>
@@ -17305,6 +17329,74 @@ window._wizardSelectProvider = (provider) => {
       <button class="btn text-xs" onclick="const el=document.getElementById('ollamaTabCatalog');if(el){el.scrollIntoView({behavior:'smooth'});el.click();}else{go('aiProviders');setTimeout(()=>{const e=document.getElementById('ollamaTabCatalog');if(e){e.scrollIntoView({behavior:'smooth'});e.click();}},300);}">
         🦙 ${t('Ollama 모델 허브로 이동')}
       </button>
+    `,
+    codex: `
+      <div class="flex items-center gap-3 mb-3">
+        <span style="font-size:1.5rem;">🧬</span>
+        <div>
+          <div class="text-sm font-semibold" style="color:var(--text)">Codex</div>
+          <div class="text-xs" style="color:var(--text-mute)">${t('OpenAI Codex CLI')}</div>
+        </div>
+      </div>
+      <div class="p-3 rounded-lg" style="background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2);">
+        <div class="text-xs" style="color:var(--ok)">
+          ${t('Codex CLI 가 PATH 에 있으면 자동 감지됩니다.')}
+        </div>
+        <div class="text-[10px] mt-1" style="color:var(--text-dim)">
+          ${t('설치')}: <code style="background:var(--code-bg);padding:2px 6px;border-radius:4px;">npm install -g @openai/codex</code>
+        </div>
+        <div class="text-[10px] mt-1" style="color:var(--text-dim)">
+          ${t('확인 명령')}: <code style="background:var(--code-bg);padding:2px 6px;border-radius:4px;">codex --version</code>
+        </div>
+        <div class="text-[10px] mt-1" style="color:var(--text-dim)">
+          ${t('지원 모델')}: gpt-5-codex · o3-pro · o4-mini · o3 · gpt-4.1
+        </div>
+      </div>
+    `,
+    groq: `
+      <div class="flex items-center gap-3 mb-3">
+        <span style="font-size:1.5rem;">⚡</span>
+        <div>
+          <div class="text-sm font-semibold" style="color:var(--text)">Groq</div>
+          <div class="text-xs" style="color:var(--text-mute)">${t('빠른 LPU 추론 — Llama / Mixtral / DeepSeek R1')}</div>
+        </div>
+      </div>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('API 키')}</label>
+      <input type="password" id="wizardApiKey" class="input w-full text-sm" placeholder="gsk_..." />
+      <div class="text-[10px] mt-1 mb-2" style="color:var(--text-dim)">
+        ${t('발급')}: <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style="color:var(--accent);">console.groq.com/keys ↗</a>
+      </div>
+      <button class="btn-primary btn text-xs mt-2" onclick="_wizardSaveApiKey('groq-api')">${t('API 키 저장')}</button>
+    `,
+    deepseek: `
+      <div class="flex items-center gap-3 mb-3">
+        <span style="font-size:1.5rem;">🐳</span>
+        <div>
+          <div class="text-sm font-semibold" style="color:var(--text)">DeepSeek</div>
+          <div class="text-xs" style="color:var(--text-mute)">${t('V3 chat + R1 reasoning')}</div>
+        </div>
+      </div>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('API 키')}</label>
+      <input type="password" id="wizardApiKey" class="input w-full text-sm" placeholder="sk-..." />
+      <div class="text-[10px] mt-1 mb-2" style="color:var(--text-dim)">
+        ${t('발급')}: <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener" style="color:var(--accent);">platform.deepseek.com ↗</a>
+      </div>
+      <button class="btn-primary btn text-xs mt-2" onclick="_wizardSaveApiKey('deepseek-api')">${t('API 키 저장')}</button>
+    `,
+    mistral: `
+      <div class="flex items-center gap-3 mb-3">
+        <span style="font-size:1.5rem;">🌬️</span>
+        <div>
+          <div class="text-sm font-semibold" style="color:var(--text)">Mistral</div>
+          <div class="text-xs" style="color:var(--text-mute)">${t('Large / Medium / Small / Codestral')}</div>
+        </div>
+      </div>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('API 키')}</label>
+      <input type="password" id="wizardApiKey" class="input w-full text-sm" placeholder="..." />
+      <div class="text-[10px] mt-1 mb-2" style="color:var(--text-dim)">
+        ${t('발급')}: <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noopener" style="color:var(--accent);">console.mistral.ai ↗</a>
+      </div>
+      <button class="btn-primary btn text-xs mt-2" onclick="_wizardSaveApiKey('mistral-api')">${t('API 키 저장')}</button>
     `,
   };
 
@@ -18939,20 +19031,32 @@ VIEWS.orchestrator = async () => {
     'codex': 'codex',           'groq-api': 'groq',
     'deepseek-api': 'deepseek',
   };
+  // X3 (v2.66.10) — clean assignee-option builder. Skip embedding-only
+  // models since the orchestrator's planner/sub-agent path is chat. Filter
+  // out the 'embed' capability when present. Labels show the
+  // provider-friendly name + context-window in k tokens.
   function _buildAssigneeOptions(selected) {
     if (!availProvs.length) {
       return `<option value="" disabled>${t('가용 프로바이더 없음 — AI 프로바이더 탭에서 키 설정')}</option>`;
     }
     return availProvs.map(p => {
       const alias = _provAlias[p.id] || p.id;
-      const opts = (p.models || []).map(m => {
-        const val = `${alias}:${(m.id || '').replace(/^claude-|^gemini-|^gpt-|^o[0-9-]+$/, x=>x)}`;
-        // Keep the exact user-facing model id; the backend's
-        // resolve_assignee handles aliases.
-        const v = `${alias}:${(m.id || '').split('-').pop().replace('gemini:', '').replace('opus-4-7','opus').replace('sonnet-4-6','sonnet').replace('haiku-4-5','haiku') || m.id}`;
-        const label = `${m.label || m.id}${m.contextWindow ? ' · ' + (m.contextWindow/1000) + 'k' : ''}`;
-        const vSafe = escapeHtml(`${alias}:${m.id.replace(/^claude-/, '')}`);
-        return `<option value="${vSafe}" ${selected === `${alias}:${m.id.replace(/^claude-/, '')}` ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+      // Drop pure-embedding models from the picker (chat-only context).
+      const chatModels = (p.models || []).filter(m => {
+        const caps = m.capabilities || [];
+        return caps.length === 0 || caps.includes('chat');
+      });
+      if (!chatModels.length) return '';
+      const opts = chatModels.map(m => {
+        // Canonical assignee value is alias:<model-id>. The backend's
+        // resolve_assignee normalises common Claude aliases (opus/sonnet/
+        // haiku) but leaves arbitrary ids untouched, so passing the raw
+        // model id is the safe default for every other provider.
+        const value = `${alias}:${m.id}`;
+        const ctx = m.contextWindow ? ` · ${Math.round(m.contextWindow / 1000)}k` : '';
+        const note = m.note ? ` — ${m.note}` : '';
+        const label = `${m.label || m.id}${ctx}${note}`;
+        return `<option value="${escapeHtml(value)}" ${selected === value ? 'selected' : ''}>${escapeHtml(label)}</option>`;
       }).join('');
       return `<optgroup label="${escapeHtml(p.icon + ' ' + p.name)}">${opts}</optgroup>`;
     }).join('');
@@ -19047,21 +19151,21 @@ VIEWS.orchestrator = async () => {
       </div>
       <div class="card p-4 lg:col-span-2">
         <div class="text-[12px] font-semibold mb-2">${t('라이브 디스패치 테스트')}</div>
-        <textarea id="orchTestText" rows="3" class="w-full text-[11px] bg-transparent border" placeholder="${t('메시지를 입력해 ad-hoc 디스패치')}"></textarea>
+        <textarea id="orchTestText" rows="3" class="input text-xs" placeholder="${t('메시지를 입력해 ad-hoc 디스패치')}"></textarea>
         <details class="mt-2 text-[11px]">
           <summary style="cursor:pointer;color:var(--text-dim)">${t('이 호출만 모델 오버라이드')}</summary>
           <div class="grid grid-cols-3 gap-2 mt-2">
             <div>
               <label class="text-[10px] block">${t('Planner')}</label>
-              <input id="orchOvrPlanner" class="text-[11px] bg-transparent border-b w-full" placeholder="${t('비워두면 기본값')}">
+              <input id="orchOvrPlanner" class="input text-xs w-full" placeholder="${t('비워두면 기본값')}">
             </div>
             <div>
               <label class="text-[10px] block">${t('Aggregator')}</label>
-              <input id="orchOvrAgg" class="text-[11px] bg-transparent border-b w-full" placeholder="${t('비워두면 기본값')}">
+              <input id="orchOvrAgg" class="input text-xs w-full" placeholder="${t('비워두면 기본값')}">
             </div>
             <div>
               <label class="text-[10px] block">${t('Assignees (csv)')}</label>
-              <input id="orchOvrAssignees" class="text-[11px] bg-transparent border-b w-full" placeholder="claude:sonnet, openai:gpt-4.1">
+              <input id="orchOvrAssignees" class="input text-xs w-full" placeholder="claude:sonnet, openai:gpt-4.1">
             </div>
           </div>
         </details>
@@ -19087,7 +19191,7 @@ VIEWS.orchestrator = async () => {
           <div class="text-[12px] font-semibold">${t('IPC 스트림')}</div>
           <span class="text-[10px]" style="color:var(--text-dim)">${t('inbound (사용자 → 오케) / outbound (오케 → 채널) 분리 로그')}</span>
           <button class="chip text-[10px] ml-auto" onclick="_orchRefreshIpc()">${t('새로고침')}</button>
-          <input id="orchIpcChan" class="text-[11px] bg-transparent border-b" placeholder="${t('채널 필터 (선택)')}" oninput="_orchRefreshIpc()">
+          <input id="orchIpcChan" class="input text-xs" placeholder="${t('채널 필터 (선택)')}" oninput="_orchRefreshIpc()">
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div>
@@ -19364,7 +19468,7 @@ VIEWS.ralph = async () => {
           ${_statusChip('max_iter', '🔁 max-iter')}
           ${_statusChip('cancelled', '⏹ cancelled')}
           ${_statusChip('error', '✗ error')}
-          <input class="text-[11px] bg-transparent border-b ml-auto" placeholder="${t('runId / assignee 검색')}"
+          <input class="input text-xs ml-auto" placeholder="${t('runId / assignee 검색')}"
             value="${escapeHtml(filterQ)}"
             oninput="state.data._ralphFilterQ=this.value;renderView()" style="width:200px;">
         </div>
@@ -19382,20 +19486,20 @@ VIEWS.ralph = async () => {
       <div class="card p-4">
         <div class="text-[12px] font-semibold mb-2">${t('새 실행 시작')}</div>
         <label class="text-[11px] block mb-1">${t('Prompt')}
-          <textarea id="ralphPrompt" rows="6" class="w-full text-[11px] bg-transparent border" placeholder="Fix every failing test. Output <promise>DONE</promise> when green."></textarea>
+          <textarea id="ralphPrompt" rows="6" class="input text-xs" placeholder="Fix every failing test. Output <promise>DONE</promise> when green."></textarea>
         </label>
         <label class="text-[11px] block mb-1">${t('Assignee')}
-          <input id="ralphAssignee" class="w-full text-[11px] bg-transparent border-b" placeholder="claude:sonnet">
+          <input id="ralphAssignee" class="input text-xs" placeholder="claude:sonnet">
         </label>
         <label class="text-[11px] block mb-1">${t('Completion 표식')}
-          <input id="ralphCompletion" class="w-full text-[11px] bg-transparent border-b" value="<promise>DONE</promise>">
+          <input id="ralphCompletion" class="input text-xs" value="<promise>DONE</promise>">
         </label>
         <div class="flex gap-2 mb-1">
           <label class="text-[11px] flex-1">${t('Max iter')}
-            <input id="ralphMax" type="number" min="1" max="200" class="w-full text-[11px] bg-transparent border-b" value="25">
+            <input id="ralphMax" type="number" min="1" max="200" class="input text-xs" value="25">
           </label>
           <label class="text-[11px] flex-1">${t('예산 USD')}
-            <input id="ralphBudget" type="number" min="0.01" max="100" step="0.5" class="w-full text-[11px] bg-transparent border-b" value="5">
+            <input id="ralphBudget" type="number" min="0.01" max="100" step="0.5" class="input text-xs" value="5">
           </label>
         </div>
         <button class="chip text-[10px] mt-2" onclick="_ralphStart()">🚀 ${t('시작')}</button>
@@ -19410,7 +19514,7 @@ VIEWS.ralph = async () => {
           <div class="text-[10px] mb-2" style="color:var(--text-dim)">
             ${t('LLM polish 패스가 추천 PROMPT.md를 다듬을 때 사용하는 시스템 프롬프트. 비워두고 저장하면 기본값으로 복원.')}
           </div>
-          <textarea id="ralphPolishText" rows="6" class="w-full text-[11px] bg-transparent border" placeholder="${t('비워두면 기본값 사용')}"></textarea>
+          <textarea id="ralphPolishText" rows="6" class="input text-xs" placeholder="${t('비워두면 기본값 사용')}"></textarea>
           <div class="flex items-center gap-2 mt-2">
             <button class="chip text-[10px]" onclick="_ralphPolishLoad()">${t('현재 로드')}</button>
             <button class="chip text-[10px]" onclick="_ralphPolishSave()">${t('저장')}</button>
@@ -19462,7 +19566,11 @@ function _ralphStartAutoRefresh() {
     clearInterval(state.data._ralphPollTimer);
     state.data._ralphPollTimer = null;
   }
-  // Only poll while we're actually on the ralph tab.
+  // X2 (v2.66.10) — only renderView when the runs list *actually changed*.
+  // The previous version called renderView every 3s regardless of new
+  // data, which caused visible flicker on the Ralph tab even with no
+  // active runs. Hash the (id,status,iter) tuple per run; render only on
+  // change.
   state.data._ralphPollTimer = setInterval(async () => {
     if (state.view !== 'ralph') {
       clearInterval(state.data._ralphPollTimer);
@@ -19472,17 +19580,18 @@ function _ralphStartAutoRefresh() {
     try {
       const r = await api('/api/ralph/list?limit=200');
       if (!r || !r.ok) return;
-      const anyRunning = (r.runs || []).some(x => x.status === 'running');
+      const runs = r.runs || [];
+      const sig = runs.map(x => `${x.runId}:${x.status}:${x.iterations||0}:${(x.costUsd||0).toFixed(4)}`).join('|');
+      const anyRunning = runs.some(x => x.status === 'running');
       if (!anyRunning) {
-        // No active runs — stop polling. User can renderView() manually
-        // to fetch fresh data when something kicks off again.
         clearInterval(state.data._ralphPollTimer);
         state.data._ralphPollTimer = null;
       }
-      renderView();
-    } catch (_) {
-      // network error — keep timer alive, try again next tick
-    }
+      if (sig !== state.data._ralphRunsSig) {
+        state.data._ralphRunsSig = sig;
+        renderView();
+      }
+    } catch (_) { /* keep timer alive on transient errors */ }
   }, 3000);
 }
 

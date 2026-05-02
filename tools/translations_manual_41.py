@@ -6,6 +6,16 @@ Loaded by ``tools/translations_manual.py``.
 from __future__ import annotations
 
 NEW_EN: dict[str, str] = {
+    # X3 (v2.66.10) — Codex + provider wizard cards
+    "Codex CLI 가 PATH 에 있으면 자동 감지됩니다.":
+        "Codex CLI is auto-detected when present in PATH.",
+    "지원 모델":  "Supported models",
+    "빠른 LPU 추론 — Llama / Mixtral / DeepSeek R1":
+        "Fast LPU inference — Llama / Mixtral / DeepSeek R1",
+    "V3 chat + R1 reasoning":  "V3 chat + R1 reasoning",
+    "Large / Medium / Small / Codestral":  "Large / Medium / Small / Codestral",
+    "OpenAI Codex CLI":  "OpenAI Codex CLI",
+    "발급":  "Get a key",
     # W1 (v2.66.9) — Orchestrator config picker UI
     "가용 프로바이더 없음 — AI 프로바이더 탭에서 키 설정":
         "No available provider — set keys in the AI Providers tab",
@@ -33,6 +43,16 @@ NEW_EN: dict[str, str] = {
 }
 
 NEW_ZH: dict[str, str] = {
+    # X3 — Codex + provider wizard cards
+    "Codex CLI 가 PATH 에 있으면 자동 감지됩니다.":
+        "如果 Codex CLI 在 PATH 中,将自动检测。",
+    "지원 모델":  "支持的模型",
+    "빠른 LPU 추론 — Llama / Mixtral / DeepSeek R1":
+        "快速 LPU 推理 — Llama / Mixtral / DeepSeek R1",
+    "V3 chat + R1 reasoning":  "V3 chat + R1 推理",
+    "Large / Medium / Small / Codestral":  "Large / Medium / Small / Codestral",
+    "OpenAI Codex CLI":  "OpenAI Codex CLI",
+    "발급":  "获取密钥",
     # W1 — Orchestrator picker UI
     "가용 프로바이더 없음 — AI 프로바이더 탭에서 키 설정":
         "无可用提供商 — 在 AI 提供商标签中设置密钥",
