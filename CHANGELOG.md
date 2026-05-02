@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.0] — 2026-05-02
+
+### Fixed
+- 🦞 LazyClaw mode-badge key corrected from `O` (legacy OpenClaw) to `L`.
+- i18n: cleared 3 Korean residue strings in EN/ZH — "Permissions Summary",
+  Settings/Permissions tab link, and email-toggle tooltip.
+
+---
 ## [2.66.0] — 2026-05-02
 
 ### Changed

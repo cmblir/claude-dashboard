@@ -1332,20 +1332,52 @@ def api_workflow_node_clipboard(body: dict) -> dict:
 
 # ───────── Run 엔진 ─────────
 
-def _run_status_snapshot(runId: str) -> dict:
+def _run_status_snapshot(runId: str, *, full: bool = False) -> dict:
     # v2.44.0 — prefer the in-memory cache (live runs) to avoid rereading
     # ~/.claude-dashboard-workflows.json on every SSE/poll tick. Falls back
     # to disk for completed runs (cache is dropped on completion) and for
     # any run that started before a process restart.
+    # Y2 (v2.66.11) — by default, truncate every node's `output` to 2 KB
+    # for the polling/SSE path. The canvas tooltip only renders 160 chars
+    # anyway. Pass full=True to get the un-truncated version (used by the
+    # run-detail modal). Cuts payload from 10s of KB per tick to a few KB.
     cached = _runs_cache_get(runId)
     if cached is not None:
-        return {"ok": True, "run": cached}
+        return {"ok": True, "run": _maybe_truncate_run(cached, full)}
     # v2.47.0 — completed runs live in SQLite. Cache misses fall through here.
     loaded = _runs_db_load(run_id=runId)
     r = loaded.get(runId)
     if not r:
         return {"ok": False, "error": "run not found"}
-    return {"ok": True, "run": r}
+    return {"ok": True, "run": _maybe_truncate_run(r, full)}
+
+
+def _maybe_truncate_run(run: dict, full: bool) -> dict:
+    """If ``full`` is False, copy the run with each node-result's output
+    capped at 2 KB. Returns the (possibly modified) run dict.
+    """
+    if full:
+        return run
+    nr = run.get("nodeResults")
+    if not isinstance(nr, dict):
+        return run
+    new_nr = {}
+    truncated_any = False
+    for nid, r in nr.items():
+        if not isinstance(r, dict):
+            new_nr[nid] = r
+            continue
+        out = r.get("output")
+        if isinstance(out, str) and len(out) > 2048:
+            truncated_any = True
+            new_nr[nid] = {**r, "output": out[:2048],
+                           "outputTruncated": True,
+                           "outputLen": len(out)}
+        else:
+            new_nr[nid] = r
+    if not truncated_any:
+        return run
+    return {**run, "nodeResults": new_nr}
 
 
 def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | None = None,
@@ -3208,17 +3240,26 @@ def api_workflow_webhook(wfId: str, body: dict | None = None, secret_header: str
 
 
 def api_workflow_run_status(query: dict) -> dict:
-    """GET /api/workflows/run-status?runId=... — 단일 run 스냅샷."""
+    """GET /api/workflows/run-status?runId=...&full=1 — 단일 run 스냅샷.
+
+    Y2 (v2.66.11) — ``full=1`` returns un-truncated outputs (for the
+    run-detail modal). The default poll/SSE path stays truncated.
+    """
     rid = None
+    full = False
     if isinstance(query, dict):
         v = query.get("runId")
         if isinstance(v, list) and v:
             rid = v[0]
         elif isinstance(v, str):
             rid = v
+        fv = query.get("full")
+        if isinstance(fv, list):
+            fv = fv[0] if fv else ""
+        full = str(fv or "").lower() in ("1", "true", "yes", "on")
     if not (isinstance(rid, str) and _RUN_ID_RE.match(rid)):
         return {"ok": False, "error": "invalid runId"}
-    return _run_status_snapshot(rid)
+    return _run_status_snapshot(rid, full=full)
 
 
 def handle_workflow_run_stream(handler, query: dict) -> None:
