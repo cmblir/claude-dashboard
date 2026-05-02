@@ -25851,13 +25851,123 @@ async function _wfDiffVersions() {
 // the entire fallback chain + retry / hang-recovery from FF1/MM1 is
 // available here too.
 // ──────────────────────────────────────────────────────────────────
+// ── OO5 (v2.66.68) — LazyClaw Chat v2: OpenClaw-style multi-session UI ──
+// Session storage schema:
+//   cc.lc.sessions   = [{id, label, assignee, ts, preview}]  (latest first)
+//   cc.lc.current    = "<session-id>"
+//   cc.lc.hist.<id>  = [{role, text, meta, ts, tokensIn, tokensOut}]
+
+function _lcGetSessions() {
+  try { return JSON.parse(localStorage.getItem('cc.lc.sessions') || '[]'); }
+  catch (_) { return []; }
+}
+function _lcSaveSessions(arr) {
+  try { localStorage.setItem('cc.lc.sessions', JSON.stringify(arr)); } catch (_) {}
+}
+function _lcCurrentId() {
+  try { return localStorage.getItem('cc.lc.current') || ''; } catch (_) { return ''; }
+}
+function _lcSetCurrentId(id) {
+  try { localStorage.setItem('cc.lc.current', id); } catch (_) {}
+}
+function _lcGetHistory(id) {
+  if (!id) return [];
+  try { return JSON.parse(localStorage.getItem('cc.lc.hist.' + id) || '[]'); }
+  catch (_) { return []; }
+}
+function _lcSaveHistory(id, msgs) {
+  if (!id) return;
+  try { localStorage.setItem('cc.lc.hist.' + id, JSON.stringify((msgs || []).slice(-200))); }
+  catch (_) {}
+}
+function _lcMakeSessionId() {
+  return 'lcs-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+}
+function _lcEnsureSession(assignee) {
+  let sessions = _lcGetSessions();
+  let cur = _lcCurrentId();
+  if (cur && sessions.find(s => s.id === cur)) return cur;
+  const id = _lcMakeSessionId();
+  sessions.unshift({ id, label: t('새 대화'), assignee: assignee || '', ts: Date.now(), preview: '' });
+  _lcSaveSessions(sessions);
+  _lcSetCurrentId(id);
+  return id;
+}
+function _lcUpdateSessionMeta(id, assignee, previewText) {
+  const sessions = _lcGetSessions();
+  const s = sessions.find(x => x.id === id);
+  if (!s) return;
+  if (assignee) s.assignee = assignee;
+  if (previewText !== undefined) s.preview = String(previewText).slice(0, 55);
+  s.ts = Date.now();
+  const idx = sessions.indexOf(s);
+  if (idx > 0) { sessions.splice(idx, 1); sessions.unshift(s); }
+  _lcSaveSessions(sessions);
+}
+
+window._lcNewSession = function (assignee) {
+  const sel = document.getElementById('lcChatAssignee');
+  const a = assignee || (sel && sel.value) || '';
+  const id = _lcMakeSessionId();
+  const sessions = _lcGetSessions();
+  sessions.unshift({ id, label: t('새 대화'), assignee: a, ts: Date.now(), preview: '' });
+  _lcSaveSessions(sessions);
+  _lcSetCurrentId(id);
+  _lcRenderSessions();
+  _lcChatRender();
+  setTimeout(() => { const ta = document.getElementById('lcChatInput'); if (ta) ta.focus(); }, 50);
+};
+
+window._lcDeleteCurrentSession = function () {
+  const id = _lcCurrentId();
+  if (!id) return;
+  if (!confirm(t('이 대화를 삭제하시겠습니까?'))) return;
+  const sessions = _lcGetSessions().filter(s => s.id !== id);
+  _lcSaveSessions(sessions);
+  try { localStorage.removeItem('cc.lc.hist.' + id); } catch (_) {}
+  _lcSetCurrentId(sessions[0] ? sessions[0].id : '');
+  _lcRenderSessions();
+  _lcChatRender();
+};
+
+window._lcSwitchSession = function (id) {
+  _lcSetCurrentId(id);
+  _lcRenderSessions();
+  _lcChatRender();
+  setTimeout(() => { const ta = document.getElementById('lcChatInput'); if (ta) ta.focus(); }, 30);
+};
+
+function _lcRenderSessions() {
+  const list = document.getElementById('lcSessionList');
+  if (!list) return;
+  const sessions = _lcGetSessions();
+  const cur = _lcCurrentId();
+  const relTime = ts => {
+    const d = Date.now() - (ts || 0);
+    if (d < 60000) return t('방금');
+    if (d < 3600000) return Math.floor(d / 60000) + t('분 전');
+    if (d < 86400000) return Math.floor(d / 3600000) + t('시간 전');
+    return Math.floor(d / 86400000) + t('일 전');
+  };
+  if (!sessions.length) {
+    list.innerHTML = `<div style="padding:20px 8px;text-align:center;font-size:11px;color:var(--text-dim);">${t('아직 대화가 없습니다')}</div>`;
+    return;
+  }
+  list.innerHTML = sessions.map(s => {
+    const active = s.id === cur;
+    return `<div onclick="_lcSwitchSession('${s.id}')" style="cursor:pointer;padding:8px 10px;border-radius:7px;margin:1px 2px;border:1px solid ${active ? 'rgba(217,119,87,0.5)' : 'transparent'};background:${active ? 'rgba(217,119,87,0.1)' : 'transparent'};">
+      <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${active ? 'var(--accent)' : 'var(--text)'};">${escapeHtml(s.label || t('새 대화'))}</div>
+      ${s.preview ? `<div style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dim);margin-top:2px;">${escapeHtml(s.preview)}</div>` : ''}
+      <div style="font-size:9px;color:var(--text-dim);margin-top:3px;">${relTime(s.ts)}</div>
+    </div>`;
+  }).join('');
+}
+
 VIEWS.lazyclawChat = async () => {
   const provs = await api('/api/ai-providers/list').catch(() => ({ providers: [] }));
   const available = (provs.providers || []).filter(p => p.available);
-  // Build a flat assignee dropdown: for each available provider, list
-  // a few popular models. Format: "claude:opus", "openai:gpt-4.1-mini" …
   const opts = available.flatMap(p => {
-    const models = (p.models || []).slice(0, 6);
+    const models = (p.models || []).slice(0, 8);
     if (!models.length) return [{ value: p.id, label: p.name || p.id }];
     return models.map(m => ({
       value: `${p.id}:${m.id || m.name}`,
@@ -25868,29 +25978,49 @@ VIEWS.lazyclawChat = async () => {
     try { return localStorage.getItem('cc.lazyclawChat.assignee') || (opts[0] && opts[0].value) || ''; }
     catch (_) { return (opts[0] && opts[0].value) || ''; }
   })();
-  return `
-    <div class="card p-5" style="display:flex;flex-direction:column;height:calc(100vh - 110px);">
-      <div class="flex items-center gap-3 mb-3">
-        <h1 class="text-lg font-semibold">💬 ${t('AI 채팅')}</h1>
-        <select id="lcChatAssignee" class="input text-xs" style="min-width:240px;">
-          ${opts.map(o => `<option value="${escapeHtml(o.value)}" ${o.value===lastAssignee?'selected':''}>${escapeHtml(o.label)}</option>`).join('') || '<option value="">' + t('가용 프로바이더 없음') + '</option>'}
+  const optHtml = opts.map(o => `<option value="${escapeHtml(o.value)}" ${o.value === lastAssignee ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('') || `<option value="">${t('가용 프로바이더 없음')}</option>`;
+
+  return `<div style="display:grid;grid-template-columns:220px 1fr;height:calc(100vh - 108px);border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);">
+
+    <!-- Session sidebar -->
+    <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;background:rgba(0,0,0,0.12);">
+      <div style="padding:8px;border-bottom:1px solid var(--border);">
+        <button class="btn-primary btn text-xs" style="width:100%;justify-content:center;" onclick="_lcNewSession()">＋ ${t('새 대화')}</button>
+      </div>
+      <div id="lcSessionList" style="flex:1;overflow-y:auto;padding:4px 2px;"></div>
+    </div>
+
+    <!-- Main area -->
+    <div style="display:flex;flex-direction:column;overflow:hidden;">
+
+      <!-- Top bar: model selector + actions -->
+      <div style="padding:6px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <select id="lcChatAssignee" class="input text-xs" style="min-width:190px;max-width:280px;">
+          ${optHtml}
         </select>
-        <button class="btn text-xs" onclick="_lcChatToggleSysPrompt()" id="lcSysPromptBtn" title="${t('시스템 프롬프트 설정')}">⚙ ${t('시스템')}</button>
-        <button class="btn text-xs" onclick="_lcChatExport()" title="${t('대화를 markdown 파일로 다운로드')}">📥 ${t('내보내기')}</button>
-        <button class="btn text-xs" onclick="_lcChatClear()" title="${t('대화 비우기')}">🗑 ${t('비우기')}</button>
-        <span class="ml-auto text-[10px] text-[var(--text-dim)]">${t('Enter = 전송 · Shift+Enter = 줄바꿈')}</span>
+        <button class="btn text-xs" onclick="_lcChatToggleSysPrompt()" title="${t('시스템 프롬프트')}" style="padding:3px 8px;">⚙</button>
+        <span style="flex:1;"></span>
+        <button class="btn text-xs" onclick="_lcChatExport()" title="${t('마크다운으로 내보내기')}" style="padding:3px 7px;">📥</button>
+        <button class="btn text-xs" onclick="_lcDeleteCurrentSession()" title="${t('대화 삭제')}" style="padding:3px 7px;">🗑</button>
+        <span style="font-size:10px;color:var(--text-dim);">Enter=${t('전송')} · Shift+Enter=${t('줄바꿈')}</span>
       </div>
-      <!-- OO4 (v2.66.67) — collapsible system prompt input -->
-      <div id="lcSysPromptBox" style="display:none;margin-bottom:8px;">
-        <textarea id="lcSysPrompt" class="input w-full text-xs" rows="3" placeholder="${t('시스템 프롬프트 (예: 너는 친절한 한국어 도우미다)')}" style="resize:vertical;font-family:inherit;"></textarea>
+
+      <!-- System prompt (collapsible) -->
+      <div id="lcSysPromptBox" style="display:none;padding:8px 12px;border-bottom:1px solid var(--border);background:rgba(167,139,250,0.05);">
+        <div style="font-size:10px;font-weight:600;color:var(--text-dim);margin-bottom:4px;">⚙ ${t('시스템 프롬프트')}</div>
+        <textarea id="lcSysPrompt" class="input w-full text-xs" rows="3" placeholder="${t('예: 시니어 소프트웨어 엔지니어처럼 답해줘.')}" style="resize:vertical;font-family:inherit;"></textarea>
       </div>
-      <div id="lcChatLog" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:8px;background:rgba(0,0,0,0.18);border:1px solid var(--border);border-radius:8px;"></div>
-      <div class="mt-3 flex items-end gap-2">
-        <textarea id="lcChatInput" class="input flex-1" rows="2" placeholder="${t('메시지를 입력하세요…')}" style="resize:none;font-family:inherit;"></textarea>
-        <button id="lcChatSend" class="btn-primary btn text-xs" onclick="_lcChatSend()">📨 ${t('전송')}</button>
+
+      <!-- Messages area -->
+      <div id="lcChatLog" style="flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px;"></div>
+
+      <!-- Input -->
+      <div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;align-items:flex-end;gap:8px;">
+        <textarea id="lcChatInput" class="input flex-1 text-sm" rows="2" placeholder="${t('메시지를 입력하세요…')}" style="resize:none;font-family:inherit;line-height:1.5;max-height:200px;"></textarea>
+        <button id="lcChatSend" class="btn-primary btn" style="padding:8px 16px;font-size:1.1rem;align-self:flex-end;" onclick="_lcChatSend()">↑</button>
       </div>
     </div>
-  `;
+  </div>`;
 };
 
 AFTER.lazyclawChat = () => {
@@ -25954,10 +26084,14 @@ function _lcChatRender() {
     } else {
       body = `<pre class="text-sm mt-1" style="white-space:pre-wrap;word-break:break-word;font-family:inherit;">${escapeHtml(m.text || '')}</pre>`;
     }
-    // Per-message copy button
+    // Per-message copy + (assistant only) regenerate-with-other-model
     const copyBtn = m.text ? `<button class="btn text-[10px]" style="margin-left:auto;background:transparent;border:0;opacity:0.55;" onclick="_copyToClipboard(this, ${JSON.stringify(m.text).replace(/"/g,'&quot;')})" title="${t('복사')}">📋</button>` : '';
+    // OO5 (v2.66.68) — regenerate the assistant reply with a *different*
+    // model. Looks at the previous user message and resends it. Useful
+    // for side-by-side comparison without leaving the chat.
+    const regenBtn = (!isUser && i > 0) ? `<button class="btn text-[10px]" style="background:transparent;border:0;opacity:0.55;" onclick="_lcChatRegenerate(${i})" title="${t('다른 모델로 재생성')}">🔄</button>` : '';
     return `<div style="background:${bg};border:1px solid ${stroke};border-radius:10px;padding:10px 12px;align-self:${isUser?'flex-end':'flex-start'};max-width:85%;">
-      <div class="text-[10px] text-[var(--text-dim)] flex items-center">${tag} ${escapeHtml(isUser ? t('나') : (m.assignee || t('AI')))}${copyBtn}</div>
+      <div class="text-[10px] text-[var(--text-dim)] flex items-center gap-1">${tag} ${escapeHtml(isUser ? t('나') : (m.assignee || t('AI')))}${regenBtn}${copyBtn}</div>
       ${body}
       ${meta}
     </div>`;
@@ -26123,6 +26257,76 @@ window._lcChatToggleSysPrompt = function () {
     box.style.display = '';
     setTimeout(() => ta && ta.focus(), 50);
   }
+};
+
+// OO5 (v2.66.68) — regenerate an assistant reply with a different
+// provider. Loads available providers, asks the user to pick, drops
+// the existing reply + the user message back into the input, then
+// triggers send with the new assignee.
+window._lcChatRegenerate = async function (msgIdx) {
+  const history = _lcChatLoad();
+  if (msgIdx <= 0 || msgIdx >= history.length) return;
+  // Find the user prompt that produced this assistant message.
+  const userMsg = history[msgIdx - 1];
+  if (!userMsg || userMsg.role !== 'user') {
+    toast(t('이전 사용자 메시지를 찾을 수 없습니다'), 'warn');
+    return;
+  }
+  // Build provider:model picker modal.
+  const provs = await api('/api/ai-providers/list').catch(() => ({ providers: [] }));
+  const available = (provs.providers || []).filter(p => p.available);
+  const opts = available.flatMap(p => {
+    const models = (p.models || []).slice(0, 6);
+    if (!models.length) return [{ value: p.id, label: p.name || p.id }];
+    return models.map(m => ({
+      value: `${p.id}:${m.id || m.name}`,
+      label: `${p.name || p.id} · ${m.id || m.name}`,
+    }));
+  });
+  const optsHtml = opts.map(o =>
+    `<button class="btn text-xs w-full text-left mb-1" onclick="_lcChatDoRegenerate(${msgIdx}, '${escapeHtml(o.value)}')" style="background:transparent;border:1px solid var(--border);">${escapeHtml(o.label)}</button>`
+  ).join('') || `<div class="empty">${t('가용 프로바이더 없음')}</div>`;
+  showModal(`
+    <div class="modal p-5" style="max-width:480px;">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">🔄 ${t('다른 모델로 재생성')}</h2>
+        <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+      </div>
+      <div class="text-[11px] text-[var(--text-dim)] mb-2">${t('같은 사용자 메시지를 선택한 모델로 재요청합니다')}</div>
+      <div style="max-height:60vh;overflow-y:auto;">${optsHtml}</div>
+    </div>
+  `);
+};
+
+window._lcChatDoRegenerate = function (msgIdx, assignee) {
+  closeModal();
+  const history = _lcChatLoad();
+  if (msgIdx <= 0 || msgIdx >= history.length) return;
+  const userMsg = history[msgIdx - 1];
+  if (!userMsg || userMsg.role !== 'user') return;
+  // Drop the old assistant reply (and anything after it) so context is clean.
+  const trimmed = history.slice(0, msgIdx);
+  _lcChatSave(trimmed);
+  _lcChatRender();
+  // Set the dropdown + textarea to the user prompt and fire send.
+  const sel = document.getElementById('lcChatAssignee');
+  if (sel) {
+    if (![...sel.options].some(o => o.value === assignee)) {
+      const opt = document.createElement('option');
+      opt.value = assignee; opt.textContent = assignee;
+      sel.appendChild(opt);
+    }
+    sel.value = assignee;
+    try { localStorage.setItem('cc.lazyclawChat.assignee', assignee); } catch (_) {}
+  }
+  // Drop the user message we'll re-send (so _lcChatSend re-pushes it).
+  const trimmed2 = trimmed.slice(0, -1);
+  _lcChatSave(trimmed2);
+  _lcChatRender();
+  const ta = document.getElementById('lcChatInput');
+  if (ta) ta.value = userMsg.text || '';
+  // Defer so the dropdown change is committed.
+  setTimeout(() => _lcChatSend(), 30);
 };
 
 window._lcChatClear = function () {
