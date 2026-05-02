@@ -123,6 +123,13 @@ const NAV = [
   { id: 'lazyclawChat', icon: '💬', label: 'AI 채팅', group: 'build',
     desc: '등록된 AI 프로바이더(Claude·OpenAI·Gemini·Ollama 등)와 직접 대화. assignee 즉석 전환·히스토리 저장.',
     docUrl: null },
+  // QQ2 (v2.66.77) — terminal-style settings inspector. Whitelisted
+  // read-only commands so the user can poke at provider/CLI state
+  // without leaving the dashboard. Write paths intentionally stay
+  // out of scope here (use the proper Settings tab for those).
+  { id: 'lazyclawTerm', icon: '⌨', label: '터미널', group: 'build',
+    desc: 'lazyclaw 설정·CLI 상태를 화이트리스트된 read-only 명령으로 즉시 점검 (claude --version, ollama list 등).',
+    docUrl: null },
 
   // config — Claude Code 설정 전반 (13, advanced 흡수)
   { id: 'hooks',       icon: '🪝', label: '훅',
@@ -488,7 +495,7 @@ const MODE_TABS = {
     'costsTimeline','zclaude','envConfig','settings',
   ]),
   lazyclaw: new Set([
-    'orchestrator','ralph','agents','workflows','lazyclawChat',
+    'orchestrator','ralph','agents','workflows','lazyclawChat','lazyclawTerm',
     'aiProviders','runCenter','sessionReplay',
     'settings',
   ]),
@@ -26659,6 +26666,134 @@ window._lcChatExport = function () {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast(t('내보내기 완료'), 'ok');
+};
+
+// QQ2 (v2.66.77) — read-only terminal for inspecting CLI/provider
+// state without leaving the dashboard. Whitelisted commands only:
+// claude --version, claude config get/list, ollama list/ps,
+// gemini --version, codex --version, lazyclaude status, etc.
+// Server-side validation enforces the whitelist; client just
+// builds the UI and renders mac-term-style output.
+VIEWS.lazyclawTerm = async () => {
+  return `
+    <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 110px);overflow:hidden;">
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
+        <h1 class="text-sm font-semibold m-0">⌨ ${t('LazyClaw 설정 터미널')}</h1>
+        <span class="text-[10px] text-[var(--text-dim)]">${t('화이트리스트 read-only 명령만 실행됩니다')}</span>
+        <button class="btn text-xs ml-auto" onclick="_lcTermClear()" title="${t('출력 비우기')}">🧹</button>
+        <button class="btn text-xs" onclick="_lcTermShowHelp()" title="${t('가능한 명령')}">❔</button>
+      </div>
+      <div id="lcTermLog" style="flex:1;overflow-y:auto;padding:14px 18px;font-family:'SF Mono',ui-monospace,Menlo,monospace;font-size:12px;background:#0a0a0a;color:#e8e8e8;line-height:1.55;"></div>
+      <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;">
+        <span style="color:#4ade80;font-family:ui-monospace;font-weight:700;">$</span>
+        <input id="lcTermInput" class="input flex-1" placeholder="${t('예: claude --version, ollama list, lazyclaude status')}" style="font-family:ui-monospace;font-size:12px;">
+        <button class="btn-primary btn text-xs" onclick="_lcTermRun()">▶ ${t('실행')}</button>
+      </div>
+    </div>
+  `;
+};
+
+AFTER.lazyclawTerm = () => {
+  const inp = document.getElementById('lcTermInput');
+  if (!inp) return;
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); _lcTermRun(); }
+    else if (e.key === 'ArrowUp' && !inp.value) {
+      const hist = JSON.parse(localStorage.getItem('cc.lazyclawTerm.history') || '[]');
+      if (hist.length) inp.value = hist[hist.length - 1];
+    }
+  });
+  setTimeout(() => inp.focus(), 50);
+  // Restore log
+  _lcTermRender();
+};
+
+function _lcTermLoadLog() {
+  try { return JSON.parse(localStorage.getItem('cc.lazyclawTerm.log') || '[]'); }
+  catch (_) { return []; }
+}
+function _lcTermSaveLog(log) {
+  try { localStorage.setItem('cc.lazyclawTerm.log', JSON.stringify(log.slice(-200))); }
+  catch (_) {}
+}
+function _lcTermRender() {
+  const out = document.getElementById('lcTermLog');
+  if (!out) return;
+  const log = _lcTermLoadLog();
+  if (!log.length) {
+    out.innerHTML = `<div style="color:#6b6b6f;">${t('명령을 입력해 시작하세요. ❔ 버튼으로 사용 가능한 명령 확인.')}</div>`;
+    return;
+  }
+  out.innerHTML = log.map(l => {
+    if (l.kind === 'cmd') {
+      return `<div style="color:#4ade80;">$ ${escapeHtml(l.text)}</div>`;
+    }
+    if (l.kind === 'err') {
+      return `<div style="color:#f87171;white-space:pre-wrap;">${escapeHtml(l.text)}</div>`;
+    }
+    return `<div style="white-space:pre-wrap;">${escapeHtml(l.text)}</div>`;
+  }).join('');
+  out.scrollTop = out.scrollHeight;
+}
+
+window._lcTermClear = function () {
+  _lcTermSaveLog([]);
+  _lcTermRender();
+};
+
+window._lcTermShowHelp = function () {
+  showModal(`
+    <div class="modal p-5" style="max-width:560px;">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">⌨ ${t('가능한 명령')}</h2>
+        <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+      </div>
+      <div class="text-xs" style="line-height:1.7;">
+        <div><code>claude --version</code> · <code>claude config list</code> · <code>claude config get &lt;key&gt;</code></div>
+        <div><code>ollama --version</code> · <code>ollama list</code> · <code>ollama ps</code></div>
+        <div><code>gemini --version</code></div>
+        <div><code>codex --version</code></div>
+        <div><code>lazyclaude status</code> · <code>lazyclaude version</code></div>
+        <div><code>git log -5</code> · <code>git status</code> · <code>git remote -v</code></div>
+        <div><code>which claude / ollama / gemini / codex</code></div>
+        <div><code>node --version</code> · <code>python3 --version</code></div>
+        <div class="mt-3 text-[10px] text-[var(--text-dim)]">${t('write 명령 (config set, install 등) 은 보안상 차단. Settings 탭을 사용하세요.')}</div>
+      </div>
+    </div>
+  `);
+};
+
+window._lcTermRun = async function () {
+  const inp = document.getElementById('lcTermInput');
+  if (!inp) return;
+  const cmd = (inp.value || '').trim();
+  if (!cmd) return;
+  inp.value = '';
+  // history (uparrow recall)
+  try {
+    const hist = JSON.parse(localStorage.getItem('cc.lazyclawTerm.history') || '[]');
+    hist.push(cmd);
+    localStorage.setItem('cc.lazyclawTerm.history', JSON.stringify(hist.slice(-100)));
+  } catch (_) {}
+  const log = _lcTermLoadLog();
+  log.push({ kind: 'cmd', text: cmd, ts: Date.now() });
+  _lcTermSaveLog(log); _lcTermRender();
+  try {
+    const r = await api('/api/lazyclaw/term', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: cmd }),
+    });
+    if (r.ok) {
+      log.push({ kind: 'out', text: (r.stdout || '').trim() || '(no output)', ts: Date.now() });
+      if (r.stderr && r.stderr.trim()) log.push({ kind: 'err', text: r.stderr.trim(), ts: Date.now() });
+    } else {
+      log.push({ kind: 'err', text: '⚠ ' + (r.error || 'unknown'), ts: Date.now() });
+    }
+  } catch (e) {
+    log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+  }
+  _lcTermSaveLog(log); _lcTermRender();
+  inp.focus();
 };
 
 // LL2 (v2.66.31) — perf HUD. Press Cmd/Ctrl+Shift+P to toggle a

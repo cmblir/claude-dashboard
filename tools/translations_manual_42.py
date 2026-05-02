@@ -149,6 +149,16 @@ NEW_EN: dict[str, str] = {
     "어시니 전환 (예: claude:opus)": "Switch assignee (e.g. claude:opus)",
     "마크다운으로 내보내기": "Export as markdown",
     "이 목록": "This help",
+    # QQ2
+    "터미널": "Terminal",
+    "lazyclaw 설정·CLI 상태를 화이트리스트된 read-only 명령으로 즉시 점검 (claude --version, ollama list 등).": "Inspect lazyclaw / CLI state with whitelisted read-only commands (claude --version, ollama list, etc).",
+    "LazyClaw 설정 터미널": "LazyClaw settings terminal",
+    "화이트리스트 read-only 명령만 실행됩니다": "Whitelisted read-only commands only",
+    "출력 비우기": "Clear output",
+    "가능한 명령": "Available commands",
+    "예: claude --version, ollama list, lazyclaude status": "e.g. claude --version, ollama list, lazyclaude status",
+    "명령을 입력해 시작하세요. ❔ 버튼으로 사용 가능한 명령 확인.": "Type a command to start. Click ❔ for the whitelist.",
+    "write 명령 (config set, install 등) 은 보안상 차단. Settings 탭을 사용하세요.": "Write commands (config set, install, …) are blocked for safety — use the Settings tab.",
     # PP4
     "노드 타임아웃 (서버 기본값 사용 = 0)": "Node timeout (0 = use server default)",
     "0 = 서버 기본 (180s) · 30~600초 사이로 조절. 짧으면 빨리 fail, 길면 hang 인내.": "0 = server default (180s). 30–600s; shorter fails fast, longer tolerates hangs.",
@@ -304,6 +314,16 @@ NEW_ZH: dict[str, str] = {
     "어시니 전환 (예: claude:opus)": "切换执行者（例如 claude:opus）",
     "마크다운으로 내보내기": "导出为 markdown",
     "이 목록": "此帮助",
+    # QQ2
+    "터미널": "终端",
+    "lazyclaw 설정·CLI 상태를 화이트리스트된 read-only 명령으로 즉시 점검 (claude --version, ollama list 등).": "用白名单只读命令检查 lazyclaw / CLI 状态（如 claude --version、ollama list）",
+    "LazyClaw 설정 터미널": "LazyClaw 设置终端",
+    "화이트리스트 read-only 명령만 실행됩니다": "仅允许白名单只读命令",
+    "출력 비우기": "清空输出",
+    "가능한 명령": "可用命令",
+    "예: claude --version, ollama list, lazyclaude status": "例如：claude --version, ollama list, lazyclaude status",
+    "명령을 입력해 시작하세요. ❔ 버튼으로 사용 가능한 명령 확인.": "输入命令开始。点击 ❔ 查看白名单。",
+    "write 명령 (config set, install 등) 은 보안상 차단. Settings 탭을 사용하세요.": "出于安全考虑禁止写命令（config set、install 等），请使用「设置」标签页。",
     # PP4
     "노드 타임아웃 (서버 기본값 사용 = 0)": "节点超时（0 = 使用服务器默认）",
     "0 = 서버 기본 (180s) · 30~600초 사이로 조절. 짧으면 빨리 fail, 길면 hang 인내.": "0 = 服务器默认 (180s)。30~600s 之间。较短快速失败，较长容忍挂起。",
