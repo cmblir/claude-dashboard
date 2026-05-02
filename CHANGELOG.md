@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.29] — 2026-05-02
+
+### Performance
+- 🪪 **`/app.js` now versioned + immutable** (KK2). `_send_static`
+  rewrites the `<script src="/app.js">` reference in `index.html`
+  to `<script src="/app.js?v=<mtime>">`, and any URL with `?v=`
+  gets `Cache-Control: public, max-age=31536000, immutable`.
+  After the first load, the browser serves `app.js` from disk cache
+  without even a 304 round-trip — the URL itself changes whenever
+  app.js does, so staleness is impossible.
+
+---
 ## [2.66.28] — 2026-05-02
 
 ### Fixed
