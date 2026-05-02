@@ -157,6 +157,9 @@ NEW_EN: dict[str, str] = {
     "이 대화를 삭제할까요?": "Delete this conversation?",
     # QQ11
     "격자 표시 토글": "Toggle grid",
+    # QQ13
+    "붙여넣기": "Paste",
+    "인스펙터 토글": "Toggle inspector",
     # QQ1
     "시스템 프롬프트 설정됨": "System prompt set",
     "시스템 프롬프트 초기화됨": "System prompt cleared",
@@ -341,6 +344,9 @@ NEW_ZH: dict[str, str] = {
     "이 대화를 삭제할까요?": "删除此对话？",
     # QQ11
     "격자 표시 토글": "切换网格",
+    # QQ13
+    "붙여넣기": "粘贴",
+    "인스펙터 토글": "切换检查器",
     # QQ1
     "시스템 프롬프트 설정됨": "已设置系统提示",
     "시스템 프롬프트 초기화됨": "已清空系统提示",
