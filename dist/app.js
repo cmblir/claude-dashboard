@@ -26843,12 +26843,18 @@ window._lcSessionDelete = function (sid) {
   if (!confirm(t('이 대화를 삭제할까요?'))) return;
   const sessions = _lcGetSessions().filter(x => x.id !== sid);
   _lcSaveSessions(sessions);
-  // Drop history payload too.
+  // Drop history + draft payload too. QQ54 (v2.66.129) — earlier
+  // logic only matched keys ending in ':<sid>', missing the actual
+  // schema (cc.lc.hist.<sid>, cc.lc.draft.<sid>). Result: deleting a
+  // session left megabytes of orphan history bytes in localStorage.
   try {
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.endsWith(':' + sid)) keys.push(k);
+      if (!k) continue;
+      if (k === 'cc.lc.hist.' + sid) keys.push(k);
+      else if (k === 'cc.lc.draft.' + sid) keys.push(k);
+      else if (k && k.endsWith(':' + sid)) keys.push(k);  // legacy
     }
     keys.forEach(k => localStorage.removeItem(k));
   } catch (_) {}
