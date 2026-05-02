@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.76] — 2026-05-02
+
+### Added
+- ⌨ **Slash commands in the LazyClaw chat input** (QQ1) — terminal-
+  like settings without leaving the keyboard:
+  - `/clear` — wipe history
+  - `/system [text]` — set or clear the system prompt
+  - `/model <provider:model>` — switch assignee inline
+  - `/export` — download conversation as markdown
+  - `/help` — list commands inline as an assistant message
+
+---
 ## [2.66.75] — 2026-05-02
 
 ### Added
