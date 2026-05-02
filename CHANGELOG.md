@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.61] — 2026-05-02
+
+### Changed
+- ⏹ **Sibling-cancelled nodes shown distinct from real errors**
+  (NN1). Result-modal cards for nodes whose subprocess was
+  SIGTERM'd by MM1's fail-fast now show `(자동 취소됨)` in amber
+  with `⏹ 형제 노드 실패로 자동 취소됨` instead of the red
+  `⚠ cancelled by sibling-node failure`. The "switch provider"
+  UI is suppressed on these — they weren't the real failure.
+
+---
 ## [2.66.60] — 2026-05-02
 
 ### Added
