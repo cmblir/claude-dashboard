@@ -21,6 +21,9 @@ NEW_EN: dict[str, str] = {
     "실제 터미널에서 이어서 열기": "Open in a real terminal",
     "실제 터미널": "Real terminal",
     "터미널 활성화": "Terminal activated",
+    # Z2 (v2.66.12) — n8n-style palette
+    "일치하는 노드 없음": "No matching node",
+    "왼쪽 패널에서 노드 타입을 선택하세요": "Pick a node type from the left panel",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -37,4 +40,7 @@ NEW_ZH: dict[str, str] = {
     "실제 터미널에서 이어서 열기": "在真实终端中继续",
     "실제 터미널": "真实终端",
     "터미널 활성화": "终端已激活",
+    # Z2
+    "일치하는 노드 없음": "没有匹配的节点",
+    "왼쪽 패널에서 노드 타입을 선택하세요": "请从左侧面板选择节点类型",
 }

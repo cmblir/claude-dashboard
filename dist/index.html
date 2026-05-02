@@ -635,53 +635,68 @@ tailwind.config = {
   .wf-list-item.active { background: var(--grad-soft); border-color: rgba(167,139,250,0.35); }
 
   /* v2.34.1 — n8n-style accordion palette inside the node editor */
-  .wf-palette { display: flex; flex-direction: column; gap: 6px; }
-  .wf-pal-cat { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: border-color 0.12s; background: rgba(255,255,255,0.015); }
-  .wf-pal-cat.has-current { border-color: rgba(217,119,87,0.45); }
+  /* Z2 (v2.66.12) — n8n-style fixed-width palette. Lives inside the
+     editor's left aside; sticky search at top, scrollable category list
+     below. No more accordion-pushes-window-down: the palette has its
+     own scroll context. */
+  .wf-pal-search {
+    position: sticky; top: 0; z-index: 2;
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px 10px 14px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+  }
+  .wf-pal-search-icon { font-size: 12px; color: var(--text-dim); }
+  .wf-pal-search-input {
+    flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    color: var(--text); font-size: 12px; padding: 6px 10px; border-radius: 7px;
+    outline: none; transition: border-color 0.12s, box-shadow 0.12s;
+  }
+  .wf-pal-search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(217,119,87,0.15); }
+  .wf-pal-empty { padding: 24px 16px; color: var(--text-dim); font-size: 11px; text-align: center; }
+
+  .wf-palette { display: flex; flex-direction: column; padding: 6px 8px 14px 8px; gap: 4px; }
+  .wf-pal-cat { border: 1px solid transparent; border-radius: 8px; overflow: hidden; transition: border-color 0.12s; }
+  .wf-pal-cat.has-current { border-color: rgba(217,119,87,0.35); background: rgba(217,119,87,0.04); }
   .wf-pal-cat-header {
-    display: grid; grid-template-columns: 28px 1fr auto auto; align-items: center;
-    gap: 10px; width: 100%;
-    padding: 8px 12px; background: transparent; border: 0; color: var(--text);
-    cursor: pointer; text-align: left; font-size: 13px;
+    display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center;
+    gap: 8px; width: 100%;
+    padding: 7px 10px; background: transparent; border: 0; color: var(--text);
+    cursor: pointer; text-align: left; font-size: 12px;
     transition: background 0.12s;
   }
   .wf-pal-cat-header:hover { background: rgba(255,255,255,0.04); }
-  .wf-pal-cat-icon { font-size: 1.1rem; line-height: 1; text-align: center; }
-  .wf-pal-cat-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-  .wf-pal-cat-label { font-size: 12.5px; font-weight: 600; color: var(--text); }
-  .wf-pal-cat-desc { font-size: 10.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wf-pal-cat-icon { font-size: 0.95rem; line-height: 1; text-align: center; }
+  .wf-pal-cat-label { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .wf-pal-cat-count {
-    font-size: 10px; color: var(--text-dim); padding: 1px 7px;
-    background: rgba(255,255,255,0.06); border-radius: 8px;
+    font-size: 9.5px; color: var(--text-dim); padding: 1px 6px;
+    background: rgba(255,255,255,0.06); border-radius: 7px;
   }
-  .wf-pal-cat-chev { font-size: 11px; color: var(--text-dim); width: 14px; text-align: center; transition: transform 0.12s; }
+  .wf-pal-cat-chev { font-size: 10px; color: var(--text-dim); width: 12px; text-align: center; transition: transform 0.12s; }
   .wf-pal-cat.open .wf-pal-cat-chev { color: var(--accent); }
 
   .wf-pal-cat-body {
     display: none;
-    border-top: 1px solid var(--border);
-    padding: 6px;
+    padding: 3px 0 6px 0;
     flex-direction: column;
-    gap: 4px;
-    background: rgba(0,0,0,0.18);
+    gap: 1px;
   }
   .wf-pal-cat.open .wf-pal-cat-body { display: flex; }
 
   .wf-pal-row {
-    display: grid; grid-template-columns: 22px 1fr; grid-template-rows: auto auto;
-    column-gap: 8px; row-gap: 1px; padding: 6px 8px;
-    background: transparent; border: 1px solid transparent; border-radius: 8px;
+    display: grid; grid-template-columns: 20px 1fr;
+    column-gap: 9px; padding: 6px 12px;
+    background: transparent; border: 0; border-radius: 6px;
     cursor: pointer; text-align: left; color: var(--text);
-    transition: background 0.1s, border-color 0.1s;
+    transition: background 0.1s;
+    align-items: center;
   }
-  .wf-pal-row:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
+  .wf-pal-row:hover { background: rgba(255,255,255,0.06); }
   .wf-pal-row-active {
-    background: rgba(217,119,87,0.14);
-    border-color: rgba(217,119,87,0.55) !important;
+    background: rgba(217,119,87,0.16) !important;
   }
-  .wf-pal-icon { grid-row: 1 / span 2; align-self: center; font-size: 1.05rem; line-height: 1; text-align: center; }
-  .wf-pal-label { font-size: 12px; font-weight: 600; color: var(--text); }
-  .wf-pal-desc { font-size: 10.5px; color: var(--text-dim); line-height: 1.35; }
+  .wf-pal-icon { font-size: 0.95rem; line-height: 1; text-align: center; }
+  .wf-pal-label { font-size: 12px; font-weight: 500; color: var(--text); }
 
   /* v2.36.0 — Run Center cards + filters */
   .rc-filter {
@@ -4801,8 +4816,11 @@ function _wfRenderCanvas() {
     for (const el of __wf._nodeEls.values()) el.style.display = '';
   }
 
-  // Edges — full innerHTML rebuild (see comment above).
-  edgesG.innerHTML = edges.map(e => _wfRenderEdge(e)).join('');
+  // Z3 (v2.66.12) — Edges with O(1) node lookup. Build a Map once and
+  // pass it into _wfRenderEdge so we skip the per-edge linear find()
+  // that becomes O(E·N) at scale.
+  const _nodeMap = new Map(__wf.current.nodes.map(n => [n.id, n]));
+  edgesG.innerHTML = edges.map(e => _wfRenderEdge(e, _nodeMap)).join('');
 
   // 선택 상태 동기화 (재생성된 노드의 .selected class 반영)
   _wfSyncSelectionClasses();
@@ -5177,10 +5195,13 @@ function _wfRenderNode(n) {
   `;
 }
 
-function _wfRenderEdge(e) {
+// Z3 (v2.66.12) — accept an optional pre-built node Map to skip the
+// linear nodes.find() per edge. Caller (_wfRenderCanvas) passes the
+// map once; without it we still fall back to find() for safety.
+function _wfRenderEdge(e, nodeMap) {
   if (!__wf.current) return '';
-  const fromN = __wf.current.nodes.find(x => x.id === e.from);
-  const toN   = __wf.current.nodes.find(x => x.id === e.to);
+  const fromN = nodeMap ? nodeMap.get(e.from) : __wf.current.nodes.find(x => x.id === e.from);
+  const toN   = nodeMap ? nodeMap.get(e.to)   : __wf.current.nodes.find(x => x.id === e.to);
   if (!fromN || !toN) return '';
   const p1 = _wfPortPos(fromN, e.fromPort || 'out');
   const p2 = _wfPortPos(toN, e.toPort || 'in');
@@ -6206,18 +6227,23 @@ function _wfOpenNodeEditor(nid) {
   }
   const w = document.createElement('div');
   w.id = winId;
-  w.className = 'feat-win';
+  w.className = 'feat-win wf-node-editor';
   w.style.zIndex = ++_winMgr.zIndex;
-  // 중앙 근처 + 여러 개 띄우면 살짝 계단식
+  // Z2 (v2.66.12) — fixed-width n8n-style two-column layout. Window
+  // dimensions are *bounded* — user can drag-resize within sensible
+  // limits but the layout never stretches infinitely.
   const offset = _winMgr.openIds.size * 24;
-  // 초기 크기를 넉넉히 — 카테고리 grid + 선택한 카테고리의 전체 폼까지
-  // 스크롤 없이 한눈에 들어오는 사이즈
-  const initW = Math.min(620, window.innerWidth - 40);
-  const initH = Math.min(720, window.innerHeight - 40);
+  // Choose a sensible initial size: 760×640 on big screens, viewport-
+  // limited otherwise. Keep min/max so the right column doesn't break.
+  const initW = Math.max(560, Math.min(820, window.innerWidth - 40));
+  const initH = Math.max(440, Math.min(680, window.innerHeight - 40));
   w.style.left = (Math.max(20, window.innerWidth / 2 - initW / 2) + offset) + 'px';
   w.style.top = (Math.max(20, window.innerHeight / 2 - initH / 2) + offset) + 'px';
   w.style.width = initW + 'px';
   w.style.height = initH + 'px';
+  w.style.minWidth = '520px';
+  w.style.minHeight = '380px';
+  w.style.maxWidth = 'min(900px, calc(100vw - 24px))';
   w.style.maxHeight = 'calc(100vh - 24px)';
   w.style.resize = 'both';
   w.style.overflow = 'hidden';
@@ -6233,9 +6259,11 @@ function _wfOpenNodeEditor(nid) {
       </div>
       <div class="feat-win-title-text" id="${winId}-title">${isNew ? '✨ ' + t('새 노드') : '✏️ ' + t('노드 편집')}</div>
     </div>
-    <div class="feat-win-body" style="padding:0;display:flex;flex-direction:column;">
-      <div id="${winId}-cat" style="padding:14px 16px 8px 16px;"></div>
-      <div id="${winId}-form" style="flex:1;padding:0 16px 8px 16px;overflow-y:auto;"></div>
+    <div class="feat-win-body wf-editor-body" style="padding:0;display:flex;flex-direction:column;overflow:hidden;">
+      <div class="wf-editor-cols" style="flex:1;display:flex;min-height:0;overflow:hidden;">
+        <aside id="${winId}-cat" class="wf-editor-palette" style="width:280px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;background:rgba(255,255,255,0.015);"></aside>
+        <main id="${winId}-form" class="wf-editor-form" style="flex:1;min-width:0;padding:14px 18px;overflow-y:auto;"></main>
+      </div>
       <div class="flex justify-end gap-2 p-3 border-t border-[var(--border)]" style="flex-shrink:0;">
         <button class="btn text-sm" onclick="_wfCloseNodeEditor('${winId}')" aria-label="${t('취소')}">${t('취소')}</button>
         ${!isNew ? `<button class="btn text-sm" onclick="_wfDeleteFromEditor('${winId}')" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);" aria-label="${t('노드 삭제')}">🗑️ ${t('삭제')}</button>` : ''}
@@ -6334,6 +6362,15 @@ function _wfToggleCat(winId) {
 
 // v2.34.1 — n8n-style palette: open/close one category at a time. Persists
 // the open category per editor window so re-opening the editor stays put.
+// Z2 (v2.66.12) — debounced palette search. sessionStorage keeps the
+// query across re-renders within the editor window's lifetime.
+let _wfPalSearchTimer = null;
+window._wfPaletteSearch = function(winId, q) {
+  try { sessionStorage.setItem('wfPaletteSearch::' + winId, q || ''); } catch(_){}
+  if (_wfPalSearchTimer) clearTimeout(_wfPalSearchTimer);
+  _wfPalSearchTimer = setTimeout(() => _wfRenderEditorBody(winId), 100);
+};
+
 function _wfPaletteToggleCat(winId, catId) {
   const key = `wfPaletteOpenCat::${winId}`;
   let cur = '';
@@ -6350,84 +6387,88 @@ function _wfRenderEditorBody(winId) {
   const formHost = document.getElementById(winId + '-form');
   if (!catHost || !formHost) return;
 
-  const expanded = _wfCatIsExpanded(draft);
   const curMeta = draft.type ? WF_TYPE_MAP[draft.type] : null;
 
-  if (expanded) {
-    // v2.34.1 — n8n-style accordion. Categories are collapsed by default;
-    // clicking a category header expands its compact node list. Only one
-    // category open at a time. Currently selected node's category opens by
-    // default so users see where they are.
-    const openCatKey = `wfPaletteOpenCat::${winId}`;
-    let openCat = '';
-    try { openCat = localStorage.getItem(openCatKey) || ''; } catch(_){}
-    if (!openCat && draft.type) openCat = WF_TYPE_TO_CAT[draft.type] || '';
-    if (!openCat) openCat = WF_NODE_CATEGORIES[0].id;
+  // Z2 (v2.66.12) — n8n-style fixed left palette. Always rendered
+  // (no expand/collapse states), with a search input on top and the
+  // categories below. The whole palette has its own scroll context so
+  // it never grows the parent window. Search filters node types by
+  // label / id / desc / category — algorithmic, not hardcoded.
+  const openCatKey = `wfPaletteOpenCat::${winId}`;
+  const searchKey = `wfPaletteSearch::${winId}`;
+  let openCat = '';
+  let searchQ = '';
+  try { openCat = localStorage.getItem(openCatKey) || ''; } catch(_){}
+  try { searchQ = sessionStorage.getItem(searchKey) || ''; } catch(_){}
+  if (!openCat && draft.type) openCat = WF_TYPE_TO_CAT[draft.type] || '';
+  if (!openCat) openCat = WF_NODE_CATEGORIES[0].id;
 
-    const cats = WF_NODE_CATEGORIES.map(cat => {
-      const isOpen = cat.id === openCat;
-      const types = cat.types.map(id => WF_TYPE_MAP[id]).filter(Boolean);
-      const isCurCat = curMeta && cat.types.includes(curMeta.id);
-      const rowsHtml = types.map(tp => {
-        const isCur = draft.type === tp.id;
-        return `
-          <button class="wf-pal-row ${isCur ? 'wf-pal-row-active' : ''}"
-                  onclick="_wfPickNodeType('${winId}','${tp.id}')"
-                  title="${escapeHtml(t(tp.desc))}">
-            <span class="wf-pal-icon">${tp.icon}</span>
-            <span class="wf-pal-label">${escapeHtml(t(tp.label))}</span>
-            <span class="wf-pal-desc">${escapeHtml(t(tp.desc).slice(0, 70))}${(t(tp.desc).length > 70 ? '…' : '')}</span>
-          </button>`;
-      }).join('');
+  const ql = (searchQ || '').toLowerCase().trim();
+  // Score every type vs the query; >0 = match. Returns the active filter
+  // set so we can short-circuit category rendering when nothing matches.
+  function _matches(tp) {
+    if (!ql) return true;
+    const hay = (
+      (tp.label || '') + ' ' +
+      (tp.id || '') + ' ' +
+      t(tp.label || '') + ' ' +
+      t(tp.desc || '')
+    ).toLowerCase();
+    return hay.includes(ql);
+  }
+
+  const cats = WF_NODE_CATEGORIES.map(cat => {
+    const types = cat.types.map(id => WF_TYPE_MAP[id]).filter(Boolean).filter(_matches);
+    if (!types.length) return ''; // hide empty categories under filter
+    // When searching, force every category open so matches are visible.
+    const isOpen = !!ql || cat.id === openCat;
+    const isCurCat = curMeta && cat.types.includes(curMeta.id);
+    const rowsHtml = types.map(tp => {
+      const isCur = draft.type === tp.id;
       return `
-        <div class="wf-pal-cat ${isOpen ? 'open' : ''} ${isCurCat ? 'has-current' : ''}"
-             data-cat="${cat.id}">
-          <button class="wf-pal-cat-header" type="button"
-                  onclick="_wfPaletteToggleCat('${winId}','${cat.id}')"
-                  aria-expanded="${isOpen ? 'true' : 'false'}">
-            <span class="wf-pal-cat-icon">${cat.icon}</span>
-            <span class="wf-pal-cat-meta">
-              <span class="wf-pal-cat-label">${escapeHtml(t(cat.label))}</span>
-              <span class="wf-pal-cat-desc">${escapeHtml(t(cat.desc))}</span>
-            </span>
-            <span class="wf-pal-cat-count">${types.length}</span>
-            <span class="wf-pal-cat-chev">${isOpen ? '▾' : '▸'}</span>
-          </button>
-          <div class="wf-pal-cat-body">${rowsHtml}</div>
-        </div>`;
+        <button class="wf-pal-row ${isCur ? 'wf-pal-row-active' : ''}"
+                onclick="_wfPickNodeType('${winId}','${tp.id}')"
+                title="${escapeHtml(t(tp.desc))}">
+          <span class="wf-pal-icon">${tp.icon}</span>
+          <span class="wf-pal-label">${escapeHtml(t(tp.label))}</span>
+        </button>`;
     }).join('');
-
-    catHost.innerHTML = `
-      <div class="flex items-center justify-between mb-2">
-        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('카테고리 → 노드 선택')}</div>
-        ${curMeta ? `<button class="btn text-[11px]" onclick="_wfToggleCat('${winId}')" title="Alt+C">▾ ${t('접기')}</button>` : ''}
-      </div>
-      <div class="wf-palette">${cats}</div>
-    `;
-  } else if (curMeta) {
-    // 접힌 상태: 현재 타입 칩 + "타입 변경" 버튼
-    catHost.innerHTML = `
-      <div class="flex items-center gap-2 flex-wrap py-1">
-        <span class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('타입')}</span>
-        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg"
-              style="background:rgba(217,119,87,0.12);border:1px solid rgba(217,119,87,0.35);">
-          <span style="font-size:1.1rem;line-height:1;">${curMeta.icon}</span>
-          <span class="text-[12px] font-semibold" style="color:var(--text)">${t(curMeta.label)}</span>
-        </span>
-        <button class="btn text-[11px]" onclick="_wfToggleCat('${winId}')" title="Alt+C">
-          ▸ ${t('타입 변경')}
+    return `
+      <div class="wf-pal-cat ${isOpen ? 'open' : ''} ${isCurCat ? 'has-current' : ''}"
+           data-cat="${cat.id}">
+        <button class="wf-pal-cat-header" type="button"
+                onclick="_wfPaletteToggleCat('${winId}','${cat.id}')"
+                aria-expanded="${isOpen ? 'true' : 'false'}">
+          <span class="wf-pal-cat-icon">${cat.icon}</span>
+          <span class="wf-pal-cat-label">${escapeHtml(t(cat.label))}</span>
+          <span class="wf-pal-cat-count">${types.length}</span>
+          <span class="wf-pal-cat-chev">${isOpen ? '▾' : '▸'}</span>
         </button>
-      </div>
-    `;
-  } else {
-    // type 없는데 접힘 상태로 진입한 경우 — 펼침 강제
-    localStorage.setItem('wfEditorCatExpanded', 'true');
-    return _wfRenderEditorBody(winId);
+        <div class="wf-pal-cat-body">${rowsHtml}</div>
+      </div>`;
+  }).join('');
+
+  catHost.innerHTML = `
+    <div class="wf-pal-search">
+      <span class="wf-pal-search-icon">🔍</span>
+      <input id="${winId}-pal-q" class="wf-pal-search-input" type="text"
+             value="${escapeHtml(searchQ)}"
+             placeholder="${t('노드 검색...')}"
+             oninput="_wfPaletteSearch('${winId}', this.value)" autocomplete="off">
+    </div>
+    <div class="wf-palette">${cats || '<div class="wf-pal-empty">' + t('일치하는 노드 없음') + '</div>'}</div>
+  `;
+  // Restore focus on filter input on every render so typing doesn't lose it.
+  if (ql) {
+    const inp = document.getElementById(winId + '-pal-q');
+    if (inp && document.activeElement !== inp) {
+      try { inp.focus(); inp.setSelectionRange(ql.length, ql.length); } catch(_){}
+    }
   }
 
   if (!draft.type) {
     formHost.innerHTML = `
-      <div class="text-xs text-[var(--text-dim)] text-center py-4">${t('위에서 카테고리를 먼저 선택하세요')}</div>
+      <div class="text-xs text-[var(--text-dim)] text-center py-4">${t('왼쪽 패널에서 노드 타입을 선택하세요')}</div>
       <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-4 mb-2">${t('카테고리별 설명')}</div>
       <div class="flex flex-col gap-2">
         ${WF_NODE_TYPES.map(tp => `
