@@ -4377,8 +4377,20 @@ function _wfBindCanvas() {
     if (__wf.drag.kind === 'node') {
       const n = __wf.drag._node;  // v2.43.1: cached on drag start
       if (!n) return;
-      n.x = Math.round(__wf.drag.origX + (pt.x - __wf.drag.startX));
-      n.y = Math.round(__wf.drag.origY + (pt.y - __wf.drag.startY));
+      // LL3 (v2.66.32) — grid snap (n8n parity). Drop position is
+      // rounded to the nearest 10px so manual layouts look tidy
+      // without anyone having to nudge pixel-by-pixel. Hold Alt to
+      // bypass for free placement.
+      const SNAP = 10;
+      let nx = __wf.drag.origX + (pt.x - __wf.drag.startX);
+      let ny = __wf.drag.origY + (pt.y - __wf.drag.startY);
+      if (!e.altKey) {
+        nx = Math.round(nx / SNAP) * SNAP;
+        ny = Math.round(ny / SNAP) * SNAP;
+      } else {
+        nx = Math.round(nx); ny = Math.round(ny);
+      }
+      n.x = nx; n.y = ny;
       // 깜빡임 방지 — 해당 노드 transform + 관련 엣지 d 만 in-place 업데이트
       _wfUpdateNodeTransform(__wf.drag.nodeId);
       if (!__wf.dirty) { __wf.dirty = true; _wfUpdateToolbar(); }
