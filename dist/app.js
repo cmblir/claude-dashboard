@@ -26790,22 +26790,56 @@ function _lcChatSave(history) {
 
 function _lcMsgBody(m) {
   const isUser = m.role === 'user';
+  const raw = m.text || '';
+  // QQ32 (v2.66.107) — collapse long messages to keep the scroll
+  // manageable. ~1500 chars or ~30 lines triggers a "더보기" toggle.
+  // Per-render id so multiple long messages on screen don't share state.
+  const isLong = raw.length > 1500 || (raw.match(/\n/g) || []).length > 30;
+  const collapsedKey = '_lcCollapsed_' + (window.__lcMsgIdSeq = (window.__lcMsgIdSeq || 0) + 1);
   if (!isUser && typeof marked !== 'undefined' && marked.parse) {
     try {
       // QQ31 (v2.66.106) — inject a floating 📋 button into every <pre>
       // block so users can copy code without selecting text.
-      let html = marked.parse(m.text || '');
+      let html = marked.parse(raw);
       html = html.replace(/<pre([^>]*)>([\s\S]*?)<\/pre>/g, (_full, attrs, inner) => {
         return `<div style="position:relative;margin:6px 0;"><pre${attrs}>${inner}</pre>`
           + `<button onclick="_lcCopyCodeBlock(this)" title="${t('코드 복사')}" style="position:absolute;top:6px;right:6px;font-size:11px;padding:2px 6px;background:rgba(0,0,0,0.45);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:#e5e7eb;opacity:0.55;transition:opacity .15s;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.55">📋</button>`
           + `</div>`;
       });
-      return `<div class="prose-claude" style="font-size:.875rem;line-height:1.6;margin-top:4px;">${html}</div>`;
+      const inner = `<div class="prose-claude" style="font-size:.875rem;line-height:1.6;margin-top:4px;">${html}</div>`;
+      if (!isLong) return inner;
+      return `<div id="${collapsedKey}" style="position:relative;max-height:300px;overflow:hidden;">
+        ${inner}
+        <div style="position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(to bottom,transparent,var(--bg,#0f172a));pointer-events:none;"></div>
+      </div>
+      <button onclick="_lcToggleCollapse('${collapsedKey}',this)" style="margin-top:6px;font-size:11px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;color:var(--text-mute);">▾ ${t('더보기')} (${raw.length.toLocaleString()} ${t('자')})</button>`;
     }
     catch (_) {}
   }
-  return `<pre style="font-size:.875rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;font-family:inherit;margin:4px 0 0;">${escapeHtml(m.text || '')}</pre>`;
+  const inner = `<pre style="font-size:.875rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;font-family:inherit;margin:4px 0 0;">${escapeHtml(raw)}</pre>`;
+  if (!isLong) return inner;
+  return `<div id="${collapsedKey}" style="position:relative;max-height:300px;overflow:hidden;">
+    ${inner}
+    <div style="position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(to bottom,transparent,var(--bg,#0f172a));pointer-events:none;"></div>
+  </div>
+  <button onclick="_lcToggleCollapse('${collapsedKey}',this)" style="margin-top:6px;font-size:11px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;color:var(--text-mute);">▾ ${t('더보기')} (${raw.length.toLocaleString()} ${t('자')})</button>`;
 }
+
+window._lcToggleCollapse = function (cid, btn) {
+  const el = document.getElementById(cid);
+  if (!el) return;
+  const overlay = el.lastElementChild;
+  const expanded = el.style.maxHeight === 'none';
+  if (expanded) {
+    el.style.maxHeight = '300px';
+    if (overlay && overlay.style && overlay.style.background) overlay.style.display = '';
+    btn.innerHTML = '▾ ' + t('더보기');
+  } else {
+    el.style.maxHeight = 'none';
+    if (overlay && overlay.style && overlay.style.background) overlay.style.display = 'none';
+    btn.innerHTML = '▴ ' + t('접기');
+  }
+};
 
 function _lcChatRender(opts) {
   const log = document.getElementById('lcChatLog');

@@ -240,6 +240,9 @@ NEW_EN: dict[str, str] = {
     "노드 삭제됨": "nodes deleted",
     # QQ31 — code block copy
     "코드 복사": "Copy code",
+    # QQ32 — collapse long messages
+    "더보기": "Show more",
+    "접기": "Show less",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -474,4 +477,7 @@ NEW_ZH: dict[str, str] = {
     "노드 삭제됨": "个节点已删除",
     # QQ31
     "코드 복사": "复制代码",
+    # QQ32
+    "더보기": "展开更多",
+    "접기": "收起",
 }
