@@ -86,6 +86,15 @@ NEW_EN: dict[str, str] = {
     "검색 지우기": "Clear search",
     "이전 / 다음 워크플로우로 전환": "Switch to previous / next workflow",
     "자동 저장됨": "Autosaved",
+    # CC5
+    "최근 세션 목록에서 선택": "Pick from recent sessions",
+    "최근": "Recent",
+    "최근 Claude 세션": "Recent Claude sessions",
+    "세션 목록을 불러올 수 없습니다": "Could not load session list",
+    "이전 세션이 없습니다 (~/.claude 인덱싱 후 다시 시도)": "No prior sessions yet (let ~/.claude index first)",
+    "이어서 사용할 세션을 선택하세요": "Pick a session to resume",
+    "개": "items",
+    "session_id 적용됨": "session_id applied",
     "워크플로우 실행 / 중단": "Run / stop workflow",
     # LL16 already covered: 새 노드 추가 — exists.
 }
@@ -169,5 +178,14 @@ NEW_ZH: dict[str, str] = {
     "검색 지우기": "清除搜索",
     "이전 / 다음 워크플로우로 전환": "切换到上一个 / 下一个工作流",
     "자동 저장됨": "已自动保存",
+    # CC5
+    "최근 세션 목록에서 선택": "从最近的会话中选择",
+    "최근": "最近",
+    "최근 Claude 세션": "最近的 Claude 会话",
+    "세션 목록을 불러올 수 없습니다": "无法加载会话列表",
+    "이전 세션이 없습니다 (~/.claude 인덱싱 후 다시 시도)": "暂无历史会话（请等待 ~/.claude 索引）",
+    "이어서 사용할 세션을 선택하세요": "选择要继续的会话",
+    "개": "项",
+    "session_id 적용됨": "已应用 session_id",
     "워크플로우 실행 / 중단": "运行 / 停止工作流",
 }
