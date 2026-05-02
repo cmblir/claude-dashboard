@@ -26725,6 +26725,23 @@ window._lcDeleteCurrentSession = function () {
 
 window._lcSwitchSession = function (id) {
   _lcSetCurrentId(id);
+  // QQ65 (v2.67.2) — restore the session's last-used assignee so each
+  // session keeps its own model selection. Falls back to the dropdown's
+  // current value if the session has no recorded assignee.
+  try {
+    const sess = _lcGetSessions().find(s => s.id === id);
+    const sel = document.getElementById('lcChatAssignee');
+    if (sess && sess.assignee && sel && sel.value !== sess.assignee) {
+      // Add option if it's not currently in the dropdown.
+      if (![...sel.options].some(o => o.value === sess.assignee)) {
+        const opt = document.createElement('option');
+        opt.value = sess.assignee; opt.textContent = sess.assignee;
+        sel.appendChild(opt);
+      }
+      sel.value = sess.assignee;
+      try { localStorage.setItem('cc.lazyclawChat.assignee', sess.assignee); } catch (_) {}
+    }
+  } catch (_) {}
   _lcRenderSessions();
   _lcChatRender();
   setTimeout(() => { const ta = document.getElementById('lcChatInput'); if (ta) ta.focus(); }, 30);

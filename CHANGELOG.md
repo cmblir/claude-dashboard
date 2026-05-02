@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.2] — 2026-05-02
+
+### Added
+- 🔁 **Per-session assignee restored on session switch** (QQ65). Each
+  chat session already records its own `assignee` (provider:model)
+  but `_lcSwitchSession()` previously left the dropdown on whatever
+  the user had picked last. Switching now also flips the dropdown
+  to the session's stored assignee, registering it as a new option
+  if the dropdown doesn't have it yet, and persisting to
+  `cc.lazyclawChat.assignee`. Lets users keep one session on Opus
+  for hard problems and another on Haiku for quick lookups without
+  re-picking.
+
+---
 ## [2.67.1] — 2026-05-02
 
 ### Added
