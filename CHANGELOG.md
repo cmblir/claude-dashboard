@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.63] — 2026-05-02
+
+### Added
+- 📋 **Fail-fast summary card at the top of the run-result modal**
+  (NN4). Counts how many nodes auto-cancelled (amber) vs. failed
+  for real (red), with a one-line hint that auto-cancelled nodes
+  aren't the cause — the user knows to fix the red one first.
+
+---
 ## [2.66.62] — 2026-05-02
 
 ### Changed
