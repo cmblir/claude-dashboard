@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.112] — 2026-05-02
+
+### Performance
+- 🚀 **Sticky annotations skipped during execution** (QQ37). The
+  topology builder in `_run_one_iteration` now filters out
+  `sticky` nodes before computing levels, so they don't sit in
+  the level-0 parallel batch alongside `start`. Pure annotations
+  no longer occupy a thread or contribute to execution latency.
+
+---
 ## [2.66.111] — 2026-05-02
 
 ### Added
