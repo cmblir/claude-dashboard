@@ -1946,6 +1946,9 @@ const WF_NODE_TYPES = [
     desc: 'Same-prompt iteration (Ralph Wiggum) — max-iter / completion-promise / 예산 USD / cancel 4중 안전장치. 노드는 루프 종료까지 블로킹.' },
   { id: 'docker_run', icon: '🐳', label: 'Docker Run', portIn: true, portOut: true,
     desc: '격리된 docker 컨테이너에서 셸 명령 실행. --rm + --network=none + read-only mount + memory cap 기본. docker 미설치 시 호스트 실행 폴백 없이 명확한 에러.' },
+  // QQ36 (v2.66.111) — sticky note. Free-floating annotation; no ports.
+  { id: 'sticky', icon: '🟨', label: '메모', portIn: false, portOut: false,
+    desc: '캔버스 주석용 스티키 노트. 마크다운 텍스트 + 색상 5종(노랑/파랑/초록/분홍/회색). 실행에 영향 없음 (n8n parity).' },
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 
@@ -1972,6 +1975,9 @@ const WF_NODE_CATEGORIES = [
   { id: 'output',   icon: '📤', label: '출력',
     desc: '워크플로우 종착',
     types: ['output'] },
+  { id: 'annot',    icon: '🟨', label: '주석',
+    desc: '실행에 영향 없는 캔버스 메모',
+    types: ['sticky'] },
 ];
 
 // Reverse-lookup: type id → category id (for highlighting current selection).
@@ -4085,6 +4091,35 @@ function _wfPortPos(node, port) {
 function _wfRenderNode(n) {
   const meta = WF_TYPE_MAP[n.type] || WF_TYPE_MAP.session;
   const sel = __wf.selectedNodeId === n.id ? ' selected' : '';
+  // QQ36 (v2.66.111) — sticky note (n8n parity). Renders as a colored
+  // foreignObject with markdown text, no ports, no exec chrome.
+  if (n.type === 'sticky') {
+    const d = n.data || {};
+    const w = Math.max(120, Math.min(800, d.width || 220));
+    const h = Math.max(80, Math.min(800, d.height || 140));
+    const palette = {
+      yellow: { bg: '#fef3c7', border: '#f59e0b', text: '#78350f' },
+      blue:   { bg: '#dbeafe', border: '#3b82f6', text: '#1e3a8a' },
+      green:  { bg: '#dcfce7', border: '#22c55e', text: '#14532d' },
+      pink:   { bg: '#fce7f3', border: '#ec4899', text: '#831843' },
+      gray:   { bg: '#e5e7eb', border: '#6b7280', text: '#1f2937' },
+    };
+    const c = palette[d.color] || palette.yellow;
+    const md = d.text || '';
+    let html = '';
+    try { html = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(md) : escapeHtml(md); }
+    catch (_) { html = escapeHtml(md); }
+    return `
+      <g class="wf-node${sel} wf-sticky" data-node="${n.id}" data-type="sticky" transform="translate(${n.x},${n.y})">
+        <rect class="wf-node-ring" x="-4" y="-4" width="${w+8}" height="${h+8}" rx="10" ry="10"></rect>
+        <rect width="${w}" height="${h}" rx="6" ry="6" fill="${c.bg}" stroke="${c.border}" stroke-width="1.5"/>
+        <foreignObject x="8" y="6" width="${w-16}" height="${h-12}">
+          <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:11px;line-height:1.4;color:${c.text};font-family:inherit;overflow:hidden;height:100%;">
+            ${html || `<span style="opacity:0.5;font-style:italic;">${t('메모 입력...')}</span>`}
+          </div>
+        </foreignObject>
+      </g>`;
+  }
   const sub = n.type === 'session' || n.type === 'subagent'
     ? `<text class="wf-node-sub" x="40" y="48">@${escapeHtml((n.data||{}).assignee || 'auto')}</text>`
     : `<text class="wf-node-sub" x="40" y="48">${escapeHtml(meta.label)}</text>`;
@@ -6203,6 +6238,7 @@ function _wfPickNodeType(winId, type) {
   } else if (type === 'branch')    draft.data = { condition:'', conditionType:'contains' };
   else if (type === 'aggregate') draft.data = { mode:'concat' };
   else if (type === 'output')    draft.data = { exportTo:'' };
+  else if (type === 'sticky')    draft.data = { text:'', color:'yellow', width:220, height:140 };
   else if (type === 'http')      draft.data = { url:'', method:'GET', headers:{}, body:'', extractPath:'', allowInternal: false };
   else if (type === 'transform') draft.data = { transformType:'template', template:'{{input}}', jsonPath:'', regexPattern:'', regexReplacement:'', separator:'\\n' };
   else if (type === 'variable')  draft.data = { varName:'var1', defaultValue:'', scope:'global' };
@@ -6497,6 +6533,26 @@ function _wfRenderEditorBody(winId) {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('파일로 저장 (선택, ~/ 하위만)')}</label>
       <input class="input w-full mt-1" value="${escapeHtml(d.exportTo||'')}" oninput="_wfDraftSetData('${winId}','exportTo',this.value)" placeholder="~/workflow-output.md">
+    `;
+  } else if (draft.type === 'sticky') {
+    // QQ36 (v2.66.111) — sticky note editor.
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('메모 텍스트 (마크다운)')}</label>
+      <textarea class="input w-full mt-1" rows="6" oninput="_wfDraftSetData('${winId}','text',this.value)" placeholder="## ${t('메모 제목')}\n${t('내용...')}" style="font-family:ui-monospace,monospace;">${escapeHtml(d.text||'')}</textarea>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('색상')}</label>
+      <div class="flex gap-1 mt-1">
+        ${['yellow','blue','green','pink','gray'].map(c => `<button class="btn text-[10px]" style="background:${{yellow:'#fef3c7',blue:'#dbeafe',green:'#dcfce7',pink:'#fce7f3',gray:'#e5e7eb'}[c]};color:#000;border:${d.color===c?'2px solid var(--accent)':'1px solid var(--border)'};" onclick="_wfDraftSetData('${winId}','color','${c}');this.parentNode.querySelectorAll('button').forEach(b=>b.style.border='1px solid var(--border)');this.style.border='2px solid var(--accent)'">${c}</button>`).join('')}
+      </div>
+      <div class="flex gap-2 mt-3">
+        <div class="flex-1">
+          <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block">${t('너비')} (px)</label>
+          <input type="number" min="120" max="800" class="input w-full mt-1" value="${d.width||220}" oninput="_wfDraftSetData('${winId}','width',Math.max(120,Math.min(800,parseInt(this.value)||220)))">
+        </div>
+        <div class="flex-1">
+          <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block">${t('높이')} (px)</label>
+          <input type="number" min="80" max="800" class="input w-full mt-1" value="${d.height||140}" oninput="_wfDraftSetData('${winId}','height',Math.max(80,Math.min(800,parseInt(this.value)||140)))">
+        </div>
+      </div>
     `;
   } else if (draft.type === 'http') {
     body += `
