@@ -218,6 +218,9 @@ NEW_EN: dict[str, str] = {
     "핀 해제됨": "Unpinned",
     "핀할 마지막 출력이 없습니다 — 먼저 실행하세요": "No last output to pin — run first",
     "핀: 마지막 출력 재사용 (프로바이더 호출 없음)": "Pinned: reuses last output (no provider call)",
+    # QQ22 — edit user message
+    "편집 후 재전송": "Edit & resubmit",
+    "편집 후 Enter 로 재전송": "Edit, then press Enter to resubmit",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -430,4 +433,7 @@ NEW_ZH: dict[str, str] = {
     "핀 해제됨": "已取消固定",
     "핀할 마지막 출력이 없습니다 — 먼저 실행하세요": "没有可固定的上次输出 — 请先运行",
     "핀: 마지막 출력 재사용 (프로바이더 호출 없음)": "已固定：复用上次输出（不调用提供者）",
+    # QQ22
+    "편집 후 재전송": "编辑后重发",
+    "편집 후 Enter 로 재전송": "编辑后按 Enter 重发",
 }

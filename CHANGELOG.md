@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.97] — 2026-05-02
+
+### Added
+- ✏️ **Edit user message + resubmit in lazyclaw chat** (QQ22, OpenClaw
+  parity). Hovering a user message now exposes a ✏️ button. Click →
+  history is truncated at that index and the original text is
+  pre-filled in the composer; user revises and Enter resubmits. Pairs
+  with the existing 🔄 regenerate on assistant messages.
+
+---
 ## [2.66.96] — 2026-05-02
 
 ### Added
