@@ -50,6 +50,8 @@ NEW_EN: dict[str, str] = {
     "이 노드의 실행을 중단하시겠습니까? (워크플로우 전체 실행이 다음 레벨에서 멈춥니다)": "Stop this node's run? (the whole workflow run halts at the next level boundary)",
     "세션 종료 요청됨": "Termination requested",
     "진행 중인 실행이 없습니다": "No run in progress",
+    # LL5
+    "노드 복제됨": "Node duplicated",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -95,4 +97,6 @@ NEW_ZH: dict[str, str] = {
     "이 노드의 실행을 중단하시겠습니까? (워크플로우 전체 실행이 다음 레벨에서 멈춥니다)": "停止此节点的运行？（整个工作流运行将在下一层级边界处停止）",
     "세션 종료 요청됨": "已请求终止",
     "진행 중인 실행이 없습니다": "没有正在进行的运行",
+    # LL5
+    "노드 복제됨": "节点已复制",
 }
