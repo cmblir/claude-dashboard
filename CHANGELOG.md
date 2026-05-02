@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.99] — 2026-05-02
+
+### Added
+- ↳ **Branch lineage hint in chat sidebar** (QQ24). Sessions created
+  via QQ23 branching now display `↳ <parent label> #<idx>` in the
+  sidebar row. Click the lineage chip → jumps to the parent session.
+  Lets users navigate the conversation tree without losing where
+  they came from.
+
+---
 ## [2.66.98] — 2026-05-02
 
 ### Added
