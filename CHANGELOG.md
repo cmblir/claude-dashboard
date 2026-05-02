@@ -10,6 +10,33 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.14] — 2026-05-02
+
+### Fixed
+- 🖥 **Workflow node "screen" icon** no longer launches Terminal.app — it
+  opens the inline mac-style viewer modal showing the node's prompt + the
+  latest run's per-node output. A "↗ Real terminal" button keeps the old
+  escape hatch one click away. (CC1)
+- ⏱ **Run banner / per-node elapsed timers no longer freeze**. Previously
+  the Y2 diff-render only updated when SSE pushed a status change — but
+  elapsed seconds change every wall-clock second. Added an independent
+  1Hz ticker that patches just the `.wfrb-meta-text` and
+  `.wf-node-elapsed` text contents from cached run state. The ticker
+  stops itself when the run reaches a terminal status. (CC2)
+- 🧭 **Sidebar collapsed state**: the "🕒 최근 사용 / ★ 즐겨찾기" quick block
+  no longer overflows the 78px rail. Headers shrink to icon-only and
+  quick items center-align with single-icon presentation. (CC7)
+
+### Added
+- ⏹ **Workflow Execute / Cancel toggle** (n8n-style). The primary `▶ 실행`
+  button switches to a red `■ 중단` button while a run is in flight, and
+  POSTs `/api/workflows/run-cancel` to request cooperative cancellation.
+  Server-side: `_run_one_iteration` checks a `_CANCEL_REQUESTED` set at
+  every topological-level boundary; the run terminates with
+  `status='err' / error='cancelled by user'` without yanking in-flight
+  node executors. (CC3)
+
+---
 ## [2.67.0] — 2026-05-02
 
 ### Fixed

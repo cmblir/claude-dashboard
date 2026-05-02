@@ -70,6 +70,28 @@ _LOCK = threading.Lock()
 # transparently fall back to the on-disk store.
 _RUNS_CACHE: dict[str, dict] = {}
 _RUNS_LOCK = threading.Lock()
+# CC3 (v2.66.14) — runs the user has explicitly asked to cancel. Checked at
+# every topological-level boundary in `_run_one_iteration`, and at every
+# repeat-iteration boundary in the orchestrator loop.
+_CANCEL_REQUESTED: set[str] = set()
+
+
+def request_cancel(runId: str) -> bool:
+    """Mark a run for cooperative cancellation. Returns True if the run was
+    in the live cache (i.e., probably still running)."""
+    with _RUNS_LOCK:
+        _CANCEL_REQUESTED.add(runId)
+        return runId in _RUNS_CACHE
+
+
+def _is_cancel_requested(runId: str) -> bool:
+    with _RUNS_LOCK:
+        return runId in _CANCEL_REQUESTED
+
+
+def _clear_cancel(runId: str) -> None:
+    with _RUNS_LOCK:
+        _CANCEL_REQUESTED.discard(runId)
 
 
 def _runs_cache_set(runId: str, run: dict) -> None:
@@ -2731,6 +2753,17 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
         return (nid, res)
 
     for level in levels:
+        # CC3 — cooperative cancel. Stops at level boundary so in-flight
+        # node executors don't get yanked, but no new nodes start.
+        if _is_cancel_requested(runId):
+            def _mark_cancel(r: dict) -> None:
+                r["status"] = "err"
+                r["error"] = "cancelled by user"
+                r["finishedAt"] = int(time.time() * 1000)
+            _runs_cache_update(runId, _mark_cancel)
+            _persist_run(runId)
+            _clear_cancel(runId)
+            return (False, results, "")
         # 전체 timeout 체크
         if time.time() - total_t0 > _DEFAULT_TOTAL_TIMEOUT:
             def _mark_timeout(r: dict) -> None:
@@ -3260,6 +3293,19 @@ def api_workflow_run_status(query: dict) -> dict:
     if not (isinstance(rid, str) and _RUN_ID_RE.match(rid)):
         return {"ok": False, "error": "invalid runId"}
     return _run_status_snapshot(rid, full=full)
+
+
+def api_workflow_run_cancel(body: dict) -> dict:
+    """POST /api/workflows/run-cancel  — cooperative cancel. Sets a flag
+    that the run loop checks at every level boundary. Returns immediately;
+    the run will report status='err' / error='cancelled by user' shortly."""
+    rid = ""
+    if isinstance(body, dict):
+        rid = (body.get("runId") or "").strip()
+    if not (rid and _RUN_ID_RE.match(rid)):
+        return {"ok": False, "error": "invalid runId"}
+    live = request_cancel(rid)
+    return {"ok": True, "live": live}
 
 
 def handle_workflow_run_stream(handler, query: dict) -> None:
