@@ -26673,7 +26673,11 @@ function _lcGetSessions() {
   } catch (_) { return []; }
 }
 function _lcSaveSessions(arr) {
-  try { localStorage.setItem('cc.lc.sessions', JSON.stringify(arr)); } catch (_) {}
+  // QQ103 (v2.68.13) — coerce non-array inputs. Defensive mirror of
+  // QQ83's getter normalization — persisting an object or null
+  // would corrupt the schema for later reads.
+  try { localStorage.setItem('cc.lc.sessions', JSON.stringify(Array.isArray(arr) ? arr : [])); }
+  catch (_) {}
 }
 function _lcCurrentId() {
   try { return localStorage.getItem('cc.lc.current') || ''; } catch (_) { return ''; }

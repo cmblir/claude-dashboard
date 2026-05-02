@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.13] — 2026-05-02
+
+### Fixed
+- 🛡 **`_lcSaveSessions` coerces non-array inputs** (QQ103). Mirror
+  of QQ83's getter normalization — persisting an object or null
+  would corrupt the `cc.lc.sessions` schema for later reads.
+  External tampering or a buggy migration can no longer poison
+  the sessions store.
+
+---
 ## [2.68.12] — 2026-05-02
 
 ### Added
