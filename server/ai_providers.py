@@ -2194,7 +2194,15 @@ class OllamaApiProvider(BaseProvider):
             chat_models = [m for m in models if CAP_EMBED not in (m.capabilities or [])]
             model = chat_models[0].id if chat_models else (models[0].id if models else "llama3.1")
 
-        body_obj: dict = {"model": model, "prompt": prompt, "stream": True}
+        # QQ43 (v2.66.118) — multimodal in Ollama streaming.
+        clean_prompt, images = _extract_inline_images(prompt)
+        body_obj: dict = {
+            "model": model,
+            "prompt": clean_prompt if images else prompt,
+            "stream": True,
+        }
+        if images:
+            body_obj["images"] = [img["base64"] for img in images]
         if system_prompt:
             body_obj["system"] = system_prompt
 
