@@ -27271,11 +27271,14 @@ window._lcTermRun = async function () {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command: cmd }),
     });
+    // QQ17 (v2.66.92) — show server-reported elapsed time per command.
+    const durStr = (typeof r.durationMs === 'number') ? `  (${r.durationMs}ms)` : '';
     if (r.ok) {
-      log.push({ kind: 'out', text: (r.stdout || '').trim() || '(no output)', ts: Date.now() });
+      const text = ((r.stdout || '').trim() || '(no output)') + durStr;
+      log.push({ kind: 'out', text, ts: Date.now() });
       if (r.stderr && r.stderr.trim()) log.push({ kind: 'err', text: r.stderr.trim(), ts: Date.now() });
     } else {
-      log.push({ kind: 'err', text: '⚠ ' + (r.error || 'unknown'), ts: Date.now() });
+      log.push({ kind: 'err', text: '⚠ ' + (r.error || 'unknown') + durStr, ts: Date.now() });
     }
   } catch (e) {
     log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });

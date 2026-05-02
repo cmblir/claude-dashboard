@@ -375,21 +375,27 @@ def api_lazyclaw_term(body: dict) -> dict:
     bin_path = shutil.which(head)
     if not bin_path:
         return {"ok": False, "error": f"{head} not installed"}
+    import time as _time
+    t0 = _time.time()
     try:
         proc = subprocess.run(
             [bin_path] + rest, capture_output=True, text=True,
             timeout=15, stdin=subprocess.DEVNULL,
         )
+        # QQ17 (v2.66.92) — surface elapsed ms so the client can show
+        # "(123ms)" next to each command in the log.
+        dur_ms = int((_time.time() - t0) * 1000)
         return {
             "ok": True,
             "rc": proc.returncode,
             "stdout": (proc.stdout or "")[-32_000:],
             "stderr": (proc.stderr or "")[-8_000:],
+            "durationMs": dur_ms,
         }
     except subprocess.TimeoutExpired:
-        return {"ok": False, "error": "timeout (15s)"}
+        return {"ok": False, "error": "timeout (15s)", "durationMs": int((_time.time() - t0) * 1000)}
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "error": str(e), "durationMs": int((_time.time() - t0) * 1000)}
 
 
 def api_lazyclaw_chat(body: dict) -> dict:
