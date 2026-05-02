@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.98] — 2026-05-02
+
+### Added
+- 🍴 **Branch conversation from any message** (QQ23, ChatGPT parity).
+  Hovering any chat message now exposes a 🍴 button. Clicking creates
+  a new session whose history is everything up to and including that
+  message, with `parentId` and `branchedAt` metadata so the lineage
+  is recoverable. Lets users explore alternative directions without
+  losing the original conversation.
+
+---
 ## [2.66.97] — 2026-05-02
 
 ### Added
