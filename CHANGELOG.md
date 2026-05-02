@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.3] — 2026-05-02
+
+### Fixed
+- 🏷 **Robust auto-label for chat sessions across locales** (QQ66).
+  The first-user-message auto-label only fired when `ses.label`
+  matched the current `t('새 대화')` lookup — so a session created
+  in Korean and used after switching to English (or vice-versa)
+  kept the literal "새 대화" / "New conversation" forever. The
+  match now uses a small set of known locale variants and also
+  strips embedded `data:image/…` markdown from the seed so a pure-
+  image first message doesn't produce a gibberish label.
+
+---
 ## [2.67.2] — 2026-05-02
 
 ### Added

@@ -27569,10 +27569,18 @@ async function _lcChatSend() {
   const history = _lcGetHistory(sessionId);
   history.push({ role: 'user', text, assignee, ts: Date.now() });
   // Auto-label session from first user message.
+  // QQ66 (v2.67.3) — match all locale variants of "새 대화" so the
+  // auto-label still fires when the user creates a session in one
+  // locale and sends their first message in another.
+  const DEFAULT_LABELS = new Set(['', '새 대화', 'New conversation', '新对话']);
   const sessions = _lcGetSessions();
   const ses = sessions.find(s => s.id === sessionId);
-  if (ses && (!ses.label || ses.label === t('새 대화'))) {
-    ses.label = text.slice(0, 40);
+  if (ses && (DEFAULT_LABELS.has(ses.label) || ses.label === t('새 대화'))) {
+    // Strip embedded base64 image markdown so the label isn't gibberish.
+    let labelSeed = text;
+    try { labelSeed = labelSeed.replace(/!\[[^\]]*\]\(data:image\/[^)]+;base64,[^)]+\)/g, ''); } catch (_) {}
+    labelSeed = (labelSeed || '').trim().split('\n')[0] || ses.label;
+    ses.label = labelSeed.slice(0, 40);
     _lcSaveSessions(sessions);
     _lcRenderSessions();
   }
