@@ -26837,19 +26837,25 @@ function _lcRenderSessions() {
   // show a small ↳ arrow + parent label so users see the lineage.
   const byId = Object.fromEntries(allSessions.map(x => [x.id, x]));
   // QQ99 (v2.68.9) — compute cumulative spend across ALL sessions.
-  // QQ100 (v2.68.10) — also break out today's spend so users can see
-  // how much budget the current day burned vs all-time.
+  // QQ100 (v2.68.10) — also break out today's spend.
+  // QQ101 (v2.68.11) — short-circuit when no costUsd-bearing message
+  // has been recorded yet (sessionStorage flag set on first cost-
+  // bearing send). Avoids walking every history every render in the
+  // common case (free tier, ollama, etc.).
   try {
     let grand = 0, today = 0;
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const dayMs = startOfDay.getTime();
-    for (const s of allSessions) {
-      const h = _lcGetHistory(s.id);
-      for (const m of h) {
-        if (typeof m.costUsd === 'number') {
-          grand += m.costUsd;
-          if ((m.ts || 0) >= dayMs) today += m.costUsd;
+    const seenCostKey = 'cc.lc.hasCost';
+    if (localStorage.getItem(seenCostKey)) {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const dayMs = startOfDay.getTime();
+      for (const s of allSessions) {
+        const h = _lcGetHistory(s.id);
+        for (const m of h) {
+          if (typeof m.costUsd === 'number') {
+            grand += m.costUsd;
+            if ((m.ts || 0) >= dayMs) today += m.costUsd;
+          }
         }
       }
     }
@@ -27829,7 +27835,14 @@ async function _lcChatSend() {
             reply.meta = [o.provider, o.model, dur + 's', costStr].filter(Boolean).join(' · ');
             if (o.tokensIn) reply.tokensIn = o.tokensIn;
             if (o.tokensOut) reply.tokensOut = o.tokensOut;
-            if (typeof o.costUsd === 'number') reply.costUsd = o.costUsd;
+            if (typeof o.costUsd === 'number') {
+              reply.costUsd = o.costUsd;
+              // QQ101 — flag so QQ99 sidebar walk runs only after a
+              // cost-bearing send actually happens.
+              if (o.costUsd > 0) {
+                try { localStorage.setItem('cc.lc.hasCost', '1'); } catch (_) {}
+              }
+            }
           } catch (_) {}
         } else if (event === 'error') {
           try { const o = JSON.parse(data); reply.text = (reply.text || '') + '\n⚠ ' + (o.error || 'error'); }
