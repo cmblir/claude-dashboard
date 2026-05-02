@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.27] — 2026-05-02
+
+### Added
+- ⌨ **n8n-style zoom shortcuts** on the workflow canvas (JJ2):
+  - `Cmd/Ctrl + 0` → fit to screen
+  - `Cmd/Ctrl + 1` → 100% (reset to identity transform)
+  - `Cmd/Ctrl + +/=` → zoom in 15%
+  - `Cmd/Ctrl + -` → zoom out 15%
+  - **Empty-canvas double-click → fit to screen**
+- One-motion recovery from a stray trackpad pinch or accidental
+  wheel zoom that left the canvas at an unreadable scale.
+
+---
 ## [2.66.26] — 2026-05-02
 
 ### Performance

@@ -4418,9 +4418,14 @@ function _wfBindCanvas() {
   // 노드 더블클릭 → 에디터 창 (우측 인스펙터 '편집' 버튼과 동일)
   svg.addEventListener('dblclick', (e) => {
     const g = e.target.closest && e.target.closest('.wf-node');
-    if (!g) return;
-    const nid = g.getAttribute('data-node');
-    if (nid) _wfOpenNodeEditor(nid);
+    if (g) {
+      const nid = g.getAttribute('data-node');
+      if (nid) _wfOpenNodeEditor(nid);
+      return;
+    }
+    // JJ2 (v2.66.27) — empty-canvas double-click = fit-to-screen
+    // (n8n parity). Recovers from a stuck pan/zoom in one motion.
+    if (typeof _wfFitView === 'function') _wfFitView();
   });
   document.addEventListener('mousemove', (e) => {
     if (!__wf.drag) return;
@@ -4478,6 +4483,40 @@ function _wfBindCanvas() {
       }
 
       const mod = e.ctrlKey || e.metaKey;
+
+      // JJ2 (v2.66.27) — n8n-style zoom shortcuts.
+      //   Cmd/Ctrl + 0  → fit to screen
+      //   Cmd/Ctrl + 1  → 100% (reset zoom + center)
+      //   Cmd/Ctrl + +/= → zoom in
+      //   Cmd/Ctrl + -  → zoom out
+      // Saves the user when a stray pinch/wheel zooms the canvas to
+      // an unreadable scale.
+      if (mod && !inInput && (e.key === '0' || e.key === ')')) {
+        e.preventDefault(); _wfFitView(); return true;
+      }
+      if (mod && !inInput && (e.key === '1' || e.key === '!')) {
+        e.preventDefault();
+        if (__wf.current) {
+          __wf.current.viewport = { panX: 0, panY: 0, zoom: 1 };
+          const vp = document.getElementById('wfViewport');
+          if (vp) vp.setAttribute('transform', 'translate(0,0) scale(1)');
+          if (typeof _wfRenderMinimap === 'function') _wfRenderMinimap();
+        }
+        return true;
+      }
+      if (mod && !inInput && (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_')) {
+        e.preventDefault();
+        if (__wf.current) {
+          const v = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
+          const factor = (e.key === '-' || e.key === '_') ? 0.85 : 1.15;
+          v.zoom = Math.max(0.3, Math.min(2.5, (v.zoom || 1) * factor));
+          __wf.current.viewport = v;
+          const vp = document.getElementById('wfViewport');
+          if (vp) vp.setAttribute('transform', `translate(${v.panX||0},${v.panY||0}) scale(${v.zoom||1})`);
+          if (typeof _wfRenderMinimap === 'function') _wfRenderMinimap();
+        }
+        return true;
+      }
 
       // Alt+C — collapse/expand node-editor categories
       if (e.altKey && (e.key === 'c' || e.key === 'C')) {
