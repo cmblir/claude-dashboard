@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.71] — 2026-05-02
+
+### Added
+- 📎 **Drag-and-drop text/code files into the chat input** (OO7).
+  Drop a `.md` / `.json` / `.py` / `.tsx` / etc. and the contents
+  appear as a fenced code block in the textarea (with a comment
+  line `// <filename> · <bytes>B`). Multiple files OK; binary
+  files are skipped with a warning toast.
+
+---
 ## [2.66.70] — 2026-05-02
 
 ### Changed
