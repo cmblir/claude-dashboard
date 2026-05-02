@@ -109,6 +109,9 @@ NEW_EN: dict[str, str] = {
     "나": "You",
     "AI": "AI",
     "가용 프로바이더 없음": "No available provider",
+    "대화를 markdown 파일로 다운로드": "Download conversation as a markdown file",
+    "내보낼 대화가 없습니다": "Nothing to export",
+    "내보내기 완료": "Exported",
     # NN1
     "형제 노드 실패로 자동 취소됨": "Auto-cancelled because a sibling node failed",
     "자동 취소됨": "auto-cancelled",
@@ -221,6 +224,9 @@ NEW_ZH: dict[str, str] = {
     "나": "我",
     "AI": "AI",
     "가용 프로바이더 없음": "无可用提供商",
+    "대화를 markdown 파일로 다운로드": "将对话下载为 markdown 文件",
+    "내보낼 대화가 없습니다": "无可导出的对话",
+    "내보내기 완료": "已导出",
     # NN1
     "형제 노드 실패로 자동 취소됨": "因同级节点失败而自动取消",
     "자동 취소됨": "自动取消",

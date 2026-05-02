@@ -25875,6 +25875,7 @@ VIEWS.lazyclawChat = async () => {
         <select id="lcChatAssignee" class="input text-xs" style="min-width:240px;">
           ${opts.map(o => `<option value="${escapeHtml(o.value)}" ${o.value===lastAssignee?'selected':''}>${escapeHtml(o.label)}</option>`).join('') || '<option value="">' + t('가용 프로바이더 없음') + '</option>'}
         </select>
+        <button class="btn text-xs" onclick="_lcChatExport()" title="${t('대화를 markdown 파일로 다운로드')}">📥 ${t('내보내기')}</button>
         <button class="btn text-xs" onclick="_lcChatClear()" title="${t('대화 비우기')}">🗑 ${t('비우기')}</button>
         <span class="ml-auto text-[10px] text-[var(--text-dim)]">${t('Enter = 전송 · Shift+Enter = 줄바꿈')}</span>
       </div>
@@ -25929,15 +25930,30 @@ function _lcChatRender() {
     log.innerHTML = `<div class="text-[11px] text-[var(--text-dim)] text-center py-8">${t('새 대화를 시작하세요')}</div>`;
     return;
   }
-  log.innerHTML = history.map(m => {
+  log.innerHTML = history.map((m, i) => {
     const isUser = m.role === 'user';
     const bg = isUser ? 'rgba(217,119,87,0.12)' : 'rgba(167,139,250,0.10)';
     const stroke = isUser ? 'rgba(217,119,87,0.35)' : 'rgba(167,139,250,0.28)';
     const tag = isUser ? '🧑' : '🤖';
     const meta = m.meta ? `<div class="text-[10px] text-[var(--text-dim)] mt-1">${escapeHtml(m.meta)}</div>` : '';
+    // OO2 (v2.66.65) — render assistant replies as markdown so code
+    // blocks, lists, and headings come through. User messages stay
+    // verbatim (preserves whitespace / paste fidelity).
+    let body;
+    if (!isUser && typeof marked !== 'undefined' && marked.parse) {
+      try {
+        body = `<div class="prose-claude text-sm mt-1" style="line-height:1.55;">${marked.parse(m.text || '')}</div>`;
+      } catch (e) {
+        body = `<pre class="text-sm mt-1" style="white-space:pre-wrap;word-break:break-word;font-family:inherit;">${escapeHtml(m.text || '')}</pre>`;
+      }
+    } else {
+      body = `<pre class="text-sm mt-1" style="white-space:pre-wrap;word-break:break-word;font-family:inherit;">${escapeHtml(m.text || '')}</pre>`;
+    }
+    // Per-message copy button
+    const copyBtn = m.text ? `<button class="btn text-[10px]" style="margin-left:auto;background:transparent;border:0;opacity:0.55;" onclick="_copyToClipboard(this, ${JSON.stringify(m.text).replace(/"/g,'&quot;')})" title="${t('복사')}">📋</button>` : '';
     return `<div style="background:${bg};border:1px solid ${stroke};border-radius:10px;padding:10px 12px;align-self:${isUser?'flex-end':'flex-start'};max-width:85%;">
-      <div class="text-[10px] text-[var(--text-dim)]">${tag} ${escapeHtml(isUser ? t('나') : (m.assignee || t('AI')))}</div>
-      <pre class="text-sm mt-1" style="white-space:pre-wrap;word-break:break-word;font-family:inherit;">${escapeHtml(m.text || '')}</pre>
+      <div class="text-[10px] text-[var(--text-dim)] flex items-center">${tag} ${escapeHtml(isUser ? t('나') : (m.assignee || t('AI')))}${copyBtn}</div>
+      ${body}
       ${meta}
     </div>`;
   }).join('');
@@ -25987,6 +26003,28 @@ window._lcChatClear = function () {
   if (!confirm(t('이 대화를 비우시겠습니까?'))) return;
   _lcChatSave([]);
   _lcChatRender();
+};
+
+// OO2 (v2.66.65) — download conversation as a markdown file. Useful for
+// turning a chat into a permanent artifact (notion/obsidian/git etc).
+window._lcChatExport = function () {
+  const history = _lcChatLoad();
+  if (!history.length) { toast(t('내보낼 대화가 없습니다'), 'warn'); return; }
+  const sel = document.getElementById('lcChatAssignee');
+  const assignee = (sel && sel.value) || 'lazyclaw';
+  const lines = [`# AI Chat — ${assignee}`, '', `_${new Date().toISOString()}_`, ''];
+  for (const m of history) {
+    const role = m.role === 'user' ? '🧑 You' : `🤖 ${m.assignee || assignee}`;
+    lines.push(`### ${role}`, '', m.text || '', '');
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `lazyclaw-chat-${assignee.replace(/[:/]/g,'_')}-${new Date().toISOString().slice(0,16).replace(/[T:]/g,'-')}.md`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(t('내보내기 완료'), 'ok');
 };
 
 // LL2 (v2.66.31) — perf HUD. Press Cmd/Ctrl+Shift+P to toggle a

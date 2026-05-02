@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.65] — 2026-05-02
+
+### Added (LazyClaw 채팅 polish)
+- 📝 **Markdown rendering for AI replies** (OO2). Code blocks,
+  lists, tables, headings render properly via `marked`. User
+  messages stay verbatim to preserve copy-paste fidelity.
+- 📋 **Per-message copy button** in the chat log header.
+- 📥 **Export conversation as markdown** (`📥 내보내기` button).
+  Filename pattern: `lazyclaw-chat-<assignee>-<timestamp>.md`.
+
+---
 ## [2.66.64] — 2026-05-02
 
 ### Added
