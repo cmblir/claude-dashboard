@@ -2090,6 +2090,7 @@ VIEWS.workflows = async () => {
       <div id="wfList" class="card">
         <button class="btn-primary btn text-sm w-full mb-2" style="justify-content:center;" onclick="_wfCreateNew()">＋ ${t('새 워크플로우')}</button>
         <input id="wfSearch" class="input w-full mb-2" placeholder="${t('검색…')}" style="font-size:13px;">
+        <div id="wfTagFilter" class="flex flex-wrap gap-1 mb-2" style="display:none;"></div>
         <div id="wfListItems" class="flex flex-col gap-1"></div>
       </div>
 
@@ -3170,13 +3171,36 @@ async function _rcConvertToWorkflow(itemId) {
   } catch(e) { toast(t('오류: ') + (e.message||String(e)), 'err'); }
 }
 
+// QQ38 (v2.66.113) — workflow tag filter chips.
+window._wfSetTagFilter = function (tag) {
+  __wf.tagFilter = (__wf.tagFilter === tag) ? '' : tag;
+  _wfRenderList();
+};
+function _wfRenderTagFilter() {
+  const host = document.getElementById('wfTagFilter');
+  if (!host) return;
+  const all = new Set();
+  for (const w of (__wf.workflows || [])) for (const tg of (w.tags || [])) all.add(tg);
+  if (all.size === 0) { host.style.display = 'none'; host.innerHTML = ''; return; }
+  host.style.display = '';
+  const cur = (__wf.tagFilter || '');
+  host.innerHTML = `<button class="chip text-[10px]" onclick="_wfSetTagFilter('')" style="${!cur?'background:var(--accent);color:#fff;':''}">${t('전체')}</button>`
+    + Array.from(all).sort().map(tg =>
+      `<button class="chip text-[10px]" onclick="_wfSetTagFilter('${tg.replace(/'/g, "\\'")}')" style="${cur===tg?'background:var(--accent);color:#fff;':''}">#${escapeHtml(tg)}</button>`
+    ).join('');
+}
+
 function _wfRenderList() {
   const host = document.getElementById('wfListItems');
   if (!host) return;
   const q = (__wf.search || '').trim();
+  // QQ38 (v2.66.113) — render the tag filter chip strip above the list.
+  _wfRenderTagFilter();
+  const tagFilter = (__wf.tagFilter || '').trim().toLowerCase();
   // LL26 (v2.66.55) — fuzzy match for the workflow list (n8n parity).
   // Matches against the workflow name; falls back to substring for CJK.
   const list = __wf.workflows.filter(w => {
+    if (tagFilter && !((w.tags || []).includes(tagFilter))) return false;
     if (!q) return true;
     const name = (w.name || '');
     if (typeof _wfFuzzyMatch === 'function') return _wfFuzzyMatch(q, name);
@@ -3200,6 +3224,9 @@ function _wfRenderList() {
     const runningBadge = runningCount > 0
       ? `<span class="chip chip-accent text-[9px]" style="background:rgba(59,130,246,0.25);color:#93c5fd;animation:pulse 1.5s infinite;">⏳ ${runningCount} ${t('실행 중')}</span>`
       : '';
+    const tagChips = (w.tags || []).slice(0, 6).map(tg =>
+      `<span onclick="event.stopPropagation();_wfSetTagFilter('${tg.replace(/'/g, "\\'")}')" class="chip text-[9px] cursor-pointer" style="padding:1px 6px;background:rgba(96,165,250,0.15);color:#93c5fd;border:1px solid rgba(96,165,250,0.35);">#${escapeHtml(tg)}</span>`
+    ).join('');
     return `
     <div class="wf-list-item ${__wf.current && __wf.current.id === w.id ? 'active' : ''}" onclick="_wfOpen('${w.id}')">
       <div class="flex items-start justify-between gap-2">
@@ -3208,6 +3235,7 @@ function _wfRenderList() {
           <div class="text-[10px] text-[var(--text-dim)] mt-0.5">
             ${w.nodeCount} ${t('노드')} · ${w.edgeCount} ${t('연결')} · ${fmtRel(w.updatedAt)}
           </div>
+          ${tagChips ? `<div class="flex flex-wrap gap-1 mt-1">${tagChips}</div>` : ''}
           <div class="flex items-center gap-1.5 mt-1">
             <span class="flex gap-0.5">${recentChips}</span>
             ${totalRuns > 0 ? `<span class="text-[10px]" style="color:var(--text-dim);">${totalRuns} ${t('회')}</span>` : ''}
@@ -5773,6 +5801,8 @@ function _wfRenderInspector(opts) {
       <input class="input w-full mt-1" value="${escapeHtml(__wf.current.name||'')}" oninput="__wf.current.name=this.value;__wf.dirty=true;_wfUpdateToolbar();_wfRenderList();">
       <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('설명')}</label>
       <textarea class="input w-full mt-1" rows="2" oninput="__wf.current.description=this.value;__wf.dirty=true;_wfUpdateToolbar();">${escapeHtml(__wf.current.description||'')}</textarea>
+      <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('태그 (쉼표 구분, 최대 10개)')}</label>
+      <input class="input w-full mt-1 text-[11px]" value="${escapeHtml(((__wf.current.tags||[]).join(', ')))}" placeholder="prod, demo, ai" oninput="(function(v){__wf.current.tags=v.split(',').map(s=>s.trim().toLowerCase()).filter((s,i,a)=>s&&a.indexOf(s)===i).slice(0,10);__wf.dirty=true;_wfUpdateToolbar();})(this.value)">
     </div>
 
     <div class="mb-4 pt-3 border-t border-[var(--border)]">

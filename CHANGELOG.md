@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.113] — 2026-05-02
+
+### Added
+- 🏷 **Workflow tags + sidebar tag filter** (QQ38, n8n parity for
+  organizing many workflows). Each workflow now has a `tags: string[]`
+  field — clamped to 20 chars each, max 10 per workflow, lowercased
+  and de-duplicated server-side. Sidebar shows a chip strip above
+  the list ("All / #prod / #demo / …"); clicking a chip filters
+  the workflow list. Tags also appear as small chips on each list
+  row and are editable as a comma-separated input in the inspector
+  meta block. Composes with the existing fuzzy search.
+
+---
 ## [2.66.112] — 2026-05-02
 
 ### Performance

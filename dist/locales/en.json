@@ -3972,6 +3972,7 @@
   "탐색 모드 (Read-only)": "Read-only",
   "탑 세션": "Top Sessions",
   "태그 (쉼표 구분)": "Tags (comma-separated)",
+  "태그 (쉼표 구분, 최대 10개)": "Tags (comma-separated, max 10)",
   "태그 (콤마 구분)": "Tags (comma-separated)",
   "태스크": "Tasks",
   "태스크 / TODO": "Tasks / TODO",

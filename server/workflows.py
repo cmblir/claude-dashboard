@@ -900,9 +900,25 @@ def _sanitize_workflow(raw: Any) -> Optional[dict]:
         if ce and (ce["from"], ce["to"], ce["fromPort"]) not in seen_pairs:
             edges.append(ce); seen_pairs.add((ce["from"], ce["to"], ce["fromPort"]))
     vp = raw.get("viewport") or {}
+    # QQ38 (v2.66.113) — workflow tags. Free-form labels (max 20 chars
+    # each, max 10 per workflow) used by the sidebar filter.
+    raw_tags = raw.get("tags")
+    tags: list[str] = []
+    if isinstance(raw_tags, list):
+        seen_tags: set[str] = set()
+        for tg in raw_tags:
+            if not isinstance(tg, str):
+                continue
+            v = _clamp_str(tg, 20).strip().lower()
+            if not v or v in seen_tags:
+                continue
+            seen_tags.add(v); tags.append(v)
+            if len(tags) >= 10:
+                break
     out = {
         "name":        _clamp_str(raw.get("name"), 120) or "Untitled",
         "description": _clamp_str(raw.get("description"), 2000),
+        "tags":        tags,
         "nodes":       nodes,
         "edges":       edges,
         "viewport": {
@@ -1160,6 +1176,7 @@ def api_workflows_list(query: dict | None = None) -> dict:
             "id": wfId,
             "name": wf.get("name", "Untitled"),
             "description": wf.get("description", ""),
+            "tags":  wf.get("tags") or [],  # QQ38
             "nodeCount": len(wf.get("nodes", [])),
             "edgeCount": len(wf.get("edges", [])),
             "createdAt": wf.get("createdAt", 0),

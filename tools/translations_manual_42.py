@@ -266,6 +266,9 @@ NEW_EN: dict[str, str] = {
     "색상": "Color",
     "너비": "Width",
     "높이": "Height",
+    # QQ38 — workflow tags
+    "태그 (쉼표 구분, 최대 10개)": "Tags (comma-separated, max 10)",
+    "전체": "All",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -526,4 +529,7 @@ NEW_ZH: dict[str, str] = {
     "색상": "颜色",
     "너비": "宽度",
     "높이": "高度",
+    # QQ38
+    "태그 (쉼표 구분, 최대 10개)": "标签（逗号分隔，最多 10 个）",
+    "전체": "全部",
 }
