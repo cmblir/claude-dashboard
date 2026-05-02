@@ -26237,6 +26237,70 @@ window._lcRegenerate = async function (idx) {
 // OO4 (v2.66.67) — track active stream so the user can cancel.
 let _lcChatAbortCtrl = null;
 
+// QQ1 (v2.66.76) — slash commands. Lets the user reconfigure the
+// chat from the keyboard like a terminal:
+//   /clear            → wipe history
+//   /system <text>    → set system prompt
+//   /system           → clear system prompt
+//   /model <id>       → switch assignee (e.g. claude:opus)
+//   /export           → download as markdown
+//   /help             → list available commands
+// Returns true if the line was handled as a command.
+function _lcChatSlashCommand(line) {
+  if (!line.startsWith('/')) return false;
+  const space = line.indexOf(' ');
+  const cmd = (space >= 0 ? line.slice(1, space) : line.slice(1)).toLowerCase();
+  const rest = space >= 0 ? line.slice(space + 1).trim() : '';
+  switch (cmd) {
+    case 'clear':
+      if (typeof _lcChatClear === 'function') _lcChatClear();
+      return true;
+    case 'system': {
+      const sel = document.getElementById('lcChatAssignee');
+      const a = (sel && sel.value) || 'default';
+      const key = 'cc.lazyclawChat.sys.' + a;
+      try { localStorage.setItem(key, rest || ''); } catch (_) {}
+      const sysTa = document.getElementById('lcSysPrompt');
+      if (sysTa) sysTa.value = rest || '';
+      toast(rest ? `⚙ ${t('시스템 프롬프트 설정됨')}` : `⚙ ${t('시스템 프롬프트 초기화됨')}`, 'ok');
+      return true;
+    }
+    case 'model': {
+      if (!rest) { toast(t('사용법: /model <provider:model>'), 'warn'); return true; }
+      const sel = document.getElementById('lcChatAssignee');
+      if (!sel) return true;
+      if (![...sel.options].some(o => o.value === rest)) {
+        const opt = document.createElement('option');
+        opt.value = rest; opt.textContent = rest;
+        sel.appendChild(opt);
+      }
+      sel.value = rest;
+      try { localStorage.setItem('cc.lazyclawChat.assignee', rest); } catch (_) {}
+      sel.dispatchEvent(new Event('change'));
+      toast(`🔄 ${t('모델 전환:')} ${rest}`, 'ok');
+      return true;
+    }
+    case 'export':
+      if (typeof _lcChatExport === 'function') _lcChatExport();
+      return true;
+    case 'help': {
+      const helpMd = `**${t('슬래시 명령')}**
+
+\`/clear\` — ${t('대화 기록 비우기')}
+\`/system [텍스트]\` — ${t('시스템 프롬프트 설정 (인자 없으면 초기화)')}
+\`/model <provider:model>\` — ${t('어시니 전환 (예: claude:opus)')}
+\`/export\` — ${t('마크다운으로 내보내기')}
+\`/help\` — ${t('이 목록')}`;
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: helpMd, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      return true;
+    }
+  }
+  return false;
+}
+
 async function _lcChatSend() {
   // OO5 (v2.66.68) — session-aware send with token stats, auto-labelling, regenerate.
   if (_lcChatAbortCtrl) {
@@ -26249,6 +26313,12 @@ async function _lcChatSend() {
   if (!ta || !sel) return;
   const text = (ta.value || '').trim();
   if (!text) return;
+  // QQ1 — slash commands intercept before sending to provider.
+  if (text.startsWith('/') && _lcChatSlashCommand(text)) {
+    ta.value = ''; ta.style.height = 'auto';
+    setTimeout(() => ta.focus(), 30);
+    return;
+  }
   const assignee = sel.value || '';
   if (!assignee) { toast(t('프로바이더를 선택하세요'), 'warn'); return; }
   ta.value = ''; ta.style.height = 'auto';
