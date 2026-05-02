@@ -278,6 +278,13 @@ NEW_EN: dict[str, str] = {
     "마지막 실행 — 노드별 소요": "Last run — per-node duration",
     "합계": "Total",
     "상위": "Top",
+    # QQ52 — chat /help shortcuts
+    "단축키": "Shortcuts",
+    "이전/다음 세션": "Prev/next session",
+    "이전 사용자 메시지 recall": "Recall previous user message",
+    "전송": "Send",
+    "줄바꿈": "Newline",
+    "이미지 paste / drop 으로 첨부": "Paste / drop an image to attach",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -550,4 +557,11 @@ NEW_ZH: dict[str, str] = {
     "마지막 실행 — 노드별 소요": "上次运行 — 各节点耗时",
     "합계": "合计",
     "상위": "前",
+    # QQ52
+    "단축키": "快捷键",
+    "이전/다음 세션": "上一个/下一个会话",
+    "이전 사용자 메시지 recall": "调出上一条用户消息",
+    "전송": "发送",
+    "줄바꿈": "换行",
+    "이미지 paste / drop 으로 첨부": "粘贴 / 拖放图片以附加",
 }

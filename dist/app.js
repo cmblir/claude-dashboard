@@ -27353,7 +27353,15 @@ function _lcChatSlashCommand(line) {
 \`/system [텍스트]\` — ${t('시스템 프롬프트 설정 (인자 없으면 초기화)')}
 \`/model <provider:model>\` — ${t('어시니 전환 (예: claude:opus)')}
 \`/export\` — ${t('마크다운으로 내보내기')}
-\`/help\` — ${t('이 목록')}`;
+\`/help\` — ${t('이 목록')}
+
+**${t('단축키')}**
+
+- \`Cmd/Ctrl + K\` — ${t('대화 검색')}
+- \`Cmd/Ctrl + Shift + [\` / \`]\` — ${t('이전/다음 세션')}
+- \`Cmd/Ctrl + ↑\` / \`↓\` — ${t('이전 사용자 메시지 recall')}
+- \`Enter\` — ${t('전송')} · \`Shift+Enter\` — ${t('줄바꿈')}
+- ${t('이미지 paste / drop 으로 첨부')}`;
       const history = _lcChatLoad();
       history.push({ role: 'assistant', text: helpMd, assignee: 'system', ts: Date.now() });
       _lcChatSave(history);
