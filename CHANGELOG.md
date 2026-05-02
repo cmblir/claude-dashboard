@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.78] — 2026-05-02
+
+### Added
+- 📝 **Per-node note field** (QQ3, n8n parity).
+  - Inspector now has a collapsible 📝 메모 textarea (≤ 4000
+    chars) beneath each node's edit/delete buttons. Persists
+    with the workflow.
+  - Hover tooltip on the canvas surfaces the note (amber 📝
+    line) so the user remembers a node's purpose without
+    opening it.
+  - Server `_sanitize_node` preserves `disabled` (PP2) and
+    `notes` (QQ3) across **every** node type.
+
+---
 ## [2.66.77] — 2026-05-02
 
 ### Added

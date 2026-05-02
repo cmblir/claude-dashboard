@@ -138,6 +138,9 @@ NEW_EN: dict[str, str] = {
     "선택 노드 비활성화 / 활성화": "Toggle disable on selected node",
     "비활성화 (D)": "Disable (D)",
     "비활성": "Disable",
+    # QQ3
+    "메모": "Note",
+    "이 노드에 대한 짧은 메모 (캔버스 hover 시 표시)": "Short note about this node (shown on canvas hover)",
     # QQ1
     "시스템 프롬프트 설정됨": "System prompt set",
     "시스템 프롬프트 초기화됨": "System prompt cleared",
@@ -303,6 +306,9 @@ NEW_ZH: dict[str, str] = {
     "선택 노드 비활성화 / 활성화": "切换所选节点的禁用",
     "비활성화 (D)": "禁用 (D)",
     "비활성": "禁用",
+    # QQ3
+    "메모": "备注",
+    "이 노드에 대한 짧은 메모 (캔버스 hover 시 표시)": "关于该节点的短备注（在画布悬停时显示）",
     # QQ1
     "시스템 프롬프트 설정됨": "已设置系统提示",
     "시스템 프롬프트 초기화됨": "已清空系统提示",
