@@ -2859,6 +2859,10 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
     """
     nodes = wf.get("nodes", [])
     edges = wf.get("edges", [])
+    # QQ37 (v2.66.112) — sticky annotations are not part of execution.
+    # Drop them before computing topo levels so they don't bloat
+    # parallel level-0 batches.
+    nodes = [n for n in nodes if n.get("type") != "sticky"]
     levels = _topological_levels(nodes, edges)
     order = _topological_order(nodes, edges)  # final_output 검색용
     node_by_id = {n["id"]: n for n in nodes}
