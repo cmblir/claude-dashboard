@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.8] — 2026-05-02
+
+### Verified
+- ✅ **Sticky annotation regression suite** (QQ71). New test class
+  `TestStickyAnnotations` in `tests/test_workflows.py` covers the
+  cumulative QQ36 / QQ37 / QQ59 / QQ63 invariants:
+  1. `_sanitize_node` preserves `text/color/width/height`.
+  2. Invalid color falls back to yellow; tiny / huge dimensions
+     clamp to `[120, 800]`.
+  3. `_execute_node` returns `status=ok output="" sessionId=""`
+     and ignores upstream input.
+  4. `_sanitize_workflow` drops edges whose `from` or `to` points
+     at a sticky node, while keeping legitimate edges between
+     session nodes intact.
+
+  All 22 workflow tests pass.
+
+---
 ## [2.67.7] — 2026-05-02
 
 ### Fixed

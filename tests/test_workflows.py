@@ -190,3 +190,62 @@ class TestRunsDbRoundTrip:
         wf._runs_db_save("", {"workflowId": "wf-z"})
         # Loading without filter should return an empty dict (no rows).
         assert wf._runs_db_load() == {}
+
+
+class TestStickyAnnotations:
+    """QQ36 / QQ37 / QQ59 / QQ63 — sticky note nodes are a non-executing
+    annotation primitive. Make sure they survive sanitize, get filtered
+    out of the executor, and orphan edges referencing them are dropped."""
+
+    def test_sanitize_preserves_sticky_fields(self):
+        n = wf._sanitize_node({
+            "id": "n-stk", "type": "sticky", "x": 100, "y": 50,
+            "data": {"text": "## hi", "color": "blue", "width": 240, "height": 120},
+        })
+        assert n is not None
+        assert n["type"] == "sticky"
+        assert n["data"]["text"] == "## hi"
+        assert n["data"]["color"] == "blue"
+        assert n["data"]["width"] == 240
+        assert n["data"]["height"] == 120
+
+    def test_sanitize_clamps_invalid_color_and_dimensions(self):
+        n = wf._sanitize_node({
+            "id": "n-stk2", "type": "sticky", "x": 0, "y": 0,
+            "data": {"text": "x", "color": "rainbow", "width": 50, "height": 999999},
+        })
+        assert n["data"]["color"] == "yellow"  # invalid → default
+        assert n["data"]["width"] == 120  # clamped to floor
+        assert n["data"]["height"] == 800  # clamped to ceiling
+
+    def test_execute_returns_pass_through(self):
+        n = wf._sanitize_node({
+            "id": "n-stk3", "type": "sticky", "x": 0, "y": 0,
+            "data": {"text": "note", "color": "yellow", "width": 220, "height": 140},
+        })
+        r = wf._execute_node(n, ["upstream input ignored"])
+        assert r["status"] == "ok"
+        assert r["output"] == ""
+        assert r["sessionId"] == ""
+
+    def test_sanitize_workflow_drops_edges_attached_to_sticky(self):
+        clean = wf._sanitize_workflow({
+            "name": "test",
+            "nodes": [
+                {"id": "n-stk", "type": "sticky", "x": 0, "y": 0, "data": {"text": "n", "color": "yellow"}},
+                {"id": "n-a", "type": "session", "x": 200, "y": 0, "data": {"subject": "s"}},
+                {"id": "n-b", "type": "session", "x": 400, "y": 0, "data": {"subject": "s"}},
+            ],
+            "edges": [
+                {"id": "e1", "from": "n-stk", "fromPort": "out", "to": "n-a", "toPort": "in"},
+                {"id": "e2", "from": "n-a",   "fromPort": "out", "to": "n-stk", "toPort": "in"},
+                {"id": "e3", "from": "n-a",   "fromPort": "out", "to": "n-b", "toPort": "in"},
+            ],
+        })
+        assert clean is not None
+        # All three nodes survive; only the legitimate n-a → n-b edge remains.
+        assert len(clean["nodes"]) == 3
+        assert len(clean["edges"]) == 1
+        assert clean["edges"][0]["from"] == "n-a"
+        assert clean["edges"][0]["to"] == "n-b"
+
