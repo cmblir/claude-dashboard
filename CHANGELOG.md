@@ -10,6 +10,27 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.16] — 2026-05-02
+
+### Investigation
+- 🔎 Reproduced the user-reported `node n-fe: all providers failed` against
+  the saved "팀 개발 스프린트" workflow. Root cause: `claude-cli` and
+  `gemini-cli` both hung past the 300 s subprocess timeout for the parallel
+  `subagent` level, with no API-key fallback configured. The CC4
+  improvement to the error message is now visible end-to-end:
+  `all providers failed — primary: timeout after 300s || chain: ...`.
+
+### Added
+- 🔄 **Switch-provider recovery in the run-result modal** (EE2). Each
+  failed `session` / `subagent` row now shows a "프로바이더 변경" select
+  populated from `/api/ai-providers/list` (only available providers). One
+  click saves the new assignee back to the workflow and re-runs.
+- 🛡 **Workflow preflight endpoint** (EE1): `POST /api/workflows/preflight`
+  scans every node's assignee, resolves to (provider_id, model), and
+  returns the unavailable ones plus the list of available providers.
+  Useful for static "no API key" cases — does not catch runtime hang.
+
+---
 ## [2.66.15] — 2026-05-02
 
 ### Added

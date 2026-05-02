@@ -3295,6 +3295,90 @@ def api_workflow_run_status(query: dict) -> dict:
     return _run_status_snapshot(rid, full=full)
 
 
+def api_workflow_preflight(body: dict) -> dict:
+    """POST /api/workflows/preflight — pre-run provider availability check.
+
+    EE1 (v2.66.16) — scan every node's `assignee` (and any `multiAssignee`),
+    resolve to (provider_id, model), and probe `is_available()`. Returns a
+    list of nodes with unavailable assignees so the UI can surface a
+    "switch to X" dropdown before the user wastes 5 min on a timeout.
+
+    body: { wfId | nodes: [...] }
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    nodes = body.get("nodes") or []
+    if not nodes and body.get("wfId"):
+        s = _load_all()
+        wf = (s.get("workflows") or {}).get(body["wfId"])
+        if not wf:
+            return {"ok": False, "error": "wf not found"}
+        nodes = wf.get("nodes", [])
+    if not isinstance(nodes, list):
+        return {"ok": False, "error": "no nodes"}
+
+    from .ai_providers import get_registry
+    reg = get_registry()
+
+    # Cache availability checks — same provider id repeats often.
+    avail_cache: dict[str, bool] = {}
+    def _avail(pid: str) -> bool:
+        if pid in avail_cache:
+            return avail_cache[pid]
+        p = reg.get(pid)
+        ok = bool(p and p.is_available())
+        avail_cache[pid] = ok
+        return ok
+
+    issues: list[dict] = []
+    available_assignees: list[str] = []
+    # Collect available providers' ids — UI uses for the dropdown.
+    for p in reg.all_providers():
+        try:
+            if p.is_available():
+                avail_cache[p.provider_id] = True
+                available_assignees.append(p.provider_id)
+            else:
+                avail_cache[p.provider_id] = False
+        except Exception:
+            avail_cache[p.provider_id] = False
+
+    for n in nodes:
+        if not isinstance(n, dict):
+            continue
+        if n.get("type") not in ("session", "subagent"):
+            continue
+        d = n.get("data") or {}
+        targets: list[str] = []
+        a = (d.get("assignee") or "").strip()
+        if a:
+            targets.append(a)
+        for ma in (d.get("multiAssignee") or []):
+            if isinstance(ma, str) and ma.strip():
+                targets.append(ma.strip())
+        if not targets:
+            continue
+        unavailable: list[dict] = []
+        for tgt in targets:
+            try:
+                pid, model = reg.resolve_assignee(tgt)
+            except Exception:
+                pid, model = "", ""
+            if not pid or not _avail(pid):
+                unavailable.append({"assignee": tgt, "providerId": pid, "model": model})
+        if unavailable:
+            issues.append({
+                "nodeId": n.get("id"),
+                "title":  n.get("title") or n.get("id"),
+                "unavailable": unavailable,
+            })
+    return {
+        "ok": True,
+        "issues": issues,
+        "availableProviders": available_assignees,
+    }
+
+
 def api_workflow_run_cancel(body: dict) -> dict:
     """POST /api/workflows/run-cancel  — cooperative cancel. Sets a flag
     that the run loop checks at every level boundary. Returns immediately;

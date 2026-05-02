@@ -7845,16 +7845,48 @@ function _wfStartPollingFallback() {
   }, 1200);
 }
 
-function _wfShowRunResult(run) {
+async function _wfShowRunResult(run) {
   const ok = run.status === 'ok';
   const results = run.nodeResults || {};
   const iterInfo = (typeof run.iteration === 'number' && run.iteration > 0)
     ? `<div class="text-xs text-[var(--text-dim)] mb-2">🔁 ${t('최종 반복')}: ${run.iteration + 1}</div>` : '';
+  // EE2 (v2.66.16) — when a node fails, fetch the list of currently
+  // available providers and offer a one-click switch dropdown. This is
+  // the recovery path after a `timeout after 300s` / `unavailable` error.
+  let availableProviders = [];
+  const hasErr = Object.values(results).some(r => r && r.status === 'err');
+  if (hasErr) {
+    try {
+      const pr = await api('/api/ai-providers/list');
+      availableProviders = (pr.providers || []).filter(p => p.available);
+    } catch (e) { /* silent */ }
+  }
+  const _switchSelectFor = (nid, currentAssignee) => {
+    if (!availableProviders.length) return '';
+    const opts = availableProviders.flatMap(p => {
+      const provLabel = p.name || p.id;
+      const models = (p.models || []).slice(0, 8);
+      if (!models.length) return [`<option value="${escapeHtml(p.id)}">${escapeHtml(provLabel)}</option>`];
+      return models.map(m => {
+        const v = `${p.id}:${m.id || m.name}`;
+        return `<option value="${escapeHtml(v)}">${escapeHtml(provLabel)} · ${escapeHtml(m.id || m.name)}</option>`;
+      });
+    }).join('');
+    return `
+      <div class="mt-2 pt-2 border-t border-[var(--border)] flex items-center gap-2 flex-wrap">
+        <span class="text-[10px] text-[var(--text-dim)] whitespace-nowrap">${t('프로바이더 변경')}:</span>
+        <span class="text-[10px] text-[var(--text-dim)] truncate" title="${escapeHtml(currentAssignee || '')}">↪ ${escapeHtml(currentAssignee || '—')}</span>
+        <select id="wfSw-${nid}" class="input text-[10px]" style="flex:1;min-width:160px;"><option value="">${t('선택…')}</option>${opts}</select>
+        <button class="btn text-[10px] btn-primary" onclick="_wfSwitchProvider('${nid}')">${t('적용 + 재실행')}</button>
+      </div>`;
+  };
   const rows = Object.entries(results).map(([nid, r]) => {
     const node = (__wf.current.nodes || []).find(n => n.id === nid) || {};
     const icon = (WF_TYPE_MAP[node.type]||{}).icon || '•';
     const preview = (r.output||'').slice(0, 500);
     const err = r.error ? `<div class="text-[11px] text-red-400 mt-1">⚠ ${escapeHtml(r.error)}</div>` : '';
+    const switchUI = (r.status === 'err' && (node.type === 'session' || node.type === 'subagent'))
+      ? _switchSelectFor(nid, (node.data || {}).assignee || '') : '';
     const sid = r.sessionId || '';
     const sidRow = sid ? `
       <div class="mt-2 pt-2 border-t border-[var(--border)] flex items-center gap-2">
@@ -7870,6 +7902,7 @@ function _wfShowRunResult(run) {
       </div>
       ${preview ? `<pre class="text-[11px] whitespace-pre-wrap break-words" style="max-height:160px;overflow-y:auto;">${escapeHtml(preview)}</pre>` : ''}
       ${err}
+      ${switchUI}
       ${sidRow}
     </div>`;
   }).join('');
@@ -7884,6 +7917,31 @@ function _wfShowRunResult(run) {
       <div class="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">${rows || '<div class="empty card p-4">'+t('결과 없음')+'</div>'}</div>
     </div>
   `);
+}
+
+// EE2 (v2.66.16) — apply a new assignee to a failed node and re-run the
+// workflow. Saves the workflow first so the change persists.
+async function _wfSwitchProvider(nid) {
+  if (!__wf.current) return;
+  const sel = document.getElementById('wfSw-' + nid);
+  if (!sel || !sel.value) { toast(t('프로바이더를 선택하세요'), 'warn'); return; }
+  const newAssignee = sel.value;
+  const node = __wf.current.nodes.find(n => n.id === nid);
+  if (!node) return;
+  node.data = node.data || {};
+  const prev = node.data.assignee || '';
+  node.data.assignee = newAssignee;
+  __wf.dirty = true;
+  // Persist the change before re-running so the registry sees it.
+  try {
+    await api('/api/workflows/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workflow: __wf.current }),
+    });
+  } catch(e) { /* silent — re-run still works against in-memory copy */ }
+  toast(`${prev || '(none)'} → ${newAssignee} ${t('적용됨, 재실행합니다')}`, 'ok');
+  closeModal();
+  await _wfRun();
 }
 
 async function _wfUseAsResume(sourceNid, sessionId) {

@@ -39,6 +39,12 @@ NEW_EN: dict[str, str] = {
     "인라인 터미널 보기": "View inline terminal",
     "아직 실행된 노드가 없습니다": "No nodes have run yet",
     "건너뜀": "Skipped",
+    # EE (v2.66.16) — switch-provider recovery in run-result modal
+    "프로바이더 변경": "Switch provider",
+    "선택…": "Select…",
+    "적용 + 재실행": "Apply + re-run",
+    "프로바이더를 선택하세요": "Pick a provider",
+    "적용됨, 재실행합니다": "applied — re-running",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -73,4 +79,10 @@ NEW_ZH: dict[str, str] = {
     "인라인 터미널 보기": "查看内嵌终端",
     "아직 실행된 노드가 없습니다": "尚未执行任何节点",
     "건너뜀": "已跳过",
+    # EE (v2.66.16)
+    "프로바이더 변경": "切换提供商",
+    "선택…": "选择…",
+    "적용 + 재실행": "应用 + 重新运行",
+    "프로바이더를 선택하세요": "请选择提供商",
+    "적용됨, 재실행합니다": "已应用 — 重新运行",
 }
