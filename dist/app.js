@@ -2132,6 +2132,7 @@ VIEWS.workflows = async () => {
       </div>
 
       <div id="wfInspector" class="card">
+        <div class="wf-inspector-resize" id="wfInspectorResize" title="${t('드래그로 너비 조절')}"></div>
         <div class="flex items-center justify-between mb-2">
           <div class="text-xs font-semibold">📋 ${t('워크플로우 메타')}</div>
           <button class="btn text-[10px]" onclick="_wfToggleInspector()" title="${t('가리기')}">→</button>
@@ -4382,6 +4383,46 @@ function _wfBindCanvas() {
   // on first canvas mount. Without this, the label reads "100%" even
   // when the workflow opens at a fit-to-screen zoom of, say, 0.78.
   if (typeof _wfUpdateZoomLabel === 'function') _wfUpdateZoomLabel();
+
+  // LL23 (v2.66.52) — restore inspector width + bind resize handle.
+  try {
+    const w = parseInt(localStorage.getItem('cc.wfInspectorWidth') || '0', 10);
+    if (w >= 240 && w <= 720) {
+      const el = document.getElementById('wfInspector');
+      if (el) el.style.width = w + 'px';
+    }
+  } catch (_) {}
+  const ihandle = document.getElementById('wfInspectorResize');
+  if (ihandle && !ihandle.__wfBound) {
+    ihandle.__wfBound = true;
+    let dragging = false, startX = 0, startW = 0;
+    ihandle.addEventListener('mousedown', (e) => {
+      const ins = document.getElementById('wfInspector');
+      if (!ins) return;
+      dragging = true;
+      startX = e.clientX;
+      startW = ins.getBoundingClientRect().width;
+      ihandle.classList.add('dragging');
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const ins = document.getElementById('wfInspector');
+      if (!ins) return;
+      // Inspector is on the right; growing the width means dragging LEFT.
+      const next = Math.max(240, Math.min(720, startW - (e.clientX - startX)));
+      ins.style.width = next + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      ihandle.classList.remove('dragging');
+      const ins = document.getElementById('wfInspector');
+      if (!ins) return;
+      const w = Math.round(ins.getBoundingClientRect().width);
+      try { localStorage.setItem('cc.wfInspectorWidth', String(w)); } catch (_) {}
+    });
+  }
 
   // LL19 (v2.66.48) — click on minimap → pan canvas to that location.
   // LL22 (v2.66.51) — also drag-to-pan: holding the mouse on the

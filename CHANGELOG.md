@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.52] — 2026-05-02
+
+### Added
+- ↔ **Inspector panel resize handle** (LL23, n8n parity). Drag
+  the left edge of the inspector to resize between 240–720px.
+  Width persists in localStorage so it sticks across sessions.
+
+---
 ## [2.66.51] — 2026-05-02
 
 ### Added
