@@ -147,6 +147,14 @@ NEW_EN: dict[str, str] = {
     # QQ6
     "명령 history 검색 (reverse-i-search)": "Search command history (reverse-i-search)",
     "일치하는 명령 없음": "No matching command",
+    # QQ9
+    "대화 필터…": "Filter conversations…",
+    "일치하는 대화 없음": "No matching conversations",
+    "이름 변경": "Rename",
+    "고정": "Pin",
+    "고정 해제": "Unpin",
+    "새 이름 입력:": "New name:",
+    "이 대화를 삭제할까요?": "Delete this conversation?",
     # QQ1
     "시스템 프롬프트 설정됨": "System prompt set",
     "시스템 프롬프트 초기화됨": "System prompt cleared",
@@ -321,6 +329,14 @@ NEW_ZH: dict[str, str] = {
     # QQ6
     "명령 history 검색 (reverse-i-search)": "搜索命令历史 (reverse-i-search)",
     "일치하는 명령 없음": "无匹配命令",
+    # QQ9
+    "대화 필터…": "筛选对话…",
+    "일치하는 대화 없음": "无匹配的对话",
+    "이름 변경": "重命名",
+    "고정": "置顶",
+    "고정 해제": "取消置顶",
+    "새 이름 입력:": "输入新名称：",
+    "이 대화를 삭제할까요?": "删除此对话？",
     # QQ1
     "시스템 프롬프트 설정됨": "已设置系统提示",
     "시스템 프롬프트 초기화됨": "已清空系统提示",

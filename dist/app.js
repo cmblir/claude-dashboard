@@ -26107,8 +26107,17 @@ window._lcSwitchSession = function (id) {
 function _lcRenderSessions() {
   const list = document.getElementById('lcSessionList');
   if (!list) return;
-  const sessions = _lcGetSessions();
+  const allSessions = _lcGetSessions();
   const cur = _lcCurrentId();
+  // QQ9 (v2.66.84) — filter input + pinned sort.
+  const filterInp = document.getElementById('lcSessionFilter');
+  const q = ((filterInp && filterInp.value) || '').toLowerCase().trim();
+  const sessions = (allSessions
+    .filter(s => !q
+      || (s.label || '').toLowerCase().includes(q)
+      || (s.preview || '').toLowerCase().includes(q)
+      || (s.assignee || '').toLowerCase().includes(q))
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)));
   const relTime = ts => {
     const d = Date.now() - (ts || 0);
     if (d < 60000) return t('방금');
@@ -26117,18 +26126,97 @@ function _lcRenderSessions() {
     return Math.floor(d / 86400000) + t('일 전');
   };
   if (!sessions.length) {
-    list.innerHTML = `<div style="padding:20px 8px;text-align:center;font-size:11px;color:var(--text-dim);">${t('아직 대화가 없습니다')}</div>`;
+    list.innerHTML = `<div style="padding:20px 8px;text-align:center;font-size:11px;color:var(--text-dim);">${q ? t('일치하는 대화 없음') : t('아직 대화가 없습니다')}</div>`;
     return;
   }
   list.innerHTML = sessions.map(s => {
     const active = s.id === cur;
-    return `<div onclick="_lcSwitchSession('${s.id}')" style="cursor:pointer;padding:8px 10px;border-radius:7px;margin:1px 2px;border:1px solid ${active ? 'rgba(217,119,87,0.5)' : 'transparent'};background:${active ? 'rgba(217,119,87,0.1)' : 'transparent'};">
-      <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${active ? 'var(--accent)' : 'var(--text)'};">${escapeHtml(s.label || t('새 대화'))}</div>
+    const pin = s.pinned ? '📌 ' : '';
+    return `<div oncontextmenu="event.preventDefault();_lcSessionContextMenu('${s.id}', event.clientX, event.clientY);" onclick="_lcSwitchSession('${s.id}')" style="cursor:pointer;padding:8px 10px;border-radius:7px;margin:1px 2px;border:1px solid ${active ? 'rgba(217,119,87,0.5)' : 'transparent'};background:${active ? 'rgba(217,119,87,0.1)' : 'transparent'};">
+      <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${active ? 'var(--accent)' : 'var(--text)'};">${pin}${escapeHtml(s.label || t('새 대화'))}</div>
       ${s.preview ? `<div style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dim);margin-top:2px;">${escapeHtml(s.preview)}</div>` : ''}
       <div style="font-size:9px;color:var(--text-dim);margin-top:3px;">${relTime(s.ts)}</div>
     </div>`;
   }).join('');
 }
+
+// QQ9 (v2.66.84) — right-click on a session row → small context
+// menu with rename / pin-toggle / delete.
+window._lcSessionContextMenu = function (sid, x, y) {
+  const old = document.getElementById('lcSessionCtxMenu');
+  if (old) old.remove();
+  const sessions = _lcGetSessions();
+  const s = sessions.find(x => x.id === sid);
+  if (!s) return;
+  const menu = document.createElement('div');
+  menu.id = 'lcSessionCtxMenu';
+  menu.style.cssText = 'position:fixed;z-index:10000;min-width:160px;background:var(--surface,#1c1c1e);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.35);padding:4px 0;font-size:12px;left:' + x + 'px;top:' + y + 'px;';
+  const items = [
+    { icon: '✏️', label: t('이름 변경'), fn: () => _lcSessionRename(sid) },
+    { icon: s.pinned ? '📍' : '📌', label: s.pinned ? t('고정 해제') : t('고정'), fn: () => _lcSessionTogglePin(sid) },
+    { sep: true },
+    { icon: '🗑', label: t('삭제'), danger: true, fn: () => _lcSessionDelete(sid) },
+  ];
+  for (const item of items) {
+    if (item.sep) {
+      const sp = document.createElement('div');
+      sp.style.cssText = 'height:1px;background:var(--border);margin:4px 0;';
+      menu.appendChild(sp);
+      continue;
+    }
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;color:' + (item.danger ? '#fca5a5' : 'var(--text)') + ';';
+    row.innerHTML = `<span>${item.icon}</span><span style="flex:1">${escapeHtml(item.label)}</span>`;
+    row.onmouseenter = () => row.style.background = 'rgba(255,255,255,0.06)';
+    row.onmouseleave = () => row.style.background = '';
+    row.onclick = () => { try { item.fn(); } catch(e) {} const m = document.getElementById('lcSessionCtxMenu'); if (m) m.remove(); };
+    menu.appendChild(row);
+  }
+  document.body.appendChild(menu);
+  setTimeout(() => {
+    const closer = (ev) => { if (!menu.contains(ev.target)) { const m = document.getElementById('lcSessionCtxMenu'); if (m) m.remove(); } };
+    document.addEventListener('mousedown', closer, { once: true });
+  }, 0);
+};
+
+window._lcSessionRename = function (sid) {
+  const sessions = _lcGetSessions();
+  const s = sessions.find(x => x.id === sid);
+  if (!s) return;
+  const next = prompt(t('새 이름 입력:'), s.label || t('새 대화'));
+  if (next == null) return;
+  s.label = next.trim() || (t('새 대화'));
+  _lcSaveSessions(sessions);
+  _lcRenderSessions();
+};
+
+window._lcSessionTogglePin = function (sid) {
+  const sessions = _lcGetSessions();
+  const s = sessions.find(x => x.id === sid);
+  if (!s) return;
+  s.pinned = !s.pinned;
+  _lcSaveSessions(sessions);
+  _lcRenderSessions();
+};
+
+window._lcSessionDelete = function (sid) {
+  if (!confirm(t('이 대화를 삭제할까요?'))) return;
+  const sessions = _lcGetSessions().filter(x => x.id !== sid);
+  _lcSaveSessions(sessions);
+  // Drop history payload too.
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.endsWith(':' + sid)) keys.push(k);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+  } catch (_) {}
+  if (_lcCurrentId() === sid) {
+    if (sessions.length) _lcSwitchSession(sessions[0].id);
+    else _lcNewSession();
+  } else _lcRenderSessions();
+};
 
 VIEWS.lazyclawChat = async () => {
   const provs = await api('/api/ai-providers/list').catch(() => ({ providers: [] }));
@@ -26151,8 +26239,10 @@ VIEWS.lazyclawChat = async () => {
 
     <!-- Session sidebar -->
     <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;background:rgba(0,0,0,0.12);">
-      <div style="padding:8px;border-bottom:1px solid var(--border);">
+      <div style="padding:8px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:4px;">
         <button class="btn-primary btn text-xs" style="width:100%;justify-content:center;" onclick="_lcNewSession()">＋ ${t('새 대화')}</button>
+        <!-- QQ9 (v2.66.84) — quick filter for the session list -->
+        <input id="lcSessionFilter" class="input text-[11px]" placeholder="${t('대화 필터…')}" style="padding:4px 8px;" oninput="_lcRenderSessions()">
       </div>
       <div id="lcSessionList" style="flex:1;overflow-y:auto;padding:4px 2px;"></div>
     </div>

@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.84] — 2026-05-02
+
+### Added
+- 🔍 **Chat session filter** input above the sidebar list (QQ9).
+  Live-matches session label / preview / assignee.
+- 🖱 **Right-click on a chat session** opens a context menu:
+  - ✏️ Rename
+  - 📌 / 📍 Pin / Unpin (pinned sessions float to the top)
+  - 🗑 Delete (also wipes the session's history payload)
+
+---
 ## [2.66.83] — 2026-05-02
 
 ### Added
