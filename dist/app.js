@@ -2109,6 +2109,17 @@ VIEWS.workflows = async () => {
           <label class="btn text-xs cursor-pointer" title="${t('JSON 파일에서 가져오기')}">📥 ${t('가져오기')}<input type="file" accept=".json,application/json" style="display:none;" onchange="_wfImport(event)"></label>
           <span style="width:1px;height:22px;background:var(--border);margin:0 4px;"></span>
           <button id="wfGroupBtn" class="btn text-xs" onclick="_wfCreateGroup()" title="${t('선택 노드 그룹 만들기 (Shift+클릭)')}" aria-label="${t('그룹 만들기')}" style="display:none;">📦 ${t('그룹')}</button>
+          <!-- QQ34 (v2.66.109) — alignment buttons for multi-select. -->
+          <span id="wfAlignBar" style="display:none;gap:2px;" class="flex items-center">
+            <button class="btn text-xs" onclick="_wfAlignSelected('left')" title="${t('왼쪽 정렬')}">⫷</button>
+            <button class="btn text-xs" onclick="_wfAlignSelected('hcenter')" title="${t('가로 가운데')}">⇔</button>
+            <button class="btn text-xs" onclick="_wfAlignSelected('right')" title="${t('오른쪽 정렬')}">⫸</button>
+            <button class="btn text-xs" onclick="_wfAlignSelected('top')" title="${t('위 정렬')}">⫶↑</button>
+            <button class="btn text-xs" onclick="_wfAlignSelected('vcenter')" title="${t('세로 가운데')}">⇕</button>
+            <button class="btn text-xs" onclick="_wfAlignSelected('bottom')" title="${t('아래 정렬')}">⫶↓</button>
+            <button class="btn text-xs" onclick="_wfAlignSelected('hdist')" title="${t('가로 균등 분산')}">≡↔</button>
+            <button class="btn text-xs" onclick="_wfAlignSelected('vdist')" title="${t('세로 균등 분산')}">≡↕</button>
+          </span>
         </div>
         <div id="wfCanvasHost">
           <!-- QQ8 (v2.66.83) — floating workflow-description tag in
@@ -26177,7 +26188,57 @@ function _wfSyncMultiSelectClasses() {
   // 그룹 만들기 버튼 표시/숨김
   const groupBtn = document.getElementById('wfGroupBtn');
   if (groupBtn) groupBtn.style.display = __wfMultiSelected.size >= 2 ? '' : 'none';
+  // QQ34 — alignment bar for 2+ selection.
+  const alignBar = document.getElementById('wfAlignBar');
+  if (alignBar) alignBar.style.display = __wfMultiSelected.size >= 2 ? 'inline-flex' : 'none';
 }
+
+// QQ34 (v2.66.109) — align/distribute multi-selected nodes (n8n parity).
+window._wfAlignSelected = function (mode) {
+  if (!__wf.current || !__wfMultiSelected || __wfMultiSelected.size < 2) return;
+  const ids = Array.from(__wfMultiSelected);
+  const nodes = ids.map(id => __wf.current.nodes.find(n => n.id === id)).filter(Boolean);
+  if (nodes.length < 2) return;
+  const W = (typeof WF_NODE_W !== 'undefined') ? WF_NODE_W : 200;
+  const H = (typeof WF_NODE_H !== 'undefined') ? WF_NODE_H : 80;
+  _wfPushUndo();
+  if (mode === 'left') {
+    const x = Math.min(...nodes.map(n => n.x));
+    nodes.forEach(n => n.x = x);
+  } else if (mode === 'right') {
+    const x = Math.max(...nodes.map(n => n.x));
+    nodes.forEach(n => n.x = x);
+  } else if (mode === 'hcenter') {
+    const cx = nodes.reduce((s, n) => s + n.x, 0) / nodes.length;
+    nodes.forEach(n => n.x = Math.round(cx));
+  } else if (mode === 'top') {
+    const y = Math.min(...nodes.map(n => n.y));
+    nodes.forEach(n => n.y = y);
+  } else if (mode === 'bottom') {
+    const y = Math.max(...nodes.map(n => n.y));
+    nodes.forEach(n => n.y = y);
+  } else if (mode === 'vcenter') {
+    const cy = nodes.reduce((s, n) => s + n.y, 0) / nodes.length;
+    nodes.forEach(n => n.y = Math.round(cy));
+  } else if (mode === 'hdist' && nodes.length >= 3) {
+    const sorted = [...nodes].sort((a, b) => a.x - b.x);
+    const x0 = sorted[0].x, x1 = sorted[sorted.length - 1].x;
+    const step = (x1 - x0) / (sorted.length - 1);
+    sorted.forEach((n, i) => n.x = Math.round(x0 + i * step));
+  } else if (mode === 'vdist' && nodes.length >= 3) {
+    const sorted = [...nodes].sort((a, b) => a.y - b.y);
+    const y0 = sorted[0].y, y1 = sorted[sorted.length - 1].y;
+    const step = (y1 - y0) / (sorted.length - 1);
+    sorted.forEach((n, i) => n.y = Math.round(y0 + i * step));
+  } else {
+    return;
+  }
+  __wf.dirty = true;
+  if (typeof _wfRenderCanvasNow === 'function') _wfRenderCanvasNow();
+  else _wfRenderCanvas();
+  _wfUpdateToolbar();
+  toast(t('정렬됨') + ` (${nodes.length})`, 'ok');
+};
 
 function _wfCreateGroup() {
   if (__wfMultiSelected.size < 2) { toast(t('2개 이상의 노드를 선택하세요'), 'warn'); return; }

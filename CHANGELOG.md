@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.109] — 2026-05-02
+
+### Added
+- 📐 **Align / distribute toolbar for multi-selected nodes** (QQ34,
+  n8n parity). Whenever 2+ nodes are selected (Shift+click, lasso, or
+  Cmd+A), an 8-button bar appears in the workflow toolbar:
+  ⫷ left, ⇔ horizontal center, ⫸ right, ⫶↑ top, ⇕ vertical center,
+  ⫶↓ bottom, ≡↔ horizontal distribute (3+ nodes), ≡↕ vertical
+  distribute (3+ nodes). Pushes one undo step. Pairs with QQ27 / QQ28
+  / QQ29 / QQ30 for the full multi-select editing flow.
+
+---
 ## [2.66.108] — 2026-05-02
 
 ### Added

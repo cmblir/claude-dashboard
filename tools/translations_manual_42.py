@@ -243,6 +243,16 @@ NEW_EN: dict[str, str] = {
     # QQ32 — collapse long messages
     "더보기": "Show more",
     "접기": "Show less",
+    # QQ34 — align/distribute
+    "왼쪽 정렬": "Align left",
+    "오른쪽 정렬": "Align right",
+    "가로 가운데": "Align horizontal center",
+    "위 정렬": "Align top",
+    "아래 정렬": "Align bottom",
+    "세로 가운데": "Align vertical center",
+    "가로 균등 분산": "Distribute horizontally",
+    "세로 균등 분산": "Distribute vertically",
+    "정렬됨": "Aligned",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -480,4 +490,14 @@ NEW_ZH: dict[str, str] = {
     # QQ32
     "더보기": "展开更多",
     "접기": "收起",
+    # QQ34
+    "왼쪽 정렬": "左对齐",
+    "오른쪽 정렬": "右对齐",
+    "가로 가운데": "水平居中",
+    "위 정렬": "顶部对齐",
+    "아래 정렬": "底部对齐",
+    "세로 가운데": "垂直居中",
+    "가로 균등 분산": "水平等距分布",
+    "세로 균등 분산": "垂直等距分布",
+    "정렬됨": "已对齐",
 }
