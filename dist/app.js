@@ -26653,12 +26653,14 @@ function _lcChatRender(opts) {
     const regenBtn = (!isUser && i > 0) ? `<button onclick="_lcRegenerate(${i})" title="${t('재생성')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">🔄</button>` : '';
     // QQ22 (v2.66.97) — edit user message + resubmit (OpenClaw parity).
     const editBtn = isUser ? `<button onclick="_lcEditUserMsg('${id}',${i})" title="${t('편집 후 재전송')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">✏️</button>` : '';
+    // QQ23 (v2.66.98) — branch conversation from this message (ChatGPT parity).
+    const forkBtn = `<button onclick="_lcBranchFrom('${id}',${i})" title="${t('이 메시지에서 분기')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">🍴</button>`;
     // QQ15 (v2.66.90) — star toggle. Persists in the message itself
     // (m.starred boolean) so it travels with export / search results.
     const starOn = !!m.starred;
     const starBtn = `<button onclick="_lcToggleStar('${id}',${i})" title="${t('즐겨찾기')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:${starOn?0.95:0.4};color:${starOn?'#fbbf24':'var(--text-dim)'};line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=${starOn?0.95:0.4}">${starOn?'⭐':'☆'}</button>`;
     return `<div style="background:${bg};border:${border};border-radius:10px;padding:11px 14px;align-self:${isUser?'flex-end':'flex-start'};max-width:88%;min-width:100px;${starOn?'box-shadow:0 0 0 2px rgba(251,191,36,0.18);':''}">
-      <div style="display:flex;align-items:center;font-size:10px;color:var(--text-dim);">${label}${tokenHtml}<span style="flex:1;"></span>${starBtn}${editBtn}${regenBtn}${copyBtn}${delBtn}</div>
+      <div style="display:flex;align-items:center;font-size:10px;color:var(--text-dim);">${label}${tokenHtml}<span style="flex:1;"></span>${starBtn}${editBtn}${forkBtn}${regenBtn}${copyBtn}${delBtn}</div>
       ${_lcMsgBody(m)}${metaHtml}
     </div>`;
   }).join('');
@@ -26700,6 +26702,35 @@ window._lcEditUserMsg = function (sessionId, idx) {
     try { ta.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
   }
   toast(t('편집 후 Enter 로 재전송'), 'info');
+};
+
+// QQ23 (v2.66.98) — branch conversation from a message (ChatGPT parity).
+// Creates a new session whose history is everything up to and including
+// the chosen index, then switches to it. The original session stays
+// intact so users can compare paths.
+window._lcBranchFrom = function (sessionId, idx) {
+  const h = _lcGetHistory(sessionId);
+  if (idx < 0 || idx >= h.length) return;
+  const slice = h.slice(0, idx + 1).map(m => ({ ...m }));
+  const sessions = _lcGetSessions();
+  const src = sessions.find(s => s.id === sessionId);
+  const newId = _lcMakeSessionId();
+  const newLabel = (src && src.label ? src.label + ' · ' : '') + t('분기');
+  sessions.unshift({
+    id: newId,
+    label: newLabel.slice(0, 60),
+    assignee: (src && src.assignee) || '',
+    ts: Date.now(),
+    preview: (slice[slice.length - 1] && slice[slice.length - 1].text || '').slice(0, 55),
+    parentId: sessionId,
+    branchedAt: idx,
+  });
+  _lcSaveSessions(sessions);
+  _lcSaveHistory(newId, slice);
+  _lcSetCurrentId(newId);
+  _lcRenderSessions();
+  _lcChatRender();
+  toast(`🍴 ${t('새 분기 생성됨')} (${slice.length} ${t('메시지')})`, 'ok');
 };
 
 window._lcRegenerate = async function (idx) {

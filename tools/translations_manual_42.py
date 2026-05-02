@@ -221,6 +221,11 @@ NEW_EN: dict[str, str] = {
     # QQ22 — edit user message
     "편집 후 재전송": "Edit & resubmit",
     "편집 후 Enter 로 재전송": "Edit, then press Enter to resubmit",
+    # QQ23 — branch conversation
+    "이 메시지에서 분기": "Branch from this message",
+    "분기": "branch",
+    "새 분기 생성됨": "New branch created",
+    "메시지": "messages",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -436,4 +441,9 @@ NEW_ZH: dict[str, str] = {
     # QQ22
     "편집 후 재전송": "编辑后重发",
     "편집 후 Enter 로 재전송": "编辑后按 Enter 重发",
+    # QQ23
+    "이 메시지에서 분기": "从此消息分支",
+    "분기": "分支",
+    "새 분기 생성됨": "已创建新分支",
+    "메시지": "条消息",
 }
