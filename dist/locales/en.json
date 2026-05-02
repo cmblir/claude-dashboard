@@ -1572,6 +1572,7 @@
   "노드 붙여넣기": "Paste node",
   "노드 붙여넣기 완료": "Node pasted",
   "노드 삭제": "Delete Node",
+  "노드 선택됨": "nodes selected",
   "노드 수 차이": "Node Count Difference",
   "노드 우측의 주황 포트를 다음 노드 좌측 보라 포트로 드래그. 베지어 곡선 + 방향 화살표가 자동으로 그려짐.": "Drag the orange port on a node's right to the purple port on the next node. A bezier curve with an arrow is drawn automatically.",
   "노드 이동 시 격자 정렬": "Snap nodes to a grid while dragging",

@@ -4604,6 +4604,22 @@ function _wfBindCanvas() {
         return;
       }
 
+      // LL6 (v2.66.35) — Cmd/Ctrl + A — select all nodes (multi-select).
+      // Subsequent Cmd+C / Delete / arrow keys operate on the whole set
+      // when __wfMultiSelected has entries.
+      if (mod && e.key === 'a' && !inInput && __wf.current && (__wf.current.nodes || []).length) {
+        e.preventDefault();
+        if (typeof __wfMultiSelected !== 'undefined' && __wfMultiSelected && typeof _wfSyncMultiSelectClasses === 'function') {
+          __wfMultiSelected.clear();
+          for (const n of __wf.current.nodes) __wfMultiSelected.add(n.id);
+          __wf.selectedNodeId = null; __wf.selectedEdgeId = null;
+          _wfSyncMultiSelectClasses();
+          if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
+          if (typeof toast === 'function') toast(`${__wfMultiSelected.size} ${t('노드 선택됨')}`, 'ok');
+        }
+        return true;
+      }
+
       // LL5 (v2.66.34) — Cmd/Ctrl + D — duplicate selected node in
       // place (n8n parity). New node lands +40px offset and becomes
       // the selection.
