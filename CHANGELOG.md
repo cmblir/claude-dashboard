@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.7] — 2026-05-02
+
+### Added
+- 💲 **Per-turn cost in chat assistant meta line** (QQ97). When the
+  SSE `done` event reports `costUsd > 0`, the meta strip below
+  the assistant bubble now also shows `$0.0042` alongside
+  provider · model · 4.5s. Quick visibility into per-turn spend
+  without opening telemetry. The cost is also persisted as
+  `reply.costUsd` in the message for QQ26 sidebar token-badge
+  cousin features.
+
+---
 ## [2.68.6] — 2026-05-02
 
 ### Added
