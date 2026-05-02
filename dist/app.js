@@ -26840,11 +26840,16 @@ function _lcRenderSessions() {
       for (const m of h) tokSum += (m.tokensIn || 0) + (m.tokensOut || 0);
     } catch (_) {}
     const tokBadge = tokSum > 0 ? `<span style="font-size:9px;color:var(--text-dim);background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:8px;font-variant-numeric:tabular-nums;" title="${t('총 토큰 사용량')}">🔤 ${fmtTok(tokSum)}</span>` : '';
+    // QQ91 (v2.68.1) — show the session's stored assignee as a tiny
+    // chip so users can see which model each session is wired to
+    // without switching to it (pairs with QQ65 per-session model).
+    const aShort = (s.assignee || '').split(':').pop().slice(0, 14);
+    const aBadge = aShort ? `<span style="font-size:9px;color:var(--text-dim);opacity:0.65;font-variant-numeric:tabular-nums;" title="${escapeHtml(s.assignee || '')}">${escapeHtml(aShort)}</span>` : '';
     return `<div ${active?'data-active="1"':''} oncontextmenu="event.preventDefault();_lcSessionContextMenu('${s.id}', event.clientX, event.clientY);" onclick="_lcSwitchSession('${s.id}')" style="cursor:pointer;padding:8px 10px;border-radius:7px;margin:1px 2px;border:1px solid ${active ? 'rgba(217,119,87,0.5)' : 'transparent'};background:${active ? 'rgba(217,119,87,0.1)' : 'transparent'};">
       <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${active ? 'var(--accent)' : 'var(--text)'};">${pin}${escapeHtml(s.label || t('새 대화'))}</div>
       ${s.preview ? `<div style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dim);margin-top:2px;">${escapeHtml(s.preview)}</div>` : ''}
       ${lineage}
-      <div style="font-size:9px;color:var(--text-dim);margin-top:3px;display:flex;align-items:center;gap:6px;"><span>${relTime(s.ts)}</span>${tokBadge}</div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:3px;display:flex;align-items:center;gap:6px;"><span>${relTime(s.ts)}</span>${aBadge}${tokBadge}</div>
     </div>`;
   }).join('');
 }

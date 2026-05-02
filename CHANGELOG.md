@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.1] — 2026-05-02
+
+### Added
+- 🤖 **Per-session model badge in chat sidebar** (QQ91). Each row
+  now shows a small text chip with the session's stored
+  `assignee` (just the model part after the colon, truncated to
+  14 chars). Tooltip shows the full `provider:model`. Lets users
+  see which model each session is wired to without switching to
+  it — pairs with QQ65 per-session model restore.
+
+---
 ## [2.68.0] — 2026-05-02
 
 **QQ64–QQ90 rollup** — milestone for the second tier of Q-series work
