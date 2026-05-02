@@ -76,6 +76,10 @@ NEW_EN: dict[str, str] = {
     "줌 아웃": "Zoom out",
     "줌 인": "Zoom in",
     "연결 삭제": "Delete connection",
+    "우클릭": "Right-click",
+    "미니맵 클릭": "Click minimap",
+    "노드/엣지 컨텍스트 메뉴": "Node / edge context menu",
+    "해당 위치로 캔버스 이동": "Pan canvas to that location",
     "워크플로우 실행 / 중단": "Run / stop workflow",
     # LL16 already covered: 새 노드 추가 — exists.
 }
@@ -149,5 +153,9 @@ NEW_ZH: dict[str, str] = {
     "줌 아웃": "缩小",
     "줌 인": "放大",
     "연결 삭제": "删除连接",
+    "우클릭": "右键单击",
+    "미니맵 클릭": "单击迷你地图",
+    "노드/엣지 컨텍스트 메뉴": "节点 / 连接的上下文菜单",
+    "해당 위치로 캔버스 이동": "将画布平移到该位置",
     "워크플로우 실행 / 중단": "运行 / 停止工作流",
 }

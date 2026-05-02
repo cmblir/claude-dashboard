@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.50] — 2026-05-02
+
+### Added
+- 📖 **Help modal lists mouse actions** (LL21). Right-click for
+  node/edge context menus and minimap-click to pan are now
+  discoverable from the `?` shortcut help on the workflow tab.
+
+---
 ## [2.66.49] — 2026-05-02
 
 ### Added

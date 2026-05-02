@@ -4279,6 +4279,8 @@ function _wfShowShortcutHelp() {
     { key: 'Wheel', desc: t('캔버스 패닝') },
     { key: 'Ctrl+Wheel', desc: t('커서 기준 줌') },
     { key: 'Alt+드래그', desc: t('grid snap 우회') },
+    { key: t('우클릭'), desc: t('노드/엣지 컨텍스트 메뉴') },
+    { key: t('미니맵 클릭'), desc: t('해당 위치로 캔버스 이동') },
     { key: '더블클릭 (빈 영역)', desc: t('화면 맞춤') },
     { key: 'Esc', desc: t('선택 해제') },
     { key: '?', desc: t('단축키 도움말 표시') },
