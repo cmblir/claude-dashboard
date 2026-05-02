@@ -121,6 +121,13 @@ NEW_EN: dict[str, str] = {
     "다른 모델로 재생성": "Regenerate with another model",
     "이전 사용자 메시지를 찾을 수 없습니다": "Could not find the prior user message",
     "같은 사용자 메시지를 선택한 모델로 재요청합니다": "Resend the same user message to the picked model",
+    # OO6
+    "대화 검색": "Search conversations",
+    "검색": "Search",
+    "검색어 (모든 대화에서 찾기)": "Search across all conversations",
+    "일치하는 메시지 없음": "No matching messages",
+    "검색어를 입력하세요": "Type a query",
+    "건": "hits",
     # NN1
     "형제 노드 실패로 자동 취소됨": "Auto-cancelled because a sibling node failed",
     "자동 취소됨": "auto-cancelled",
@@ -245,6 +252,13 @@ NEW_ZH: dict[str, str] = {
     "다른 모델로 재생성": "用其他模型重新生成",
     "이전 사용자 메시지를 찾을 수 없습니다": "未找到上一条用户消息",
     "같은 사용자 메시지를 선택한 모델로 재요청합니다": "用所选模型重新请求同一条用户消息",
+    # OO6
+    "대화 검색": "搜索对话",
+    "검색": "搜索",
+    "검색어 (모든 대화에서 찾기)": "在所有对话中搜索",
+    "일치하는 메시지 없음": "无匹配消息",
+    "검색어를 입력하세요": "请输入搜索词",
+    "건": "条",
     # NN1
     "형제 노드 실패로 자동 취소됨": "因同级节点失败而自动取消",
     "자동 취소됨": "自动取消",
