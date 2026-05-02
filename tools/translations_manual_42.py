@@ -144,6 +144,9 @@ NEW_EN: dict[str, str] = {
     # QQ4
     "헬스체크 시작": "Health check start",
     "헬스체크 완료": "Health check done",
+    # QQ6
+    "명령 history 검색 (reverse-i-search)": "Search command history (reverse-i-search)",
+    "일치하는 명령 없음": "No matching command",
     # QQ1
     "시스템 프롬프트 설정됨": "System prompt set",
     "시스템 프롬프트 초기화됨": "System prompt cleared",
@@ -315,6 +318,9 @@ NEW_ZH: dict[str, str] = {
     # QQ4
     "헬스체크 시작": "健康检查开始",
     "헬스체크 완료": "健康检查完成",
+    # QQ6
+    "명령 history 검색 (reverse-i-search)": "搜索命令历史 (reverse-i-search)",
+    "일치하는 명령 없음": "无匹配命令",
     # QQ1
     "시스템 프롬프트 설정됨": "已设置系统提示",
     "시스템 프롬프트 초기화됨": "已清空系统提示",
