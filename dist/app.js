@@ -26896,6 +26896,17 @@ function _lcRenderSessions() {
       }
     } catch (_) {}
   }, 0);
+  // QQ107 (v2.68.17) — show filter match count in the sidebar
+  // header alongside (or in place of) the spend display.
+  if (q) {
+    const totEl = document.getElementById('lcTotalSpend');
+    if (totEl) {
+      const match = `${sessions.length} / ${allSessions.length}`;
+      const hasSpend = totEl.style.display !== 'none' && totEl.innerHTML;
+      totEl.style.display = '';
+      totEl.innerHTML = hasSpend ? `${match} · ${totEl.innerHTML}` : match;
+    }
+  }
   list.innerHTML = sessions.map(s => {
     const active = s.id === cur;
     const pin = s.pinned ? '📌 ' : '';
