@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.138] — 2026-05-02
+
+### Cleaned
+- 🧼 **Drop sticky-attached edges at save time** (QQ63). Defensive
+  pass in `_sanitize_workflow`: any edge whose `from` or `to`
+  points at a sticky node is rejected. The client UI never
+  renders ports on sticky so this is normally a no-op, but it
+  matters when users import a hand-edited JSON.
+
+---
 ## [2.66.137] — 2026-05-02
 
 ### Added
