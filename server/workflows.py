@@ -75,13 +75,69 @@ _RUNS_LOCK = threading.Lock()
 # repeat-iteration boundary in the orchestrator loop.
 _CANCEL_REQUESTED: set[str] = set()
 
+# MM1 (v2.66.58) — fail-fast: registry of live subprocesses keyed by runId.
+# CLI providers register their Popen here so a sibling-node failure can
+# terminate them immediately instead of waiting for their own timeout.
+_PROC_REGISTRY: dict[str, list] = {}
+
+
+def register_proc(runId: str, proc) -> None:
+    """Add a subprocess.Popen to the run's cancel registry."""
+    if not runId or proc is None:
+        return
+    with _RUNS_LOCK:
+        _PROC_REGISTRY.setdefault(runId, []).append(proc)
+
+
+def unregister_proc(runId: str, proc) -> None:
+    if not runId or proc is None:
+        return
+    with _RUNS_LOCK:
+        bucket = _PROC_REGISTRY.get(runId) or []
+        try: bucket.remove(proc)
+        except ValueError: pass
+        if not bucket:
+            _PROC_REGISTRY.pop(runId, None)
+
+
+def _terminate_run_procs(runId: str) -> int:
+    """SIGTERM every registered subprocess for the run; SIGKILL after 2s
+    if anything is still alive. Returns count terminated."""
+    import subprocess as _sp, time as _t
+    with _RUNS_LOCK:
+        procs = list(_PROC_REGISTRY.get(runId) or [])
+    n = 0
+    for p in procs:
+        try:
+            if p.poll() is None:
+                p.terminate(); n += 1
+        except Exception:
+            pass
+    if not procs:
+        return 0
+    deadline = _t.time() + 2
+    for p in procs:
+        try:
+            timeout = max(0.05, deadline - _t.time())
+            p.wait(timeout=timeout)
+        except Exception:
+            try: p.kill()
+            except Exception: pass
+    with _RUNS_LOCK:
+        _PROC_REGISTRY.pop(runId, None)
+    return n
+
 
 def request_cancel(runId: str) -> bool:
     """Mark a run for cooperative cancellation. Returns True if the run was
-    in the live cache (i.e., probably still running)."""
+    in the live cache (i.e., probably still running). MM1 — also kills any
+    registered subprocesses immediately so sibling nodes don't keep
+    waiting for their own timeout."""
     with _RUNS_LOCK:
         _CANCEL_REQUESTED.add(runId)
-        return runId in _RUNS_CACHE
+        in_cache = runId in _RUNS_CACHE
+    _terminate_run_procs(runId)
+    return in_cache
 
 
 def _is_cancel_requested(runId: str) -> bool:
@@ -1428,7 +1484,7 @@ def _maybe_truncate_run(run: dict, full: bool) -> dict:
 
 
 def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | None = None,
-                  fallback_provider: str = "") -> dict:
+                  fallback_provider: str = "", run_id: str = "") -> dict:
     """단일 노드 실행. 동기. (subject/description + inputs) → stdout.
 
     prev_session_ids: 이 노드로 들어오는 엣지의 from 노드들의 lastRun.sessionId 리스트.
@@ -1633,6 +1689,9 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
         "allowedTools": (data.get("allowedTools") or "").strip(),
         "disallowedTools": (data.get("disallowedTools") or "").strip(),
         "resumeSessionId": resume_id,
+        # MM1 (v2.66.58) — pass through so providers can register their
+        # subprocess Popen with the run's fail-fast registry.
+        "__runId": run_id,
     }
 
     # 멀티 프로바이더 실행 — 실패 시 policy.fallbackProvider 로 1회 재시도 (v2.29.0)
@@ -2774,7 +2833,7 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
         node = node_by_id[nid]
         input_strs = _collect_inputs(nid)
         prev_sids = _collect_prev_sids(nid)
-        res = _execute_node(node, input_strs, prev_sids, fallback_provider=fallback_provider)
+        res = _execute_node(node, input_strs, prev_sids, fallback_provider=fallback_provider, run_id=runId)
         return (nid, res)
 
     for level in levels:
@@ -2902,6 +2961,13 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
                     r["finishedAt"] = int(time.time() * 1000)
                 _runs_cache_update(runId, _mark_err)
                 _persist_run(runId)  # terminal failure: flush before returning
+                # MM1 (v2.66.58) — FAIL-FAST. Kill any sibling subprocesses
+                # still running for this run so the user isn't left staring
+                # at a 1024s timer on Claude/Gemini after GPT already failed.
+                try:
+                    _terminate_run_procs(runId)
+                except Exception:
+                    pass
                 had_error = True
                 break
             else:

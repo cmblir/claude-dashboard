@@ -44,6 +44,47 @@ _CLI_SEARCH_PATHS: list[str] = [
 ]
 
 
+# MM1 (v2.66.58) — fail-fast helper. Run a subprocess with optional
+# registration in workflows._PROC_REGISTRY so a sibling-node failure
+# can SIGTERM us. Returns (returncode, stdout, stderr, cancelled).
+# `cancelled` is True iff the process exited from a signal (negative
+# returncode), i.e. our registry killed it.
+def _run_cancellable(cmd, *, cwd=None, timeout=300, run_id=""):
+    proc = None
+    try:
+        proc = subprocess.Popen(
+            cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL, text=True,
+        )
+        if run_id:
+            try:
+                from .workflows import register_proc
+                register_proc(run_id, proc)
+            except Exception:
+                pass
+        try:
+            out, err = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            try: proc.communicate(timeout=2)
+            except Exception: pass
+            return (None, "", "", False)  # caller treats None as timeout
+        finally:
+            if run_id:
+                try:
+                    from .workflows import unregister_proc
+                    unregister_proc(run_id, proc)
+                except Exception:
+                    pass
+        rc = proc.returncode
+        cancelled = rc is not None and rc < 0
+        return (rc, out, err, cancelled)
+    except FileNotFoundError as e:
+        raise
+    except Exception as e:
+        return (None, "", str(e), False)
+
+
 def _which(name: str) -> str:
     """PATH 기반 탐지 → 실패 시 통상 설치 경로 fallback."""
     found = shutil.which(name)
@@ -358,37 +399,77 @@ class ClaudeCliProvider(BaseProvider):
                 cmd += [flag, val]
 
         # FF1 (v2.66.17) — claude-cli (Anthropic backend) sporadically
-        # hangs on otherwise-valid requests; the SAME prompt+model pair
-        # has been measured at 28s OK / 180s TIMEOUT / 28s OK in three
-        # consecutive workflow runs. Mitigation: short per-attempt
-        # timeout (60s default) with up to 4 retries, killing the hung
-        # subprocess on each timeout. Successful calls return in ≈30s,
-        # so 4 attempts cap end-to-end at ~4 min for the worst case.
+        # hangs on otherwise-valid requests. Short per-attempt timeout
+        # (60s default) with up to 4 retries, killing the hung
+        # subprocess on each timeout.
+        # MM1 (v2.66.58) — fail-fast: register the live Popen with the
+        # workflow run so a sibling node failure can SIGTERM us
+        # immediately (instead of waiting our own timeout).
         per_attempt = max(45, min(timeout, 60))
         max_attempts = max(2, min(5, timeout // per_attempt))
+        run_id = (extra or {}).get("__runId") or ""
         last_err = ""
         r = None
+        cancelled = False
         for attempt in range(1, max_attempts + 1):
+            proc = None
             try:
-                r = subprocess.run(
-                    cmd, cwd=cwd_safe, capture_output=True, text=True,
-                    timeout=per_attempt,
-                    # FF1 — claude-cli (and some other CLIs) block on
-                    # stdin even with `-p`; explicitly close it so the
-                    # process never waits for tty input.
-                    stdin=subprocess.DEVNULL,
+                proc = subprocess.Popen(
+                    cmd, cwd=cwd_safe, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    stdin=subprocess.DEVNULL, text=True,
                 )
+                if run_id:
+                    try:
+                        from .workflows import register_proc, unregister_proc
+                        register_proc(run_id, proc)
+                    except Exception:
+                        pass
+                try:
+                    out, errout = proc.communicate(timeout=per_attempt)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    try: proc.communicate(timeout=2)
+                    except Exception: pass
+                    last_err = f"timeout after {per_attempt}s (attempt {attempt}/{max_attempts})"
+                    if proc.returncode is not None and proc.returncode < 0:
+                        # Negative returncode = killed by signal — treat as
+                        # external cancellation, don't retry.
+                        cancelled = True
+                        break
+                    continue
+                finally:
+                    if run_id:
+                        try:
+                            from .workflows import unregister_proc
+                            unregister_proc(run_id, proc)
+                        except Exception:
+                            pass
+                rc = proc.returncode
+                if rc is not None and rc < 0:
+                    # Killed by signal — fail-fast cancel from sibling node.
+                    cancelled = True
+                    last_err = "cancelled by sibling-node failure"
+                    break
+                # Build a fake CompletedProcess-like for the rest of the function.
+                class _R:
+                    def __init__(self, rc, stdout, stderr):
+                        self.returncode = rc; self.stdout = stdout; self.stderr = stderr
+                r = _R(rc, out, errout)
                 last_err = ""
                 break
-            except subprocess.TimeoutExpired:
-                last_err = f"timeout after {per_attempt}s (attempt {attempt}/{max_attempts})"
-                continue
             except Exception as e:
+                if proc is not None and run_id:
+                    try:
+                        from .workflows import unregister_proc
+                        unregister_proc(run_id, proc)
+                    except Exception:
+                        pass
                 last_err = str(e)
                 break
         if r is None:
             return AIResponse(
-                status="err", error=last_err or "unknown error",
+                status="err",
+                error=last_err or ("cancelled" if cancelled else "unknown error"),
                 provider=self.provider_id, duration_ms=int(time.time() * 1000) - t0,
             )
 
@@ -600,35 +681,29 @@ class GeminiCliProvider(BaseProvider):
         if model:
             cmd += ["--model", model]
 
-        try:
-            r = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=timeout,
-                cwd=cwd or None,
-                stdin=subprocess.DEVNULL,  # 인터랙티브 모드 방지
-            )
-        except subprocess.TimeoutExpired:
-            return AIResponse(
-                status="err", error=f"timeout after {timeout}s",
-                provider=self.provider_id, model=model,
-                duration_ms=int(time.time() * 1000) - t0,
-            )
-        except Exception as e:
-            return AIResponse(
-                status="err", error=str(e),
-                provider=self.provider_id, model=model,
-                duration_ms=int(time.time() * 1000) - t0,
-            )
-
+        run_id = (extra or {}).get("__runId") or ""
+        rc, stdout, stderr, cancelled = _run_cancellable(
+            cmd, cwd=cwd or None, timeout=timeout, run_id=run_id,
+        )
         duration = int(time.time() * 1000) - t0
-        if r.returncode != 0:
+        if rc is None:
             return AIResponse(
-                status="err",
-                error=(r.stderr or "").strip()[:1000] or f"exit {r.returncode}",
+                status="err", error=(stderr or "").strip()[:1000] or f"timeout after {timeout}s",
                 provider=self.provider_id, model=model, duration_ms=duration,
             )
-
+        if cancelled:
+            return AIResponse(
+                status="err", error="cancelled by sibling-node failure",
+                provider=self.provider_id, model=model, duration_ms=duration,
+            )
+        if rc != 0:
+            return AIResponse(
+                status="err",
+                error=(stderr or "").strip()[:1000] or f"exit {rc}",
+                provider=self.provider_id, model=model, duration_ms=duration,
+            )
         return AIResponse(
-            status="ok", output=(r.stdout or "").strip(),
+            status="ok", output=(stdout or "").strip(),
             provider=self.provider_id, model=model or "gemini-2.5-pro",
             duration_ms=duration,
         )
@@ -695,34 +770,29 @@ class CodexProvider(BaseProvider):
             cmd += ["-c", f'model="{model}"']
         cmd += [full_prompt]
 
-        try:
-            r = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=timeout,
-                cwd=cwd or None,
-            )
-        except subprocess.TimeoutExpired:
-            return AIResponse(
-                status="err", error=f"timeout after {timeout}s",
-                provider=self.provider_id, model=model,
-                duration_ms=int(time.time() * 1000) - t0,
-            )
-        except Exception as e:
-            return AIResponse(
-                status="err", error=str(e),
-                provider=self.provider_id, model=model,
-                duration_ms=int(time.time() * 1000) - t0,
-            )
-
+        run_id = (extra or {}).get("__runId") or ""
+        rc, stdout, stderr, cancelled = _run_cancellable(
+            cmd, cwd=cwd or None, timeout=timeout, run_id=run_id,
+        )
         duration = int(time.time() * 1000) - t0
-        if r.returncode != 0:
+        if rc is None:
             return AIResponse(
-                status="err",
-                error=(r.stderr or "").strip()[:1000] or f"exit {r.returncode}",
+                status="err", error=(stderr or "").strip()[:1000] or f"timeout after {timeout}s",
                 provider=self.provider_id, model=model, duration_ms=duration,
             )
-
+        if cancelled:
+            return AIResponse(
+                status="err", error="cancelled by sibling-node failure",
+                provider=self.provider_id, model=model, duration_ms=duration,
+            )
+        if rc != 0:
+            return AIResponse(
+                status="err",
+                error=(stderr or "").strip()[:1000] or f"exit {rc}",
+                provider=self.provider_id, model=model, duration_ms=duration,
+            )
         return AIResponse(
-            status="ok", output=(r.stdout or "").strip(),
+            status="ok", output=(stdout or "").strip(),
             provider=self.provider_id, model=model or "o4-mini",
             duration_ms=duration,
         )
