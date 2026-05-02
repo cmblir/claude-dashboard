@@ -269,6 +269,9 @@ NEW_EN: dict[str, str] = {
     # QQ38 — workflow tags
     "태그 (쉼표 구분, 최대 10개)": "Tags (comma-separated, max 10)",
     "전체": "All",
+    # QQ39 — image attach
+    "이미지": "images",
+    "이미지 붙여넣음": "image(s) pasted",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -532,4 +535,7 @@ NEW_ZH: dict[str, str] = {
     # QQ38
     "태그 (쉼표 구분, 최대 10개)": "标签（逗号分隔，最多 10 个）",
     "전체": "全部",
+    # QQ39
+    "이미지": "张图片",
+    "이미지 붙여넣음": "张图片已粘贴",
 }
