@@ -4604,6 +4604,21 @@ function _wfBindCanvas() {
         return;
       }
 
+      // LL8 (v2.66.37) — Shift + L — auto-layout (Beautify) without
+      // a fit-to-screen step. The 🎯 toolbar button does both; this
+      // shortcut just rearranges so the user keeps their current
+      // pan/zoom and sees the topology snap into place.
+      if (e.shiftKey && (e.key === 'L' || e.key === 'l') && !mod && !inInput
+          && __wf.current && (__wf.current.nodes || []).length) {
+        e.preventDefault();
+        if (typeof _wfPushUndo === 'function') _wfPushUndo();
+        if (typeof _wfBeautifyLayout === 'function') _wfBeautifyLayout();
+        if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
+        __wf.dirty = true; _wfUpdateToolbar();
+        if (typeof toast === 'function') toast(t('자동 정렬 완료'), 'ok');
+        return true;
+      }
+
       // LL7 (v2.66.36) — Cmd/Ctrl + I — toggle inspector side panel.
       // Lets the user reclaim full canvas width without reaching for
       // the toolbar 📋 button.
