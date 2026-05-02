@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.11] — 2026-05-02
+
+### Performance
+- ⚡ **Short-circuit cost walk when no spend recorded** (QQ101). The
+  QQ99/QQ100 sidebar spend calculation now checks a `sessionStorage`
+  flag (`cc.lc.hasCost`) before walking every session's history. The
+  flag is set only when a cost-bearing SSE `done` event arrives. Free
+  tier users (Ollama, unconfigured providers) see zero extra overhead;
+  paid API users get the full walk only after their first paid turn.
+
+---
 ## [2.68.10] — 2026-05-02
 
 ### Added
