@@ -26911,10 +26911,13 @@ function _lcRenderSessions() {
       ? `<span style="font-size:9px;color:#f59e0b;background:rgba(245,158,11,0.10);padding:1px 5px;border-radius:8px;font-variant-numeric:tabular-nums;" title="${t('세션 누적 비용')}">$${costSum.toFixed(costSum < 0.01 ? 4 : 3)}</span>`
       : '';
     // QQ91 (v2.68.1) — show the session's stored assignee as a tiny
-    // chip so users can see which model each session is wired to
-    // without switching to it (pairs with QQ65 per-session model).
-    const aShort = (s.assignee || '').split(':').pop().slice(0, 14);
-    const aBadge = aShort ? `<span style="font-size:9px;color:var(--text-dim);opacity:0.65;font-variant-numeric:tabular-nums;" title="${escapeHtml(s.assignee || '')}">${escapeHtml(aShort)}</span>` : '';
+    // chip. QQ104 (v2.68.14) — keep the full model spec after the
+    // FIRST colon (e.g. 'llama3.1:8b' for ollama tagged variants),
+    // only stripping the provider prefix.
+    const aFull = s.assignee || '';
+    const colonIdx = aFull.indexOf(':');
+    const aShort = (colonIdx >= 0 ? aFull.slice(colonIdx + 1) : aFull).slice(0, 14);
+    const aBadge = aShort ? `<span style="font-size:9px;color:var(--text-dim);opacity:0.65;font-variant-numeric:tabular-nums;" title="${escapeHtml(aFull)}">${escapeHtml(aShort)}</span>` : '';
     return `<div ${active?'data-active="1"':''} oncontextmenu="event.preventDefault();_lcSessionContextMenu('${s.id}', event.clientX, event.clientY);" onclick="_lcSwitchSession('${s.id}')" style="cursor:pointer;padding:8px 10px;border-radius:7px;margin:1px 2px;border:1px solid ${active ? 'rgba(217,119,87,0.5)' : 'transparent'};background:${active ? 'rgba(217,119,87,0.1)' : 'transparent'};">
       <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${active ? 'var(--accent)' : 'var(--text)'};">${pin}${escapeHtml(s.label || t('새 대화'))}</div>
       ${s.preview ? `<div style="font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dim);margin-top:2px;">${escapeHtml(s.preview)}</div>` : ''}
