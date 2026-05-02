@@ -123,3 +123,45 @@ class TestResolveAssignee:
         reg = get_registry()
         pid, _ = reg.resolve_assignee("")
         assert pid == "claude-cli"
+
+
+class TestExtractInlineImages:
+    """QQ40 → QQ43 / QQ49 / QQ55 / QQ58 — inline base64 image extraction
+    is the foundation of multimodal routing across providers + the
+    claude-cli scrubbing path. Make sure the shape stays stable."""
+
+    def test_no_image_short_circuits(self):
+        clean, imgs = ap._extract_inline_images("just a plain prompt")
+        assert clean == "just a plain prompt"
+        assert imgs == []
+
+    def test_extracts_single_image(self):
+        prompt = "Describe this:\n\n![cat](data:image/png;base64,iVBORw0KGgo)\n\nThanks."
+        clean, imgs = ap._extract_inline_images(prompt)
+        assert "data:image/" not in clean
+        assert "Describe this:" in clean
+        assert "Thanks." in clean
+        assert len(imgs) == 1
+        assert imgs[0]["mime"] == "image/png"
+        assert imgs[0]["base64"] == "iVBORw0KGgo"
+        assert imgs[0]["data_url"].startswith("data:image/png;base64,")
+
+    def test_extracts_multiple_and_strips_whitespace(self):
+        prompt = (
+            "First:\n![](data:image/jpeg;base64,AAAA  BBBB)\n"
+            "Second:\n![](data:image/webp;base64,CCCC\nDDDD)\n"
+        )
+        clean, imgs = ap._extract_inline_images(prompt)
+        assert "data:image/" not in clean
+        assert len(imgs) == 2
+        assert imgs[0]["mime"] == "image/jpeg"
+        assert imgs[0]["base64"] == "AAAABBBB"  # spaces stripped
+        assert imgs[1]["mime"] == "image/webp"
+        assert imgs[1]["base64"] == "CCCCDDDD"  # newline stripped
+
+    def test_does_not_match_non_image_data_urls(self):
+        # data:application/json shouldn't be picked up.
+        prompt = "Here is a json:\n[anchor](data:application/json;base64,eyJ4Ijoxfq==)"
+        clean, imgs = ap._extract_inline_images(prompt)
+        assert imgs == []
+        assert "data:application/json" in clean
