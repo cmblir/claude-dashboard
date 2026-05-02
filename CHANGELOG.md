@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.40] — 2026-05-02
+
+### Added
+- ⌨ **`Tab` / `Shift+Tab` cycle through nodes** (LL11). Combined
+  with arrow-key nudging this gives full keyboard-only canvas
+  navigation: Tab to land on a node, arrows to move it, Cmd+D
+  to duplicate.
+
+---
 ## [2.66.39] — 2026-05-02
 
 ### Added

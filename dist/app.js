@@ -4208,6 +4208,7 @@ function _wfShowShortcutHelp() {
     { key: 'Ctrl+F', desc: t('노드 검색 포커스') },
     { key: 'Ctrl+I', desc: t('인스펙터 패널 토글') },
     { key: 'Ctrl+M', desc: t('미니맵 토글') },
+    { key: 'Tab / Shift+Tab', desc: t('다음 / 이전 노드 선택') },
     { key: 'Ctrl+0', desc: t('화면 맞춤') },
     { key: 'Ctrl+1', desc: t('100% 줌으로 리셋') },
     { key: 'Ctrl++ / -', desc: t('줌 인/아웃') },
@@ -4624,6 +4625,26 @@ function _wfBindCanvas() {
         const si = document.getElementById('wfNodeSearch');
         if (si) { e.preventDefault(); si.focus(); return true; }
         return;
+      }
+
+      // LL11 (v2.66.40) — Tab / Shift+Tab — cycle through nodes.
+      // No-modifier shortcut (so it works without leaving the keyboard
+      // home row). Tab → next node, Shift+Tab → previous. Wraps.
+      // Skips when typing in an input.
+      if (e.key === 'Tab' && !mod && !inInput && __wf.current) {
+        const nodes = __wf.current.nodes || [];
+        if (nodes.length) {
+          e.preventDefault();
+          const ids = nodes.map(n => n.id);
+          const cur = __wf.selectedNodeId;
+          let idx = ids.indexOf(cur);
+          if (e.shiftKey) idx = (idx <= 0) ? ids.length - 1 : idx - 1;
+          else            idx = (idx < 0 || idx >= ids.length - 1) ? 0 : idx + 1;
+          __wf.selectedNodeId = ids[idx]; __wf.selectedEdgeId = null;
+          if (typeof _wfSyncSelectionClasses === 'function') _wfSyncSelectionClasses();
+          if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
+          return true;
+        }
       }
 
       // LL10 (v2.66.39) — Cmd/Ctrl + M — toggle minimap visibility.
