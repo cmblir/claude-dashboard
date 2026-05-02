@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.5] — 2026-05-02
+
+### Added
+- ⌨ **Esc clears the workflow sidebar search** (QQ95). The
+  workflow list search input now follows the same convention as
+  QQ58 (chat sidebar filter) and the existing node-search box —
+  Esc empties the field, resets `__wf.search`, and re-renders
+  the list. Consistent muscle memory across all three side
+  panels.
+
+---
 ## [2.68.4] — 2026-05-02
 
 ### Added
