@@ -3221,6 +3221,15 @@ function _wfRenderList() {
     const recentChips = lastRuns.length
       ? lastRuns.map(r => `<span title="${escapeHtml(r.status)} ${r.error?'· '+escapeHtml(r.error):''} ${r.durationMs?'· '+(r.durationMs/1000).toFixed(1)+'s':''}" style="color:${_runColor(r.status)};font-size:11px;">${_runIcon(r.status)}</span>`).join('')
       : `<span style="color:var(--text-dim);font-size:10px;">${escapeHtml(t('실행 기록 없음'))}</span>`;
+    // QQ78 (v2.67.15) — small success-rate badge from the lastRuns
+    // sample (good enough as a recency-weighted health signal).
+    let recentBadge = '';
+    if (lastRuns.length >= 3) {
+      const ok = lastRuns.filter(r => r.status === 'ok').length;
+      const pct = Math.round((ok / lastRuns.length) * 100);
+      const c = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+      recentBadge = `<span title="${t('최근')} ${lastRuns.length} ${t('회')}" style="font-size:9px;color:${c};font-variant-numeric:tabular-nums;">${pct}%</span>`;
+    }
     const runningBadge = runningCount > 0
       ? `<span class="chip chip-accent text-[9px]" style="background:rgba(59,130,246,0.25);color:#93c5fd;animation:pulse 1.5s infinite;">⏳ ${runningCount} ${t('실행 중')}</span>`
       : '';
@@ -3238,6 +3247,7 @@ function _wfRenderList() {
           ${tagChips ? `<div class="flex flex-wrap gap-1 mt-1">${tagChips}</div>` : ''}
           <div class="flex items-center gap-1.5 mt-1">
             <span class="flex gap-0.5">${recentChips}</span>
+            ${recentBadge}
             ${totalRuns > 0 ? `<span class="text-[10px]" style="color:var(--text-dim);">${totalRuns} ${t('회')}</span>` : ''}
             ${runningBadge}
           </div>
