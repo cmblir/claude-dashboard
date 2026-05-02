@@ -27040,7 +27040,8 @@ VIEWS.lazyclawChat = async () => {
       <!-- QQ14 (v2.66.89) — live char + approx token count -->
       <div id="lcChatInputStats" style="padding:0 14px 8px;font-size:10px;color:var(--text-dim);display:flex;gap:12px;justify-content:flex-end;align-items:center;">
         <!-- QQ92 (v2.68.2) — image-attach indicator -->
-        <span id="lcInputImgs" style="display:none;color:#60a5fa;">📷 <span id="lcInputImgCount">0</span></span>
+        <!-- QQ93 (v2.68.3) — clickable to clear all attached images. -->
+        <span id="lcInputImgs" style="display:none;color:#60a5fa;cursor:pointer;" title="${t('이미지 모두 제거')}" onclick="(function(){var ta=document.getElementById('lcChatInput');if(!ta)return;ta.value=ta.value.replace(/\\n*!\\[[^\\]]*\\]\\(data:image\\/[^)]+;base64,[^)]+\\)\\n*/g,'');ta.dispatchEvent(new Event('input'));toast(t('이미지 모두 제거'),'ok');})()">📷 <span id="lcInputImgCount">0</span></span>
         <span><span id="lcInputChars">0</span> ${t('자')}</span>
         <span>≈ <span id="lcInputTokens">0</span> ${t('토큰')}</span>
       </div>

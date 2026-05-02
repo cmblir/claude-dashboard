@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.3] — 2026-05-02
+
+### Added
+- 📷 **Click image counter to clear all attachments** (QQ93). The
+  QQ92 `📷 N` chip is now clickable and tooltipped "이미지 모두
+  제거". Clicking strips every `![...](data:image/...;base64,...)`
+  block from the textarea (preserving surrounding text), fires an
+  `input` event so QQ33 draft + char/token counter refresh, and
+  toasts confirmation. Useful when composing iterative attempts
+  with the wrong screenshot attached.
+
+---
 ## [2.68.2] — 2026-05-02
 
 ### Added
