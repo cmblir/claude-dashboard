@@ -71,6 +71,7 @@ NEW_EN: dict[str, str] = {
     "grid snap 우회": "Bypass grid snap",
     "더블클릭 (빈 영역)": "Double-click (empty area)",
     "미니맵 토글": "Toggle minimap",
+    "다음 / 이전 노드 선택": "Select next / previous node",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -137,4 +138,5 @@ NEW_ZH: dict[str, str] = {
     "grid snap 우회": "绕过网格对齐",
     "더블클릭 (빈 영역)": "双击（空白区域）",
     "미니맵 토글": "切换迷你地图",
+    "다음 / 이전 노드 선택": "选择下一个 / 上一个节点",
 }
