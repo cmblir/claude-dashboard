@@ -816,6 +816,10 @@ window._loadVendor = (() => {
      context but knows they will be skipped on the next run. n8n parity. */
   .wf-node.wf-disabled { opacity: 0.45; filter: grayscale(0.7); }
   .wf-node.wf-disabled .wf-node-body { stroke-dasharray: 4 3; }
+  /* QQ5 (v2.66.80) — explicit ⏸ badge in the top-right of disabled
+     nodes. Reads better than just the dashed border + grayscale. */
+  .wf-node-disabled-badge { display: none; pointer-events: none; }
+  .wf-node.wf-disabled .wf-node-disabled-badge { display: inline; }
   .wf-node[data-status="skipped"] .wf-node-body { stroke: rgba(255,255,255,0.1); stroke-dasharray: 4 4; }
   /* 회전하는 점선 외곽 링 — running 상태만 표시 */
   .wf-node-ring { stroke: #a78bfa; stroke-width: 2; stroke-dasharray: 6 6; fill: none; opacity: 0; pointer-events: none; }

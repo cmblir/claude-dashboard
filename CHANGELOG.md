@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.80] — 2026-05-02
+
+### Changed
+- ⏸ **Explicit `⏸` badge on disabled workflow nodes** (QQ5).
+  Previously the only cue was opacity + grayscale + dashed
+  border — easy to miss on dark backgrounds. Now a small
+  gray-white pill in the top-right corner shows up whenever
+  `.wf-disabled` is on the node.
+
+---
 ## [2.66.79] — 2026-05-02
 
 ### Added

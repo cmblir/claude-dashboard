@@ -4036,6 +4036,11 @@ function _wfRenderNode(n) {
     <g class="wf-node${sel}${(n.data&&n.data.disabled)?' wf-disabled':''}" data-node="${n.id}" data-type="${n.type}" transform="translate(${n.x},${n.y})">
       <rect class="wf-node-body" width="${WF_NODE_W}" height="${WF_NODE_H}" rx="12" ry="12"></rect>
       <rect class="wf-node-ring" x="-4" y="-4" width="${WF_NODE_W+8}" height="${WF_NODE_H+8}" rx="14" ry="14"></rect>
+      <!-- QQ5 — disabled badge (only shown when .wf-disabled class present) -->
+      <g class="wf-node-disabled-badge" transform="translate(${WF_NODE_W - 24}, 6)">
+        <rect width="18" height="18" rx="9" ry="9" fill="rgba(120,120,120,0.85)" stroke="rgba(255,255,255,0.45)"/>
+        <text x="9" y="13" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">⏸</text>
+      </g>
       <text class="wf-node-icon" x="14" y="30">${meta.icon}</text>
       <text class="wf-node-title" x="40" y="28">${escapeHtml(n.title || meta.label)}</text>
       <text class="wf-node-elapsed" x="${WF_NODE_W-12}" y="${WF_NODE_H-8}" text-anchor="end"></text>
