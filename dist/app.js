@@ -7029,7 +7029,14 @@ function _wfRenderSessionsPanel(forceShow) {
     ` : (isLive ? `
       <button class="btn text-[10px]" style="color:#f87171;" title="${t('이 노드의 실행 세션 종료')}" onclick="_wfTerminateNodeSession('${r.nid}','')">⏹</button>
     ` : '');
-    const errLine = r.error ? `<div style="color:#f87171;font-size:10px;margin-top:2px;">⚠ ${escapeHtml(r.error.slice(0,140))}</div>` : '';
+    // NN3 (v2.66.62) — sibling-cancelled get an amber ⏹ line, real
+    // failures keep red ⚠. Same colour cue as the run-result modal.
+    const isSiblingCancel = r.error && r.error.includes('cancelled by sibling-node failure');
+    const errLine = r.error
+      ? (isSiblingCancel
+          ? `<div style="color:#fbbf24;font-size:10px;margin-top:2px;">⏹ ${escapeHtml(t('형제 노드 실패로 자동 취소됨'))}</div>`
+          : `<div style="color:#f87171;font-size:10px;margin-top:2px;">⚠ ${escapeHtml(r.error.slice(0,140))}</div>`)
+      : '';
     return `<div style="padding:8px 10px;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:6px;">
         <span style="flex:1;font-weight:600;">${escapeHtml(r.title)}</span>
