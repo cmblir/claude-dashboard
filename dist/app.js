@@ -26645,6 +26645,9 @@ function _lcGetHistory(id) {
 }
 function _lcSaveHistory(id, msgs) {
   if (!id) return;
+  // QQ77 (v2.67.14) — drop pending placeholder entries so a tab close
+  // before the first token doesn't freeze "_…_" into saved history.
+  msgs = (msgs || []).filter(m => !(m && m.pending));
   // QQ53 (v2.66.128) — defensive bound + quota recovery.
   // localStorage caps at ~5–10 MB; QQ39 image attach can push a single
   // message past that. On QuotaExceededError, drop the oldest message
@@ -27613,9 +27616,12 @@ async function _lcChatSend() {
   // QQ76 (v2.67.13) — placeholder so the empty assistant bubble doesn't
   // look broken before the first token arrives. Cleared by the first
   // 'token' SSE event (see the streaming loop below).
+  // QQ77 (v2.67.14) — render the placeholder but don't persist it.
+  // If the user closes the tab before the stream starts, the
+  // pending bubble vanishes on next load instead of being frozen
+  // in saved history forever.
   const reply = { role: 'assistant', text: '_…_', assignee, ts: Date.now(), pending: true };
   history.push(reply);
-  _lcSaveHistory(sessionId, history);
   _lcChatRender();
   if (sendBtn) {
     sendBtn.classList.remove('btn-primary');
