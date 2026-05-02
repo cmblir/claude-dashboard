@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.33] — 2026-05-02
+
+### Added
+- ⌨ **Arrow-key node nudging** on the workflow canvas (LL4, n8n parity):
+  - `←/→/↑/↓` — move selected node by 10 px (matches the new grid step)
+  - `Shift + arrow` — fine 1 px adjust
+
+---
 ## [2.66.32] — 2026-05-02
 
 ### Added
