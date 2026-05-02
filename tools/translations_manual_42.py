@@ -233,6 +233,8 @@ NEW_EN: dict[str, str] = {
     # QQ27 — rubber-band selection
     "Shift+드래그 (빈 영역)": "Shift+drag (empty)",
     "러버밴드 다중 선택": "Rubber-band multi-select",
+    # QQ29 — multi-node copy with edges
+    "엣지": "edges",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -460,4 +462,6 @@ NEW_ZH: dict[str, str] = {
     # QQ27
     "Shift+드래그 (빈 영역)": "Shift+拖动（空白处）",
     "러버밴드 다중 선택": "框选多个节点",
+    # QQ29
+    "엣지": "条边",
 }
