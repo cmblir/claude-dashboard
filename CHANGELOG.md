@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.132] — 2026-05-02
+
+### Added
+- 📷 **Stronger drag-over cue when files are dragged in** (QQ57). The
+  composer's dashed outline turns blue (vs. the default amber) when
+  the drag payload contains files, signalling that image / text
+  attach is wired and ready. Subtle cue but pairs with QQ39 paste/
+  drop to reduce "did anything happen?" hesitation.
+
+### Verified
+- ✅ Full pytest suite: **429 passed**, 2 pre-existing fails in
+  `tests/test_provider_error_passthrough.py` (legacy assertions
+  obsoleted by the FF1 fallback chain). No regression caused by
+  the QQ18 → QQ57 changes.
+
+---
 ## [2.66.131] — 2026-05-02
 
 ### Fixed
