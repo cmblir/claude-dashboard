@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.44] — 2026-05-02
+
+### Added
+- 🛡 **beforeunload guard for unsaved workflow changes** (LL15,
+  n8n parity). When the workflow has dirty edits and the user
+  reloads or closes the tab, the browser shows its native
+  "Changes you made may not be saved" prompt. Saving (Cmd+S)
+  clears the dirty flag and the prompt is skipped on next exit.
+
+---
 ## [2.66.43] — 2026-05-02
 
 ### Added

@@ -1002,6 +1002,24 @@ function _tabHistoryForward() {
   go(_tabHistory[_tabHistoryIdx]);
   _tabNavigating = false;
 }
+// LL15 (v2.66.44) — beforeunload guard for unsaved workflow changes
+// (n8n parity). When __wf.dirty is true on a non-Workflows tab transit
+// or browser close, the browser shows its native "leave this page?"
+// prompt. Returning undefined / no value lets navigation proceed
+// silently — only true dirty state triggers the dialog.
+window.addEventListener('beforeunload', (e) => {
+  try {
+    if (typeof __wf !== 'undefined' && __wf && __wf.dirty) {
+      e.preventDefault();
+      // Most browsers ignore the custom string but show their default
+      // "Changes you made may not be saved" dialog when returnValue
+      // is set to a non-empty value.
+      e.returnValue = '';
+      return '';
+    }
+  } catch (_) {}
+});
+
 window.addEventListener('hashchange', () => {
   const h = location.hash.replace(/^#\//, '') || 'overview';
   if (h !== state.view) {
