@@ -7373,11 +7373,17 @@ function _wfApplyRunStatus(run) {
     .sort().join('|');
   const changed = sig !== __wf._lastResultsSig;
   __wf._lastResultsSig = sig;
-  // QQ47 (v2.66.122) — inspector now hosts the per-node Gantt (QQ46),
-  // so it must refresh when run results change.
+  // QQ47 (v2.66.122) — inspector hosts the per-node Gantt (QQ46), so
+  // we mark it dirty whenever results change. QQ48 (v2.66.123) — and
+  // throttle the actual render to ≤4 fps so a fast SSE burst doesn't
+  // re-rebuild the entire inspector HTML on every tick.
   if (changed) {
     __wf._inspectorDirty = true;
-    if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
+    const now = Date.now();
+    if (!__wf._inspRenderAt || now - __wf._inspRenderAt > 250) {
+      __wf._inspRenderAt = now;
+      if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
+    }
   }
   // Cache node element map once per canvas render (built at _wfRenderCanvas)
   // so we skip the querySelectorAll on every tick. Lazy-build if missing.
