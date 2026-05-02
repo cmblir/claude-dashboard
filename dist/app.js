@@ -27031,6 +27031,41 @@ AFTER.lazyclawChat = () => {
   if (ta) {
     ta.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _lcChatSend(); return; }
+      // QQ62 (v2.66.137) — Tab autocomplete for slash commands. Triggers
+      // only when the line starts with / and the cursor is on the same
+      // line. Cycles through matches on repeated Tab.
+      if (e.key === 'Tab' && !e.shiftKey) {
+        const v = ta.value || '';
+        const caret = ta.selectionStart || 0;
+        // Find the start of the current line.
+        const lineStart = v.lastIndexOf('\n', Math.max(0, caret - 1)) + 1;
+        const line = v.slice(lineStart, caret);
+        if (line.startsWith('/')) {
+          const cmds = ['clear', 'system', 'model', 'export', 'help'];
+          // Use a stored "seed partial" so repeated Tab cycles through
+          // matches based on the original prefix, not the auto-completed one.
+          const cur = window.__lcTabCycle;
+          let seed;
+          if (cur && cur.line === line) {
+            seed = cur.seed;
+          } else {
+            seed = line.slice(1);
+            window.__lcTabCycle = { seed, line, idx: -1 };
+          }
+          const matches = cmds.filter(c => c.startsWith(seed));
+          if (!matches.length) return;
+          e.preventDefault();
+          window.__lcTabCycle.idx = (window.__lcTabCycle.idx + 1) % matches.length;
+          const insert = '/' + matches[window.__lcTabCycle.idx];
+          ta.value = v.slice(0, lineStart) + insert + v.slice(caret);
+          ta.selectionStart = ta.selectionEnd = lineStart + insert.length;
+          window.__lcTabCycle.line = insert;  // track so next Tab keeps cycling
+          ta.dispatchEvent(new Event('input'));
+          return;
+        } else {
+          window.__lcTabCycle = null;
+        }
+      }
       // QQ51 (v2.66.126) — Cmd/Ctrl+Up = recall previous user message
       // (shell-history style). Cmd/Ctrl+Down = clear / advance draft.
       const mod = e.ctrlKey || e.metaKey;
