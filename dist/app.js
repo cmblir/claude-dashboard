@@ -4604,6 +4604,15 @@ function _wfBindCanvas() {
         return;
       }
 
+      // LL7 (v2.66.36) — Cmd/Ctrl + I — toggle inspector side panel.
+      // Lets the user reclaim full canvas width without reaching for
+      // the toolbar 📋 button.
+      if (mod && (e.key === 'i' || e.key === 'I') && !inInput) {
+        e.preventDefault();
+        if (typeof _wfToggleInspector === 'function') _wfToggleInspector();
+        return true;
+      }
+
       // LL6 (v2.66.35) — Cmd/Ctrl + A — select all nodes (multi-select).
       // Subsequent Cmd+C / Delete / arrow keys operate on the whole set
       // when __wfMultiSelected has entries.

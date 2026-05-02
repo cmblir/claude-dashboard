@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.36] — 2026-05-02
+
+### Added
+- 📋 **`Cmd/Ctrl + I` toggles the inspector side panel** (LL7). Lets
+  the user reclaim full canvas width without reaching for the toolbar
+  button.
+
+---
 ## [2.66.35] — 2026-05-02
 
 ### Added
