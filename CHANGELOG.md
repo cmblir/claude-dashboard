@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.10] — 2026-05-02
+
+### Added
+- 📌❌ **Status icons in inspector mini Gantt rows** (QQ73). Each
+  duration row now shows a `📌` prefix when the result was a pinned
+  cache hit (QQ20) or `❌` when the node errored, alongside the
+  existing color coding. Faster scan for what was actually re-run
+  vs. served from cache vs. failed.
+
+### Verified
+- ✅ Full pytest suite (excluding pre-existing FF1-obsoleted tests):
+  **437 passed, 0 failed** after QQ18 → QQ73.
+
+---
 ## [2.67.9] — 2026-05-02
 
 ### Verified

@@ -5990,7 +5990,8 @@ function _wfRenderInspector(opts) {
               const pct = Math.round(((x.r.durationMs||0) / max) * 100);
               const isErr = x.r.status === 'err' || x.r.error;
               const c = isErr ? '#f87171' : (x.r.pinned ? '#f59e0b' : '#60a5fa');
-              const label = (x.n && (x.n.title || x.n.type)) || x.id;
+              const baseLabel = (x.n && (x.n.title || x.n.type)) || x.id;
+              const label = (x.r.pinned ? '📌 ' : (isErr ? '❌ ' : '')) + baseLabel;
               return `
                 <div onclick="__wf.selectedNodeId='${x.id}';__wf._inspectorDirty=true;_wfRenderInspector();_wfSyncSelectionClasses();" style="cursor:pointer;">
                   <div class="flex justify-between items-center text-[10px]" style="color:var(--text-mute);">
