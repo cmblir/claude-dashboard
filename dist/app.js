@@ -27968,7 +27968,16 @@ window._lcChatExport = function () {
   const lines = [`# ${title}`, '', `_${new Date().toISOString()}_`, '', `**Model:** ${assignee}`, ''];
   for (const m of history) {
     const role = m.role === 'user' ? '### 🧑 You' : `### 🤖 ${m.assignee || assignee}`;
-    lines.push(role, '', m.text || '');
+    // QQ75 (v2.67.12) — strip embedded base64 images on export so the
+    // .md file stays human-sized. Replace with an `![alt (image, NkB)]`
+    // placeholder that preserves the alt text for context.
+    let body = m.text || '';
+    body = body.replace(/!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g, (_full, alt, dataUrl) => {
+      const approxBytes = Math.floor(dataUrl.length * 0.75);
+      const sizeLabel = approxBytes >= 1024 ? Math.round(approxBytes / 1024) + 'KB' : approxBytes + 'B';
+      return `_![${alt || 'image'} (${sizeLabel})]_`;
+    });
+    lines.push(role, '', body);
     if (m.meta) lines.push('', `> ${m.meta}`);
     lines.push('');
   }
