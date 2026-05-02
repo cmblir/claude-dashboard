@@ -28,6 +28,17 @@ NEW_EN: dict[str, str] = {
     "실행 취소 요청됨": "Cancel requested",
     "중단": "Stop",
     "(아직 실행 결과 없음 — 워크플로우를 실행하면 여기에 표시됨)": "(no run output yet — execute the workflow to populate this)",
+    # DD (v2.66.15) — sessions panel + cancel button labels
+    "실행 중단": "Stop run",
+    "현재 워크플로우 실행을 안전하게 중단합니다 (진행 중인 노드는 마무리)": "Cancel the current workflow run safely (in-flight nodes finish their level)",
+    "워크플로우 실행 중단": "Stop workflow run",
+    "실행 중·완료된 노드 세션 목록 (sessionId, 이어쓰기, 보기)": "List of running and finished node sessions (session id, resume, view)",
+    "실행 세션": "Run sessions",
+    "세션 없음": "No session",
+    "Session ID 복사": "Copy session ID",
+    "인라인 터미널 보기": "View inline terminal",
+    "아직 실행된 노드가 없습니다": "No nodes have run yet",
+    "건너뜀": "Skipped",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -51,4 +62,15 @@ NEW_ZH: dict[str, str] = {
     "실행 취소 요청됨": "已请求取消",
     "중단": "停止",
     "(아직 실행 결과 없음 — 워크플로우를 실행하면 여기에 표시됨)": "(尚无运行结果 — 执行工作流后将显示在此)",
+    # DD (v2.66.15)
+    "실행 중단": "停止运行",
+    "현재 워크플로우 실행을 안전하게 중단합니다 (진행 중인 노드는 마무리)": "安全停止当前工作流运行（进行中的节点将完成当前层级）",
+    "워크플로우 실행 중단": "停止工作流运行",
+    "실행 중·완료된 노드 세션 목록 (sessionId, 이어쓰기, 보기)": "运行中和已完成节点的会话列表（sessionId、续接、查看）",
+    "실행 세션": "运行会话",
+    "세션 없음": "无会话",
+    "Session ID 복사": "复制会话 ID",
+    "인라인 터미널 보기": "查看内嵌终端",
+    "아직 실행된 노드가 없습니다": "尚未执行任何节点",
+    "건너뜀": "已跳过",
 }

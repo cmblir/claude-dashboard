@@ -10,6 +10,31 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.15] — 2026-05-02
+
+### Added
+- 🪟 **Active sessions panel** on the workflow tab. Floating card lists
+  every node that has run (or is running) with its assignee, status,
+  short session id, and per-row actions: open inline mac-style viewer,
+  copy session id, paste into another node's resume field. Toolbar
+  badge shows live/total session count and turns red while ≥1 node is
+  in flight. (DD2)
+
+### Changed
+- 🛑 **Stop button label clarified**: `■ 중단` → `■ 실행 중단` with a
+  tooltip that explains in-flight nodes finish their current level
+  before the run terminates. (DD1)
+
+### Performance
+- 🚀 **Workflow tab tick cost cut significantly**. The inspector
+  side-panel was being rebuilt on every SSE/poll tick (every 0.5–1.2 s)
+  even when nothing the user could see had changed. Now diffed against a
+  per-selected-node signature (`status:startedAt:finishedAt`) so the
+  panel only re-renders when the selected node's state actually moves.
+  Same gating applied to the minimap repaint. The sessions panel skips
+  innerHTML rebuild when its row signature is unchanged. (DD3)
+
+---
 ## [2.66.14] — 2026-05-02
 
 ### Fixed
