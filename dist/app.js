@@ -4597,13 +4597,22 @@ function _wfBindCanvas() {
     const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
     const isZoom = e.ctrlKey || e.metaKey;
     if (isZoom) {
+      // KK1 (v2.66.28) — pinch-zoom dampening. Trackpad pinch on
+      // macOS emits a stream of `ctrlKey + wheel` with very small
+      // deltaY values; the user perceives this as "the canvas keeps
+      // zooming out by itself". Two-step mitigation:
+      //   1. Drop sub-noise events (|deltaY| < 1.5) entirely.
+      //   2. Halve sensitivity (0.0015 → 0.0008 per delta unit) so
+      //      a deliberate pinch still works but stray contact doesn't
+      //      visibly move zoom.
+      // Lower bound on zoom raised 0.3 → 0.5 — at 0.3 the canvas
+      // becomes unusable and recovery requires Cmd+0.
+      if (Math.abs(e.deltaY) < 1.5) return;
       const rect = svg.getBoundingClientRect();
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
-      // exponential factor proportional to deltaY (smooth on trackpads)
-      const factor = Math.exp(-e.deltaY * 0.0015);
-      const newZoom = Math.max(0.3, Math.min(2.5, (view.zoom || 1) * factor));
-      // anchor zoom around the cursor
+      const factor = Math.exp(-e.deltaY * 0.0008);
+      const newZoom = Math.max(0.5, Math.min(2.5, (view.zoom || 1) * factor));
       const z0 = view.zoom || 1;
       const wx = (cx - (view.panX || 0)) / z0;
       const wy = (cy - (view.panY || 0)) / z0;

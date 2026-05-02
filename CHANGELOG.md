@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.28] — 2026-05-02
+
+### Fixed
+- 🤏 **Trackpad pinch-zoom dampening** (KK1). macOS reports trackpad
+  pinches as a high-frequency stream of `ctrlKey + wheel` events with
+  very small `deltaY`, which the user perceives as "the canvas keeps
+  zooming out by itself". Three fixes:
+  1. **Drop sub-noise events** — `|deltaY| < 1.5` is ignored entirely.
+  2. **Halve zoom sensitivity** — `0.0015 → 0.0008` per delta unit.
+     A deliberate pinch still zooms; stray contact doesn't visibly
+     move the view.
+  3. **Raise minimum zoom** — `0.3 → 0.5`. Below 0.5 the canvas was
+     unusable and required `Cmd+0` to recover.
+
+---
 ## [2.66.27] — 2026-05-02
 
 ### Added
