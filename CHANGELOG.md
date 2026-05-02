@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.23] — 2026-05-02
+
+### Added
+- 📌 **Active session auto-scrolls into view** (QQ86). After
+  `_lcRenderSessions()` repaints, the active row (marked
+  `data-active="1"`) checks its bounding rect against the list
+  scroll container; if it's off-screen, `scrollIntoView({block:
+  'nearest'})` fires. Most useful after QQ50 keyboard nav
+  (Cmd+Shift+[/]) in a long sidebar list — the new active row
+  is always visible without manual scrolling.
+
+---
 ## [2.67.22] — 2026-05-02
 
 ### Fixed
