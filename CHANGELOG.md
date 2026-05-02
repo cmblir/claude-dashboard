@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.47] — 2026-05-02
+
+### Fixed
+- 🔢 **Zoom-cluster label syncs with the actual viewport** on
+  canvas mount and after fit-to-screen (LL18). Was hardcoded to
+  100%; now reflects real zoom (e.g. 78% after a fit on a wide
+  workflow).
+
+---
 ## [2.66.46] — 2026-05-02
 
 ### Added

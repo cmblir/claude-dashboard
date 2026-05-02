@@ -4150,6 +4150,7 @@ function _wfFitView() {
   if (vp) vp.setAttribute('transform', `translate(${panX},${panY}) scale(${zoom})`);
   _wfSchedulePatch();
   _wfUpdateToolbar();
+  if (typeof _wfUpdateZoomLabel === 'function') _wfUpdateZoomLabel();
   toast(t('자동 정렬 + 화면 맞춤'), 'ok');
 }
 
@@ -4375,6 +4376,10 @@ function _wfBindCanvas() {
       if (cvs) cvs.style.display = 'none';
     }
   } catch (_) {}
+  // LL18 (v2.66.47) — sync zoom-cluster label with the actual viewport
+  // on first canvas mount. Without this, the label reads "100%" even
+  // when the workflow opens at a fit-to-screen zoom of, say, 0.78.
+  if (typeof _wfUpdateZoomLabel === 'function') _wfUpdateZoomLabel();
 
   // 좌표 변환 — 스크린 좌표를 SVG 뷰포트 좌표(팬/줌 적용 후)로
   function svgPt(evt) {
