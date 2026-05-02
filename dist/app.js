@@ -27149,6 +27149,9 @@ AFTER.lazyclawChat = () => {
           // Place cursor at end after recall.
           setTimeout(() => { ta.selectionStart = ta.selectionEnd = ta.value.length; }, 0);
         }
+        // QQ85 — flag the dispatched 'input' as a recall side-effect
+        // so the QQ85 reset listener doesn't clobber __lcHistIdx.
+        window.__lcHistRecallTick = true;
         ta.dispatchEvent(new Event('input'));
       }
     });
@@ -27164,6 +27167,14 @@ AFTER.lazyclawChat = () => {
         ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
       }
     } catch (_) {}
+    // QQ85 (v2.67.22) — reset the QQ51 history-recall cursor when
+    // the user types something (shell-style). Skip when the input
+    // event was synthesized by the recall handler itself, which
+    // sets a one-shot guard flag.
+    ta.addEventListener('input', () => {
+      if (window.__lcHistRecallTick) { window.__lcHistRecallTick = false; return; }
+      window.__lcHistIdx = -1;
+    });
     // Auto-resize textarea + QQ14 (v2.66.89) live char/token counter.
     ta.addEventListener('input', () => {
       ta.style.height = 'auto';
