@@ -7373,6 +7373,12 @@ function _wfApplyRunStatus(run) {
     .sort().join('|');
   const changed = sig !== __wf._lastResultsSig;
   __wf._lastResultsSig = sig;
+  // QQ47 (v2.66.122) — inspector now hosts the per-node Gantt (QQ46),
+  // so it must refresh when run results change.
+  if (changed) {
+    __wf._inspectorDirty = true;
+    if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
+  }
   // Cache node element map once per canvas render (built at _wfRenderCanvas)
   // so we skip the querySelectorAll on every tick. Lazy-build if missing.
   if (!__wf._nodeElsMap) {
