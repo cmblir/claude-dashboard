@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.124] — 2026-05-02
+
+### Fixed
+- 🛡 **Strip base64 images from claude-cli prompts** (QQ49). claude-
+  cli's `-p` flag is text-only — passing a multi-MB base64 blob via
+  argv was either truncated by the OS or hallucinated about. The
+  prompt is now scrubbed before invocation in both
+  `ClaudeCliProvider.execute()` and the lazyclaw chat SSE relay
+  (`actions.py::handle_lazyclaw_chat_stream`); the model receives a
+  short note saying an image was attached and to switch to
+  claude-api or a vision-capable assignee. Pairs with the QQ44
+  client-side soft warning.
+
+---
 ## [2.66.123] — 2026-05-02
 
 ### Performance

@@ -235,6 +235,17 @@ def handle_lazyclaw_chat_stream(handler: "Handler", body: dict) -> None:
     else:
         prompt = message
 
+    # QQ49 (v2.66.124) — claude-cli is text-only on -p; strip embedded
+    # base64 image data URLs so we don't ship multi-MB blobs over argv.
+    if "data:image/" in prompt:
+        try:
+            from .ai_providers import _extract_inline_images
+            cleaned, _imgs = _extract_inline_images(prompt)
+            if _imgs:
+                prompt = (cleaned + "\n\n[image attached — claude-cli has no vision; switch to claude-api or a vision model]").strip()
+        except Exception:
+            pass
+
     # Resolve model: assignee 'claude:opus' → 'opus' alias for the CLI.
     model_alias = ""
     if ":" in assignee:
