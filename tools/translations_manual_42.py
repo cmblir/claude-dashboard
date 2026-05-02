@@ -138,6 +138,9 @@ NEW_EN: dict[str, str] = {
     "선택 노드 비활성화 / 활성화": "Toggle disable on selected node",
     "비활성화 (D)": "Disable (D)",
     "비활성": "Disable",
+    # PP4
+    "노드 타임아웃 (서버 기본값 사용 = 0)": "Node timeout (0 = use server default)",
+    "0 = 서버 기본 (180s) · 30~600초 사이로 조절. 짧으면 빨리 fail, 길면 hang 인내.": "0 = server default (180s). 30–600s; shorter fails fast, longer tolerates hangs.",
     # NN1
     "형제 노드 실패로 자동 취소됨": "Auto-cancelled because a sibling node failed",
     "자동 취소됨": "auto-cancelled",
@@ -279,6 +282,9 @@ NEW_ZH: dict[str, str] = {
     "선택 노드 비활성화 / 활성화": "切换所选节点的禁用",
     "비활성화 (D)": "禁用 (D)",
     "비활성": "禁用",
+    # PP4
+    "노드 타임아웃 (서버 기본값 사용 = 0)": "节点超时（0 = 使用服务器默认）",
+    "0 = 서버 기본 (180s) · 30~600초 사이로 조절. 짧으면 빨리 fail, 길면 hang 인내.": "0 = 服务器默认 (180s)。30~600s 之间。较短快速失败，较长容忍挂起。",
     # NN1
     "형제 노드 실패로 자동 취소됨": "因同级节点失败而自动取消",
     "자동 취소됨": "自动取消",

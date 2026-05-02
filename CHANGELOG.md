@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.74] — 2026-05-02
+
+### Added
+- ⏱ **Per-workflow node timeout** override (PP4). Slider in
+  the inspector's policy section adjusts `policy.nodeTimeout`
+  (0–600 s; 0 = server default, currently 180 s). Plumbed
+  through `_run_one_iteration → _execute_node → execute_with_assignee`.
+  Useful for graphs with quick OpenAI/Gemini API calls (drop
+  to 60 s for snappier fail-fast) or for graphs that legitimately
+  need long Claude reasoning (raise to 600 s).
+
+---
 ## [2.66.73] — 2026-05-02
 
 ### Changed

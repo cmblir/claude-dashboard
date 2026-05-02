@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 from .logger import log
 
@@ -247,6 +247,40 @@ class BaseProvider(ABC):
             error=f"provider '{self.provider_id}' does not support embeddings",
             provider=self.provider_id,
         )
+
+    def execute_stream(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str = "",
+        model: str = "",
+        cwd: str = "",
+        timeout: int = 300,
+        extra: dict | None = None,
+        messages: "list[dict] | None" = None,
+    ) -> "Iterator[dict]":
+        """Stream tokens. Yields dicts:
+          {"type": "token", "text": "..."}
+          {"type": "done", "ok": bool, "error": "", "provider": ..., "model": ...,
+           "tokensIn": int, "tokensOut": int, "durationMs": int, "costUsd": float}
+          {"type": "error", "error": "..."} (fatal, no done follows)
+
+        Default fallback: runs execute() synchronously and yields full text as one token.
+        """
+        r = self.execute(prompt, system_prompt=system_prompt, model=model, cwd=cwd, timeout=timeout, extra=extra)
+        if r.status == "ok" and r.output:
+            yield {"type": "token", "text": r.output}
+        yield {
+            "type": "done",
+            "ok": r.status == "ok",
+            "error": r.error or "",
+            "provider": r.provider or self.provider_id,
+            "model": r.model or model,
+            "tokensIn": r.tokens_in or 0,
+            "tokensOut": r.tokens_out or 0,
+            "durationMs": r.duration_ms or 0,
+            "costUsd": r.cost_usd or 0.0,
+        }
 
     def supports(self, cap: str) -> bool:
         """이 프로바이더가 특정 capability 를 지원하는지."""
@@ -1106,6 +1140,100 @@ class OpenAIApiProvider(BaseProvider):
             cost_usd=cost, duration_ms=duration, raw=data,
         )
 
+    def execute_stream(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str = "",
+        model: str = "",
+        cwd: str = "",
+        timeout: int = 300,
+        extra: dict | None = None,
+        messages: "list[dict] | None" = None,
+    ) -> Iterator[dict]:
+        import urllib.request
+        import urllib.error
+
+        t0 = int(time.time() * 1000)
+        if not self._api_key:
+            yield {"type": "error", "error": "OPENAI_API_KEY not set"}
+            return
+
+        model = model or "gpt-4.1-mini"
+
+        # Build messages array; caller may pass pre-built conversation list.
+        if messages is None:
+            msgs: list[dict] = []
+            if system_prompt:
+                msgs.append({"role": "system", "content": system_prompt})
+            msgs.append({"role": "user", "content": prompt})
+        else:
+            msgs = list(messages)
+            if system_prompt and (not msgs or msgs[0].get("role") != "system"):
+                msgs.insert(0, {"role": "system", "content": system_prompt})
+
+        body = json.dumps({
+            "model": model,
+            "messages": msgs,
+            "max_tokens": int((extra or {}).get("max_tokens", 4096)),
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._api_key}",
+            },
+        )
+
+        tokens_in = tokens_out = 0
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                for raw_line in resp:
+                    line = raw_line.decode("utf-8").rstrip("\r\n")
+                    if not line.startswith("data: "):
+                        continue
+                    payload = line[6:]
+                    if payload == "[DONE]":
+                        break
+                    try:
+                        obj = json.loads(payload)
+                    except Exception:
+                        continue
+                    choices = obj.get("choices") or []
+                    if choices:
+                        delta = choices[0].get("delta") or {}
+                        text = delta.get("content") or ""
+                        if text:
+                            yield {"type": "token", "text": text}
+                    usage = obj.get("usage")
+                    if usage:
+                        tokens_in = usage.get("prompt_tokens", tokens_in)
+                        tokens_out = usage.get("completion_tokens", tokens_out)
+        except urllib.error.HTTPError as e:
+            err = ""
+            try:
+                err = e.read().decode("utf-8")[:300]
+            except Exception:
+                pass
+            yield {"type": "error", "error": f"HTTP {e.code}: {err}"}
+            return
+        except Exception as exc:
+            yield {"type": "error", "error": str(exc)}
+            return
+
+        cost = self.estimate_cost(model, tokens_in, tokens_out)
+        yield {
+            "type": "done", "ok": True, "error": "",
+            "provider": self.provider_id, "model": model,
+            "tokensIn": tokens_in, "tokensOut": tokens_out,
+            "durationMs": int(time.time() * 1000) - t0,
+            "costUsd": cost,
+        }
+
     def embed(
         self,
         texts: list[str],
@@ -1559,6 +1687,103 @@ class AnthropicApiProvider(BaseProvider):
             cost_usd=cost, duration_ms=duration, raw=data,
         )
 
+    def execute_stream(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str = "",
+        model: str = "",
+        cwd: str = "",
+        timeout: int = 300,
+        extra: dict | None = None,
+        messages: "list[dict] | None" = None,
+    ) -> Iterator[dict]:
+        import urllib.request
+        import urllib.error
+
+        t0 = int(time.time() * 1000)
+        if not self._api_key:
+            yield {"type": "error", "error": "ANTHROPIC_API_KEY not set"}
+            return
+
+        resolved = ClaudeCliProvider._ALIASES.get((model or "").lower(), model) or "claude-sonnet-4-6"
+
+        # Build messages array.
+        if messages is None:
+            msgs: list[dict] = [{"role": "user", "content": prompt}]
+        else:
+            msgs = list(messages)
+
+        body_obj: dict = {
+            "model": resolved,
+            "max_tokens": int((extra or {}).get("max_tokens", 4096)),
+            "messages": msgs,
+            "stream": True,
+        }
+        if system_prompt:
+            body_obj["system"] = system_prompt
+
+        body = json.dumps(body_obj).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": self._api_key,
+                "anthropic-version": "2023-06-01",
+            },
+        )
+
+        tokens_in = tokens_out = 0
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                event_type = ""
+                for raw_line in resp:
+                    line = raw_line.decode("utf-8").rstrip("\r\n")
+                    if line.startswith("event: "):
+                        event_type = line[7:].strip()
+                        continue
+                    if not line.startswith("data: "):
+                        continue
+                    payload = line[6:]
+                    try:
+                        obj = json.loads(payload)
+                    except Exception:
+                        continue
+                    etype = obj.get("type", event_type)
+                    if etype == "content_block_delta":
+                        delta = obj.get("delta") or {}
+                        if delta.get("type") == "text_delta":
+                            text = delta.get("text") or ""
+                            if text:
+                                yield {"type": "token", "text": text}
+                    elif etype == "message_start":
+                        usage = (obj.get("message") or {}).get("usage") or {}
+                        tokens_in = usage.get("input_tokens", tokens_in)
+                    elif etype == "message_delta":
+                        usage = obj.get("usage") or {}
+                        tokens_out = usage.get("output_tokens", tokens_out)
+        except urllib.error.HTTPError as e:
+            err = ""
+            try:
+                err = e.read().decode("utf-8")[:300]
+            except Exception:
+                pass
+            yield {"type": "error", "error": f"HTTP {e.code}: {err}"}
+            return
+        except Exception as exc:
+            yield {"type": "error", "error": str(exc)}
+            return
+
+        cost = self.estimate_cost(resolved, tokens_in, tokens_out)
+        yield {
+            "type": "done", "ok": True, "error": "",
+            "provider": self.provider_id, "model": resolved,
+            "tokensIn": tokens_in, "tokensOut": tokens_out,
+            "durationMs": int(time.time() * 1000) - t0,
+            "costUsd": cost,
+        }
+
 
 class OllamaApiProvider(BaseProvider):
     """Ollama HTTP API — CLI 대신 REST API 직접 호출 (원격 서버 지원).
@@ -1681,6 +1906,67 @@ class OllamaApiProvider(BaseProvider):
             tokens_in=ti, tokens_out=to_, tokens_total=ti + to_,
             duration_ms=duration, raw=data,
         )
+
+    def execute_stream(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str = "",
+        model: str = "",
+        cwd: str = "",
+        timeout: int = 300,
+        extra: dict | None = None,
+        messages: "list[dict] | None" = None,
+    ) -> Iterator[dict]:
+        import urllib.request
+        import urllib.error
+
+        t0 = int(time.time() * 1000)
+        if not model:
+            models = self.list_models()
+            chat_models = [m for m in models if CAP_EMBED not in (m.capabilities or [])]
+            model = chat_models[0].id if chat_models else (models[0].id if models else "llama3.1")
+
+        body_obj: dict = {"model": model, "prompt": prompt, "stream": True}
+        if system_prompt:
+            body_obj["system"] = system_prompt
+
+        body = json.dumps(body_obj).encode("utf-8")
+        req = urllib.request.Request(
+            f"{self._base_url}/api/generate",
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+
+        tokens_in = tokens_out = 0
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                for raw_line in resp:
+                    line = raw_line.decode("utf-8").strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except Exception:
+                        continue
+                    text = obj.get("response") or ""
+                    if text:
+                        yield {"type": "token", "text": text}
+                    if obj.get("done"):
+                        tokens_in = obj.get("prompt_eval_count", 0)
+                        tokens_out = obj.get("eval_count", 0)
+                        break
+        except Exception as exc:
+            yield {"type": "error", "error": str(exc)}
+            return
+
+        yield {
+            "type": "done", "ok": True, "error": "",
+            "provider": self.provider_id, "model": model,
+            "tokensIn": tokens_in, "tokensOut": tokens_out,
+            "durationMs": int(time.time() * 1000) - t0,
+            "costUsd": 0.0,
+        }
 
     def embed(
         self,
@@ -2213,6 +2499,38 @@ def embed_with_provider(
     if not p.supports(CAP_EMBED):
         return EmbeddingResponse(status="err", error=f"provider '{provider_id}' does not support embeddings")
     return p.embed(texts, model=model, timeout=timeout)
+
+
+def execute_stream_with_assignee(
+    assignee: str,
+    prompt: str,
+    *,
+    system_prompt: str = "",
+    cwd: str = "",
+    timeout: int = 300,
+    extra: dict | None = None,
+    messages: "list[dict] | None" = None,
+) -> "Iterator[dict]":
+    """Like execute_with_assignee but streams tokens via execute_stream().
+
+    assignee: "openai:gpt-4.1-mini", "anthropic:claude-sonnet-4-6", "ollama:llama3.1", ...
+    Yields {"type":"token","text":"..."} ... {"type":"done",...} or {"type":"error",...}.
+    """
+    reg = get_registry()
+    pid, model = reg.resolve_assignee(assignee)
+    p = reg.get(pid)
+    if not p:
+        yield {"type": "error", "error": f"provider not found: {pid}"}
+        return
+    yield from p.execute_stream(
+        prompt,
+        system_prompt=system_prompt,
+        model=model,
+        cwd=cwd,
+        timeout=timeout,
+        extra=extra,
+        messages=messages,
+    )
 
 
 def list_providers_by_capability(cap: str) -> list[dict]:

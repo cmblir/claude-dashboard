@@ -910,10 +910,18 @@ def _sanitize_policy(raw: Any) -> dict:
     fb = (raw.get("fallbackProvider") or "").strip()
     if fb not in _FALLBACK_PROVIDERS:
         fb = ""
+    # PP4 (v2.66.74) — per-workflow node timeout override.
+    try:
+        nt = int(raw.get("nodeTimeout") or 0)
+    except Exception:
+        nt = 0
+    if nt:
+        nt = max(30, min(1800, nt))
     return {
         "tokenBudgetTotal": budget,
         "onBudgetExceeded": on_exc,
         "fallbackProvider": fb,
+        "nodeTimeout": nt,
     }
 
 
@@ -1514,7 +1522,8 @@ def _maybe_truncate_run(run: dict, full: bool) -> dict:
 
 
 def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | None = None,
-                  fallback_provider: str = "", run_id: str = "") -> dict:
+                  fallback_provider: str = "", run_id: str = "",
+                  node_timeout: int = 0) -> dict:
     """단일 노드 실행. 동기. (subject/description + inputs) → stdout.
 
     prev_session_ids: 이 노드로 들어오는 엣지의 from 노드들의 lastRun.sessionId 리스트.
@@ -1767,7 +1776,7 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
                 prompt,
                 system_prompt=sys_prompt,
                 cwd=cwd_safe,
-                timeout=_DEFAULT_NODE_TIMEOUT,
+                timeout=node_timeout or _DEFAULT_NODE_TIMEOUT,
                 extra=extra,
                 fallback=True,
             )
@@ -1777,7 +1786,7 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
                 prompt,
                 system_prompt=sys_prompt,
                 cwd=cwd_safe,
-                timeout=_DEFAULT_NODE_TIMEOUT,
+                timeout=node_timeout or _DEFAULT_NODE_TIMEOUT,
                 extra=extra,
                 fallback=True,
             )
@@ -1789,7 +1798,7 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
                     prompt,
                     system_prompt=sys_prompt,
                     cwd=cwd_safe,
-                    timeout=_DEFAULT_NODE_TIMEOUT,
+                    timeout=node_timeout or _DEFAULT_NODE_TIMEOUT,
                     extra=extra,
                     fallback=False,  # 이미 fallback 단계, 재귀 방지
                 )
@@ -2857,13 +2866,23 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
     policy = wf.get("policy") or {}
     token_budget = int(policy.get("tokenBudgetTotal") or 0)
     fallback_provider = (policy.get("fallbackProvider") or "").strip()
+    # PP4 (v2.66.74) — per-workflow node timeout override. Clamped to
+    # [30, 1800] so accidental tiny / huge values don't break things.
+    try:
+        wf_node_timeout = int(policy.get("nodeTimeout") or 0)
+    except Exception:
+        wf_node_timeout = 0
+    if wf_node_timeout:
+        wf_node_timeout = max(30, min(1800, wf_node_timeout))
 
     def _run_single_node(nid: str) -> tuple[str, dict]:
         """단일 노드 실행 (병렬 워커에서 호출)."""
         node = node_by_id[nid]
         input_strs = _collect_inputs(nid)
         prev_sids = _collect_prev_sids(nid)
-        res = _execute_node(node, input_strs, prev_sids, fallback_provider=fallback_provider, run_id=runId)
+        res = _execute_node(node, input_strs, prev_sids,
+                             fallback_provider=fallback_provider,
+                             run_id=runId, node_timeout=wf_node_timeout)
         return (nid, res)
 
     for level in levels:
