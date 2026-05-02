@@ -3409,7 +3409,21 @@ function _wfApplyInspectorState() {
   el.classList.toggle('wf-collapsed', collapsed);
 }
 
-function _wfUpdateToolbar() {
+// LL1 (v2.66.30) — coalesce rapid toolbar refreshes to one per frame.
+// Inspector inputs (textarea oninput, select onchange) used to call
+// _wfUpdateToolbar synchronously per keystroke; on a 60Hz keyboard
+// that's 60 textContent + innerHTML writes per second for unchanged
+// values. Now batched via rAF.
+let _wfToolbarRaf = 0;
+function _wfUpdateToolbarSchedule() {
+  if (_wfToolbarRaf) return;
+  _wfToolbarRaf = requestAnimationFrame(() => {
+    _wfToolbarRaf = 0;
+    _wfUpdateToolbarImpl();
+  });
+}
+function _wfUpdateToolbar() { _wfUpdateToolbarSchedule(); }
+function _wfUpdateToolbarImpl() {
   const nameEl = document.getElementById('wfCurName');
   const dirtyEl = document.getElementById('wfDirty');
   if (!nameEl || !dirtyEl) return;

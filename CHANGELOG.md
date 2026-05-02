@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.30] — 2026-05-02
+
+### Performance
+- ⚡ **Toolbar update batched to 1× per frame** (LL1). The
+  workflow toolbar (`name`, `dirty` indicator, undo depth) was
+  refreshed synchronously on every inspector input — 60+ writes
+  per second when the user is typing into a textarea. Now coalesced
+  via `requestAnimationFrame` to one write per paint frame.
+
+---
 ## [2.66.29] — 2026-05-02
 
 ### Performance
