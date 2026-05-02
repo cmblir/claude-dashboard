@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.118] — 2026-05-02
+
+### Fixed
+- 🖼 **Ollama vision streaming completes the multimodal loop** (QQ43).
+  `OllamaApiProvider.execute_stream()` now also runs through
+  `_extract_inline_images()` and forwards the base64 strings as
+  the `images` field. With QQ40 (cloud one-shot), QQ41 (Ollama
+  one-shot), and QQ42 (cloud streaming), every chat path now
+  correctly delivers attached images to the configured vision
+  model.
+
+---
 ## [2.66.117] — 2026-05-02
 
 ### Fixed
