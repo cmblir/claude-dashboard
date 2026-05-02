@@ -3134,7 +3134,14 @@ function _wfRenderList() {
   const host = document.getElementById('wfListItems');
   if (!host) return;
   const q = (__wf.search || '').trim();
-  const list = __wf.workflows.filter(w => !q || (w.name||'').toLowerCase().includes(q));
+  // LL26 (v2.66.55) — fuzzy match for the workflow list (n8n parity).
+  // Matches against the workflow name; falls back to substring for CJK.
+  const list = __wf.workflows.filter(w => {
+    if (!q) return true;
+    const name = (w.name || '');
+    if (typeof _wfFuzzyMatch === 'function') return _wfFuzzyMatch(q, name);
+    return name.toLowerCase().includes(q);
+  });
   if (!list.length) {
     host.innerHTML = `<div class="text-[11px] text-[var(--text-dim)] text-center py-4">${t('워크플로우 없음')}</div>`;
     return;
