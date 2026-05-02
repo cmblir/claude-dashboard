@@ -2108,11 +2108,17 @@ class OllamaApiProvider(BaseProvider):
             models = self.list_models()
             chat_models = [m for m in models if CAP_EMBED not in (m.capabilities or [])]
             model = chat_models[0].id if chat_models else (models[0].id if models else "llama3.1")
+        # QQ41 (v2.66.116) — multimodal Ollama: extract inline base64
+        # images and emit them as the `images` field (Ollama vision
+        # models like llava / llama3.2-vision read this format).
+        clean_prompt, images = _extract_inline_images(prompt)
         body_obj = {
             "model": model,
-            "prompt": prompt,
+            "prompt": clean_prompt if images else prompt,
             "stream": False,
         }
+        if images:
+            body_obj["images"] = [img["base64"] for img in images]
         if system_prompt:
             body_obj["system"] = system_prompt
 
