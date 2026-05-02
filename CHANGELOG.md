@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.16] — 2026-05-03
+
+### Added
+- ⌨ **Esc clears the terminal input** (QQ106). The lazyclaw
+  terminal's input now treats Esc the same way the chat sidebar
+  filter (QQ58) and workflow sidebar search (QQ95) do — clears
+  the field and resets the QQ6 history-recall cursor + draft.
+  Consistent muscle memory across all four input surfaces (chat
+  composer, chat filter, workflow search, terminal).
+
+---
 ## [2.68.15] — 2026-05-02
 
 ### Added

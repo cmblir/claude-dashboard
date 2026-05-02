@@ -28264,6 +28264,17 @@ AFTER.lazyclawTerm = () => {
       e.preventDefault();
       _lcTermReverseSearch();
     }
+    // QQ106 (v2.68.16) — Esc clears the terminal input + history
+    // recall cursor (matches QQ58/QQ95 conventions on the chat /
+    // workflow side panels).
+    if (e.key === 'Escape') {
+      if (inp.value) {
+        e.preventDefault();
+        inp.value = '';
+        histIdx = -1;
+        draft = '';
+      }
+    }
     // QQ12 (v2.66.87) — Tab autocomplete against the whitelist.
     // Single match → fill in the rest. Multiple → render the
     // candidate list as an output line so the user can refine.
