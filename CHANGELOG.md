@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.87] — 2026-05-02
+
+### Added
+- 🔠 **Tab autocomplete in the lazyclaw terminal** (QQ12). Press
+  `Tab` against the whitelist; single match auto-completes,
+  multiple candidates print as a hint line so the user can
+  narrow further.
+
+---
 ## [2.66.86] — 2026-05-02
 
 ### Added
