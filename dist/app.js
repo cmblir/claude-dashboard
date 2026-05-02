@@ -27610,7 +27610,10 @@ async function _lcChatSend() {
     _lcSaveSessions(sessions);
     _lcRenderSessions();
   }
-  const reply = { role: 'assistant', text: '', assignee, ts: Date.now() };
+  // QQ76 (v2.67.13) — placeholder so the empty assistant bubble doesn't
+  // look broken before the first token arrives. Cleared by the first
+  // 'token' SSE event (see the streaming loop below).
+  const reply = { role: 'assistant', text: '_…_', assignee, ts: Date.now(), pending: true };
   history.push(reply);
   _lcSaveHistory(sessionId, history);
   _lcChatRender();
@@ -27656,6 +27659,8 @@ async function _lcChatSend() {
           try {
             const o = JSON.parse(data);
             if (o.text) {
+              // QQ76 — clear the "…" placeholder on first real token.
+              if (reply.pending) { reply.text = ''; reply.pending = false; }
               reply.text += o.text;
               const now = performance.now();
               if (now - lastRender > 30) {
@@ -27684,6 +27689,7 @@ async function _lcChatSend() {
     _lcRenderSessions();
   } catch (e) {
     if (e && e.name === 'AbortError') {
+      if (reply.pending) { reply.text = ''; reply.pending = false; }
       reply.text = (reply.text || '') + (reply.text ? '\n\n' : '') + '⏹ ' + t('중단됨');
       _lcSaveHistory(sessionId, history); _lcChatRender();
     } else {
