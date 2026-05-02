@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.25] — 2026-05-02
+
+### Fixed
+- 📜 **Always jump to bottom on send** (QQ88). `_lcChatRender` only
+  auto-scrolled when the user was already within 80 px of the
+  bottom. So if a user scrolled up to reread earlier context and
+  then sent a new message, the new bubble + QQ76 placeholder
+  appeared off-screen. `_lcChatSend` now force-scrolls the chat
+  log to the bottom on send so the outgoing message is always
+  visible.
+
+---
 ## [2.67.24] — 2026-05-02
 
 ### Fixed
