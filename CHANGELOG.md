@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.100] — 2026-05-02
+
+### Performance
+- 🚀 **Workflow canvas RAF coalescing** (QQ25). Multiple
+  `_wfRenderCanvas()` calls within one animation frame now collapse
+  to a single sync render via `requestAnimationFrame`. Bulk
+  operations (paste many nodes, undo across multiple changes, run-
+  status updates from rapid SSE ticks) no longer trigger N redundant
+  SVG diffs. Drag stays smooth — it uses
+  `_wfApplyDragTransform()` which writes `setAttribute` directly and
+  bypasses the renderer. Callers that genuinely need an immediate DOM
+  can use the new `_wfRenderCanvasNow()` escape hatch.
+
+---
 ## [2.66.99] — 2026-05-02
 
 ### Added

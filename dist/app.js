@@ -26062,10 +26062,25 @@ function _wfRemoveGroup(gid) {
 
 // 그룹 렌더링을 기존 _wfRenderCanvas 에 추가
 const _origWfRenderCanvas = _wfRenderCanvas;
-window._wfRenderCanvas = function() {
+const _wfRenderCanvasSync = function() {
   _origWfRenderCanvas();
   _wfRenderGroups();
 };
+// QQ25 (v2.66.100) — RAF coalescing. Multiple _wfRenderCanvas() calls
+// within one animation frame collapse to a single sync render. Drag
+// uses a separate fast-path (_wfApplyDragTransform) so this only
+// affects bulk operations: paste, undo, multi-select drag, run-status
+// updates. For paths that genuinely need an immediate DOM, call
+// _wfRenderCanvasNow() directly.
+let _wfRenderRafId = 0;
+window._wfRenderCanvas = function() {
+  if (_wfRenderRafId) return;
+  _wfRenderRafId = requestAnimationFrame(() => {
+    _wfRenderRafId = 0;
+    _wfRenderCanvasSync();
+  });
+};
+window._wfRenderCanvasNow = _wfRenderCanvasSync;
 // 전역에서 호출하는 _wfRenderCanvas 재바인딩
 _wfRenderCanvas = window._wfRenderCanvas;
 
