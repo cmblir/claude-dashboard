@@ -4591,16 +4591,31 @@ function _wfBindCanvas() {
   // LL14 (v2.66.43) — right-click on a node opens a context menu
   // (n8n parity). Edit / Duplicate / Delete; closes on outside-click
   // or Esc. Anchored at the cursor.
+  // LL20 (v2.66.49) — extended to edges: right-click on an edge
+  // offers a Delete option. Other actions intentionally absent —
+  // edges have no editable payload of their own.
   svg.addEventListener('contextmenu', (e) => {
-    const g = e.target.closest && e.target.closest('.wf-node');
-    if (!g) return;
-    e.preventDefault();
-    const nid = g.getAttribute('data-node');
-    if (!nid) return;
-    __wf.selectedNodeId = nid; __wf.selectedEdgeId = null;
-    if (typeof _wfSyncSelectionClasses === 'function') _wfSyncSelectionClasses();
-    if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
-    _wfShowNodeContextMenu(nid, e.clientX, e.clientY);
+    const nodeG = e.target.closest && e.target.closest('.wf-node');
+    if (nodeG) {
+      e.preventDefault();
+      const nid = nodeG.getAttribute('data-node');
+      if (!nid) return;
+      __wf.selectedNodeId = nid; __wf.selectedEdgeId = null;
+      if (typeof _wfSyncSelectionClasses === 'function') _wfSyncSelectionClasses();
+      if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
+      _wfShowNodeContextMenu(nid, e.clientX, e.clientY);
+      return;
+    }
+    const edgeP = e.target.closest && e.target.closest('path.wf-edge');
+    if (edgeP) {
+      e.preventDefault();
+      const eid = edgeP.getAttribute('data-edge');
+      if (!eid) return;
+      __wf.selectedEdgeId = eid; __wf.selectedNodeId = null;
+      if (typeof _wfSyncSelectionClasses === 'function') _wfSyncSelectionClasses();
+      if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
+      _wfShowEdgeContextMenu(eid, e.clientX, e.clientY);
+    }
   });
 
 function _wfShowNodeContextMenu(nid, x, y) {
@@ -4665,6 +4680,37 @@ function _wfShowNodeContextMenu(nid, x, y) {
 function _wfCloseNodeContextMenu() {
   const m = document.getElementById('wfNodeCtxMenu');
   if (m) m.remove();
+}
+
+// LL20 (v2.66.49) — edge context menu (Delete only, for now).
+function _wfShowEdgeContextMenu(eid, x, y) {
+  const old = document.getElementById('wfNodeCtxMenu');
+  if (old) old.remove();
+  const menu = document.createElement('div');
+  menu.id = 'wfNodeCtxMenu';
+  menu.style.cssText = 'position:fixed;z-index:10000;min-width:140px;'
+    + 'background:var(--surface,#1c1c1e);border:1px solid var(--border);'
+    + 'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.35);'
+    + 'padding:4px 0;font-size:12px;left:' + x + 'px;top:' + y + 'px;';
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:8px;'
+    + 'padding:6px 12px;cursor:pointer;color:#fca5a5;';
+  row.innerHTML = `<span>🗑</span><span style="flex:1">${escapeHtml(t('연결 삭제'))}</span><span style="opacity:0.55;font-size:10px;">⌫</span>`;
+  row.onmouseenter = () => row.style.background = 'rgba(255,255,255,0.06)';
+  row.onmouseleave = () => row.style.background = '';
+  row.onclick = () => { try { _wfDeleteSelectedEdge(); } catch(e) {} _wfCloseNodeContextMenu(); };
+  menu.appendChild(row);
+  document.body.appendChild(menu);
+  const r = menu.getBoundingClientRect();
+  if (r.right > window.innerWidth) menu.style.left = (window.innerWidth - r.width - 8) + 'px';
+  if (r.bottom > window.innerHeight) menu.style.top = (window.innerHeight - r.height - 8) + 'px';
+  setTimeout(() => {
+    const closer = (ev) => { if (!menu.contains(ev.target)) _wfCloseNodeContextMenu(); };
+    document.addEventListener('mousedown', closer, { once: true });
+    document.addEventListener('keydown', function k(ev) {
+      if (ev.key === 'Escape') { _wfCloseNodeContextMenu(); document.removeEventListener('keydown', k); }
+    });
+  }, 0);
 }
 
   document.addEventListener('mousemove', (e) => {

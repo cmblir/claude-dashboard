@@ -2894,6 +2894,7 @@
   "역할 프리셋 카탈로그": "Role Preset Catalog",
   "연결": "edges",
   "연결 끊김": "Disconnected",
+  "연결 삭제": "Delete connection",
   "연결 상태": "Connection Status",
   "연결 상태, 감지된 터미널": "Connection status, detected terminals",
   "연결 성공!": "Connected!",

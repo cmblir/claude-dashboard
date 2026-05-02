@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.49] — 2026-05-02
+
+### Added
+- 🖱 **Right-click on an edge → Delete option** (LL20). The
+  existing node context menu is now reused; right-clicking
+  on an edge path selects it and offers Delete (`⌫`).
+
+---
 ## [2.66.48] — 2026-05-02
 
 ### Added
