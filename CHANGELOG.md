@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.115] — 2026-05-02
+
+### Added
+- 🖼 **Vision routing for inline base64 images** (QQ40, multimodal end-
+  to-end). New `_extract_inline_images()` helper in `ai_providers.py`
+  pulls every `![alt](data:image/...;base64,...)` out of the prompt
+  and returns a `(clean_text, [{mime,base64,data_url}])` pair.
+  - **Anthropic API** — emits `image` content blocks with
+    `source: {type: 'base64', media_type, data}`.
+  - **OpenAI API** — emits `image_url` blocks with `image_url.url`
+    set to the original data URL.
+  - **Gemini API** — emits `inline_data: {mime_type, data}` parts.
+  When no `data:image/` is found the helper short-circuits and the
+  legacy plain-string content path is unchanged. Pairs with the
+  QQ39 paste/drop UI: drop or paste an image into the chat composer
+  and the configured vision model now actually sees it.
+
+---
 ## [2.66.114] — 2026-05-02
 
 ### Added
