@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.51] — 2026-05-02
+
+### Added
+- 🗺 **Minimap drag-to-pan** (LL22, n8n parity). Hold the mouse on
+  the minimap and the canvas viewport follows the cursor smoothly,
+  not just on click.
+
+---
 ## [2.66.50] — 2026-05-02
 
 ### Added

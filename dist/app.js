@@ -4383,19 +4383,18 @@ function _wfBindCanvas() {
   // when the workflow opens at a fit-to-screen zoom of, say, 0.78.
   if (typeof _wfUpdateZoomLabel === 'function') _wfUpdateZoomLabel();
 
-  // LL19 (v2.66.48) — click on minimap → pan canvas to that location
-  // (n8n parity). Computes the minimap-to-world coord map by re-running
-  // the bounding-box arithmetic from _wfRenderMinimap.
+  // LL19 (v2.66.48) — click on minimap → pan canvas to that location.
+  // LL22 (v2.66.51) — also drag-to-pan: holding the mouse on the
+  // minimap follows the cursor smoothly (n8n behaviour).
   const mini = document.getElementById('wfMinimap');
   if (mini && !mini.__wfClickBound) {
     mini.__wfClickBound = true;
-    mini.style.cursor = 'pointer';
-    mini.addEventListener('click', (e) => {
+    mini.style.cursor = 'crosshair';
+    const _miniPanTo = (clientX, clientY) => {
       if (!__wf.current || !(__wf.current.nodes || []).length) return;
       const rect = mini.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      // Recompute the minimap mapping (cheap: O(N))
+      const mx = clientX - rect.left;
+      const my = clientY - rect.top;
       let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
       const nodes = __wf.current.nodes;
       const NW = (typeof WF_NODE_W !== 'undefined') ? WF_NODE_W : 200;
@@ -4411,10 +4410,8 @@ function _wfBindCanvas() {
       const scale = Math.min(MW / rangeX, MH / rangeY);
       const offX = (MW - rangeX * scale) / 2;
       const offY = (MH - rangeY * scale) / 2;
-      // Inverse: minimap → world
       const wx = bMinX + (mx - offX) / scale;
       const wy = bMinY + (my - offY) / scale;
-      // Center the canvas viewport on (wx, wy).
       const host = document.getElementById('wfCanvasHost');
       if (!host) return;
       const hr = host.getBoundingClientRect();
@@ -4427,6 +4424,18 @@ function _wfBindCanvas() {
       if (vp) vp.setAttribute('transform', `translate(${v.panX},${v.panY}) scale(${z})`);
       _wfSchedulePatch();
       if (typeof _wfRenderMinimap === 'function') _wfRenderMinimap();
+    };
+    let dragging = false;
+    mini.addEventListener('mousedown', (e) => {
+      dragging = true; mini.style.cursor = 'grabbing';
+      _miniPanTo(e.clientX, e.clientY);
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (dragging) _miniPanTo(e.clientX, e.clientY);
+    });
+    document.addEventListener('mouseup', () => {
+      if (dragging) { dragging = false; mini.style.cursor = 'crosshair'; }
     });
   }
 
