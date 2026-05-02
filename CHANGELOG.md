@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.107] — 2026-05-02
+
+### Added
+- ▾ **Collapsible long messages in chat** (QQ32). Assistant or user
+  messages exceeding ~1500 chars or ~30 lines now collapse to 300 px
+  with a fade overlay and a `▾ 더보기 (N자)` button. Click to expand;
+  collapse again with `▴ 접기`. Keeps long sessions scrollable
+  without losing access to full content.
+
+---
 ## [2.66.106] — 2026-05-02
 
 ### Added
