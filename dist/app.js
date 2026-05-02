@@ -27110,6 +27110,8 @@ VIEWS.lazyclawChat = async () => {
         <!-- QQ92 (v2.68.2) — image-attach indicator -->
         <!-- QQ93 (v2.68.3) — clickable to clear all attached images. -->
         <span id="lcInputImgs" style="display:none;color:#60a5fa;cursor:pointer;" title="${t('이미지 모두 제거')}" onclick="(function(){var ta=document.getElementById('lcChatInput');if(!ta)return;ta.value=ta.value.replace(/\\n*!\\[[^\\]]*\\]\\(data:image\\/[^)]+;base64,[^)]+\\)\\n*/g,'');ta.dispatchEvent(new Event('input'));toast(t('이미지 모두 제거'),'ok');})()">📷 <span id="lcInputImgCount">0</span></span>
+        <!-- QQ102 (v2.68.12) — current session cumulative cost. -->
+        <span id="lcInputSessCost" style="display:none;color:#f59e0b;" title="${t('세션 누적 비용')}">$<span id="lcInputSessCostVal">0</span></span>
         <span><span id="lcInputChars">0</span> ${t('자')}</span>
         <span>≈ <span id="lcInputTokens">0</span> ${t('토큰')}</span>
       </div>
@@ -27477,6 +27479,21 @@ function _lcChatRender(opts) {
   if (!log) return;
   const id = _lcEnsureSession('');
   const history = _lcGetHistory(id);
+  // QQ102 (v2.68.12) — show cumulative session cost in composer footer.
+  try {
+    let s = 0;
+    for (const m of history) if (typeof m.costUsd === 'number') s += m.costUsd;
+    const el = document.getElementById('lcInputSessCost');
+    const val = document.getElementById('lcInputSessCostVal');
+    if (el && val) {
+      if (s > 0) {
+        val.textContent = s.toFixed(s < 0.01 ? 4 : 3);
+        el.style.display = '';
+      } else {
+        el.style.display = 'none';
+      }
+    }
+  } catch (_) {}
   if (!history.length) {
     log.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;">
       <div style="font-size:3rem;">🦞</div>

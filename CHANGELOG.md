@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.12] — 2026-05-02
+
+### Added
+- 💲 **Current-session spend in composer footer** (QQ102). The
+  composer's char/token row now also shows `$0.0123` summed
+  across the active session's `m.costUsd` values. Visible before
+  send so users decide whether the next expensive turn fits the
+  budget. Hides when zero.
+
+---
 ## [2.68.11] — 2026-05-02
 
 ### Performance
