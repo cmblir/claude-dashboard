@@ -56,6 +56,20 @@ NEW_EN: dict[str, str] = {
     "노드 선택됨": "nodes selected",
     # LL8
     "자동 정렬 완료": "Layout aligned",
+    # LL9 — shortcut help additions
+    "선택 노드 복제": "Duplicate selected node",
+    "전체 노드 선택": "Select all nodes",
+    "인스펙터 패널 토글": "Toggle inspector panel",
+    "100% 줌으로 리셋": "Reset to 100% zoom",
+    "줌 인/아웃": "Zoom in / out",
+    "성능 HUD 토글": "Toggle perf HUD",
+    "선택 노드 10px 이동": "Move selected node 10px",
+    "선택 노드 1px 이동 (정밀)": "Move selected node 1px (fine)",
+    "자동 정렬": "Auto-layout",
+    "캔버스 패닝": "Pan canvas",
+    "커서 기준 줌": "Cursor-anchored zoom",
+    "grid snap 우회": "Bypass grid snap",
+    "더블클릭 (빈 영역)": "Double-click (empty area)",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -107,4 +121,18 @@ NEW_ZH: dict[str, str] = {
     "노드 선택됨": "节点已选中",
     # LL8
     "자동 정렬 완료": "已自动排列",
+    # LL9
+    "선택 노드 복제": "复制所选节点",
+    "전체 노드 선택": "选择所有节点",
+    "인스펙터 패널 토글": "切换检查面板",
+    "100% 줌으로 리셋": "重置到 100% 缩放",
+    "줌 인/아웃": "放大 / 缩小",
+    "성능 HUD 토글": "切换性能 HUD",
+    "선택 노드 10px 이동": "移动所选节点 10px",
+    "선택 노드 1px 이동 (정밀)": "移动所选节点 1px（精细）",
+    "자동 정렬": "自动布局",
+    "캔버스 패닝": "平移画布",
+    "커서 기준 줌": "光标锚定缩放",
+    "grid snap 우회": "绕过网格对齐",
+    "더블클릭 (빈 영역)": "双击（空白区域）",
 }

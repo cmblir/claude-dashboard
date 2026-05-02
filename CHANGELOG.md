@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.38] — 2026-05-02
+
+### Added
+- 📖 **Shortcut help modal updated** with the 14 new keybindings
+  added in v2.66.20–v2.66.37 (LL9). Press `?` on the workflow
+  canvas to discover them. Includes Ctrl+D, Ctrl+A, Ctrl+I,
+  zoom shortcuts, arrow nudges, Shift+L auto-layout, perf HUD,
+  Wheel pan, Cmd+Wheel zoom, Alt+drag, dblclick fit.
+
+---
 ## [2.66.37] — 2026-05-02
 
 ### Added
