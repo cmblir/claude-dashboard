@@ -1402,6 +1402,93 @@ class GeminiApiProvider(BaseProvider):
             cost_usd=cost, duration_ms=duration, raw=data,
         )
 
+    def execute_stream(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str = "",
+        model: str = "",
+        cwd: str = "",
+        timeout: int = 300,
+        extra: dict | None = None,
+        messages: "list[dict] | None" = None,
+    ) -> Iterator[dict]:
+        import urllib.request
+        import urllib.error
+
+        t0 = int(time.time() * 1000)
+        if not self._api_key:
+            yield {"type": "error", "error": "GEMINI_API_KEY not set"}
+            return
+
+        model = model or "gemini-2.5-flash"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={self._api_key}&alt=sse"
+
+        # Build contents from messages or flat prompt.
+        if messages:
+            contents = []
+            for m in messages:
+                role = "user" if m.get("role") == "user" else "model"
+                contents.append({"role": role, "parts": [{"text": m.get("content", "")}]})
+        else:
+            contents = [{"parts": [{"text": prompt}]}]
+
+        body_obj: dict = {"contents": contents}
+        if system_prompt:
+            body_obj["systemInstruction"] = {"parts": [{"text": system_prompt}]}
+
+        body = json.dumps(body_obj).encode("utf-8")
+        req = urllib.request.Request(
+            url, data=body,
+            headers={"Content-Type": "application/json"},
+        )
+
+        tokens_in = tokens_out = 0
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                for raw_line in resp:
+                    line = raw_line.decode("utf-8").rstrip("\r\n")
+                    if not line.startswith("data: "):
+                        continue
+                    payload = line[6:].strip()
+                    if not payload:
+                        continue
+                    try:
+                        obj = json.loads(payload)
+                    except Exception:
+                        continue
+                    candidates = obj.get("candidates") or []
+                    for cand in candidates:
+                        parts = (cand.get("content") or {}).get("parts") or []
+                        for part in parts:
+                            text = part.get("text") or ""
+                            if text:
+                                yield {"type": "token", "text": text}
+                    usage = obj.get("usageMetadata")
+                    if usage:
+                        tokens_in = usage.get("promptTokenCount", tokens_in)
+                        tokens_out = usage.get("candidatesTokenCount", tokens_out)
+        except urllib.error.HTTPError as e:
+            err = ""
+            try:
+                err = e.read().decode("utf-8")[:300]
+            except Exception:
+                pass
+            yield {"type": "error", "error": f"HTTP {e.code}: {err}"}
+            return
+        except Exception as exc:
+            yield {"type": "error", "error": str(exc)}
+            return
+
+        cost = self.estimate_cost(model, tokens_in, tokens_out)
+        yield {
+            "type": "done", "ok": True, "error": "",
+            "provider": self.provider_id, "model": model,
+            "tokensIn": tokens_in, "tokensOut": tokens_out,
+            "durationMs": int(time.time() * 1000) - t0,
+            "costUsd": cost,
+        }
+
 
 class _OpenAICompatibleProvider(BaseProvider):
     """Base for OpenAI-compatible chat-completions APIs (Groq, DeepSeek, etc).
@@ -1504,6 +1591,97 @@ class _OpenAICompatibleProvider(BaseProvider):
             tokens_in=ti, tokens_out=to_, tokens_total=ti + to_,
             cost_usd=cost, duration_ms=duration, raw=data,
         )
+
+    def execute_stream(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str = "",
+        model: str = "",
+        cwd: str = "",
+        timeout: int = 300,
+        extra: dict | None = None,
+        messages: "list[dict] | None" = None,
+    ) -> Iterator[dict]:
+        import urllib.request
+        import urllib.error
+
+        t0 = int(time.time() * 1000)
+        if not self._api_key:
+            yield {"type": "error", "error": f"{self._ENV_VAR} not set"}
+            return
+
+        model = model or self._DEFAULT_MODEL or (self._MODELS[0].id if self._MODELS else "")
+
+        if messages is None:
+            msgs: list[dict] = []
+            if system_prompt:
+                msgs.append({"role": "system", "content": system_prompt})
+            msgs.append({"role": "user", "content": prompt})
+        else:
+            msgs = list(messages)
+            if system_prompt and (not msgs or msgs[0].get("role") != "system"):
+                msgs.insert(0, {"role": "system", "content": system_prompt})
+
+        body = json.dumps({
+            "model": model,
+            "messages": msgs,
+            "max_tokens": int((extra or {}).get("max_tokens", 4096)),
+            "stream": True,
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            self._BASE_URL.rstrip("/") + "/chat/completions",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._api_key}",
+            },
+        )
+
+        tokens_in = tokens_out = 0
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                for raw_line in resp:
+                    line = raw_line.decode("utf-8").rstrip("\r\n")
+                    if not line.startswith("data: "):
+                        continue
+                    payload = line[6:]
+                    if payload == "[DONE]":
+                        break
+                    try:
+                        obj = json.loads(payload)
+                    except Exception:
+                        continue
+                    choices = obj.get("choices") or []
+                    if choices:
+                        delta = choices[0].get("delta") or {}
+                        text = delta.get("content") or ""
+                        if text:
+                            yield {"type": "token", "text": text}
+                    usage = obj.get("usage")
+                    if usage:
+                        tokens_in = usage.get("prompt_tokens", tokens_in)
+                        tokens_out = usage.get("completion_tokens", tokens_out)
+        except urllib.error.HTTPError as e:
+            err = ""
+            try:
+                err = e.read().decode("utf-8")[:300]
+            except Exception:
+                pass
+            yield {"type": "error", "error": f"HTTP {e.code}: {err}"}
+            return
+        except Exception as exc:
+            yield {"type": "error", "error": str(exc)}
+            return
+
+        cost = self.estimate_cost(model, tokens_in, tokens_out)
+        yield {
+            "type": "done", "ok": True, "error": "",
+            "provider": self.provider_id, "model": model,
+            "tokensIn": tokens_in, "tokensOut": tokens_out,
+            "durationMs": int(time.time() * 1000) - t0,
+            "costUsd": cost,
+        }
 
 
 class GroqApiProvider(_OpenAICompatibleProvider):

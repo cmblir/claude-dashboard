@@ -119,10 +119,10 @@ def _CHAT_SYSTEM_PROMPT() -> str:  # type: ignore[misc]
     return _build_chat_system_prompt()
 
 def handle_lazyclaw_chat_stream(handler: "Handler", body: dict) -> None:
-    """OO3 (v2.66.66) — SSE streaming chat for claude-cli assignees.
-    Falls back to one-shot api_lazyclaw_chat for non-claude providers
-    (their CLIs / HTTP APIs don't expose token-level streaming uniformly
-    enough to bother right now).
+    """OO3 (v2.66.66) — SSE streaming chat.
+    Uses true token streaming for OpenAI/Anthropic/Ollama API providers
+    via execute_stream_with_assignee(). Falls back to claude-cli stream-json
+    for Claude assignees.
     """
     if not isinstance(body, dict):
         handler.send_response(400); handler.end_headers(); return
@@ -131,12 +131,11 @@ def handle_lazyclaw_chat_stream(handler: "Handler", body: dict) -> None:
     if not message:
         handler.send_response(400); handler.end_headers(); return
 
-    # Decide whether claude-cli streaming is appropriate.
     is_claude = (
         assignee.startswith("claude:") or
         assignee in ("opus", "sonnet", "haiku") or
         assignee.startswith("opus") or assignee.startswith("sonnet") or assignee.startswith("haiku") or
-        not assignee  # default
+        not assignee
     )
 
     handler.send_response(200)
@@ -145,6 +144,7 @@ def handle_lazyclaw_chat_stream(handler: "Handler", body: dict) -> None:
     handler.send_header("Connection", "keep-alive")
     handler.send_header("X-Accel-Buffering", "no")
     handler.end_headers()
+
     def _sse(event: str, data: str) -> bool:
         try:
             chunk = f"event: {event}\ndata: {data}\n\n"
@@ -155,45 +155,63 @@ def handle_lazyclaw_chat_stream(handler: "Handler", body: dict) -> None:
             return False
 
     system_prompt = (body.get("systemPrompt") or "").strip()
+    history = body.get("history") or []
 
     if not is_claude:
-        # Non-claude — call the one-shot endpoint and emit in chunks.
-        import threading as _threading
-        import queue as _queue
-        q: "_queue.Queue[dict]" = _queue.Queue()
-        def _run_blocking() -> None:
-            try:
-                r = api_lazyclaw_chat(body)
-                q.put(r)
-            except Exception as exc:
-                q.put({"ok": False, "error": str(exc)})
-        t = _threading.Thread(target=_run_blocking, daemon=True)
-        t.start()
-        # Send a "thinking" heartbeat every second while waiting.
-        import time as _time
-        t_start = _time.time()
-        while t.is_alive():
-            try:
-                r = q.get_nowait()
-                break
-            except _queue.Empty:
-                elapsed = int(_time.time() - t_start)
-                _sse("heartbeat", json.dumps({"elapsed": elapsed}, ensure_ascii=False))
-                _time.sleep(0.8)
-        else:
-            r = q.get()
-        if r.get("ok") and r.get("output"):
-            # Emit in small chunks so the frontend streams it character by char.
-            chunk_size = 8
-            text = r["output"]
-            for i in range(0, len(text), chunk_size):
-                if not _sse("token", json.dumps({"text": text[i:i+chunk_size]}, ensure_ascii=False)):
-                    return
-        _sse("done", json.dumps({
-            "ok": bool(r.get("ok")), "error": r.get("error", ""),
-            "provider": r.get("provider", ""), "model": r.get("model", ""),
-            "durationMs": r.get("durationMs", 0),
-        }, ensure_ascii=False))
+        # True streaming via execute_stream_with_assignee.
+        # Build OpenAI-style messages array so providers can use native multi-turn.
+        msgs: list[dict] = []
+        for h in history[-16:]:
+            role = h.get("role", "")
+            text = (h.get("text") or "").strip()
+            if not text:
+                continue
+            if role == "user":
+                msgs.append({"role": "user", "content": text})
+            elif role == "assistant":
+                msgs.append({"role": "assistant", "content": text})
+        msgs.append({"role": "user", "content": message})
+
+        # Flat prompt fallback (for providers that don't override execute_stream).
+        parts: list[str] = []
+        for m in msgs[:-1]:
+            if m["role"] == "user":
+                parts.append(f"User: {m['content']}")
+            else:
+                parts.append(f"Assistant: {m['content']}")
+        prompt = "\n".join(parts) + f"\nUser: {message}\n\nAssistant:" if parts else message
+
+        try:
+            from .ai_providers import execute_stream_with_assignee
+            for ev in execute_stream_with_assignee(
+                assignee,
+                prompt,
+                system_prompt=system_prompt,
+                timeout=300,
+                messages=msgs,
+            ):
+                etype = ev.get("type", "")
+                if etype == "token":
+                    if not _sse("token", json.dumps({"text": ev.get("text", "")}, ensure_ascii=False)):
+                        return
+                elif etype == "done":
+                    _sse("done", json.dumps({
+                        "ok": ev.get("ok", True),
+                        "error": ev.get("error", ""),
+                        "provider": ev.get("provider", ""),
+                        "model": ev.get("model", ""),
+                        "durationMs": ev.get("durationMs", 0),
+                        "tokensIn": ev.get("tokensIn", 0),
+                        "tokensOut": ev.get("tokensOut", 0),
+                    }, ensure_ascii=False))
+                elif etype == "error":
+                    _sse("done", json.dumps({
+                        "ok": False,
+                        "error": ev.get("error", "unknown error"),
+                        "provider": "", "model": "", "durationMs": 0,
+                    }, ensure_ascii=False))
+        except Exception as exc:
+            _sse("done", json.dumps({"ok": False, "error": str(exc), "provider": "", "model": "", "durationMs": 0}, ensure_ascii=False))
         return
 
     # claude-cli stream-json

@@ -6910,7 +6910,18 @@ function _wfRenderRunBanner(run) {
   if (r.icon.textContent    !== icon)         r.icon.textContent = icon;
   if (r.titleT.textContent  !== title + ': ') r.titleT.textContent = title + ': ';
   if (r.subject.textContent !== subject)      r.subject.textContent = subject;
-  const metaStr = `${done}/${total} · ${elapsedStr}`;
+  // PP5 (v2.66.75) — live cumulative cost in the banner. Reads
+  // `cost` / `costUsd` from each finished node's result. Skips when
+  // every node is free (no providers reporting cost).
+  let totalCost = 0;
+  for (const rr of Object.values(results)) {
+    if (!rr) continue;
+    const c = (typeof rr.cost === 'number') ? rr.cost
+              : (typeof rr.costUsd === 'number') ? rr.costUsd : 0;
+    if (c) totalCost += c;
+  }
+  const costStr = totalCost > 0 ? ` · $${totalCost.toFixed(4)}` : '';
+  const metaStr = `${done}/${total} · ${elapsedStr}${costStr}`;
   if (r.meta.textContent !== metaStr)         r.meta.textContent = metaStr;
   // Focus button toggles based on running state
   const showFocus = (status === 'running' && runningNid);
@@ -6963,7 +6974,16 @@ function _wfStartElapsedTicker() {
         const results = run.nodeResults || {};
         const total = (__wf.current && __wf.current.nodes || []).length;
         const done = Object.values(results).filter(r => r && (r.status === 'ok' || r.status === 'err' || r.status === 'skipped')).length;
-        const metaStr = `${done}/${total} · ${elapsedStr}`;
+        // PP5 — also include cumulative cost in the live ticker.
+        let totalCost = 0;
+        for (const rr of Object.values(results)) {
+          if (!rr) continue;
+          const c = (typeof rr.cost === 'number') ? rr.cost
+                    : (typeof rr.costUsd === 'number') ? rr.costUsd : 0;
+          if (c) totalCost += c;
+        }
+        const costStr = totalCost > 0 ? ` · $${totalCost.toFixed(4)}` : '';
+        const metaStr = `${done}/${total} · ${elapsedStr}${costStr}`;
         if (banner._refs.meta && banner._refs.meta.textContent !== metaStr) {
           banner._refs.meta.textContent = metaStr;
         }

@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.75] — 2026-05-02
+
+### Added
+- 💵 **Live cumulative cost in the run banner** (PP5). The
+  banner's meta line now shows `done/total · elapsed · $cost`
+  and updates 1 Hz via the existing ticker. Skipped when no
+  provider in the run reports cost (free-tier / local Ollama).
+
+---
 ## [2.66.74] — 2026-05-02
 
 ### Added
