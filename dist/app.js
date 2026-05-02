@@ -26837,17 +26837,30 @@ function _lcRenderSessions() {
   // show a small ↳ arrow + parent label so users see the lineage.
   const byId = Object.fromEntries(allSessions.map(x => [x.id, x]));
   // QQ99 (v2.68.9) — compute cumulative spend across ALL sessions.
+  // QQ100 (v2.68.10) — also break out today's spend so users can see
+  // how much budget the current day burned vs all-time.
   try {
-    let grand = 0;
+    let grand = 0, today = 0;
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const dayMs = startOfDay.getTime();
     for (const s of allSessions) {
       const h = _lcGetHistory(s.id);
-      for (const m of h) if (typeof m.costUsd === 'number') grand += m.costUsd;
+      for (const m of h) {
+        if (typeof m.costUsd === 'number') {
+          grand += m.costUsd;
+          if ((m.ts || 0) >= dayMs) today += m.costUsd;
+        }
+      }
     }
     const totEl = document.getElementById('lcTotalSpend');
     if (totEl) {
       if (grand > 0) {
         totEl.style.display = '';
-        totEl.textContent = `${t('총 누적')}: $${grand.toFixed(grand < 0.01 ? 4 : 3)}`;
+        const fmt = (n) => '$' + n.toFixed(n < 0.01 ? 4 : 3);
+        totEl.innerHTML = today > 0 && today < grand
+          ? `${t('오늘')} ${fmt(today)} · ${t('총 누적')} ${fmt(grand)}`
+          : `${t('총 누적')}: ${fmt(grand)}`;
       } else {
         totEl.style.display = 'none';
       }
