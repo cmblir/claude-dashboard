@@ -26791,7 +26791,17 @@ function _lcChatSave(history) {
 function _lcMsgBody(m) {
   const isUser = m.role === 'user';
   if (!isUser && typeof marked !== 'undefined' && marked.parse) {
-    try { return `<div class="prose-claude" style="font-size:.875rem;line-height:1.6;margin-top:4px;">${marked.parse(m.text || '')}</div>`; }
+    try {
+      // QQ31 (v2.66.106) — inject a floating 📋 button into every <pre>
+      // block so users can copy code without selecting text.
+      let html = marked.parse(m.text || '');
+      html = html.replace(/<pre([^>]*)>([\s\S]*?)<\/pre>/g, (_full, attrs, inner) => {
+        return `<div style="position:relative;margin:6px 0;"><pre${attrs}>${inner}</pre>`
+          + `<button onclick="_lcCopyCodeBlock(this)" title="${t('코드 복사')}" style="position:absolute;top:6px;right:6px;font-size:11px;padding:2px 6px;background:rgba(0,0,0,0.45);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:#e5e7eb;opacity:0.55;transition:opacity .15s;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.55">📋</button>`
+          + `</div>`;
+      });
+      return `<div class="prose-claude" style="font-size:.875rem;line-height:1.6;margin-top:4px;">${html}</div>`;
+    }
     catch (_) {}
   }
   return `<pre style="font-size:.875rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;font-family:inherit;margin:4px 0 0;">${escapeHtml(m.text || '')}</pre>`;
@@ -26851,6 +26861,22 @@ window._lcToggleStar = function (sessionId, idx) {
   h[idx].starred = !h[idx].starred;
   _lcSaveHistory(sessionId, h);
   _lcChatRender({ keepScroll: true });
+};
+
+// QQ31 (v2.66.106) — copy a single code block's text.
+window._lcCopyCodeBlock = function (btn) {
+  if (!btn) return;
+  const wrap = btn.parentElement;
+  const pre = wrap && wrap.querySelector('pre');
+  if (!pre) return;
+  const code = pre.querySelector('code');
+  const txt = (code ? code.textContent : pre.textContent) || '';
+  navigator.clipboard.writeText(txt).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    btn.style.color = '#4ade80';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = '#e5e7eb'; }, 1200);
+  }).catch(() => toast(t('복사 실패'), 'err'));
 };
 
 // QQ22 (v2.66.97) — edit user message + resubmit (OpenClaw parity).

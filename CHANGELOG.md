@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.106] — 2026-05-02
+
+### Added
+- 📋 **Code block copy buttons in chat** (QQ31, OpenClaw parity).
+  Every `<pre>` block in an assistant message now gets a top-right
+  📋 button. Clicking writes the inner `<code>` text to the
+  clipboard and flashes ✓ for 1.2 s. Saves the select-all-then-copy
+  dance for snippets.
+
+---
 ## [2.66.105] — 2026-05-02
 
 ### Added
