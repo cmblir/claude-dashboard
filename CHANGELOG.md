@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.8] — 2026-05-02
+
+### Added
+- 💲 **Per-session cumulative cost badge in chat sidebar** (QQ98).
+  Sums `m.costUsd` (persisted by QQ97) across the session's
+  history and renders an amber `$0.0123` chip next to the
+  token-usage badge. 4 decimals when sub-cent, 3 when ≥1¢.
+  Pairs with QQ26 token badge so users see "🔤 12.4k · $0.084"
+  at a glance for each conversation.
+
+---
 ## [2.68.7] — 2026-05-02
 
 ### Added

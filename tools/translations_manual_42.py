@@ -230,6 +230,7 @@ NEW_EN: dict[str, str] = {
     "부모 세션으로 이동": "Jump to parent session",
     # QQ26 — token usage badge
     "총 토큰 사용량": "Total tokens used",
+    "세션 누적 비용": "Session cumulative cost",
     # QQ27 — rubber-band selection
     "Shift+드래그 (빈 영역)": "Shift+drag (empty)",
     "러버밴드 다중 선택": "Rubber-band multi-select",
@@ -521,6 +522,7 @@ NEW_ZH: dict[str, str] = {
     "부모 세션으로 이동": "跳转到父会话",
     # QQ26
     "총 토큰 사용량": "总令牌使用量",
+    "세션 누적 비용": "会话累计费用",
     # QQ27
     "Shift+드래그 (빈 영역)": "Shift+拖动（空白处）",
     "러버밴드 다중 선택": "框选多个节点",
