@@ -1748,20 +1748,30 @@ class ProviderRegistry:
         extra: dict | None = None,
         fallback: bool = True,
     ) -> AIResponse:
-        """프로바이더 실행 + 폴백 체인."""
-        # 1차 시도
+        """프로바이더 실행 + 폴백 체인.
+
+        Y1 (v2.66.11) — preserve the *actual* per-provider error so the
+        UI surfaces "Claude rate-limited / OpenAI 401 / ..." instead of
+        the useless "all providers failed". Each tried provider's error
+        is appended to ``attempts``; the final return string lists every
+        attempt with its own error so the user knows what to fix.
+        """
+        attempts: list[str] = []   # ["claude-cli: rate limit ...", ...]
+        primary_resp: Optional[AIResponse] = None
+
         p = self.get(provider_id)
         if p and p.is_available():
-            resp = p.execute(
+            primary_resp = p.execute(
                 prompt, system_prompt=system_prompt, model=model,
                 cwd=cwd, timeout=timeout, extra=extra,
             )
-            if resp.status == "ok":
-                return resp
-            # 에러지만 폴백 미사용이면 바로 반환
+            if primary_resp.status == "ok":
+                return primary_resp
             if not fallback:
-                return resp
-            log.warning("provider %s failed: %s — trying fallback", provider_id, resp.error)
+                return primary_resp
+            attempts.append(f"{provider_id}: {(primary_resp.error or 'err')[:200]}")
+            log.warning("provider %s failed: %s — trying fallback",
+                        provider_id, primary_resp.error)
 
         # 폴백 체인
         if fallback and self._fallback_chain:
@@ -1769,7 +1779,11 @@ class ProviderRegistry:
                 if fid == provider_id:
                     continue
                 fp = self.get(fid)
-                if not fp or not fp.is_available():
+                if not fp:
+                    attempts.append(f"{fid}: not registered")
+                    continue
+                if not fp.is_available():
+                    attempts.append(f"{fid}: unavailable (no key / not installed)")
                     continue
                 log.info("fallback to provider: %s", fid)
                 resp = fp.execute(
@@ -1778,8 +1792,9 @@ class ProviderRegistry:
                 )
                 if resp.status == "ok":
                     return resp
+                attempts.append(f"{fid}: {(resp.error or 'err')[:200]}")
 
-        # 모든 시도 실패
+        # 모든 시도 실패 — 진짜 무엇이 실패했는지 보고.
         if not p:
             return AIResponse(
                 status="err",
@@ -1789,11 +1804,21 @@ class ProviderRegistry:
         if not p.is_available():
             return AIResponse(
                 status="err",
-                error=f"provider '{provider_id}' not available (CLI not installed or API key missing)",
+                error=f"provider '{provider_id}' not available "
+                      f"(CLI not installed or API key missing). "
+                      f"Set the key in the AI Providers tab, or pick a "
+                      f"different provider:model.",
                 provider=provider_id,
             )
+        # Hand the primary error back as the headline; list the chain
+        # attempts so the user sees every step's reason.
+        head = (primary_resp.error if primary_resp else "no provider tried")
+        chain_summary = " | ".join(attempts) if attempts else "no fallback chain"
         return AIResponse(
-            status="err", error="all providers failed", provider=provider_id,
+            status="err",
+            error=f"all providers failed — primary: {head} || chain: {chain_summary}",
+            provider=provider_id,
+            raw=(primary_resp.raw if primary_resp else {}),
         )
 
     def to_dict(self) -> dict:

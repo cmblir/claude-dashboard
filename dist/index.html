@@ -347,6 +347,24 @@ tailwind.config = {
   .lc-toast-ok   { border-left-color: #4ade80; }
   .lc-toast-warn { border-left-color: #fbbf24; }
   .lc-toast-err  { border-left-color: #fca5a5; }
+
+  /* Y4 (v2.66.11) — inline Mac-style terminal viewer for session replay. */
+  .mac-term { background: #1c1c1e; border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.5); border: 1px solid #2c2c2e; max-height: 80vh; display: flex; flex-direction: column; }
+  .mac-term-titlebar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: linear-gradient(to bottom, #3a3a3c, #2c2c2e); border-bottom: 1px solid #1a1a1c; user-select: none; }
+  .mac-term-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; cursor: pointer; }
+  .mac-dot-red    { background: #ff5f57; }
+  .mac-dot-yellow { background: #ffbd2e; }
+  .mac-dot-green  { background: #28c941; }
+  .mac-term-title { color: #c0c0c0; font-size: 12px; font-weight: 500; margin-left: 8px; flex: 1; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; }
+  .mac-term-spawn { background: rgba(255,255,255,0.08); color: #e0e0e0; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 3px 8px; font-size: 10px; cursor: pointer; }
+  .mac-term-spawn:hover { background: rgba(255,255,255,0.14); }
+  .mac-term-body { padding: 14px 18px; font-family: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #e8e8e8; overflow-y: auto; max-height: 70vh; line-height: 1.55; }
+  .mac-term-line { white-space: pre-wrap; word-break: break-word; padding: 1px 0; }
+  .mac-term-line.meta   { color: #6b6b6f; font-size: 11px; }
+  .mac-term-line.user   { color: #4ade80; padding: 4px 0 4px 8px; border-left: 2px solid #4ade80; margin: 6px 0; background: rgba(74,222,128,0.04); }
+  .mac-term-line.assist { color: #e8e8e8; padding: 2px 0 2px 12px; }
+  .mac-term-line .mac-prompt { color: #4ade80; margin-right: 6px; font-weight: 600; }
+  .mac-term-tools { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #3a3a3c; }
   /* S1 (v2.66.5) — mode-aware view-header accent. Subtle 2px top-bar
      tinted by current mode; helps the user remember which curated subset
      they're in. Applied via body[data-mode=*] selector so JS just toggles
@@ -4918,8 +4936,11 @@ async function _wfLoadTelemetry() {
       const label = isOthers ? t('기타 (집계)') : escapeHtml(w.name || w.workflowId || '?');
       const sr = (w.successRate||0).toFixed(1);
       const srColor = w.successRate >= 90 ? 'var(--ok)' : (w.successRate >= 70 ? 'var(--warn)' : 'var(--err, #f87171)');
-      return `<tr style="border-top:1px solid var(--border);font-size:11px;">
-        <td style="padding:4px 6px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</td>
+      // Y3 (v2.66.11) — clickable row → run-history modal for that wf
+      const clickAttrs = isOthers ? '' :
+        `style="cursor:pointer;" onclick="_wfOpenRunHistoryFor('${escapeHtml(w.workflowId)}')" title="${t('실행 이력 + 노드별 상세 보기')}"`;
+      return `<tr ${clickAttrs} style="border-top:1px solid var(--border);font-size:11px;">
+        <td style="padding:4px 6px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}${isOthers?'':' <span class="text-[9px]" style="color:var(--text-dim)">↗</span>'}</td>
         <td style="padding:4px 6px;">${w.totalRuns}</td>
         <td style="padding:4px 6px;color:var(--ok);">${w.successCount}</td>
         <td style="padding:4px 6px;color:var(--err, #f87171);">${w.failedCount}</td>
@@ -8565,6 +8586,21 @@ function _wfTutRender() {
   }
 }
 
+// Y3 (v2.66.11) — open run-history scoped to a specific workflowId. Used
+// from the telemetry table in the workflows tab so the user can drill
+// from "this wf has 3 failures" → "which runs failed, what was the
+// node output / error".
+window._wfOpenRunHistoryFor = async function(wfId) {
+  if (!wfId) return;
+  if (!__wf.current || __wf.current.id !== wfId) {
+    try { await _wfOpen(wfId); } catch (_) {}
+  }
+  if (!__wf.current || __wf.current.id !== wfId) {
+    toast(t('워크플로우를 불러올 수 없습니다'), 'err'); return;
+  }
+  await _wfShowRuns();
+};
+
 async function _wfShowRuns() {
   if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
   const r = await api('/api/workflows/runs?wfId=' + encodeURIComponent(__wf.current.id));
@@ -8708,7 +8744,10 @@ function _wfBuildRunsChart(runs) {
 }
 
 async function _wfOpenRun(runId) {
-  const s = await api('/api/workflows/run-status?runId=' + encodeURIComponent(runId));
+  // Y3 (v2.66.11) — full=1 returns un-truncated outputs so the detail
+  // modal shows the complete prompt / response / error per node. The
+  // poll/SSE path stays truncated (Y2) for performance.
+  const s = await api('/api/workflows/run-status?runId=' + encodeURIComponent(runId) + '&full=1');
   if (!s.ok) { toast(errMsg(s), 'err'); return; }
   _wfShowRunResult(s.run || {});
 }
@@ -16128,10 +16167,82 @@ async function openFolder(path) {
   const r = await api('/api/open-folder', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ folderPath: path }) });
   toast(r.ok ? '폴더 열림' : (r.error||'실패'), r.ok ? 'ok' : 'err');
 }
+// Y4 (v2.66.11) — inline mac-style terminal viewer. Replaces the previous
+// behaviour of spawning an OS-level Terminal app. Now we render the
+// session's recorded conversation (user prompts + assistant responses +
+// tool calls) in a Mac-style window inside the dashboard. The "open in
+// real terminal" button stays as an escape hatch for users who actually
+// want to spawn a shell.
 async function openSessionTerminal(sessionId) {
-  const r = await api('/api/open-session', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ sessionId }) });
-  toast(r.ok ? `터미널 활성화 (${r.app})` : (r.error||'실패'), r.ok ? 'ok' : 'err');
+  if (!sessionId) return;
+  showModalLoading(t('세션 불러오는 중…'));
+  let d;
+  try {
+    d = await api('/api/sessions/detail/' + encodeURIComponent(sessionId));
+  } catch (e) {
+    closeModal(); toast(e.message, 'err'); return;
+  }
+  if (d.error) { closeModal(); toast(errMsg(d), 'err'); return; }
+
+  const project = d.project || d.cwd || '';
+  const cwd = d.cwd || '';
+  const startedAt = d.started_at ? new Date(d.started_at).toLocaleString() : '';
+  const messages = d.messages || [];
+
+  // Build conversation lines mac-terminal style.
+  const lines = [];
+  lines.push(`<div class="mac-term-line meta">$ claude --resume ${sessionId.slice(0,8)}</div>`);
+  if (cwd) lines.push(`<div class="mac-term-line meta">cwd: ${escapeHtml(cwd)}</div>`);
+  if (startedAt) lines.push(`<div class="mac-term-line meta">started: ${escapeHtml(startedAt)}</div>`);
+  lines.push(`<div class="mac-term-line meta">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>`);
+  for (const m of messages) {
+    const tp = m.type || '';
+    const preview = (m.preview || m.content || '').toString();
+    if (!preview.trim()) continue;
+    if (tp === 'user') {
+      lines.push(`<div class="mac-term-line user"><span class="mac-prompt">▸</span> ${escapeHtml(preview)}</div>`);
+    } else if (tp === 'assistant') {
+      lines.push(`<div class="mac-term-line assist">${escapeHtml(preview)}</div>`);
+    } else {
+      lines.push(`<div class="mac-term-line meta">${escapeHtml(preview)}</div>`);
+    }
+  }
+  if (lines.length <= 4) lines.push(`<div class="mac-term-line meta">${t('(이 세션의 대화 기록이 아직 비어있습니다)')}</div>`);
+
+  const tools = (d.tools || []).slice(-30);
+  const toolsHtml = tools.length
+    ? `<div class="mac-term-tools">
+        <div class="text-[10px] mb-1" style="color:var(--text-dim);">${t('최근 도구 호출')} (${tools.length})</div>
+        ${tools.map(t2 => `<div class="mac-term-line meta">⚙ ${escapeHtml(t2.tool || '?')}${t2.subagent_type ? ' [' + escapeHtml(t2.subagent_type) + ']' : ''}${t2.had_error ? ' ❌' : ''}</div>`).join('')}
+      </div>`
+    : '';
+
+  showModal(`
+    <div class="mac-term">
+      <div class="mac-term-titlebar">
+        <span class="mac-term-dot mac-dot-red" onclick="closeModal()"></span>
+        <span class="mac-term-dot mac-dot-yellow"></span>
+        <span class="mac-term-dot mac-dot-green"></span>
+        <span class="mac-term-title">${t('세션')} · ${escapeHtml(project || '')}</span>
+        <button class="mac-term-spawn" onclick="_macTermSpawnReal('${escapeHtml(sessionId)}')" title="${t('실제 터미널에서 이어서 열기')}">↗ ${t('실제 터미널')}</button>
+      </div>
+      <div class="mac-term-body">
+        ${lines.join('')}
+        ${toolsHtml}
+      </div>
+    </div>
+  `, { wide: true });
+  // Auto-scroll to bottom of conversation
+  setTimeout(() => {
+    const b = document.querySelector('.mac-term-body');
+    if (b) b.scrollTop = b.scrollHeight;
+  }, 80);
 }
+
+window._macTermSpawnReal = async function(sessionId) {
+  const r = await api('/api/open-session', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ sessionId }) });
+  toast(r.ok ? `${t('터미널 활성화')} (${r.app})` : (r.error||t('실패')), r.ok ? 'ok' : 'err');
+};
 
 // ────────────────────────────────────────────────────────────────
 // PROJECT SUBAGENTS (역할 카탈로그 + 프로젝트별 관리)
