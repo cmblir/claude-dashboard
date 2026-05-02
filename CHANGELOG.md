@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.131] — 2026-05-02
+
+### Fixed
+- 🧹 **Sweep orphan chat drafts/histories on tab open** (QQ56). One-
+  time-per-tab-open scan: any `cc.lc.hist.<sid>` or
+  `cc.lc.draft.<sid>` whose `<sid>` is no longer in `cc.lc.sessions`
+  is removed. Cleans up legacy bytes left by users who deleted
+  sessions before QQ54 fixed the cleanup match. Bounded in time —
+  only runs when the chat view actually mounts.
+
+---
 ## [2.66.130] — 2026-05-02
 
 ### Fixed
