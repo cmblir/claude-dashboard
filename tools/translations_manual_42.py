@@ -292,6 +292,8 @@ NEW_EN: dict[str, str] = {
     "스트리밍 중단됨": "Stream cancelled",
     # QQ68 — send button tooltip
     "전송 (Enter)": "Send (Enter)",
+    # QQ93 — clear images
+    "이미지 모두 제거": "Clear all images",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -578,4 +580,6 @@ NEW_ZH: dict[str, str] = {
     "스트리밍 중단됨": "已取消流式输出",
     # QQ68
     "전송 (Enter)": "发送 (Enter)",
+    # QQ93
+    "이미지 모두 제거": "清除所有图片",
 }
