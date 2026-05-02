@@ -5966,6 +5966,46 @@ function _wfRenderInspector(opts) {
         </select>
       ` : ''}
     </div>
+
+    ${(() => {
+      // QQ46 (v2.66.121) — last-run mini Gantt: per-node duration bar
+      // chart sorted descending. Helps spot the slowest nodes at a glance.
+      const lr = __wf.lastRunResults || {};
+      const ids = Object.keys(lr);
+      if (ids.length < 2) return '';
+      const rows = ids
+        .map(id => ({ id, r: lr[id], n: (__wf.current.nodes||[]).find(nn => nn.id === id) }))
+        .filter(x => x.r && typeof x.r.durationMs === 'number' && x.r.durationMs > 0)
+        .sort((a, b) => b.r.durationMs - a.r.durationMs)
+        .slice(0, 12);
+      if (!rows.length) return '';
+      const max = rows[0].r.durationMs || 1;
+      const total = rows.reduce((s, x) => s + (x.r.durationMs || 0), 0);
+      return `
+        <div class="mb-4 pt-3 border-t border-[var(--border)]">
+          <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">📊 ${t('마지막 실행 — 노드별 소요')}</div>
+          <div class="text-[10px] mb-2" style="color:var(--text-dim);">${t('합계')}: ${fmtDur(total)} · ${t('상위')} ${rows.length} ${t('노드')}</div>
+          <div class="flex flex-col gap-1">
+            ${rows.map(x => {
+              const pct = Math.round(((x.r.durationMs||0) / max) * 100);
+              const isErr = x.r.status === 'err' || x.r.error;
+              const c = isErr ? '#f87171' : (x.r.pinned ? '#f59e0b' : '#60a5fa');
+              const label = (x.n && (x.n.title || x.n.type)) || x.id;
+              return `
+                <div onclick="__wf.selectedNodeId='${x.id}';__wf._inspectorDirty=true;_wfRenderInspector();_wfSyncSelectionClasses();" style="cursor:pointer;">
+                  <div class="flex justify-between items-center text-[10px]" style="color:var(--text-mute);">
+                    <span class="truncate" style="max-width:160px;">${escapeHtml(label)}</span>
+                    <span style="font-variant-numeric:tabular-nums;">${fmtDur(x.r.durationMs)}</span>
+                  </div>
+                  <div style="height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;margin-top:2px;">
+                    <div style="height:100%;width:${pct}%;background:${c};"></div>
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    })()}
   `;
   // 선택된 노드가 있으면 요약 + 편집/삭제 버튼
   let nodeBlock = '';
