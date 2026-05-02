@@ -2435,6 +2435,7 @@
   "선택 노드 그룹 만들기 (Shift+클릭)": "Create group from selected nodes (Shift+Click)",
   "선택 노드 복사": "Copy selected node",
   "선택 노드 복제": "Duplicate selected node",
+  "선택 노드 편집창 열기": "Open editor for selected node",
   "선택 노드/엣지 삭제": "Delete selected node/edge",
   "선택 안 함": "— none —",
   "선택 취소": "Cancel selected",
