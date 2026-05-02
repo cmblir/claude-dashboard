@@ -2240,6 +2240,7 @@
   "본문을 입력하세요": "Enter body",
   "볼륨 마운트 경로 (선택)": "Volume mount path (optional)",
   "부모 경로 (홈 내부)": "Parent path (inside $HOME)",
+  "부모 세션으로 이동": "Jump to parent session",
   "부분": "Partial",
   "부재 안내": "Absence notice",
   "부팅 시 호출 — 첫 요청의 6초 지연을 제거한다.": "Called at boot — removes the 6-second first-request latency.",

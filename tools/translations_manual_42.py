@@ -226,6 +226,8 @@ NEW_EN: dict[str, str] = {
     "분기": "branch",
     "새 분기 생성됨": "New branch created",
     "메시지": "messages",
+    # QQ24 — branch lineage in sidebar
+    "부모 세션으로 이동": "Jump to parent session",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -446,4 +448,6 @@ NEW_ZH: dict[str, str] = {
     "분기": "分支",
     "새 분기 생성됨": "已创建新分支",
     "메시지": "条消息",
+    # QQ24
+    "부모 세션으로 이동": "跳转到父会话",
 }
