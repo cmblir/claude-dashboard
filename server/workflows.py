@@ -3295,6 +3295,32 @@ def api_workflow_run_status(query: dict) -> dict:
     return _run_status_snapshot(rid, full=full)
 
 
+def api_workflow_run_force_finish(body: dict) -> dict:
+    """POST /api/workflows/run-force-finish — manual recovery for runs
+    that finished all node work but never had `_mark_done` called
+    (post-run hook hung on SQLite contention etc.). FF3 (v2.66.18)."""
+    rid = ""
+    if isinstance(body, dict):
+        rid = (body.get("runId") or "").strip()
+    if not (rid and _RUN_ID_RE.match(rid)):
+        return {"ok": False, "error": "invalid runId"}
+    snap = _runs_cache_get(rid)
+    if not snap:
+        # Already persisted to disk — nothing to force.
+        return {"ok": False, "error": "run not in cache"}
+    results = snap.get("nodeResults") or {}
+    any_err = any((r or {}).get("status") == "err" for r in results.values())
+    final_status = "err" if any_err else "ok"
+    def _force(r: dict) -> None:
+        r["status"] = final_status
+        r["finishedAt"] = int(time.time() * 1000)
+        r["currentNodeId"] = None
+    _runs_cache_update(rid, _force)
+    _persist_run(rid)
+    _runs_cache_pop(rid)
+    return {"ok": True, "runId": rid, "status": final_status}
+
+
 def api_workflow_preflight(body: dict) -> dict:
     """POST /api/workflows/preflight — pre-run provider availability check.
 

@@ -7305,6 +7305,33 @@ async function _wfRun() {
 
 function _wfApplyRunStatus(run) {
   const results = run.nodeResults || {};
+  // FF3 (v2.66.18) — defensive: if every workflow node has reached a
+  // terminal status (ok/err/skipped) but the run.status is still
+  // 'running' (server-side post-run hook hung — SQLite lock, persistence
+  // race, etc.), promote the banner state client-side so the user isn't
+  // stuck staring at a 100%-progress "실행 중" banner.
+  const nodes = (__wf.current && __wf.current.nodes) || [];
+  if (run && run.status === 'running' && nodes.length > 0) {
+    const allTerminal = nodes.every(n => {
+      const r = results[n.id];
+      return r && (r.status === 'ok' || r.status === 'err' || r.status === 'skipped');
+    });
+    if (allTerminal) {
+      const anyErr = nodes.some(n => (results[n.id] || {}).status === 'err');
+      run = Object.assign({}, run, {
+        status: anyErr ? 'err' : 'ok',
+        finishedAt: run.finishedAt || Date.now(),
+        currentNodeId: null,
+      });
+      // Mark the runId as locally-completed so polling loops exit too.
+      if (__wf.runId) {
+        __wf.runId = null;
+        _wfSetRunButtonState(false);
+        _wfStopSSE && _wfStopSSE();
+        if (__wf.pollTimer) { clearInterval(__wf.pollTimer); __wf.pollTimer = null; }
+      }
+    }
+  }
   __wf.lastRunResults = results;
   __wf.lastRun = run;
   // CC2 (v2.66.14) — start the independent elapsed-time ticker. SSE only

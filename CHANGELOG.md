@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.18] — 2026-05-02
+
+### Fixed
+- 🩹 **Run banner stuck at 100% / "실행 중"** even after every node
+  reached a terminal status (FF3). Triple-layer fix:
+  1. **Server SQLite contention** — `_db()` now opens with
+     `timeout=10.0` and `PRAGMA busy_timeout=10000`, so a write lock
+     held by the session-indexer thread can't deadlock the
+     post-run cost write that gates `_mark_done`.
+  2. **Frontend defensive auto-promote** — when every workflow node
+     has a terminal status (ok/err/skipped) but `run.status` is still
+     `running`, the client now flips the banner to `완료/실패` itself,
+     stops polling, and resets the run button.
+  3. **Manual recovery endpoint** — `POST /api/workflows/run-force-finish`
+     marks any in-cache run as ok/err based on its node results, so
+     stuck runs can be cleared without restarting the server.
+
+---
 ## [2.66.17] — 2026-05-02
 
 ### Fixed
