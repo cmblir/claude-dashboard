@@ -4210,6 +4210,7 @@ function _wfShowShortcutHelp() {
     { key: 'Ctrl+M', desc: t('미니맵 토글') },
     { key: 'Tab / Shift+Tab', desc: t('다음 / 이전 노드 선택') },
     { key: 'Ctrl+E / Enter', desc: t('선택 노드 편집창 열기') },
+    { key: 'Ctrl+Enter', desc: t('워크플로우 실행 / 중단') },
     { key: 'Ctrl+0', desc: t('화면 맞춤') },
     { key: 'Ctrl+1', desc: t('100% 줌으로 리셋') },
     { key: 'Ctrl++ / -', desc: t('줌 인/아웃') },
@@ -4626,6 +4627,15 @@ function _wfBindCanvas() {
         const si = document.getElementById('wfNodeSearch');
         if (si) { e.preventDefault(); si.focus(); return true; }
         return;
+      }
+
+      // LL13 (v2.66.42) — Cmd/Ctrl + Enter — execute the workflow
+      // (or cancel if already running). n8n-style "press play".
+      // Avoids the browser-reload conflict that Cmd+R would trigger.
+      if (mod && e.key === 'Enter' && !inInput) {
+        e.preventDefault();
+        if (typeof _wfRunOrCancel === 'function') _wfRunOrCancel();
+        return true;
       }
 
       // LL12 (v2.66.41) — Cmd/Ctrl + E — open the editor for the
