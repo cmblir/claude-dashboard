@@ -4229,6 +4229,7 @@ function _wfShowShortcutHelp() {
     { key: 'Tab / Shift+Tab', desc: t('다음 / 이전 노드 선택') },
     { key: 'Ctrl+E / Enter', desc: t('선택 노드 편집창 열기') },
     { key: 'Ctrl+Enter', desc: t('워크플로우 실행 / 중단') },
+    { key: 'Ctrl+N', desc: t('새 노드 추가') },
     { key: 'Ctrl+0', desc: t('화면 맞춤') },
     { key: 'Ctrl+1', desc: t('100% 줌으로 리셋') },
     { key: 'Ctrl++ / -', desc: t('줌 인/아웃') },
@@ -4725,6 +4726,16 @@ function _wfCloseNodeContextMenu() {
         const si = document.getElementById('wfNodeSearch');
         if (si) { e.preventDefault(); si.focus(); return true; }
         return;
+      }
+
+      // LL16 (v2.66.45) — Cmd/Ctrl + N — open the new-node editor.
+      // Browser intercepts plain Cmd+N for new window, but inside our
+      // event scope (workflows tab + non-input) we get a chance.
+      if (mod && (e.key === 'n' || e.key === 'N') && !inInput
+          && state.view === 'workflows') {
+        e.preventDefault();
+        if (typeof _wfOpenNodeEditor === 'function') _wfOpenNodeEditor(null);
+        return true;
       }
 
       // LL13 (v2.66.42) — Cmd/Ctrl + Enter — execute the workflow
