@@ -130,10 +130,29 @@ def _db_init() -> None:
                 CREATE INDEX IF NOT EXISTS idx_tool_subagent_ts ON tool_uses(subagent_type, ts);
                 """)
 
+                # W4 (v2.66.9) — perf-agent finding: features.py time-window
+                # aggregations (`WHERE ts >= ?`, `WHERE tool='Agent' AND ts >= ?`)
+                # full-scan tool_uses currently. Add ts + (tool, ts) so the
+                # daily/weekly stats roll-ups stay sub-ms even as the table
+                # grows past 100k+ rows.
+                c.executescript("""
+                CREATE INDEX IF NOT EXISTS idx_tool_ts ON tool_uses(ts);
+                CREATE INDEX IF NOT EXISTS idx_tool_name_ts ON tool_uses(tool, ts);
+                """)
+
                 # agent_edges — ts-window queries (agent_graph edges) full-scan
                 # currently; add a ts index so growth stays bounded.
                 c.executescript("""
                 CREATE INDEX IF NOT EXISTS idx_edge_ts ON agent_edges(ts);
+                """)
+
+                # W4 — sessions(cwd, score DESC) for the briefing/recommend
+                # hot path that filters by cwd and orders by score. Existing
+                # idx_sess_cwd_started covers the cwd filter but forces a
+                # TEMP B-TREE sort on score; adding the composite kills the
+                # sort step.
+                c.executescript("""
+                CREATE INDEX IF NOT EXISTS idx_sess_cwd_score ON sessions(cwd, score DESC);
                 """)
 
                 # Workflow cost tracking table

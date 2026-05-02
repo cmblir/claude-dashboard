@@ -336,10 +336,29 @@ def _empty_store() -> dict:
     return {"version": 1, "workflows": {}, "runs": {}, "customTemplates": {}}
 
 
+# W3 (v2.66.9) — mtime+size keyed memo around _load_all. Workflows JSON
+# is read on every API hit (list / get / templates / runs); the file is
+# 60 KB+ in real use, so re-parsing it for every read is wasted work.
+# The memo invalidates automatically on _safe_write since stat changes;
+# _dump_all also explicitly clears the cache to avoid stale serves
+# during concurrent writes within the same process.
+import copy as _copy
+_LOAD_CACHE = {"key": None, "data": None, "lock": threading.Lock()}
+
+
 def _load_all() -> dict:
     """파일 로드. 없거나 파싱 실패 시 빈 store 반환."""
     if not WORKFLOWS_PATH.exists():
         return _empty_store()
+    try:
+        st = WORKFLOWS_PATH.stat()
+        cache_key = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        cache_key = None
+    with _LOAD_CACHE["lock"]:
+        if cache_key is not None and cache_key == _LOAD_CACHE["key"] \
+                and _LOAD_CACHE["data"] is not None:
+            return _copy.deepcopy(_LOAD_CACHE["data"])
     try:
         data = json.loads(_safe_read(WORKFLOWS_PATH) or "{}")
         if not isinstance(data, dict):
@@ -354,6 +373,9 @@ def _load_all() -> dict:
             data["runs"] = {}
         if not isinstance(data["customTemplates"], dict):
             data["customTemplates"] = {}
+        with _LOAD_CACHE["lock"]:
+            _LOAD_CACHE["key"] = cache_key
+            _LOAD_CACHE["data"] = _copy.deepcopy(data)
         return data
     except Exception as e:
         log.warning("workflows load failed: %s — using empty store", e)
@@ -366,7 +388,12 @@ def _dump_all(data: dict) -> bool:
     except Exception as e:
         log.error("workflows dump json failed: %s", e)
         return False
-    return _safe_write(WORKFLOWS_PATH, text)
+    ok = _safe_write(WORKFLOWS_PATH, text)
+    if ok:
+        with _LOAD_CACHE["lock"]:
+            _LOAD_CACHE["key"] = None
+            _LOAD_CACHE["data"] = None
+    return ok
 
 
 # ───────── 검증 / sanitize ─────────

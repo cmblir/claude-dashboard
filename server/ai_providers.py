@@ -614,9 +614,16 @@ class CodexProvider(BaseProvider):
         return bool(self._bin())
 
     def list_models(self) -> list[ModelInfo]:
+        # v2.66.9 — refreshed for late-2025 Codex CLI (gpt-5-codex, o3-pro,
+        # o4 family). Pricing tracks OpenAI list as of release; verify on
+        # https://openai.com/api/pricing if upstream rotates.
         return [
+            ModelInfo("gpt-5-codex", "GPT-5 Codex", 400_000,
+                      1.25, 10.0, note="Codex flagship"),
+            ModelInfo("o3-pro", "o3-pro", 200_000,
+                      20.0, 80.0, note="최고 추론 (deep reasoning)"),
             ModelInfo("o4-mini", "o4-mini", 200_000,
-                      1.10, 4.40, note="Codex 기본 모델"),
+                      1.10, 4.40, note="기본 빠른 모델"),
             ModelInfo("o3", "o3", 200_000,
                       2.0, 8.0, note="고성능 추론"),
             ModelInfo("gpt-4.1", "GPT-4.1", 1_000_000,
@@ -1159,6 +1166,191 @@ class GeminiApiProvider(BaseProvider):
         )
 
 
+class _OpenAICompatibleProvider(BaseProvider):
+    """Base for OpenAI-compatible chat-completions APIs (Groq, DeepSeek, etc).
+
+    Subclasses set ``provider_id`` / ``provider_name`` / ``icon`` /
+    ``homepage`` / ``_BASE_URL`` / ``_ENV_VAR`` / ``_MODELS`` / optional
+    default model via ``_DEFAULT_MODEL``. The chat call shape is exactly
+    the OpenAI v1/chat/completions contract — auth header + JSON body
+    with model + messages + max_tokens — so duplicating the wire code
+    is wasted work.
+    """
+
+    provider_type = "api"
+    capabilities = [CAP_CHAT, CAP_CODE]
+    _BASE_URL = ""           # subclasses override
+    _ENV_VAR = ""            # e.g. "GROQ_API_KEY"
+    _MODELS: list = []
+    _DEFAULT_MODEL = ""
+
+    def __init__(self, api_key: str = ""):
+        self._api_key = api_key or os.environ.get(self._ENV_VAR, "")
+
+    def is_available(self) -> bool:
+        return bool(self._api_key)
+
+    def list_models(self) -> list[ModelInfo]:
+        return list(self._MODELS)
+
+    def execute(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str = "",
+        model: str = "",
+        cwd: str = "",
+        timeout: int = 300,
+        extra: dict | None = None,
+    ) -> AIResponse:
+        import urllib.request
+        import urllib.error
+
+        t0 = int(time.time() * 1000)
+        if not self._api_key:
+            return AIResponse(
+                status="err", error=f"{self._ENV_VAR} not set",
+                provider=self.provider_id,
+                duration_ms=int(time.time() * 1000) - t0,
+            )
+        model = model or self._DEFAULT_MODEL or (
+            self._MODELS[0].id if self._MODELS else "")
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        body = json.dumps({
+            "model": model,
+            "messages": messages,
+            "max_tokens": int((extra or {}).get("max_tokens", 4096)),
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            self._BASE_URL.rstrip("/") + "/chat/completions",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._api_key}",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            err_body = ""
+            try:
+                err_body = e.read().decode("utf-8")[:500]
+            except Exception:
+                pass
+            return AIResponse(
+                status="err", error=f"HTTP {e.code}: {err_body}",
+                provider=self.provider_id, model=model,
+                duration_ms=int(time.time() * 1000) - t0,
+            )
+        except Exception as e:
+            return AIResponse(
+                status="err", error=str(e),
+                provider=self.provider_id, model=model,
+                duration_ms=int(time.time() * 1000) - t0,
+            )
+        duration = int(time.time() * 1000) - t0
+        output = ""
+        choices = data.get("choices", [])
+        if choices:
+            output = (choices[0].get("message") or {}).get("content", "")
+        usage = data.get("usage") or {}
+        ti = usage.get("prompt_tokens", 0)
+        to_ = usage.get("completion_tokens", 0)
+        cost = self.estimate_cost(model, ti, to_)
+        return AIResponse(
+            status="ok", output=output,
+            provider=self.provider_id, model=model,
+            tokens_in=ti, tokens_out=to_, tokens_total=ti + to_,
+            cost_usd=cost, duration_ms=duration, raw=data,
+        )
+
+
+class GroqApiProvider(_OpenAICompatibleProvider):
+    """Groq API — fast LPU inference for open models."""
+    provider_id = "groq-api"
+    provider_name = "Groq (API)"
+    homepage = "https://console.groq.com"
+    icon = "⚡"
+    _BASE_URL = "https://api.groq.com/openai/v1"
+    _ENV_VAR = "GROQ_API_KEY"
+    _DEFAULT_MODEL = "llama-3.3-70b-versatile"
+    _MODELS = [
+        ModelInfo("llama-3.3-70b-versatile", "Llama 3.3 70B", 131_072,
+                  0.59, 0.79, note="범용 강력"),
+        ModelInfo("llama-3.1-8b-instant", "Llama 3.1 8B Instant", 131_072,
+                  0.05, 0.08, note="저렴 + 빠름"),
+        ModelInfo("mixtral-8x7b-32768", "Mixtral 8×7B", 32_768,
+                  0.24, 0.24, note="MoE"),
+        ModelInfo("deepseek-r1-distill-llama-70b", "DeepSeek R1 70B (distilled)",
+                  131_072, 0.75, 0.99, note="추론",
+                  capabilities=[CAP_CHAT, CAP_REASONING]),
+    ]
+
+
+class DeepSeekApiProvider(_OpenAICompatibleProvider):
+    """DeepSeek API — original DeepSeek V3 / R1 chat + reasoning."""
+    provider_id = "deepseek-api"
+    provider_name = "DeepSeek (API)"
+    homepage = "https://platform.deepseek.com"
+    icon = "🐳"
+    _BASE_URL = "https://api.deepseek.com/v1"
+    _ENV_VAR = "DEEPSEEK_API_KEY"
+    _DEFAULT_MODEL = "deepseek-chat"
+    capabilities = [CAP_CHAT, CAP_CODE, CAP_REASONING]
+    _MODELS = [
+        ModelInfo("deepseek-chat", "DeepSeek V3", 64_000,
+                  0.27, 1.10, note="범용"),
+        ModelInfo("deepseek-reasoner", "DeepSeek R1", 64_000,
+                  0.55, 2.19, note="추론 (CoT)",
+                  capabilities=[CAP_CHAT, CAP_REASONING]),
+    ]
+
+
+class MistralApiProvider(_OpenAICompatibleProvider):
+    """Mistral La Plateforme."""
+    provider_id = "mistral-api"
+    provider_name = "Mistral (API)"
+    homepage = "https://console.mistral.ai"
+    icon = "🌬️"
+    _BASE_URL = "https://api.mistral.ai/v1"
+    _ENV_VAR = "MISTRAL_API_KEY"
+    _DEFAULT_MODEL = "mistral-large-latest"
+    _MODELS = [
+        ModelInfo("mistral-large-latest", "Mistral Large", 128_000,
+                  2.0, 6.0, note="플래그십"),
+        ModelInfo("mistral-medium-latest", "Mistral Medium", 32_000,
+                  0.40, 2.00, note="중간"),
+        ModelInfo("mistral-small-latest", "Mistral Small", 32_000,
+                  0.20, 0.60, note="저렴"),
+        ModelInfo("codestral-latest", "Codestral", 256_000,
+                  0.30, 0.90, note="코드 특화",
+                  capabilities=[CAP_CHAT, CAP_CODE]),
+    ]
+
+
+class XAIApiProvider(_OpenAICompatibleProvider):
+    """xAI Grok API."""
+    provider_id = "xai-api"
+    provider_name = "xAI Grok (API)"
+    homepage = "https://x.ai/api"
+    icon = "🇽"
+    _BASE_URL = "https://api.x.ai/v1"
+    _ENV_VAR = "XAI_API_KEY"
+    _DEFAULT_MODEL = "grok-4"
+    _MODELS = [
+        ModelInfo("grok-4", "Grok 4", 256_000,
+                  3.0, 15.0, note="플래그십"),
+        ModelInfo("grok-3", "Grok 3", 131_072,
+                  3.0, 15.0, note="강력"),
+        ModelInfo("grok-3-mini", "Grok 3 Mini", 131_072,
+                  0.30, 0.50, note="저렴"),
+    ]
+
+
 class AnthropicApiProvider(BaseProvider):
     """Anthropic Messages API — claude CLI 없이 직접 API 호출."""
 
@@ -1509,6 +1701,13 @@ class ProviderRegistry:
                 "ollama": "ollama",
                 "ollama-api": "ollama-api",
                 "codex": "codex",
+                # v2.66.9 — OpenAI-compatible third-party APIs
+                "groq": "groq-api",
+                "deepseek": "deepseek-api",
+                "mistral": "mistral-api",
+                "codestral": "mistral-api",
+                "xai": "xai-api",
+                "grok": "xai-api",
             }
             pid = PROVIDER_ALIASES.get(provider_hint, provider_hint)
 
@@ -1703,6 +1902,11 @@ def get_registry() -> ProviderRegistry:
     reg.register(GeminiApiProvider())
     reg.register(AnthropicApiProvider())
     reg.register(OllamaApiProvider())
+    # v2.66.9 — OpenAI-compatible third-party APIs
+    reg.register(GroqApiProvider())
+    reg.register(DeepSeekApiProvider())
+    reg.register(MistralApiProvider())
+    reg.register(XAIApiProvider())
 
     # 사용자 정의 프로바이더 로드 (ai_keys.py 에서 설정 파일 읽기)
     try:

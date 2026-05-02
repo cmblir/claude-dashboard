@@ -31,10 +31,27 @@ PROVIDERS_CONFIG_PATH = _env_path(
 
 # ───────── 로드/저장 ─────────
 
+# W3 (v2.66.9) — mtime+size memo for the providers config. Hit on every
+# AI call (load_api_keys → _load_config) and every 18+ internal site,
+# so a 5–10 ms parse becomes effectively free for warm reads.
+import copy as _copy
+import threading as _threading
+_AIK_CACHE = {"key": None, "data": None, "lock": _threading.Lock()}
+
+
 def _load_config() -> dict:
     """프로바이더 설정 파일 로드. 없으면 기본 구조 반환."""
     if not PROVIDERS_CONFIG_PATH.exists():
         return _default_config()
+    try:
+        st = PROVIDERS_CONFIG_PATH.stat()
+        cache_key = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        cache_key = None
+    with _AIK_CACHE["lock"]:
+        if cache_key is not None and cache_key == _AIK_CACHE["key"] \
+                and _AIK_CACHE["data"] is not None:
+            return _copy.deepcopy(_AIK_CACHE["data"])
     try:
         data = json.loads(_safe_read(PROVIDERS_CONFIG_PATH))
         if not isinstance(data, dict):
@@ -45,6 +62,9 @@ def _load_config() -> dict:
         data.setdefault("fallbackChain", [])
         data.setdefault("defaultModels", {})
         data.setdefault("providerSettings", {})
+        with _AIK_CACHE["lock"]:
+            _AIK_CACHE["key"] = cache_key
+            _AIK_CACHE["data"] = _copy.deepcopy(data)
         return data
     except Exception as e:
         log.warning("ai providers config load failed: %s", e)
@@ -55,10 +75,15 @@ def _save_config(data: dict) -> bool:
     """설정 파일 저장 (atomic write)."""
     try:
         text = json.dumps(data, ensure_ascii=False, indent=2)
-        return _safe_write(PROVIDERS_CONFIG_PATH, text)
+        ok = _safe_write(PROVIDERS_CONFIG_PATH, text)
     except Exception as e:
         log.error("ai providers config save failed: %s", e)
         return False
+    if ok:
+        with _AIK_CACHE["lock"]:
+            _AIK_CACHE["key"] = None
+            _AIK_CACHE["data"] = None
+    return ok
 
 
 def _default_config() -> dict:

@@ -6,6 +6,17 @@ Loaded by ``tools/translations_manual.py``.
 from __future__ import annotations
 
 NEW_EN: dict[str, str] = {
+    # W1 (v2.66.9) — Orchestrator config picker UI
+    "가용 프로바이더 없음 — AI 프로바이더 탭에서 키 설정":
+        "No available provider — set keys in the AI Providers tab",
+    "사용자 메시지를 단계별로 분해하는 모델":
+        "Model that breaks the user's message into sub-tasks",
+    "서브 에이전트 결과를 합쳐 채널 회신을 작성":
+        "Merges sub-agent outputs into the channel reply",
+    "아래 + 버튼으로 추가":  "Add via the + below",
+    "어사이니 추가":         "Add assignee",
+    "플래너가 작업 분배 시 후보로 사용하는 모델 목록":
+        "Candidate models the planner picks from when fanning out tasks",
     # U1 — System tab refactor (newly t()-wrapped strings)
     "편집은 \"Settings 편집\" 또는 \"권한\" 탭에서.": "Edit via the \"Settings 편집\" or \"권한\" tab.",
     # M1 — System tab boot-timing card
@@ -22,6 +33,15 @@ NEW_EN: dict[str, str] = {
 }
 
 NEW_ZH: dict[str, str] = {
+    # W1 — Orchestrator picker UI
+    "가용 프로바이더 없음 — AI 프로바이더 탭에서 키 설정":
+        "无可用提供商 — 在 AI 提供商标签中设置密钥",
+    "사용자 메시지를 단계별로 분해하는 모델": "将用户消息分解为子任务的模型",
+    "서브 에이전트 결과를 합쳐 채널 회신을 작성": "合并子代理输出后写入频道回复",
+    "아래 + 버튼으로 추가":  "通过下方 + 按钮添加",
+    "어사이니 추가":         "添加 assignee",
+    "플래너가 작업 분배 시 후보로 사용하는 모델 목록":
+        "规划器分发任务时使用的候选模型列表",
     # U1 — System tab refactor
     "편집은 \"Settings 편집\" 또는 \"권한\" 탭에서.": "在 \"Settings 编辑\" 或 \"权限\" 标签中编辑。",
     # M1 — System tab boot-timing card

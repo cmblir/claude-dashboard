@@ -2114,6 +2114,17 @@ let _tabNavigating = false;
 
 function go(id) {
   if (state.view === 'rtk' && id !== 'rtk' && typeof _rtkStopPolling === 'function') _rtkStopPolling();
+  // W5 (v2.66.9) — close any leaked EventSource / interval timers when
+  // navigating away. Prevents the orchestrator + ralph SSE connections
+  // (and the ralph-list polling timer) from holding HTTP sockets +
+  // DOM refs open after the user moves on. The AFTER hooks already do
+  // this on tab-leave when registered, but not every view registers
+  // one — defence in depth.
+  if (id !== state.view) {
+    try { if (state.data._orchEs) { state.data._orchEs.close(); state.data._orchEs = null; } } catch (_) {}
+    try { if (state.data._ralphEs) { state.data._ralphEs.close(); state.data._ralphEs = null; } } catch (_) {}
+    try { if (state.data._ralphPollTimer) { clearInterval(state.data._ralphPollTimer); state.data._ralphPollTimer = null; } } catch (_) {}
+  }
   // 히스토리에 기록 — 알트 ±로 이동 중일 때는 append 안 함
   if (!_tabNavigating && id !== _tabHistory[_tabHistoryIdx]) {
     _tabHistory.splice(_tabHistoryIdx + 1);
@@ -18898,11 +18909,12 @@ function _artSetFormat(f) {
 // ORCHESTRATOR — Slack/Telegram → Claude planner → multi-agent dispatch
 // ────────────────────────────────────────────────────────────────
 VIEWS.orchestrator = async () => {
-  const [cfgR, slkR, tgR, histR] = await Promise.all([
+  const [cfgR, slkR, tgR, histR, provR] = await Promise.all([
     api('/api/orchestrator/config'),
     api('/api/slack/config'),
     api('/api/telegram/config'),
     api('/api/orchestrator/history?limit=20'),
+    api('/api/ai-providers/list'),
   ]);
   if (!cfgR.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}</div>`;
   const cfg = cfgR.config || {};
@@ -18910,6 +18922,43 @@ VIEWS.orchestrator = async () => {
   const bindings = cfg.bindings || [];
   const slackOk = slkR && slkR.configured;
   const tgOk    = tgR && tgR.configured;
+
+  // W1 (v2.66.9) — picker-friendly assignee list. Build from
+  // /api/ai-providers/list, restricted to *available* providers, and
+  // grouped by provider in a single <select>. The full
+  // ``provider:model`` string is the value (matches what
+  // ``execute_with_assignee`` parses).
+  const allProvs = (provR && provR.providers) || [];
+  const availProvs = allProvs.filter(p => p.available && (p.models || []).length > 0);
+  // Provider-alias short names so the option labels stay readable
+  const _provAlias = {
+    'claude-cli': 'claude',     'claude': 'claude',
+    'anthropic-api': 'claude-api', 'openai-api': 'openai',
+    'gemini-cli': 'gemini',     'gemini-api': 'gemini-api',
+    'ollama': 'ollama',         'ollama-api': 'ollama-api',
+    'codex': 'codex',           'groq-api': 'groq',
+    'deepseek-api': 'deepseek',
+  };
+  function _buildAssigneeOptions(selected) {
+    if (!availProvs.length) {
+      return `<option value="" disabled>${t('가용 프로바이더 없음 — AI 프로바이더 탭에서 키 설정')}</option>`;
+    }
+    return availProvs.map(p => {
+      const alias = _provAlias[p.id] || p.id;
+      const opts = (p.models || []).map(m => {
+        const val = `${alias}:${(m.id || '').replace(/^claude-|^gemini-|^gpt-|^o[0-9-]+$/, x=>x)}`;
+        // Keep the exact user-facing model id; the backend's
+        // resolve_assignee handles aliases.
+        const v = `${alias}:${(m.id || '').split('-').pop().replace('gemini:', '').replace('opus-4-7','opus').replace('sonnet-4-6','sonnet').replace('haiku-4-5','haiku') || m.id}`;
+        const label = `${m.label || m.id}${m.contextWindow ? ' · ' + (m.contextWindow/1000) + 'k' : ''}`;
+        const vSafe = escapeHtml(`${alias}:${m.id.replace(/^claude-/, '')}`);
+        return `<option value="${vSafe}" ${selected === `${alias}:${m.id.replace(/^claude-/, '')}` ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+      }).join('');
+      return `<optgroup label="${escapeHtml(p.icon + ' ' + p.name)}">${opts}</optgroup>`;
+    }).join('');
+  }
+  // For the multi-select we keep the existing CSV underneath but render
+  // a chip picker on top. Toggling a chip updates the CSV state.
 
   const bindRows = bindings.length ? bindings.map((b, i) => `
     <tr class="text-[11px]">
@@ -18931,13 +18980,41 @@ VIEWS.orchestrator = async () => {
         <div class="text-[11px] mt-3" style="color:var(--text-dim)">${t('가용 프로바이더')}: ${escapeHtml(avail)}</div>
         <button class="chip text-[10px] mt-3" onclick="_orchStart()">${t('리스너 시작')}</button>
       </div>
-      <div class="card p-4">
-        <div class="text-[12px] font-semibold mb-2">${t('기본 설정')}</div>
-        <label class="text-[11px] block mb-1">${t('플래너')}: <input id="orchPlanner" class="text-[11px] bg-transparent border-b" value="${escapeHtml(cfg.plannerAssignee || '')}"></label>
-        <label class="text-[11px] block mb-1">${t('취합기')}: <input id="orchAggregator" class="text-[11px] bg-transparent border-b" value="${escapeHtml(cfg.aggregatorAssignee || '')}"></label>
-        <label class="text-[11px] block mb-1">${t('기본 어사이니')} (csv): <input id="orchDefaults" class="text-[11px] bg-transparent border-b w-full" value="${escapeHtml((cfg.defaultAssignees || []).join(', '))}"></label>
-        <label class="text-[11px] block mb-1">${t('동시 실행')}: <input id="orchParallel" type="number" min="1" max="16" class="text-[11px] bg-transparent border-b w-16" value="${cfg.maxParallel || 4}"></label>
-        <button class="chip text-[10px] mt-2" onclick="_orchSaveCfg()">${t('저장')}</button>
+      <div class="lc-card">
+        <div class="lc-section-title">${t('기본 설정')}</div>
+        <label class="text-[11px] block mb-3">
+          <span class="lc-section-sub">${t('플래너')}</span>
+          <select id="orchPlanner" class="input mt-1">
+            ${_buildAssigneeOptions(cfg.plannerAssignee)}
+          </select>
+          <div class="text-[10px] mt-1" style="color:var(--text-dim)">${t('사용자 메시지를 단계별로 분해하는 모델')}</div>
+        </label>
+        <label class="text-[11px] block mb-3">
+          <span class="lc-section-sub">${t('취합기')}</span>
+          <select id="orchAggregator" class="input mt-1">
+            ${_buildAssigneeOptions(cfg.aggregatorAssignee)}
+          </select>
+          <div class="text-[10px] mt-1" style="color:var(--text-dim)">${t('서브 에이전트 결과를 합쳐 채널 회신을 작성')}</div>
+        </label>
+        <div class="text-[11px] block mb-3">
+          <span class="lc-section-sub">${t('기본 어사이니')}</span>
+          <div id="orchAssigneeChips" class="flex flex-wrap gap-1 mt-1 mb-2 min-h-[28px] p-2" style="border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,0.02);">
+            ${((cfg.defaultAssignees || []).map(a => `
+              <span class="chip text-[10px]" style="cursor:pointer;background:rgba(167,139,250,0.18);border-color:rgba(167,139,250,0.4);" onclick="_orchToggleAssignee('${escapeHtml(a)}')">${escapeHtml(a)} ✕</span>
+            `).join('') || `<span class="text-[10px]" style="color:var(--text-dim)">${t('아래 + 버튼으로 추가')}</span>`)}
+          </div>
+          <select id="orchAssigneePicker" class="input" onchange="if(this.value){_orchToggleAssignee(this.value);this.value='';}">
+            <option value="">+ ${t('어사이니 추가')}</option>
+            ${_buildAssigneeOptions('')}
+          </select>
+          <input id="orchDefaults" type="hidden" value="${escapeHtml((cfg.defaultAssignees || []).join(','))}">
+          <div class="text-[10px] mt-1" style="color:var(--text-dim)">${t('플래너가 작업 분배 시 후보로 사용하는 모델 목록')}</div>
+        </div>
+        <label class="text-[11px] block mb-3">
+          <span class="lc-section-sub">${t('동시 실행')}</span>
+          <input id="orchParallel" type="number" min="1" max="16" class="input mt-1" style="width:80px;" value="${cfg.maxParallel || 4}">
+        </label>
+        <button class="btn text-xs" onclick="_orchSaveCfg()">${t('저장')}</button>
       </div>
       <div class="card p-4 lg:col-span-2">
         <div class="flex items-center justify-between mb-2">
@@ -19109,6 +19186,25 @@ AFTER.orchestrator = () => {
     state.data._orchEs = null;
   }
 };
+
+// W1 (v2.66.9) — chip-based multi-picker for default assignees. The
+// hidden #orchDefaults input mirrors the chip list as a CSV so the save
+// path stays the same.
+function _orchToggleAssignee(value) {
+  const hidden = document.getElementById('orchDefaults');
+  if (!hidden) return;
+  const cur = (hidden.value || '').split(',').map(s => s.trim()).filter(Boolean);
+  const idx = cur.indexOf(value);
+  if (idx >= 0) cur.splice(idx, 1); else cur.push(value);
+  hidden.value = cur.join(',');
+  // Re-render chips block in place
+  const host = document.getElementById('orchAssigneeChips');
+  if (host) {
+    host.innerHTML = cur.length
+      ? cur.map(a => `<span class="chip text-[10px]" style="cursor:pointer;background:rgba(167,139,250,0.18);border-color:rgba(167,139,250,0.4);" onclick="_orchToggleAssignee('${escapeHtml(a)}')">${escapeHtml(a)} ✕</span>`).join('')
+      : `<span class="text-[10px]" style="color:var(--text-dim)">${t('아래 + 버튼으로 추가')}</span>`;
+  }
+}
 
 async function _orchSaveCfg() {
   const body = {
