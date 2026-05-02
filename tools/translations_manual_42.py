@@ -165,6 +165,8 @@ NEW_EN: dict[str, str] = {
     "토큰": "tokens",
     # QQ15
     "즐겨찾기": "Favourite",
+    "별 표시만 보기": "Show starred only",
+    "별 표시한 메시지 없음": "No starred messages",
     # QQ1
     "시스템 프롬프트 설정됨": "System prompt set",
     "시스템 프롬프트 초기화됨": "System prompt cleared",
@@ -357,6 +359,8 @@ NEW_ZH: dict[str, str] = {
     "토큰": "tokens",
     # QQ15
     "즐겨찾기": "收藏",
+    "별 표시만 보기": "仅显示已加星",
+    "별 표시한 메시지 없음": "无加星消息",
     # QQ1
     "시스템 프롬프트 설정됨": "已设置系统提示",
     "시스템 프롬프트 초기화됨": "已清空系统提示",

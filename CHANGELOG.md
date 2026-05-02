@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.91] — 2026-05-02
+
+### Added
+- ⭐ **Starred-only filter in chat search** (QQ16). The search
+  modal gets a `⭐` checkbox; toggling it restricts results to
+  starred messages. Result rows now also display the ⭐ icon
+  on starred hits.
+
+---
 ## [2.66.90] — 2026-05-02
 
 ### Added
