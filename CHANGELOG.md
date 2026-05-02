@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.6] — 2026-05-02
+
+### Added
+- 🔍 **`aria-label` on the chat 📎 attach button** (QQ96). Screen
+  readers (and search/keyboard nav helpers) now hear "이미지 첨부
+  (paste/drop 도 지원)" instead of just the emoji glyph. Brings
+  the QQ61 attach button up to parity with other accessible
+  buttons in the composer.
+
+---
 ## [2.68.5] — 2026-05-02
 
 ### Added
