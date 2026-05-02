@@ -25875,9 +25875,14 @@ VIEWS.lazyclawChat = async () => {
         <select id="lcChatAssignee" class="input text-xs" style="min-width:240px;">
           ${opts.map(o => `<option value="${escapeHtml(o.value)}" ${o.value===lastAssignee?'selected':''}>${escapeHtml(o.label)}</option>`).join('') || '<option value="">' + t('가용 프로바이더 없음') + '</option>'}
         </select>
+        <button class="btn text-xs" onclick="_lcChatToggleSysPrompt()" id="lcSysPromptBtn" title="${t('시스템 프롬프트 설정')}">⚙ ${t('시스템')}</button>
         <button class="btn text-xs" onclick="_lcChatExport()" title="${t('대화를 markdown 파일로 다운로드')}">📥 ${t('내보내기')}</button>
         <button class="btn text-xs" onclick="_lcChatClear()" title="${t('대화 비우기')}">🗑 ${t('비우기')}</button>
         <span class="ml-auto text-[10px] text-[var(--text-dim)]">${t('Enter = 전송 · Shift+Enter = 줄바꿈')}</span>
+      </div>
+      <!-- OO4 (v2.66.67) — collapsible system prompt input -->
+      <div id="lcSysPromptBox" style="display:none;margin-bottom:8px;">
+        <textarea id="lcSysPrompt" class="input w-full text-xs" rows="3" placeholder="${t('시스템 프롬프트 (예: 너는 친절한 한국어 도우미다)')}" style="resize:vertical;font-family:inherit;"></textarea>
       </div>
       <div id="lcChatLog" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:8px;background:rgba(0,0,0,0.18);border:1px solid var(--border);border-radius:8px;"></div>
       <div class="mt-3 flex items-end gap-2">
@@ -25965,7 +25970,15 @@ function _lcChatRender() {
 // fetch+ReadableStream. Falls back to one-shot /api/lazyclaw/chat on
 // connection failure. The assistant message is appended once
 // (placeholder), then mutated in-place as tokens stream in.
+// OO4 (v2.66.67) — track active stream so the user can cancel.
+let _lcChatAbortCtrl = null;
+
 async function _lcChatSend() {
+  // If a stream is in flight, this button click means CANCEL.
+  if (_lcChatAbortCtrl) {
+    try { _lcChatAbortCtrl.abort(); } catch (_) {}
+    return;
+  }
   const ta = document.getElementById('lcChatInput');
   const sel = document.getElementById('lcChatAssignee');
   const sendBtn = document.getElementById('lcChatSend');
@@ -25975,6 +25988,13 @@ async function _lcChatSend() {
   const assignee = sel.value || '';
   if (!assignee) { toast(t('프로바이더를 선택하세요'), 'warn'); return; }
   ta.value = '';
+  // Pull system prompt (per-assignee).
+  let sysPrompt = '';
+  try {
+    const sysTa = document.getElementById('lcSysPrompt');
+    if (sysTa && sysTa.value.trim()) sysPrompt = sysTa.value.trim();
+    else sysPrompt = localStorage.getItem('cc.lazyclawChat.sys.' + assignee) || '';
+  } catch (_) {}
   const history = _lcChatLoad();
   history.push({ role: 'user', text, assignee, ts: Date.now() });
   // Placeholder assistant message — text grows as tokens stream in.
@@ -25982,15 +26002,22 @@ async function _lcChatSend() {
   history.push(reply);
   _lcChatSave(history);
   _lcChatRender();
-  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳'; }
+  if (sendBtn) {
+    sendBtn.classList.remove('btn-primary');
+    sendBtn.classList.add('btn-danger');
+    sendBtn.textContent = '■ ' + t('중단');
+  }
+  _lcChatAbortCtrl = new AbortController();
   const t0 = Date.now();
   try {
     const resp = await fetch('/api/lazyclaw/chat/stream', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         assignee, message: text,
+        systemPrompt: sysPrompt,
         history: history.slice(0, -1).slice(-12),
       }),
+      signal: _lcChatAbortCtrl.signal,
     });
     if (!resp.ok || !resp.body) throw new Error('stream not available');
     const reader = resp.body.getReader();
@@ -26043,25 +26070,60 @@ async function _lcChatSend() {
     }
     _lcChatSave(history); _lcChatRender();
   } catch (e) {
-    // Fallback: one-shot.
-    try {
-      const r = await api('/api/lazyclaw/chat', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignee, message: text, history: history.slice(0, -1).slice(-12) }),
-      });
-      reply.text = (r && r.ok && r.output) ? r.output : ('⚠ ' + (r.error || t('응답 실패')));
-      if (r && r.ok) {
-        reply.meta = `${r.provider || ''}${r.model ? ' · ' + r.model : ''}${r.durationMs ? ' · ' + (r.durationMs/1000).toFixed(1) + 's' : ''}`;
+    if (e && e.name === 'AbortError') {
+      reply.text = (reply.text || '') + '\n\n⏹ ' + t('사용자가 중단함');
+      _lcChatSave(history); _lcChatRender();
+    } else {
+      // Fallback: one-shot.
+      try {
+        const r = await api('/api/lazyclaw/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assignee, message: text, systemPrompt: sysPrompt, history: history.slice(0, -1).slice(-12) }),
+        });
+        reply.text = (r && r.ok && r.output) ? r.output : ('⚠ ' + (r.error || t('응답 실패')));
+        if (r && r.ok) {
+          reply.meta = `${r.provider || ''}${r.model ? ' · ' + r.model : ''}${r.durationMs ? ' · ' + (r.durationMs/1000).toFixed(1) + 's' : ''}`;
+        }
+      } catch (e2) {
+        reply.text = '⚠ ' + (e2 && e2.message || e2);
       }
-    } catch (e2) {
-      reply.text = '⚠ ' + (e2 && e2.message || e2);
+      _lcChatSave(history); _lcChatRender();
     }
-    _lcChatSave(history); _lcChatRender();
   } finally {
-    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '📨 ' + t('전송'); }
+    _lcChatAbortCtrl = null;
+    if (sendBtn) {
+      sendBtn.classList.remove('btn-danger');
+      sendBtn.classList.add('btn-primary');
+      sendBtn.textContent = '📨 ' + t('전송');
+    }
     setTimeout(() => ta.focus(), 30);
   }
 }
+
+// OO4 (v2.66.67) — system prompt toggle + persistence per-assignee.
+window._lcChatToggleSysPrompt = function () {
+  const box = document.getElementById('lcSysPromptBox');
+  if (!box) return;
+  const ta = document.getElementById('lcSysPrompt');
+  const open = box.style.display !== 'none';
+  if (open) {
+    // closing — persist current value
+    if (ta) {
+      const sel = document.getElementById('lcChatAssignee');
+      const key = 'cc.lazyclawChat.sys.' + ((sel && sel.value) || 'default');
+      try { localStorage.setItem(key, ta.value); } catch (_) {}
+    }
+    box.style.display = 'none';
+  } else {
+    if (ta) {
+      const sel = document.getElementById('lcChatAssignee');
+      const key = 'cc.lazyclawChat.sys.' + ((sel && sel.value) || 'default');
+      try { ta.value = localStorage.getItem(key) || ''; } catch (_) {}
+    }
+    box.style.display = '';
+    setTimeout(() => ta && ta.focus(), 50);
+  }
+};
 
 window._lcChatClear = function () {
   if (!confirm(t('이 대화를 비우시겠습니까?'))) return;

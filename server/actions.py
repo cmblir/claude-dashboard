@@ -248,6 +248,8 @@ def handle_lazyclaw_chat_stream(handler: "Handler", body: dict) -> None:
         )
         # Stream stdout line by line.
         full_text = ""
+        tokens_in = tokens_out = 0
+        cost_usd = 0.0
         if proc.stdout is None:
             _sse("error", json.dumps({"error": "no stdout"}, ensure_ascii=False))
             return
@@ -258,7 +260,8 @@ def handle_lazyclaw_chat_stream(handler: "Handler", body: dict) -> None:
                 obj = json.loads(line)
             except Exception:
                 continue
-            if obj.get("type") == "stream_event":
+            t = obj.get("type")
+            if t == "stream_event":
                 ev = obj.get("event") or {}
                 if ev.get("type") == "content_block_delta":
                     delta = (ev.get("delta") or {}).get("text") or ""
@@ -268,10 +271,22 @@ def handle_lazyclaw_chat_stream(handler: "Handler", body: dict) -> None:
                             try: proc.kill()
                             except Exception: pass
                             return
+            elif t == "result":
+                # Extract usage info from the result event.
+                usage = obj.get("usage") or {}
+                tokens_in = usage.get("input_tokens", 0)
+                tokens_out = usage.get("output_tokens", 0)
+                cost_usd = obj.get("cost_usd") or 0.0
+                # If streaming missed content, recover from result.
+                if not full_text:
+                    full_text = obj.get("result") or ""
+                    if full_text:
+                        _sse("token", json.dumps({"text": full_text}, ensure_ascii=False))
         proc.wait(timeout=2)
         _sse("done", json.dumps({
             "ok": True, "provider": "claude-cli",
             "model": model_alias or "default",
+            "tokensIn": tokens_in, "tokensOut": tokens_out, "costUsd": cost_usd,
         }, ensure_ascii=False))
     except Exception as e:
         if proc:
