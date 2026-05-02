@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.26] — 2026-05-02
+
+### Performance
+- 🎨 **CSS `contain: layout paint` on `.wf-node`** (JJ1). Each
+  workflow node becomes its own paint/layout boundary — per-node
+  attribute mutations (data-status, transform, .wf-node-elapsed
+  text) no longer trigger relayout cascades across siblings.
+  Significant on 20+ node graphs during a live run; harmless on
+  small ones.
+- 🌒 **Elapsed-time ticker skips ticking when `document.hidden`**
+  (JJ1). The browser already throttles `setInterval` in background
+  tabs, but an explicit guard avoids any DOM mutation on an
+  offscreen canvas. Resumes naturally when the user returns.
+
+---
 ## [2.66.25] — 2026-05-02
 
 ### Fixed

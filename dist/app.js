@@ -6245,6 +6245,12 @@ function _wfHideRunBanner() {
 function _wfStartElapsedTicker() {
   if (__wf._elapsedTicker) return; // already running
   __wf._elapsedTicker = setInterval(() => {
+    // JJ1 (v2.66.26) — skip ticking when the tab is hidden; the
+    // browser already throttles setInterval in background tabs but
+    // an explicit guard avoids any DOM mutation on an offscreen
+    // canvas the user can't see. The ticker resumes naturally when
+    // the user comes back (next interval fire).
+    if (document.hidden) return;
     const run = __wf.lastRun;
     if (!run || (run.status !== 'running' && run.status !== 'queued')) {
       _wfStopElapsedTicker();
