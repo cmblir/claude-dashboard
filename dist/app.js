@@ -26644,8 +26644,34 @@ function _lcGetHistory(id) {
 }
 function _lcSaveHistory(id, msgs) {
   if (!id) return;
-  try { localStorage.setItem('cc.lc.hist.' + id, JSON.stringify((msgs || []).slice(-200))); }
-  catch (_) {}
+  // QQ53 (v2.66.128) — defensive bound + quota recovery.
+  // localStorage caps at ~5–10 MB; QQ39 image attach can push a single
+  // message past that. On QuotaExceededError, drop the oldest message
+  // and retry; if that fails too, drop the largest data URL with a
+  // placeholder. Then retry, finally swallow.
+  let arr = (msgs || []).slice(-200);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      localStorage.setItem('cc.lc.hist.' + id, JSON.stringify(arr));
+      return;
+    } catch (e) {
+      if (!arr.length) return;
+      // Find the heaviest message (most likely an image-heavy one).
+      let worstIdx = 0, worstLen = 0;
+      for (let i = 0; i < arr.length; i++) {
+        const len = (arr[i] && arr[i].text || '').length;
+        if (len > worstLen) { worstLen = len; worstIdx = i; }
+      }
+      const m = arr[worstIdx];
+      // First pass — replace embedded data URLs in the heaviest message.
+      if (m && /data:image\/[^)]+;base64,/.test(m.text || '')) {
+        m.text = m.text.replace(/!\[[^\]]*\]\(data:image\/[^)]+;base64,[A-Za-z0-9+/=\s]+\)/g, '_[image dropped to fit storage]_');
+        continue;
+      }
+      // Second pass — drop the oldest message entirely.
+      arr.shift();
+    }
+  }
 }
 function _lcMakeSessionId() {
   return 'lcs-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
