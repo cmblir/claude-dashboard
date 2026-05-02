@@ -208,6 +208,9 @@ NEW_EN: dict[str, str] = {
     "저장되지 않은 변경 — 먼저 저장하세요": "Unsaved changes — save first",
     "실행 중...": "Running...",
     "실행 실패": "Execution failed",
+    # QQ19 — context-menu actions
+    "출력 복사": "Copy output",
+    "출력 복사됨": "Output copied",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -410,4 +413,7 @@ NEW_ZH: dict[str, str] = {
     "저장되지 않은 변경 — 먼저 저장하세요": "存在未保存的更改 — 请先保存",
     "실행 중...": "正在执行...",
     "실행 실패": "执行失败",
+    # QQ19
+    "출력 복사": "复制输出",
+    "출력 복사됨": "已复制输出",
 }

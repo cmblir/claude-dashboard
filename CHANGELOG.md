@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.94] — 2026-05-02
+
+### Added
+- ▶📋 **Canvas right-click: Run-alone + Copy output** (QQ19, n8n parity).
+  The node context menu now exposes `▶ 단독 실행` (only for
+  session/subagent — reuses QQ18 endpoint) and `📋 출력 복사` (only
+  visible when the node has a recorded last output, copies the raw
+  `output`/`error` to clipboard). Faster debug loop without opening
+  the inspector.
+
+---
 ## [2.66.93] — 2026-05-02
 
 ### Added
