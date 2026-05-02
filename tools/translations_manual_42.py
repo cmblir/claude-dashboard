@@ -134,6 +134,10 @@ NEW_EN: dict[str, str] = {
     "비활성화 토글": "Toggle disable",
     "비활성화됨": "Disabled",
     "활성화됨": "Enabled",
+    # PP3
+    "선택 노드 비활성화 / 활성화": "Toggle disable on selected node",
+    "비활성화 (D)": "Disable (D)",
+    "비활성": "Disable",
     # NN1
     "형제 노드 실패로 자동 취소됨": "Auto-cancelled because a sibling node failed",
     "자동 취소됨": "auto-cancelled",
@@ -271,6 +275,10 @@ NEW_ZH: dict[str, str] = {
     "비활성화 토글": "切换禁用",
     "비활성화됨": "已禁用",
     "활성화됨": "已启用",
+    # PP3
+    "선택 노드 비활성화 / 활성화": "切换所选节点的禁用",
+    "비활성화 (D)": "禁用 (D)",
+    "비활성": "禁用",
     # NN1
     "형제 노드 실패로 자동 취소됨": "因同级节点失败而自动取消",
     "자동 취소됨": "自动取消",
