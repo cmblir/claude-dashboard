@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.48] — 2026-05-02
+
+### Added
+- 🗺 **Click on the minimap pans the canvas** to that location
+  (LL19, n8n parity). Inverse minimap→world transform — useful
+  on large workflows where you need to jump to a specific area
+  without dragging the canvas across the viewport.
+
+---
 ## [2.66.47] — 2026-05-02
 
 ### Fixed

@@ -4381,6 +4381,53 @@ function _wfBindCanvas() {
   // when the workflow opens at a fit-to-screen zoom of, say, 0.78.
   if (typeof _wfUpdateZoomLabel === 'function') _wfUpdateZoomLabel();
 
+  // LL19 (v2.66.48) — click on minimap → pan canvas to that location
+  // (n8n parity). Computes the minimap-to-world coord map by re-running
+  // the bounding-box arithmetic from _wfRenderMinimap.
+  const mini = document.getElementById('wfMinimap');
+  if (mini && !mini.__wfClickBound) {
+    mini.__wfClickBound = true;
+    mini.style.cursor = 'pointer';
+    mini.addEventListener('click', (e) => {
+      if (!__wf.current || !(__wf.current.nodes || []).length) return;
+      const rect = mini.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      // Recompute the minimap mapping (cheap: O(N))
+      let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
+      const nodes = __wf.current.nodes;
+      const NW = (typeof WF_NODE_W !== 'undefined') ? WF_NODE_W : 200;
+      const NH = (typeof WF_NODE_H !== 'undefined') ? WF_NODE_H : 80;
+      nodes.forEach(n => {
+        bMinX = Math.min(bMinX, n.x); bMinY = Math.min(bMinY, n.y);
+        bMaxX = Math.max(bMaxX, n.x + NW); bMaxY = Math.max(bMaxY, n.y + NH);
+      });
+      const pad = 40;
+      bMinX -= pad; bMinY -= pad; bMaxX += pad; bMaxY += pad;
+      const rangeX = bMaxX - bMinX || 1, rangeY = bMaxY - bMinY || 1;
+      const MW = mini.width, MH = mini.height;
+      const scale = Math.min(MW / rangeX, MH / rangeY);
+      const offX = (MW - rangeX * scale) / 2;
+      const offY = (MH - rangeY * scale) / 2;
+      // Inverse: minimap → world
+      const wx = bMinX + (mx - offX) / scale;
+      const wy = bMinY + (my - offY) / scale;
+      // Center the canvas viewport on (wx, wy).
+      const host = document.getElementById('wfCanvasHost');
+      if (!host) return;
+      const hr = host.getBoundingClientRect();
+      const v = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
+      const z = v.zoom || 1;
+      v.panX = hr.width / 2 - wx * z;
+      v.panY = hr.height / 2 - wy * z;
+      __wf.current.viewport = v;
+      const vp = __wf._viewportEl || document.getElementById('wfViewport');
+      if (vp) vp.setAttribute('transform', `translate(${v.panX},${v.panY}) scale(${z})`);
+      _wfSchedulePatch();
+      if (typeof _wfRenderMinimap === 'function') _wfRenderMinimap();
+    });
+  }
+
   // 좌표 변환 — 스크린 좌표를 SVG 뷰포트 좌표(팬/줌 적용 후)로
   function svgPt(evt) {
     const rect = svg.getBoundingClientRect();
