@@ -27038,7 +27038,9 @@ VIEWS.lazyclawChat = async () => {
         <button id="lcChatSend" class="btn-primary btn" style="padding:8px 16px;font-size:1.1rem;align-self:flex-end;" onclick="_lcChatSend()" title="${t('전송 (Enter)')}">↑</button>
       </div>
       <!-- QQ14 (v2.66.89) — live char + approx token count -->
-      <div id="lcChatInputStats" style="padding:0 14px 8px;font-size:10px;color:var(--text-dim);display:flex;gap:12px;justify-content:flex-end;">
+      <div id="lcChatInputStats" style="padding:0 14px 8px;font-size:10px;color:var(--text-dim);display:flex;gap:12px;justify-content:flex-end;align-items:center;">
+        <!-- QQ92 (v2.68.2) — image-attach indicator -->
+        <span id="lcInputImgs" style="display:none;color:#60a5fa;">📷 <span id="lcInputImgCount">0</span></span>
         <span><span id="lcInputChars">0</span> ${t('자')}</span>
         <span>≈ <span id="lcInputTokens">0</span> ${t('토큰')}</span>
       </div>
@@ -27221,6 +27223,14 @@ AFTER.lazyclawChat = () => {
       const tEl = document.getElementById('lcInputTokens');
       if (cEl) cEl.textContent = chars.toLocaleString();
       if (tEl) tEl.textContent = tokens.toLocaleString();
+      // QQ92 — count embedded base64 images and surface as a chip.
+      const iEl = document.getElementById('lcInputImgs');
+      const iCnt = document.getElementById('lcInputImgCount');
+      const imgs = (ta.value.match(/!\[[^\]]*\]\(data:image\//g) || []).length;
+      if (iEl && iCnt) {
+        iCnt.textContent = String(imgs);
+        iEl.style.display = imgs > 0 ? '' : 'none';
+      }
       // QQ33 — persist draft per session (debounced via inline timer).
       try {
         const sid = _lcCurrentId();

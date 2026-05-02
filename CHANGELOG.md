@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.2] — 2026-05-02
+
+### Added
+- 📷 **Live image-attach counter in composer stats** (QQ92). The
+  composer's chars/tokens stats row now also shows
+  `📷 N` when the textarea has N base64 images embedded. Quick
+  visual confirmation that QQ39 paste/drop / QQ61 picker
+  attachments landed before pressing send. Hides itself when
+  no images are attached.
+
+---
 ## [2.68.1] — 2026-05-02
 
 ### Added
