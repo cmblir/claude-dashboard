@@ -2878,8 +2878,13 @@ def _run_one_iteration(wf: dict, runId: str, iter_idx: int,
     edges = wf.get("edges", [])
     # QQ37 (v2.66.112) — sticky annotations are not part of execution.
     # Drop them before computing topo levels so they don't bloat
-    # parallel level-0 batches.
-    nodes = [n for n in nodes if n.get("type") != "sticky"]
+    # parallel level-0 batches. QQ59 (v2.66.134) — also drop orphan
+    # edges that referenced a sticky node so inputs_map / results
+    # stay free of dangling references.
+    sticky_ids = {n["id"] for n in nodes if n.get("type") == "sticky"}
+    if sticky_ids:
+        nodes = [n for n in nodes if n.get("type") != "sticky"]
+        edges = [e for e in edges if e.get("from") not in sticky_ids and e.get("to") not in sticky_ids]
     levels = _topological_levels(nodes, edges)
     order = _topological_order(nodes, edges)  # final_output 검색용
     node_by_id = {n["id"]: n for n in nodes}
