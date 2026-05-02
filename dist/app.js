@@ -26721,6 +26721,18 @@ AFTER.lazyclawChat = () => {
     ta.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _lcChatSend(); }
     });
+    // QQ33 (v2.66.108) — restore unsent draft for the current session
+    // so a refresh doesn't drop a half-typed message.
+    try {
+      const sid = _lcCurrentId();
+      const draftKey = 'cc.lc.draft.' + sid;
+      const saved = localStorage.getItem(draftKey);
+      if (saved && !ta.value) {
+        ta.value = saved;
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+      }
+    } catch (_) {}
     // Auto-resize textarea + QQ14 (v2.66.89) live char/token counter.
     ta.addEventListener('input', () => {
       ta.style.height = 'auto';
@@ -26734,6 +26746,16 @@ AFTER.lazyclawChat = () => {
       const tEl = document.getElementById('lcInputTokens');
       if (cEl) cEl.textContent = chars.toLocaleString();
       if (tEl) tEl.textContent = tokens.toLocaleString();
+      // QQ33 — persist draft per session (debounced via inline timer).
+      try {
+        const sid = _lcCurrentId();
+        const draftKey = 'cc.lc.draft.' + sid;
+        if (window.__lcDraftTimer) clearTimeout(window.__lcDraftTimer);
+        window.__lcDraftTimer = setTimeout(() => {
+          if (ta.value) localStorage.setItem(draftKey, ta.value);
+          else localStorage.removeItem(draftKey);
+        }, 350);
+      } catch (_) {}
     });
     // OO7 (v2.66.71) — drag & drop text/code files into the input.
     // The file content is appended as a fenced code block (```ext …).
@@ -27069,6 +27091,8 @@ async function _lcChatSend() {
   const assignee = sel.value || '';
   if (!assignee) { toast(t('프로바이더를 선택하세요'), 'warn'); return; }
   ta.value = ''; ta.style.height = 'auto';
+  // QQ33 — drop the draft once we send.
+  try { localStorage.removeItem('cc.lc.draft.' + _lcCurrentId()); } catch (_) {}
   let sysPrompt = '';
   try {
     const sysTa = document.getElementById('lcSysPrompt');

@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.108] — 2026-05-02
+
+### Added
+- 💾 **Per-session draft autosave for chat composer** (QQ33). Typing
+  in the composer now persists to `localStorage["cc.lc.draft.<sid>"]`
+  with a 350 ms debounce. On tab open / refresh, the draft is
+  restored if the textarea is empty. Sending or running a slash
+  command clears the draft. No more lost prompts after a refresh
+  or accidental tab swap.
+
+---
 ## [2.66.107] — 2026-05-02
 
 ### Added
