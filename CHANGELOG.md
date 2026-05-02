@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.67] — 2026-05-02
+
+### Added
+- ⚙ **System prompt input** for the chat tab (OO4). Toggle via
+  `⚙ 시스템` button; 3-line textarea above the conversation log;
+  value persists per-assignee in localStorage. Sent to the
+  server as `systemPrompt` and prepended to the prompt as a
+  `[System instructions: …]` line.
+- ⏹ **Cancel-mid-stream** (OO4). The `📨 전송` button flips to a
+  red `■ 중단` while a stream is in flight. Clicking it aborts
+  the `fetch` (`AbortController`); the partial response is
+  preserved and a `⏹ 사용자가 중단함` line is appended.
+
+---
 ## [2.66.66] — 2026-05-02
 
 ### Added

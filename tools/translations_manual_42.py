@@ -112,6 +112,11 @@ NEW_EN: dict[str, str] = {
     "대화를 markdown 파일로 다운로드": "Download conversation as a markdown file",
     "내보낼 대화가 없습니다": "Nothing to export",
     "내보내기 완료": "Exported",
+    # OO4
+    "시스템": "System",
+    "시스템 프롬프트 설정": "Set system prompt",
+    "시스템 프롬프트 (예: 너는 친절한 한국어 도우미다)": "System prompt (e.g. 'You are a helpful Korean assistant')",
+    "사용자가 중단함": "Cancelled by user",
     # NN1
     "형제 노드 실패로 자동 취소됨": "Auto-cancelled because a sibling node failed",
     "자동 취소됨": "auto-cancelled",
@@ -227,6 +232,11 @@ NEW_ZH: dict[str, str] = {
     "대화를 markdown 파일로 다운로드": "将对话下载为 markdown 文件",
     "내보낼 대화가 없습니다": "无可导出的对话",
     "내보내기 완료": "已导出",
+    # OO4
+    "시스템": "系统",
+    "시스템 프롬프트 설정": "设置系统提示",
+    "시스템 프롬프트 (예: 너는 친절한 한국어 도우미다)": "系统提示（例如：你是一个友好的中文助手）",
+    "사용자가 중단함": "用户已中断",
     # NN1
     "형제 노드 실패로 자동 취소됨": "因同级节点失败而自动取消",
     "자동 취소됨": "自动取消",
