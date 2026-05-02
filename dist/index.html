@@ -27,47 +27,21 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
 <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-<link rel="dns-prefetch" href="https://unpkg.com">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
-<script>
-// Tailwind CDN 런타임 JIT 최적화 — 불필요한 스캔 범위 축소
-tailwind.config = {
-  darkMode: 'class',
-  // corePlugins 중 사용하지 않는 기능 비활성화 → JIT 컴파일 속도 향상
-  corePlugins: {
-    float: false,
-    clear: false,
-    skew: false,
-    caretColor: false,
-    sepia: false,
-    hueRotate: false,
-    saturate: false,
-    backdropBlur: false,
-    backdropBrightness: false,
-    backdropContrast: false,
-    backdropGrayscale: false,
-    backdropHueRotate: false,
-    backdropInvert: false,
-    backdropOpacity: false,
-    backdropSaturate: false,
-    backdropSepia: false,
-    ringOffsetWidth: false,
-    ringOffsetColor: false,
-    scrollSnapType: false,
-    scrollSnapAlign: false,
-    touchAction: false,
-  },
-};
-</script>
-<!-- v2.40.1 — defer the heavy chart/graph/markdown libs so they don't block first paint.
-     Inline page script doesn't touch them at boot; views call them on demand. -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/marked@11.2.0/marked.min.js" defer></script>
+<!-- GG1 (v2.66.19) — replaced cdn.tailwindcss.com (1MB JIT runtime that
+     re-compiles on every DOM mutation) with a pre-built 26KB stylesheet.
+     Single biggest workflow-tab lag fix. Rebuild via:
+       /tmp/tailwindcss-v3 -c tools/tailwind.config.js \
+         -i tools/tailwind.input.css -o dist/vendor/tailwind.css --minify -->
+<link rel="stylesheet" href="/vendor/tailwind.css">
+<!-- v2.66.19 — self-hosted vendor libs (was: jsdelivr/unpkg CDN). Eliminates
+     DNS lookup + cross-origin handshake on every page load and survives
+     network failures. Files in dist/vendor/. -->
+<script src="/vendor/chart.umd.min.js" defer></script>
+<script src="/vendor/vis-network.min.js" defer></script>
+<script src="/vendor/marked.min.js" defer></script>
 <style>
   :root, body.theme-dark {
     --bg: #000000;
@@ -7560,6 +7534,27 @@ function _wfStopElapsedTicker() {
 // 카드. 실행 중/완료된 노드의 sessionId, assignee, status 를 한 눈에
 // 보여주고, 인라인 mac-term viewer 열기 / sessionId 복사 / 다른 노드의
 // resume 필드에 붙여넣기 액션을 제공한다.
+// GG1 (v2.66.19) — terminate the workflow session associated with a node.
+// At backend granularity we cancel the whole run (level boundary kill),
+// since per-node subprocess kill isn't wired up. The user sees an
+// immediate "취소 요청됨" toast and the banner flips on the next tick.
+async function _wfTerminateNodeSession(nid, sid) {
+  if (!confirm(t('이 노드의 실행을 중단하시겠습니까? (워크플로우 전체 실행이 다음 레벨에서 멈춥니다)'))) return;
+  if (__wf.runId) {
+    const r = await api('/api/workflows/run-cancel', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId: __wf.runId }),
+    });
+    if (r.ok) {
+      toast(`${t('세션 종료 요청됨')} — ${nid}${sid ? ' (' + sid.slice(0, 8) + '…)' : ''}`, 'warn');
+    } else {
+      toast(errMsg(r) || t('취소 실패'), 'err');
+    }
+  } else {
+    toast(t('진행 중인 실행이 없습니다'), 'warn');
+  }
+}
+
 function _wfToggleSessionsPanel() {
   const open = document.getElementById('wfSessionsPanel');
   if (open) { open.remove(); return; }
@@ -7616,10 +7611,14 @@ function _wfRenderSessionsPanel(forceShow) {
   const list = rows.length ? rows.map(r => {
     const sidShort = r.sid ? r.sid.slice(0, 12) + '…' : '<span style="opacity:0.5">' + t('세션 없음') + '</span>';
     const sidEsc = r.sid ? r.sid.replace(/'/g, '&#39;') : '';
+    const isLive = r.status === 'running';
     const sidActions = r.sid ? `
       <button class="btn text-[10px]" title="${t('Session ID 복사')}" onclick="_copyToClipboard(this, '${sidEsc}')">📋</button>
       <button class="btn text-[10px]" title="${t('다른 노드의 resume 필드에 붙여넣기')}" onclick="_wfUseAsResume('${r.nid}','${sidEsc}')">↪</button>
-    ` : '';
+      ${isLive ? `<button class="btn text-[10px]" style="color:#f87171;" title="${t('이 노드의 실행 세션 종료')}" onclick="_wfTerminateNodeSession('${r.nid}','${sidEsc}')">⏹</button>` : ''}
+    ` : (isLive ? `
+      <button class="btn text-[10px]" style="color:#f87171;" title="${t('이 노드의 실행 세션 종료')}" onclick="_wfTerminateNodeSession('${r.nid}','')">⏹</button>
+    ` : '');
     const errLine = r.error ? `<div style="color:#f87171;font-size:10px;margin-top:2px;">⚠ ${escapeHtml(r.error.slice(0,140))}</div>` : '';
     return `<div style="padding:8px 10px;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:6px;">
