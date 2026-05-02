@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.20] — 2026-05-02
+
+### Fixed
+- 🛡 **`_lcGetSessions` defensive normalization** (QQ83). Older
+  builds or external tampering can leave `cc.lc.sessions` parsing
+  as an object or `null` instead of an array, which would later
+  break `.find()` / `.map()` calls in QQ24 lineage / QQ45 search
+  / QQ65 assignee restore. The getter now coerces non-array
+  payloads to `[]` and filters entries missing a string `id`,
+  so downstream callers can rely on the shape.
+
+---
 ## [2.67.19] — 2026-05-02
 
 ### Verified

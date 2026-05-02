@@ -26636,8 +26636,13 @@ async function _wfDiffVersions() {
 //   cc.lc.hist.<id>  = [{role, text, meta, ts, tokensIn, tokensOut}]
 
 function _lcGetSessions() {
-  try { return JSON.parse(localStorage.getItem('cc.lc.sessions') || '[]'); }
-  catch (_) { return []; }
+  // QQ83 (v2.67.20) — defend against corrupted entries: JSON could
+  // parse as an object/null instead of an array if a different
+  // version of the app wrote there. Normalize to a list.
+  try {
+    const v = JSON.parse(localStorage.getItem('cc.lc.sessions') || '[]');
+    return Array.isArray(v) ? v.filter(s => s && typeof s === 'object' && typeof s.id === 'string') : [];
+  } catch (_) { return []; }
 }
 function _lcSaveSessions(arr) {
   try { localStorage.setItem('cc.lc.sessions', JSON.stringify(arr)); } catch (_) {}
