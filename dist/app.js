@@ -5535,6 +5535,13 @@ function _wfRenderInspector(opts) {
             </label>
             <button class="btn text-xs" onclick="_wfDeleteSelectedNode()" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);" aria-label="${t('노드 삭제')}">🗑️</button>
           </div>
+          <!-- QQ3 (v2.66.78) — node-level note (n8n parity). Shown in
+               hover tooltip + persisted with the workflow. -->
+          <details class="mt-2" ${(d.notes||'').trim()?'open':''}>
+            <summary class="text-[10px] text-[var(--text-dim)] cursor-pointer">📝 ${t('메모')}${(d.notes||'').trim()?' ●':''}</summary>
+            <textarea class="input w-full text-[11px] mt-1" rows="2" placeholder="${t('이 노드에 대한 짧은 메모 (캔버스 hover 시 표시)')}"
+              oninput="(function(el){var nn=__wf.current.nodes.find(x=>x.id==='${n.id}');if(!nn)return;nn.data=nn.data||{};nn.data.notes=el.value;__wf.dirty=true;_wfUpdateToolbar();})(this)">${escapeHtml(d.notes||'')}</textarea>
+          </details>
         </div>
       `;
     }
@@ -7146,28 +7153,34 @@ function _wfRenderSessionsPanel(forceShow) {
 let _wfTooltipTimer = null;
 function _wfShowNodeTooltip(nid, evt) {
   const results = __wf.lastRunResults || {};
-  const r = results[nid];
-  if (!r) return; // 실행 이력 없으면 표시 안 함
+  const r = results[nid] || null;
+  // QQ3 (v2.66.78) — also surface the node's note (data.notes) so a
+  // user can hover a never-run node and still see its memo.
+  const wfNodes0 = (__wf.current && __wf.current.nodes) || [];
+  const node0 = wfNodes0.find(n => n.id === nid);
+  const notes = (node0 && node0.data && node0.data.notes || '').trim();
+  if (!r && !notes) return; // nothing to show
   let el = document.getElementById('wfNodeTooltip');
   if (!el) {
     el = document.createElement('div');
     el.id = 'wfNodeTooltip';
     document.body.appendChild(el);
   }
-  const status = r.status || 'idle';
+  const status = (r && r.status) || 'idle';
   const icons = { ok: '✅', err: '❌', running: '⏳', skipped: '⏭️', idle: '•' };
   const labels = { ok: t('완료'), err: t('실패'), running: t('실행 중'), skipped: t('건너뜀'), idle: t('대기 중') };
   const wfNodes = (__wf.current && __wf.current.nodes) || [];
   const node = wfNodes.find(n => n.id === nid);
   const title = (node && ((node.data && node.data.subject) || node.title)) || nid;
-  const duration = r.durationMs != null
+  const duration = (r && r.durationMs != null)
     ? (status === 'running' && r.startedAt ? Math.max(0, Date.now() - r.startedAt) : r.durationMs)
     : 0;
   const dText = (duration / 1000).toFixed(1) + 's';
-  const usage = r.usage || {};
-  const tokens = (usage.input_tokens || r.inputTokens || 0) + ' / ' + (usage.output_tokens || r.outputTokens || 0);
-  const output = (r.output || '').slice(0, 160);
-  const more = (r.output || '').length > 160 ? '…' : '';
+  const usage = (r && r.usage) || {};
+  const tokens = (usage.input_tokens || (r && r.inputTokens) || 0) + ' / ' + (usage.output_tokens || (r && r.outputTokens) || 0);
+  const output = (r && r.output || '').slice(0, 160);
+  const more = (r && r.output || '').length > 160 ? '…' : '';
+  const notesBlock = notes ? `<div class="wfnt-row" style="border-top:1px dashed var(--border);margin-top:6px;padding-top:6px;color:#fbbf24;"><span>📝</span><span style="white-space:pre-wrap;font-size:11px;">${escapeHtml(notes.slice(0, 240))}</span></div>` : '';
 
   el.className = 'visible state-' + status;
   el.innerHTML = `
@@ -7188,9 +7201,10 @@ function _wfShowNodeTooltip(nid, evt) {
       ? `<div class="wfnt-row wfnt-meta"><span>🐳</span><span class="font-mono">${escapeHtml(r.image)}</span></div>` : ''}
     ${r.ralphRunId
       ? `<div class="wfnt-row wfnt-meta"><span>🦞</span><span>${escapeHtml(r.ralphRunId)} · ${r.ralphIters||0} iter · $${(r.ralphCostUsd||0).toFixed(4)}</span></div>` : ''}
-    ${status === 'err' && r.error
+    ${status === 'err' && r && r.error
       ? `<div class="wfnt-out wfnt-err">${escapeHtml(String(r.error).slice(0, 260))}</div>`
       : (output ? `<div class="wfnt-out">${escapeHtml(output)}${more}</div>` : '')}
+    ${notesBlock}
   `;
 
   // 위치: 마우스 근처 (화면 경계 고려)

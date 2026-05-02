@@ -804,6 +804,17 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
             "cacheTtlSec": max(1, min(86400, int(d.get("cacheTtlSec") or 300))),
         }
     # start 는 data 비움
+    # PP2/QQ3 (v2.66.72/.78) — preserve cross-type fields:
+    # `disabled` (bool) controls fail-fast skip;
+    # `notes` (string ≤ 4000) is the per-node memo shown in the
+    # tooltip + inspector. Both apply to ALL node types.
+    if d.get("disabled") is True:
+        out["data"]["disabled"] = True
+    notes_v = d.get("notes")
+    if isinstance(notes_v, str):
+        notes_v = _clamp_str(notes_v, 4000)
+        if notes_v:
+            out["data"]["notes"] = notes_v
     return out
 
 
