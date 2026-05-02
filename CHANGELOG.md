@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.24] — 2026-05-02
+
+### Fixed
+- 🧹 **`_wfOpen()` clears previous workflow's run results** (QQ87).
+  Switching workflows preserved `__wf.lastRunResults` from the
+  previous DAG. The QQ46 mini-Gantt + QQ47 inspector chips would
+  briefly show stale per-node entries that mapped to nothing in
+  the new graph until the next SSE tick replaced them. Now
+  cleared on workflow open along with `_lastResultsSig` so the
+  next status-apply pass starts fresh.
+
+---
 ## [2.67.23] — 2026-05-02
 
 ### Added

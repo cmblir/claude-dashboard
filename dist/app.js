@@ -3428,6 +3428,11 @@ async function _wfOpen(wfId) {
   __wf.selectedNodeId = null;
   __wf.selectedEdgeId = null;
   __wf.dirty = false;
+  // QQ87 (v2.67.24) — drop the previous workflow's lastRunResults so
+  // the QQ46 mini-Gantt + per-node chips don't carry over to a
+  // different DAG (node ids would map to nothing).
+  __wf.lastRunResults = null;
+  __wf._lastResultsSig = null;
   // v2.44.0 — invalidate webhook-secret cache for this id on workflow load
   // so we always fetch a fresh value on first inspector render.
   if (__wf._webhookSecretCache) {
