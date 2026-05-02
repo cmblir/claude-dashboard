@@ -7293,6 +7293,25 @@ async function _wfShowRunResult(run) {
   const results = run.nodeResults || {};
   const iterInfo = (typeof run.iteration === 'number' && run.iteration > 0)
     ? `<div class="text-xs text-[var(--text-dim)] mb-2">🔁 ${t('최종 반복')}: ${run.iteration + 1}</div>` : '';
+  // NN4 (v2.66.63) — fail-fast summary at top of the result modal.
+  // Distinguishes "real failures" from "auto-cancelled because a sibling
+  // failed first" so the user sees the actual root cause at a glance.
+  let failFastSummary = '';
+  if (!ok) {
+    let realErrs = 0, autoCancels = 0;
+    for (const r of Object.values(results)) {
+      if (!r || r.status !== 'err') continue;
+      if (r.error && r.error.includes('cancelled by sibling-node failure')) autoCancels++;
+      else realErrs++;
+    }
+    if (autoCancels > 0) {
+      failFastSummary = `<div class="card p-2 mb-2" style="background:rgba(251,191,36,0.08);border-color:rgba(251,191,36,0.3);">
+        <div class="text-xs">⏹ <span style="color:#fbbf24;font-weight:600;">${autoCancels}</span> ${t('노드가 형제 실패로 자동 취소됨')} · ` +
+        `🔴 <span style="color:#f87171;font-weight:600;">${realErrs}</span> ${t('실제 실패')}</div>
+        <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('자동 취소된 노드는 본인 잘못이 아닙니다 — 빨간 노드를 먼저 고치세요')}</div>
+      </div>`;
+    }
+  }
   // EE2 (v2.66.16) — when a node fails, fetch the list of currently
   // available providers and offer a one-click switch dropdown. This is
   // the recovery path after a `timeout after 300s` / `unavailable` error.
@@ -7373,6 +7392,7 @@ async function _wfShowRunResult(run) {
       </div>
       ${run.error ? `<div class="text-sm text-red-400 mb-2">⚠ ${escapeHtml(run.error)}</div>` : ''}
       ${iterInfo}
+      ${failFastSummary}
       <div class="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">${rows || '<div class="empty card p-4">'+t('결과 없음')+'</div>'}</div>
     </div>
   `);

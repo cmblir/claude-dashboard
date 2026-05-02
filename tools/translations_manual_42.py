@@ -98,6 +98,9 @@ NEW_EN: dict[str, str] = {
     # NN1
     "형제 노드 실패로 자동 취소됨": "Auto-cancelled because a sibling node failed",
     "자동 취소됨": "auto-cancelled",
+    "노드가 형제 실패로 자동 취소됨": "node(s) auto-cancelled by sibling failure",
+    "실제 실패": "real failure(s)",
+    "자동 취소된 노드는 본인 잘못이 아닙니다 — 빨간 노드를 먼저 고치세요": "Auto-cancelled nodes aren't the cause — fix the red node(s) first",
     "워크플로우 실행 / 중단": "Run / stop workflow",
     # LL16 already covered: 새 노드 추가 — exists.
 }
@@ -193,5 +196,8 @@ NEW_ZH: dict[str, str] = {
     # NN1
     "형제 노드 실패로 자동 취소됨": "因同级节点失败而自动取消",
     "자동 취소됨": "自动取消",
+    "노드가 형제 실패로 자동 취소됨": "个节点因同级失败而自动取消",
+    "실제 실패": "实际失败",
+    "자동 취소된 노드는 본인 잘못이 아닙니다 — 빨간 노드를 먼저 고치세요": "自动取消的节点并非根因 — 请先修复红色节点",
     "워크플로우 실행 / 중단": "运行 / 停止工作流",
 }
