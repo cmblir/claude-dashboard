@@ -26978,7 +26978,7 @@ VIEWS.lazyclawChat = async () => {
         <input id="lcAttachInput" type="file" accept="image/*" multiple style="display:none;" onchange="_lcAttachFiles(this.files);this.value='';">
         <button class="btn" style="padding:8px 10px;font-size:1.05rem;align-self:flex-end;" title="${t('이미지 첨부 (paste/drop 도 지원)')}" onclick="document.getElementById('lcAttachInput').click()">📎</button>
         <textarea id="lcChatInput" class="input flex-1 text-sm" rows="2" placeholder="${t('메시지를 입력하세요…')}" style="resize:none;font-family:inherit;line-height:1.5;max-height:200px;"></textarea>
-        <button id="lcChatSend" class="btn-primary btn" style="padding:8px 16px;font-size:1.1rem;align-self:flex-end;" onclick="_lcChatSend()">↑</button>
+        <button id="lcChatSend" class="btn-primary btn" style="padding:8px 16px;font-size:1.1rem;align-self:flex-end;" onclick="_lcChatSend()" title="${t('전송 (Enter)')}">↑</button>
       </div>
       <!-- QQ14 (v2.66.89) — live char + approx token count -->
       <div id="lcChatInputStats" style="padding:0 14px 8px;font-size:10px;color:var(--text-dim);display:flex;gap:12px;justify-content:flex-end;">
@@ -27236,13 +27236,24 @@ AFTER.lazyclawChat = () => {
     setTimeout(() => ta.focus(), 50);
   }
   const sel = document.getElementById('lcChatAssignee');
-  if (sel) sel.onchange = () => {
-    try { localStorage.setItem('cc.lazyclawChat.assignee', sel.value); } catch (_) {}
-    // Update current session's assignee.
-    const id = _lcCurrentId();
-    if (id) _lcUpdateSessionMeta(id, sel.value, undefined);
-    _lcRenderSessions();
-  };
+  if (sel) {
+    // QQ68 (v2.67.5) — keep send-button tooltip in sync with the
+    // active assignee so users see what model they're about to hit.
+    const updateSendTooltip = () => {
+      const sb = document.getElementById('lcChatSend');
+      if (!sb) return;
+      const a = sel.value || '';
+      sb.title = a ? `${t('전송 (Enter)')} → ${a}` : t('전송 (Enter)');
+    };
+    sel.onchange = () => {
+      try { localStorage.setItem('cc.lazyclawChat.assignee', sel.value); } catch (_) {}
+      const id = _lcCurrentId();
+      if (id) _lcUpdateSessionMeta(id, sel.value, undefined);
+      _lcRenderSessions();
+      updateSendTooltip();
+    };
+    updateSendTooltip();
+  }
 };
 
 function _lcChatLoad() {

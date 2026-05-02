@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.5] — 2026-05-02
+
+### Added
+- 🏷 **Send button shows current assignee in tooltip** (QQ68). Hover
+  the chat ↑ send button to see "전송 (Enter) → claude:opus" or
+  whatever the active assignee is. Updates on every dropdown
+  change. Quick visual confirmation of which model is about to
+  receive the prompt — useful when juggling QQ65 per-session
+  models.
+
+---
 ## [2.67.4] — 2026-05-02
 
 ### Fixed
