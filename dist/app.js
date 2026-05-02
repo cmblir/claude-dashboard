@@ -4209,6 +4209,7 @@ function _wfShowShortcutHelp() {
     { key: 'Ctrl+I', desc: t('인스펙터 패널 토글') },
     { key: 'Ctrl+M', desc: t('미니맵 토글') },
     { key: 'Tab / Shift+Tab', desc: t('다음 / 이전 노드 선택') },
+    { key: 'Ctrl+E / Enter', desc: t('선택 노드 편집창 열기') },
     { key: 'Ctrl+0', desc: t('화면 맞춤') },
     { key: 'Ctrl+1', desc: t('100% 줌으로 리셋') },
     { key: 'Ctrl++ / -', desc: t('줌 인/아웃') },
@@ -4625,6 +4626,23 @@ function _wfBindCanvas() {
         const si = document.getElementById('wfNodeSearch');
         if (si) { e.preventDefault(); si.focus(); return true; }
         return;
+      }
+
+      // LL12 (v2.66.41) — Cmd/Ctrl + E — open the editor for the
+      // selected node. Pairs with Tab cycling for fully keyboard-
+      // driven editing: Tab to land on a node, Cmd+E to open it.
+      if (mod && (e.key === 'e' || e.key === 'E') && !inInput
+          && __wf.current && __wf.selectedNodeId) {
+        e.preventDefault();
+        if (typeof _wfOpenNodeEditor === 'function') _wfOpenNodeEditor(__wf.selectedNodeId);
+        return true;
+      }
+      // Enter key on an SVG node also opens the editor (n8n parity).
+      if (e.key === 'Enter' && !mod && !inInput
+          && __wf.current && __wf.selectedNodeId) {
+        e.preventDefault();
+        if (typeof _wfOpenNodeEditor === 'function') _wfOpenNodeEditor(__wf.selectedNodeId);
+        return true;
       }
 
       // LL11 (v2.66.40) — Tab / Shift+Tab — cycle through nodes.

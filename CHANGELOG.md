@@ -10,6 +10,14 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.41] — 2026-05-02
+
+### Added
+- ⌨ **`Cmd/Ctrl + E` (or `Enter`) opens the editor** for the
+  selected node (LL12). Closes the keyboard navigation loop:
+  Tab to land on a node, Cmd+E to edit its content, Esc to close.
+
+---
 ## [2.66.40] — 2026-05-02
 
 ### Added
