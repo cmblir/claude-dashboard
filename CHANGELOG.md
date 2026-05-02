@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.18] — 2026-05-02
+
+### Cleaned
+- 🧼 **Dry-run also skips sticky annotations** (QQ81). The
+  `api_workflow_dry_run` plan-builder iterated all nodes, including
+  sticky comments — so dry-run reported `nodeCount` and `levels`
+  that included annotations. Now applies the same QQ37/QQ59 sticky
+  filter (drop sticky nodes + edges incident on them) before
+  computing the plan, so the dry-run output matches what the
+  executor will actually walk.
+
+---
 ## [2.67.17] — 2026-05-02
 
 ### Verified

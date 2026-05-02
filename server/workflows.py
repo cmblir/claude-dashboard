@@ -3338,6 +3338,14 @@ def api_workflow_dry_run(body: dict) -> dict:
     cyc = _check_dag(nodes, edges)
     if cyc:
         return {"ok": False, "error": cyc[0]}
+    # QQ81 (v2.67.18) — drop sticky annotations from dry-run plan too
+    # (consistent with QQ37/QQ59 in the executor). Sticky has no port
+    # so its edges were already filtered, but keeping it in the plan
+    # would make `nodeCount` and `levels` overstate the real surface.
+    sticky_ids = {n["id"] for n in nodes if n.get("type") == "sticky"}
+    if sticky_ids:
+        nodes = [n for n in nodes if n["id"] not in sticky_ids]
+        edges = [e for e in edges if e.get("from") not in sticky_ids and e.get("to") not in sticky_ids]
     levels = _topological_levels(nodes, edges)
     order = [nid for lv in levels for nid in lv]
     by_id = {n["id"]: n for n in nodes}
