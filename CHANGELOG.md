@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.68.4] — 2026-05-02
+
+### Added
+- ▶ **`▶ 단독 실행` offers auto-save when workflow is dirty** (QQ94).
+  Previously the QQ18 single-node-run button just refused on a
+  dirty workflow with a "save first" toast. Now it asks via
+  `confirm()` whether to auto-save and proceed; on save failure
+  it falls back to a "save failed" toast. Removes the
+  edit-save-rerun bounce when the user is iterating quickly on
+  one node's prompt.
+
+---
 ## [2.68.3] — 2026-05-02
 
 ### Added
