@@ -586,6 +586,17 @@ def handle_chat_stream(handler: "Handler", body: dict) -> None:
     prompt_parts.append(f"\n## 현재 질문\n사용자: {user_msg}\n\nJSON으로만 답변:")
     full_prompt = "\n".join(prompt_parts)
 
+    # QQ55 (v2.66.130) — strip embedded base64 images from the help-bot
+    # chat prompt for the same reason as QQ49 (claude-cli is text-only).
+    if "data:image/" in full_prompt:
+        try:
+            from .ai_providers import _extract_inline_images
+            cleaned, imgs = _extract_inline_images(full_prompt)
+            if imgs:
+                full_prompt = (cleaned + "\n\n[image attached — claude-cli has no vision]").strip()
+        except Exception:
+            pass
+
     # SSE 헤더
     handler.send_response(200)
     handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
