@@ -26951,7 +26951,30 @@ AFTER.lazyclawChat = () => {
   const ta = document.getElementById('lcChatInput');
   if (ta) {
     ta.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _lcChatSend(); }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _lcChatSend(); return; }
+      // QQ51 (v2.66.126) — Cmd/Ctrl+Up = recall previous user message
+      // (shell-history style). Cmd/Ctrl+Down = clear / advance draft.
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        const id = _lcCurrentId();
+        const hist = _lcGetHistory(id).filter(m => m.role === 'user');
+        if (!hist.length) return;
+        if (typeof __lcHistIdx === 'undefined') window.__lcHistIdx = -1;
+        if (e.key === 'ArrowUp') {
+          window.__lcHistIdx = Math.min(hist.length - 1, window.__lcHistIdx + 1);
+        } else {
+          window.__lcHistIdx = Math.max(-1, window.__lcHistIdx - 1);
+        }
+        if (window.__lcHistIdx < 0) {
+          ta.value = '';
+        } else {
+          ta.value = hist[hist.length - 1 - window.__lcHistIdx].text || '';
+          // Place cursor at end after recall.
+          setTimeout(() => { ta.selectionStart = ta.selectionEnd = ta.value.length; }, 0);
+        }
+        ta.dispatchEvent(new Event('input'));
+      }
     });
     // QQ33 (v2.66.108) — restore unsent draft for the current session
     // so a refresh doesn't drop a half-typed message.
@@ -27379,6 +27402,8 @@ async function _lcChatSend() {
   ta.value = ''; ta.style.height = 'auto';
   // QQ33 — drop the draft once we send.
   try { localStorage.removeItem('cc.lc.draft.' + _lcCurrentId()); } catch (_) {}
+  // QQ51 — reset history-recall cursor on each send.
+  window.__lcHistIdx = -1;
   let sysPrompt = '';
   try {
     const sysTa = document.getElementById('lcSysPrompt');
