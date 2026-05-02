@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.135] — 2026-05-02
+
+### Fixed
+- 🏷 **Tag edits in inspector now refresh the sidebar live** (QQ60).
+  QQ38's tag input only marked the workflow dirty — the sidebar
+  chip strip and per-row tag chips waited until next save+reload
+  to reflect the change. The inspector input now mirrors the new
+  tag list into the in-memory `__wf.workflows` entry and re-runs
+  `_wfRenderList()` on every keystroke, so the chip filter and
+  per-row chips update instantly.
+
+---
 ## [2.66.134] — 2026-05-02
 
 ### Cleaned
