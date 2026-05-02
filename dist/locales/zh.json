@@ -2195,6 +2195,8 @@
   "변환 실패": "转换失败",
   "변환 실패: ": "转换失败: ",
   "변환 유형": "转换类型",
+  "별 표시만 보기": "仅显示已加星",
+  "별 표시한 메시지 없음": "无加星消息",
   "별도": "独立",
   "별도 설치 불필요. 4 명령(doctor/wiki/hud/tasks)은 정적 매핑으로 임의 프로바이더에 dispatch.": "无需另行安装。4 个命令 (doctor/wiki/hud/tasks) 通过静态映射分派到任意 provider。",
   "별도 설치 불필요. 4 모드(autopilot/ralph/ultrawork/deep-interview)는 v2.25 부터 LazyClaude 빌트인 워크플로우 템플릿으로 흡수됨.": "无需另行安装。自 v2.25 起，4 个模式 (autopilot/ralph/ultrawork/deep-interview) 已作为 LazyClaude 内置工作流模板提供。",

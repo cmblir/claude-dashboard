@@ -2195,6 +2195,8 @@
   "변환 실패": "Conversion failed",
   "변환 실패: ": "Conversion failed: ",
   "변환 유형": "Transform Type",
+  "별 표시만 보기": "Show starred only",
+  "별 표시한 메시지 없음": "No starred messages",
   "별도": "separate",
   "별도 설치 불필요. 4 명령(doctor/wiki/hud/tasks)은 정적 매핑으로 임의 프로바이더에 dispatch.": "No separate install needed. The four commands (doctor/wiki/hud/tasks) are statically mapped and dispatched to any provider.",
   "별도 설치 불필요. 4 모드(autopilot/ralph/ultrawork/deep-interview)는 v2.25 부터 LazyClaude 빌트인 워크플로우 템플릿으로 흡수됨.": "No separate install needed. Since v2.25 the four modes (autopilot/ralph/ultrawork/deep-interview) ship as built-in LazyClaude workflow templates.",

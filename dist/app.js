@@ -26850,8 +26850,9 @@ window._lcChatDoRegenerate = function (msgIdx, assignee) {
 // each message against the query, and shows hits in a modal. Click
 // hit → switches assignee + scrolls into view.
 window._lcChatSearch = function () {
-  const q0 = '';
-  const renderModal = (q) => {
+  // QQ16 (v2.66.91) — search modal now offers a ⭐ filter that
+  // restricts results to starred messages.
+  const renderModal = (q, starredOnly) => {
     const queryLower = (q || '').toLowerCase();
     const hits = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -26862,17 +26863,18 @@ window._lcChatSearch = function () {
       try { history = JSON.parse(localStorage.getItem(k) || '[]'); } catch (_) { continue; }
       for (let mi = 0; mi < history.length; mi++) {
         const m = history[mi];
+        if (!m) continue;
+        if (starredOnly && !m.starred) continue;
         const text = (m && m.text) || '';
         if (queryLower && !text.toLowerCase().includes(queryLower)) continue;
-        if (!queryLower && hits.length >= 30) break;
-        // Find match position for snippet
+        if (!queryLower && !starredOnly && hits.length >= 30) break;
         let snippet = text.slice(0, 120);
         if (queryLower) {
           const idx = text.toLowerCase().indexOf(queryLower);
           if (idx > 30) snippet = '…' + text.slice(idx - 30, idx + 90);
           else snippet = text.slice(0, 120);
         }
-        hits.push({ assignee, msgIdx: mi, role: m.role, text: snippet, full: text });
+        hits.push({ assignee, msgIdx: mi, role: m.role, text: snippet, full: text, starred: !!m.starred });
         if (hits.length >= 50) break;
       }
       if (hits.length >= 50) break;
@@ -26880,14 +26882,18 @@ window._lcChatSearch = function () {
     const rows = hits.length ? hits.map(h =>
       `<button class="card p-2 text-left w-full mb-1" style="background:transparent;border:1px solid var(--border);cursor:pointer;"
         onclick="_lcChatJumpToMatch('${escapeHtml(h.assignee)}', ${h.msgIdx})">
-        <div class="text-[10px] text-[var(--text-dim)]">${h.role === 'user' ? '🧑' : '🤖'} ${escapeHtml(h.assignee)}</div>
+        <div class="text-[10px] text-[var(--text-dim)]">${h.starred ? '⭐ ' : ''}${h.role === 'user' ? '🧑' : '🤖'} ${escapeHtml(h.assignee)}</div>
         <div class="text-xs mt-1" style="white-space:pre-wrap;line-height:1.4;">${escapeHtml(h.text)}</div>
       </button>`
-    ).join('') : `<div class="empty">${escapeHtml(q ? t('일치하는 메시지 없음') : t('검색어를 입력하세요'))}</div>`;
+    ).join('') : `<div class="empty">${escapeHtml(starredOnly ? t('별 표시한 메시지 없음') : (q ? t('일치하는 메시지 없음') : t('검색어를 입력하세요')))}</div>`;
     showModal(`
       <div class="modal p-4" style="max-width:640px;">
         <div class="flex items-center gap-2 mb-3">
           <input id="lcSearchInp" class="input flex-1" placeholder="${t('검색어 (모든 대화에서 찾기)')}" value="${escapeHtml(q || '')}" autofocus>
+          <label class="text-[11px] flex items-center gap-1 cursor-pointer" title="${t('별 표시만 보기')}">
+            <input id="lcSearchStar" type="checkbox" ${starredOnly?'checked':''}>
+            ⭐
+          </label>
           <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
         </div>
         <div style="max-height:60vh;overflow-y:auto;">${rows}</div>
@@ -26896,16 +26902,16 @@ window._lcChatSearch = function () {
     `);
     setTimeout(() => {
       const inp = document.getElementById('lcSearchInp');
+      const star = document.getElementById('lcSearchStar');
       if (!inp) return;
       inp.focus();
       let timer;
-      inp.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = setTimeout(() => renderModal(inp.value), 150);
-      });
+      const refresh = () => { clearTimeout(timer); timer = setTimeout(() => renderModal(inp.value, !!(star && star.checked)), 150); };
+      inp.addEventListener('input', refresh);
+      if (star) star.addEventListener('change', refresh);
     }, 30);
   };
-  renderModal(q0);
+  renderModal('', false);
 };
 
 window._lcChatJumpToMatch = function (assignee, msgIdx) {
