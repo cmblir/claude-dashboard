@@ -160,6 +160,9 @@ NEW_EN: dict[str, str] = {
     # QQ13
     "붙여넣기": "Paste",
     "인스펙터 토글": "Toggle inspector",
+    # QQ14
+    "자": "chars",
+    "토큰": "tokens",
     # QQ1
     "시스템 프롬프트 설정됨": "System prompt set",
     "시스템 프롬프트 초기화됨": "System prompt cleared",
@@ -347,6 +350,9 @@ NEW_ZH: dict[str, str] = {
     # QQ13
     "붙여넣기": "粘贴",
     "인스펙터 토글": "切换检查器",
+    # QQ14
+    "자": "字",
+    "토큰": "tokens",
     # QQ1
     "시스템 프롬프트 설정됨": "已设置系统提示",
     "시스템 프롬프트 초기화됨": "已清空系统提示",

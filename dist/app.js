@@ -26368,9 +26368,14 @@ VIEWS.lazyclawChat = async () => {
       <div id="lcChatLog" style="flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px;"></div>
 
       <!-- Input -->
-      <div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;align-items:flex-end;gap:8px;">
+      <div style="padding:10px 12px 4px;border-top:1px solid var(--border);display:flex;align-items:flex-end;gap:8px;">
         <textarea id="lcChatInput" class="input flex-1 text-sm" rows="2" placeholder="${t('메시지를 입력하세요…')}" style="resize:none;font-family:inherit;line-height:1.5;max-height:200px;"></textarea>
         <button id="lcChatSend" class="btn-primary btn" style="padding:8px 16px;font-size:1.1rem;align-self:flex-end;" onclick="_lcChatSend()">↑</button>
+      </div>
+      <!-- QQ14 (v2.66.89) — live char + approx token count -->
+      <div id="lcChatInputStats" style="padding:0 14px 8px;font-size:10px;color:var(--text-dim);display:flex;gap:12px;justify-content:flex-end;">
+        <span><span id="lcInputChars">0</span> ${t('자')}</span>
+        <span>≈ <span id="lcInputTokens">0</span> ${t('토큰')}</span>
       </div>
     </div>
   </div>`;
@@ -26396,10 +26401,19 @@ AFTER.lazyclawChat = () => {
     ta.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _lcChatSend(); }
     });
-    // Auto-resize textarea.
+    // Auto-resize textarea + QQ14 (v2.66.89) live char/token counter.
     ta.addEventListener('input', () => {
       ta.style.height = 'auto';
       ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+      const chars = ta.value.length;
+      // ~chars/4 is a coarse upper bound for English/code; CJK is
+      // closer to 1 token per char. Average to ~chars/3 so the
+      // estimate isn't wildly off for multilingual prompts.
+      const tokens = Math.ceil(chars / 3);
+      const cEl = document.getElementById('lcInputChars');
+      const tEl = document.getElementById('lcInputTokens');
+      if (cEl) cEl.textContent = chars.toLocaleString();
+      if (tEl) tEl.textContent = tokens.toLocaleString();
     });
     // OO7 (v2.66.71) — drag & drop text/code files into the input.
     // The file content is appended as a fenced code block (```ext …).
