@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.134] — 2026-05-02
+
+### Cleaned
+- 🧼 **Drop edges referencing sticky annotations during execution**
+  (QQ59). QQ37 filtered sticky nodes from the topo input but left
+  edges with `from` or `to` pointing at a sticky node in the edge
+  list. Functionally inert (the executor's `results.get(src_id)`
+  returned `None` for the missing source) but it bloated
+  `inputs_map` with dangling entries and made debug dumps noisy.
+  Both endpoints are now checked against the sticky-id set and
+  the edge is dropped if either side hits.
+
+---
 ## [2.66.133] — 2026-05-02
 
 ### Added
