@@ -17530,6 +17530,16 @@ VIEWS.aiProviders = async () => {
     const testBtn = avail
       ? `<button class="btn btn-sm" onclick="testProvider('${p.id}')">${t('연결 테스트')}</button>`
       : '';
+    // QQ97 (v2.68.7) — one-click jump to lazyclawChat with this provider
+    // pre-selected. Saves the first available model as the preferred assignee
+    // so the chat tab opens ready to go, not stuck on "no provider".
+    const firstModel = (p.models || [])[0];
+    const chatAssignee = firstModel
+      ? `${p.id}:${(firstModel.id || firstModel.name || '').replace(/'/g, '')}`
+      : p.id;
+    const chatBtn = avail
+      ? `<button class="btn btn-sm" style="color:var(--cyan);" onclick="_providerOpenChat('${escapeHtml(chatAssignee)}')" title="${t('이 프로바이더로 채팅 열기')}">💬 ${t('채팅')}</button>`
+      : '';
 
     // CLI 설치·로그인 버튼 (CLI 타입 + 카탈로그에 존재하는 도구만)
     let cliInstallBlock = '';
@@ -27765,9 +27775,15 @@ async function _lcChatSend() {
           try {
             const o = JSON.parse(data);
             const dur = ((Date.now() - t0) / 1000).toFixed(1);
-            reply.meta = [o.provider, o.model, dur + 's'].filter(Boolean).join(' · ');
+            // QQ97 (v2.68.7) — include cost (USD) in the meta line if
+            // the provider reported a non-zero cost. Cheap visibility
+            // for cumulative spend per turn without opening a panel.
+            const costStr = (typeof o.costUsd === 'number' && o.costUsd > 0)
+              ? '$' + o.costUsd.toFixed(4) : '';
+            reply.meta = [o.provider, o.model, dur + 's', costStr].filter(Boolean).join(' · ');
             if (o.tokensIn) reply.tokensIn = o.tokensIn;
             if (o.tokensOut) reply.tokensOut = o.tokensOut;
+            if (typeof o.costUsd === 'number') reply.costUsd = o.costUsd;
           } catch (_) {}
         } else if (event === 'error') {
           try { const o = JSON.parse(data); reply.text = (reply.text || '') + '\n⚠ ' + (o.error || 'error'); }
