@@ -5351,6 +5351,15 @@ function _wfRenderInspector(opts) {
             <option value="ollama-api" ${fp==='ollama-api'?'selected':''}>Ollama (local)</option>
           </select>
           <div class="text-[10px]" style="color:var(--text-dim)">${t('policy_fallback_hint', 'session 노드가 assignee 로 실패 시 선택한 프로바이더로 1회 재시도. 노드 결과에 fallbackUsed 기록.')}</div>
+          <!-- PP4 (v2.66.74) — per-workflow node timeout slider -->
+          <label class="text-[10px] mt-3 block" style="color:var(--text-dim)">${t('노드 타임아웃 (서버 기본값 사용 = 0)')}</label>
+          <div class="flex items-center gap-2 mt-1">
+            <input type="range" min="0" max="600" step="30" class="flex-1"
+                   value="${Number(pol.nodeTimeout || 0)}"
+                   oninput="document.getElementById('wfNodeTimeoutVal').textContent=this.value+'s'; __wf.current.policy = __wf.current.policy || {}; __wf.current.policy.nodeTimeout=parseInt(this.value)||0; __wf.dirty=true; _wfUpdateToolbar();">
+            <span id="wfNodeTimeoutVal" class="text-[11px]" style="min-width:55px;font-variant-numeric:tabular-nums;">${Number(pol.nodeTimeout||0)}s</span>
+          </div>
+          <div class="text-[10px]" style="color:var(--text-dim)">${t('0 = 서버 기본 (180s) · 30~600초 사이로 조절. 짧으면 빨리 fail, 길면 hang 인내.')}</div>
         `;
       })()}
     </div>
