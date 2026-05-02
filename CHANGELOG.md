@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.11] — 2026-05-02
+
+### Performance
+- 🚀 **QQ56 orphan sweep guarded to once per browser session**
+  (QQ74). Revisiting the chat tab N times in a row no longer
+  rescans the entire `localStorage` keyspace each time — first
+  open scans, sets a `sessionStorage` flag, subsequent opens skip.
+  The sweep is for legacy cleanup so once-per-session is enough.
+
+---
 ## [2.67.10] — 2026-05-02
 
 ### Added

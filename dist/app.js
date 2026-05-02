@@ -26993,18 +26993,24 @@ VIEWS.lazyclawChat = async () => {
 AFTER.lazyclawChat = () => {
   // QQ56 (v2.66.131) — drop drafts/histories whose session has been
   // deleted (legacy data from before QQ54 cleaned them up properly).
+  // QQ74 (v2.67.11) — guard with sessionStorage so we sweep at most
+  // once per browser session; revisiting the chat tab N times in a
+  // row no longer rescans localStorage each time.
   try {
-    const live = new Set(_lcGetSessions().map(s => s.id));
-    const orphans = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k) continue;
-      let sid = '';
-      if (k.startsWith('cc.lc.hist.')) sid = k.slice('cc.lc.hist.'.length);
-      else if (k.startsWith('cc.lc.draft.')) sid = k.slice('cc.lc.draft.'.length);
-      if (sid && !live.has(sid)) orphans.push(k);
+    if (!sessionStorage.getItem('cc.lc.sweptOrphans')) {
+      const live = new Set(_lcGetSessions().map(s => s.id));
+      const orphans = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        let sid = '';
+        if (k.startsWith('cc.lc.hist.')) sid = k.slice('cc.lc.hist.'.length);
+        else if (k.startsWith('cc.lc.draft.')) sid = k.slice('cc.lc.draft.'.length);
+        if (sid && !live.has(sid)) orphans.push(k);
+      }
+      orphans.forEach(k => { try { localStorage.removeItem(k); } catch(_) {} });
+      sessionStorage.setItem('cc.lc.sweptOrphans', '1');
     }
-    orphans.forEach(k => { try { localStorage.removeItem(k); } catch(_) {} });
   } catch (_) {}
   // Render sessions sidebar and current session messages.
   _lcRenderSessions();
