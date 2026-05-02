@@ -5551,6 +5551,22 @@ function _wfShowEdgeContextMenu(eid, x, y) {
 
       // Delete / Backspace — remove
       if (['Delete','Backspace'].includes(e.key) && !inInput) {
+        // QQ30 (v2.66.105) — multi-select delete (n8n parity).
+        if (__wfMultiSelected && __wfMultiSelected.size > 1 && __wf.current) {
+          e.preventDefault();
+          const ids = new Set(__wfMultiSelected);
+          if (ids.size > 3 && !confirm(`${ids.size} ${t('노드를 삭제하시겠습니까?')}`)) return true;
+          _wfPushUndo();
+          __wf.current.nodes = __wf.current.nodes.filter(n => !ids.has(n.id));
+          __wf.current.edges = (__wf.current.edges || []).filter(ed => !ids.has(ed.from) && !ids.has(ed.to));
+          __wfMultiSelected.clear();
+          __wf.selectedNodeId = null;
+          __wf.dirty = true;
+          _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
+          if (typeof _wfSyncMultiSelectClasses === 'function') _wfSyncMultiSelectClasses();
+          toast(`${ids.size} ${t('노드 삭제됨')}`, 'ok');
+          return true;
+        }
         if (__wf.selectedNodeId) { e.preventDefault(); _wfDeleteSelectedNode(); return true; }
         if (__wf.selectedEdgeId) { e.preventDefault(); _wfDeleteSelectedEdge(); return true; }
       }

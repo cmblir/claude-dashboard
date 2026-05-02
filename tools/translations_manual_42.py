@@ -235,6 +235,9 @@ NEW_EN: dict[str, str] = {
     "러버밴드 다중 선택": "Rubber-band multi-select",
     # QQ29 — multi-node copy with edges
     "엣지": "edges",
+    # QQ30 — multi-delete
+    "노드를 삭제하시겠습니까?": "Delete these nodes?",
+    "노드 삭제됨": "nodes deleted",
 }
 
 NEW_ZH: dict[str, str] = {
@@ -464,4 +467,7 @@ NEW_ZH: dict[str, str] = {
     "러버밴드 다중 선택": "框选多个节点",
     # QQ29
     "엣지": "条边",
+    # QQ30
+    "노드를 삭제하시겠습니까?": "删除这些节点？",
+    "노드 삭제됨": "个节点已删除",
 }

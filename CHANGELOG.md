@@ -10,6 +10,16 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.105] — 2026-05-02
+
+### Added
+- 🗑 **Multi-select delete with confirm** (QQ30, n8n parity). Delete /
+  Backspace now removes every node in `__wfMultiSelected` (and all
+  edges incident on the set) in one undo step. Asks for confirmation
+  when the selection has more than 3 nodes — small lassos delete
+  silently. Pairs with QQ27 / QQ28 / QQ29.
+
+---
 ## [2.66.104] — 2026-05-02
 
 ### Added
