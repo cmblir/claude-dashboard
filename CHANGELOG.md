@@ -10,6 +10,15 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.83] — 2026-05-02
+
+### Added
+- 📌 **Floating description tag in canvas top-left** (QQ8).
+  Shows `name` + truncated `description` so the user remembers
+  the workflow's purpose without opening the inspector. Click
+  jumps to the inspector's description textarea for editing.
+
+---
 ## [2.66.82] — 2026-05-02
 
 ### Changed
