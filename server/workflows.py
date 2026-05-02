@@ -646,6 +646,13 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
             "lastRun": d.get("lastRun") if isinstance(d.get("lastRun"), dict) else {
                 "status": "idle", "output": None, "sessionId": "", "durationMs": 0, "startedAt": 0
             },
+            # QQ20 (v2.66.95) — pin data (n8n parity). When `pinned` is true
+            # and `pinnedOutput` is non-empty, the executor returns the pinned
+            # output immediately without invoking any provider. Lets users
+            # freeze an upstream LLM result and iterate cheaply on downstream
+            # nodes.
+            "pinned": bool(d.get("pinned")),
+            "pinnedOutput": _clamp_str(d.get("pinnedOutput"), 32000),
         }
     elif ntype == "branch":
         out["data"] = {"condition": _clamp_str(d.get("condition"), 400)}
@@ -1656,6 +1663,24 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
         return _execute_docker_run_node(data, inputs, _elapsed)
 
     # ── session / subagent — 멀티 프로바이더 실행 ──
+    # QQ20 (v2.66.95) — pinned data short-circuit (n8n parity).
+    # If the user has pinned an output for this node, return it
+    # immediately as a successful run without invoking any provider.
+    if data.get("pinned") and (data.get("pinnedOutput") or "").strip():
+        pinned = data["pinnedOutput"]
+        return {
+            "status": "ok",
+            "output": pinned,
+            "durationMs": _elapsed(),
+            "sessionId": "",
+            "provider": "pinned",
+            "model": "pinned",
+            "tokensIn": 0,
+            "tokensOut": 0,
+            "cost": 0.0,
+            "pinned": True,
+        }
+
     prompt_parts = []
     if data.get("subject"):
         prompt_parts.append(data["subject"])
