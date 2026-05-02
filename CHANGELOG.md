@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.66.103] — 2026-05-02
+
+### Added
+- 🟦 **Group drag for multi-selected nodes** (QQ28, n8n parity).
+  Clicking and dragging any node that belongs to the active multi-
+  selection now moves all selected nodes together while preserving
+  their relative layout. Lead-node grid snap (Alt to bypass) is
+  applied via a delta so the cluster doesn't drift on snap. Pairs
+  with QQ27 rubber-band: lasso a cluster, then move it as one.
+
+---
 ## [2.66.102] — 2026-05-02
 
 ### Added

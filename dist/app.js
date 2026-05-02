@@ -4671,7 +4671,24 @@ function _wfBindCanvas() {
         if (touch) { try{e.preventDefault();}catch(_){} }
         return;
       }
-      // 다중 선택 클리어
+      // QQ28 (v2.66.103) — if the clicked node is part of an active
+      // multi-selection, drag all selected nodes together (n8n parity).
+      // Otherwise, clear the multi-selection and start a single-node drag.
+      if (__wfMultiSelected.size > 0 && __wfMultiSelected.has(nid)) {
+        const ids = Array.from(__wfMultiSelected);
+        const origs = ids.map(id => {
+          const nn = __wf.current.nodes.find(x => x.id === id);
+          return nn ? { id, _node: nn, origX: nn.x, origY: nn.y } : null;
+        }).filter(Boolean);
+        __wf.selectedNodeId = nid; __wf.selectedEdgeId = null;
+        __wf._lastInspSig = null;
+        _wfPushUndo();
+        __wf.drag = { kind: 'multi', leadId: nid, items: origs, startX: pt.x, startY: pt.y };
+        _wfSyncSelectionClasses();
+        _wfRenderInspector();
+        if (touch) { try{e.preventDefault();}catch(_){} }
+        return;
+      }
       if (__wfMultiSelected.size > 0) { __wfMultiSelected.clear(); _wfSyncMultiSelectClasses(); }
       __wf.selectedNodeId = nid; __wf.selectedEdgeId = null;
       __wf._lastInspSig = null; // DD3 — force inspector refresh on next tick
@@ -4762,6 +4779,34 @@ function _wfBindCanvas() {
     } else if (__wf.drag.kind === 'edge') {
       __wf.edgeDraft.x2 = pt.x; __wf.edgeDraft.y2 = pt.y;
       _wfDraftRender();
+      if (touch) { try{e.preventDefault();}catch(_){} }
+    } else if (__wf.drag.kind === 'multi') {
+      const SNAP = 10;
+      const rawDx = pt.x - __wf.drag.startX;
+      const rawDy = pt.y - __wf.drag.startY;
+      let dx = rawDx, dy = rawDy;
+      if (!e.altKey) {
+        // Snap the lead's resulting position; apply same delta to followers
+        // so the cluster keeps its internal layout.
+        const lead = __wf.drag.items.find(it => it.id === __wf.drag.leadId);
+        if (lead) {
+          const snappedX = Math.round((lead.origX + rawDx) / SNAP) * SNAP;
+          const snappedY = Math.round((lead.origY + rawDy) / SNAP) * SNAP;
+          dx = snappedX - lead.origX;
+          dy = snappedY - lead.origY;
+        }
+      } else {
+        dx = Math.round(rawDx); dy = Math.round(rawDy);
+      }
+      for (const it of __wf.drag.items) {
+        const n = it._node;
+        n.x = it.origX + dx;
+        n.y = it.origY + dy;
+        _wfUpdateNodeTransform(it.id);
+      }
+      if (!__wf.dirty) { __wf.dirty = true; _wfUpdateToolbar(); }
+      _wfSchedulePatch();
+      _wfScheduleMinimap();
       if (touch) { try{e.preventDefault();}catch(_){} }
     } else if (__wf.drag.kind === 'rubber') {
       __wf.drag.curX = pt.x; __wf.drag.curY = pt.y;
