@@ -10,6 +10,59 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.67.0] — 2026-05-02
+
+**Q-series rollup** — milestone marker for the cumulative work landed
+between 2.66.93 and 2.66.138 across the four pillars of the Ralph
+prompt: n8n-parity workflows, zero-lag UI, fail-fast cancel, and
+OpenClaw-parity chat. Backwards-compatible — no schema breaks, no
+removed endpoints, every prior point release is still individually
+listed below.
+
+### Workflow editor — n8n parity
+- `▶ 단독 실행` / `🍴 우클릭 단독 실행` / `📋 출력 복사` (QQ18, QQ19) —
+  per-node debug execution.
+- `📌 Pin Data` with inspector status panel (QQ20, QQ21) — freeze a
+  node's last output and reuse it instead of re-running the model.
+- Rubber-band drag selection, group drag, multi-copy/paste w/ internal
+  edges, multi-delete with confirm (QQ27 → QQ30) — full multi-select
+  editing loop.
+- Align / distribute toolbar for 2+ selected (QQ34) — left/center/right
+  + top/middle/bottom + horizontal/vertical distribute.
+- 🟨 Sticky note nodes (QQ36) — free-floating markdown annotations,
+  5 colors, resizable. Skipped from execution (QQ37) and orphan
+  edges dropped (QQ59, QQ63).
+- 🏷 Workflow tags + sidebar tag-chip filter (QQ38, QQ60) — quick
+  organization for many workflows.
+- 📊 Last-run mini Gantt in inspector (QQ46) — top 12 nodes by
+  duration, live-updating during runs (QQ47, QQ48 throttled).
+
+### Chat — OpenClaw parity
+- ✏️ edit + resubmit (QQ22), 🍴 branch from any message (QQ23),
+  ↳ branch lineage hint in sidebar (QQ24).
+- 🔤 per-session token-usage badge (QQ26).
+- 📋 code-block copy buttons (QQ31), ▾ collapse long messages (QQ32).
+- 💾 per-session draft autosave with quota recovery (QQ33, QQ53),
+  orphan sweep on tab open (QQ56), session delete cleanup fix (QQ54).
+- ⬇ scroll-to-bottom button (QQ35), Cmd+Shift+[/] session nav
+  (QQ50), Cmd+↑/↓ history recall (QQ51), Tab slash-command
+  autocomplete (QQ62), `/help` lists shortcuts (QQ52).
+- 🖼 image attach via paste, drop, and 📎 file picker (QQ39, QQ61)
+  with stronger drag-over cue (QQ57).
+- Multimodal routing for OpenAI / Anthropic / Gemini / Ollama in
+  both one-shot and streaming paths (QQ40-QQ43); `data:image/...`
+  stripped before claude-cli with a note (QQ49, QQ55); soft warning
+  when sending an image to a non-vision assignee (QQ44).
+- 🔎 Cmd+K search now also walks per-session histories (QQ45).
+- Esc clears chat sidebar filter (QQ58).
+
+### Performance
+- RAF-coalesced canvas rendering (QQ25) — bulk operations no longer
+  trigger N redundant SVG diffs.
+- Inspector re-render throttled to ≤4 fps under SSE bursts (QQ48).
+- Sticky annotations skipped from topological execution (QQ37).
+
+---
 ## [2.66.138] — 2026-05-02
 
 ### Cleaned
