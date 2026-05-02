@@ -25999,6 +25999,7 @@ VIEWS.lazyclawChat = async () => {
           ${optHtml}
         </select>
         <button class="btn text-xs" onclick="_lcChatToggleSysPrompt()" title="${t('시스템 프롬프트')}" style="padding:3px 8px;">⚙</button>
+        <button class="btn text-xs" onclick="_lcChatSearch()" title="${t('대화 검색')} (Cmd+K)" style="padding:3px 7px;">🔎</button>
         <span style="flex:1;"></span>
         <button class="btn text-xs" onclick="_lcChatExport()" title="${t('마크다운으로 내보내기')}" style="padding:3px 7px;">📥</button>
         <button class="btn text-xs" onclick="_lcDeleteCurrentSession()" title="${t('대화 삭제')}" style="padding:3px 7px;">🗑</button>
@@ -26024,80 +26025,108 @@ VIEWS.lazyclawChat = async () => {
 };
 
 AFTER.lazyclawChat = () => {
-  // Restore log from localStorage so the user can continue a prior chat.
+  // Render sessions sidebar and current session messages.
+  _lcRenderSessions();
   _lcChatRender();
+  // OO6 — Cmd/Ctrl+K opens search across all chat histories.
+  if (!window.__lcSearchKeyBound) {
+    window.__lcSearchKeyBound = true;
+    document.addEventListener('keydown', (e) => {
+      if (state.view !== 'lazyclawChat') return;
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        if (typeof _lcChatSearch === 'function') _lcChatSearch();
+      }
+    });
+  }
   const ta = document.getElementById('lcChatInput');
   if (ta) {
-    ta.addEventListener('keydown', (e) => {
+    ta.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _lcChatSend(); }
+    });
+    // Auto-resize textarea.
+    ta.addEventListener('input', () => {
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
     });
     setTimeout(() => ta.focus(), 50);
   }
   const sel = document.getElementById('lcChatAssignee');
   if (sel) sel.onchange = () => {
     try { localStorage.setItem('cc.lazyclawChat.assignee', sel.value); } catch (_) {}
-    _lcChatRender();
+    // Update current session's assignee.
+    const id = _lcCurrentId();
+    if (id) _lcUpdateSessionMeta(id, sel.value, undefined);
+    _lcRenderSessions();
   };
 };
 
-function _lcChatKey() {
-  const sel = document.getElementById('lcChatAssignee');
-  return 'cc.lazyclawChat.history.' + ((sel && sel.value) || 'default');
-}
-
 function _lcChatLoad() {
-  try {
-    const raw = localStorage.getItem(_lcChatKey());
-    return raw ? JSON.parse(raw) : [];
-  } catch (_) { return []; }
+  return _lcGetHistory(_lcEnsureSession(''));
 }
 
 function _lcChatSave(history) {
-  try { localStorage.setItem(_lcChatKey(), JSON.stringify(history.slice(-100))); }
-  catch (_) {}
+  _lcSaveHistory(_lcCurrentId(), history);
 }
 
-function _lcChatRender() {
+function _lcMsgBody(m) {
+  const isUser = m.role === 'user';
+  if (!isUser && typeof marked !== 'undefined' && marked.parse) {
+    try { return `<div class="prose-claude" style="font-size:.875rem;line-height:1.6;margin-top:4px;">${marked.parse(m.text || '')}</div>`; }
+    catch (_) {}
+  }
+  return `<pre style="font-size:.875rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;font-family:inherit;margin:4px 0 0;">${escapeHtml(m.text || '')}</pre>`;
+}
+
+function _lcChatRender(opts) {
   const log = document.getElementById('lcChatLog');
   if (!log) return;
-  const history = _lcChatLoad();
+  const id = _lcEnsureSession('');
+  const history = _lcGetHistory(id);
   if (!history.length) {
-    log.innerHTML = `<div class="text-[11px] text-[var(--text-dim)] text-center py-8">${t('새 대화를 시작하세요')}</div>`;
+    log.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;">
+      <div style="font-size:3rem;">🦞</div>
+      <div style="font-size:1rem;font-weight:600;color:var(--text);">${t('새 대화를 시작하세요')}</div>
+      <div style="font-size:.8rem;text-align:center;max-width:280px;line-height:1.5;color:var(--text-dim);">${t('아래에 메시지를 입력하면 선택한 AI와 대화를 시작합니다.')}</div>
+    </div>`;
     return;
   }
+  const wasAtBottom = log.scrollHeight - log.scrollTop <= log.clientHeight + 80;
   log.innerHTML = history.map((m, i) => {
     const isUser = m.role === 'user';
-    const bg = isUser ? 'rgba(217,119,87,0.12)' : 'rgba(167,139,250,0.10)';
-    const stroke = isUser ? 'rgba(217,119,87,0.35)' : 'rgba(167,139,250,0.28)';
-    const tag = isUser ? '🧑' : '🤖';
-    const meta = m.meta ? `<div class="text-[10px] text-[var(--text-dim)] mt-1">${escapeHtml(m.meta)}</div>` : '';
-    // OO2 (v2.66.65) — render assistant replies as markdown so code
-    // blocks, lists, and headings come through. User messages stay
-    // verbatim (preserves whitespace / paste fidelity).
-    let body;
-    if (!isUser && typeof marked !== 'undefined' && marked.parse) {
-      try {
-        body = `<div class="prose-claude text-sm mt-1" style="line-height:1.55;">${marked.parse(m.text || '')}</div>`;
-      } catch (e) {
-        body = `<pre class="text-sm mt-1" style="white-space:pre-wrap;word-break:break-word;font-family:inherit;">${escapeHtml(m.text || '')}</pre>`;
-      }
-    } else {
-      body = `<pre class="text-sm mt-1" style="white-space:pre-wrap;word-break:break-word;font-family:inherit;">${escapeHtml(m.text || '')}</pre>`;
-    }
-    // Per-message copy + (assistant only) regenerate-with-other-model
-    const copyBtn = m.text ? `<button class="btn text-[10px]" style="margin-left:auto;background:transparent;border:0;opacity:0.55;" onclick="_copyToClipboard(this, ${JSON.stringify(m.text).replace(/"/g,'&quot;')})" title="${t('복사')}">📋</button>` : '';
-    // OO5 (v2.66.68) — regenerate the assistant reply with a *different*
-    // model. Looks at the previous user message and resends it. Useful
-    // for side-by-side comparison without leaving the chat.
-    const regenBtn = (!isUser && i > 0) ? `<button class="btn text-[10px]" style="background:transparent;border:0;opacity:0.55;" onclick="_lcChatRegenerate(${i})" title="${t('다른 모델로 재생성')}">🔄</button>` : '';
-    return `<div style="background:${bg};border:1px solid ${stroke};border-radius:10px;padding:10px 12px;align-self:${isUser?'flex-end':'flex-start'};max-width:85%;">
-      <div class="text-[10px] text-[var(--text-dim)] flex items-center gap-1">${tag} ${escapeHtml(isUser ? t('나') : (m.assignee || t('AI')))}${regenBtn}${copyBtn}</div>
-      ${body}
-      ${meta}
+    const bg = isUser ? 'rgba(217,119,87,0.1)' : 'rgba(255,255,255,0.04)';
+    const border = isUser ? '1px solid rgba(217,119,87,0.3)' : '1px solid var(--border)';
+    const label = isUser ? '🧑 ' + t('나') : '🤖 ' + escapeHtml(m.assignee || t('AI'));
+    const metaHtml = m.meta ? `<div style="font-size:10px;color:var(--text-dim);margin-top:4px;">${escapeHtml(m.meta)}</div>` : '';
+    const tokenHtml = (m.tokensIn || m.tokensOut) ? `<span style="font-size:9px;color:var(--text-dim);margin-left:6px;">↑${m.tokensIn||0} ↓${m.tokensOut||0}</span>` : '';
+    const sf = JSON.stringify(m.text || '').replace(/"/g, '&quot;');
+    const copyBtn = `<button onclick="_copyToClipboard(this,${sf})" title="${t('복사')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">📋</button>`;
+    const delBtn = `<button onclick="_lcDeleteMsg('${id}',${i})" title="${t('삭제')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:11px;opacity:0.4;color:var(--text-dim);line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">✕</button>`;
+    const regenBtn = (!isUser && i > 0) ? `<button onclick="_lcRegenerate(${i})" title="${t('재생성')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">🔄</button>` : '';
+    return `<div style="background:${bg};border:${border};border-radius:10px;padding:11px 14px;align-self:${isUser?'flex-end':'flex-start'};max-width:88%;min-width:100px;">
+      <div style="display:flex;align-items:center;font-size:10px;color:var(--text-dim);">${label}${tokenHtml}<span style="flex:1;"></span>${regenBtn}${copyBtn}${delBtn}</div>
+      ${_lcMsgBody(m)}${metaHtml}
     </div>`;
   }).join('');
-  log.scrollTop = log.scrollHeight;
+  if (!opts || opts.keepScroll !== true || wasAtBottom) log.scrollTop = log.scrollHeight;
 }
+
+window._lcDeleteMsg = function (sessionId, idx) {
+  const h = _lcGetHistory(sessionId); h.splice(idx, 1);
+  _lcSaveHistory(sessionId, h); _lcChatRender({ keepScroll: true });
+};
+
+window._lcRegenerate = async function (idx) {
+  if (_lcChatAbortCtrl) { toast(t('현재 응답을 먼저 중단하세요'), 'warn'); return; }
+  const id = _lcCurrentId(); const history = _lcGetHistory(id);
+  let userMsg = '';
+  for (let j = idx - 1; j >= 0; j--) { if (history[j].role === 'user') { userMsg = history[j].text; break; } }
+  if (!userMsg) return;
+  history.splice(idx); _lcSaveHistory(id, history);
+  const ta = document.getElementById('lcChatInput');
+  if (ta) ta.value = userMsg;
+  await _lcChatSend();
+};
 
 // OO3 (v2.66.66) — streaming chat send. POSTs to
 // /api/lazyclaw/chat/stream and renders tokens as they arrive via
@@ -26327,6 +26356,99 @@ window._lcChatDoRegenerate = function (msgIdx, assignee) {
   if (ta) ta.value = userMsg.text || '';
   // Defer so the dropdown change is committed.
   setTimeout(() => _lcChatSend(), 30);
+};
+
+// OO6 (v2.66.69) — full-text search across all chat histories.
+// Walks every `cc.lazyclawChat.history.*` localStorage key, matches
+// each message against the query, and shows hits in a modal. Click
+// hit → switches assignee + scrolls into view.
+window._lcChatSearch = function () {
+  const q0 = '';
+  const renderModal = (q) => {
+    const queryLower = (q || '').toLowerCase();
+    const hits = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith('cc.lazyclawChat.history.')) continue;
+      const assignee = k.slice('cc.lazyclawChat.history.'.length);
+      let history;
+      try { history = JSON.parse(localStorage.getItem(k) || '[]'); } catch (_) { continue; }
+      for (let mi = 0; mi < history.length; mi++) {
+        const m = history[mi];
+        const text = (m && m.text) || '';
+        if (queryLower && !text.toLowerCase().includes(queryLower)) continue;
+        if (!queryLower && hits.length >= 30) break;
+        // Find match position for snippet
+        let snippet = text.slice(0, 120);
+        if (queryLower) {
+          const idx = text.toLowerCase().indexOf(queryLower);
+          if (idx > 30) snippet = '…' + text.slice(idx - 30, idx + 90);
+          else snippet = text.slice(0, 120);
+        }
+        hits.push({ assignee, msgIdx: mi, role: m.role, text: snippet, full: text });
+        if (hits.length >= 50) break;
+      }
+      if (hits.length >= 50) break;
+    }
+    const rows = hits.length ? hits.map(h =>
+      `<button class="card p-2 text-left w-full mb-1" style="background:transparent;border:1px solid var(--border);cursor:pointer;"
+        onclick="_lcChatJumpToMatch('${escapeHtml(h.assignee)}', ${h.msgIdx})">
+        <div class="text-[10px] text-[var(--text-dim)]">${h.role === 'user' ? '🧑' : '🤖'} ${escapeHtml(h.assignee)}</div>
+        <div class="text-xs mt-1" style="white-space:pre-wrap;line-height:1.4;">${escapeHtml(h.text)}</div>
+      </button>`
+    ).join('') : `<div class="empty">${escapeHtml(q ? t('일치하는 메시지 없음') : t('검색어를 입력하세요'))}</div>`;
+    showModal(`
+      <div class="modal p-4" style="max-width:640px;">
+        <div class="flex items-center gap-2 mb-3">
+          <input id="lcSearchInp" class="input flex-1" placeholder="${t('검색어 (모든 대화에서 찾기)')}" value="${escapeHtml(q || '')}" autofocus>
+          <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+        </div>
+        <div style="max-height:60vh;overflow-y:auto;">${rows}</div>
+        <div class="text-[10px] text-[var(--text-dim)] mt-2">${hits.length} ${t('건')}</div>
+      </div>
+    `);
+    setTimeout(() => {
+      const inp = document.getElementById('lcSearchInp');
+      if (!inp) return;
+      inp.focus();
+      let timer;
+      inp.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => renderModal(inp.value), 150);
+      });
+    }, 30);
+  };
+  renderModal(q0);
+};
+
+window._lcChatJumpToMatch = function (assignee, msgIdx) {
+  closeModal();
+  // Switch assignee dropdown if needed.
+  const sel = document.getElementById('lcChatAssignee');
+  if (sel && sel.value !== assignee) {
+    if (![...sel.options].some(o => o.value === assignee)) {
+      const opt = document.createElement('option');
+      opt.value = assignee; opt.textContent = assignee;
+      sel.appendChild(opt);
+    }
+    sel.value = assignee;
+    try { localStorage.setItem('cc.lazyclawChat.assignee', assignee); } catch (_) {}
+    if (typeof _lcChatRender === 'function') _lcChatRender();
+  }
+  // Scroll the matching message into view (after render).
+  setTimeout(() => {
+    const log = document.getElementById('lcChatLog');
+    if (!log) return;
+    const children = log.children;
+    if (msgIdx < children.length) {
+      const el = children[msgIdx];
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const orig = el.style.boxShadow;
+      el.style.boxShadow = '0 0 0 2px rgba(217,119,87,0.65)';
+      el.style.transition = 'box-shadow 0.4s';
+      setTimeout(() => { el.style.boxShadow = orig; }, 1400);
+    }
+  }, 80);
 };
 
 window._lcChatClear = function () {
