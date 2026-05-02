@@ -6055,6 +6055,10 @@ function _wfRenderInspector(opts) {
           dur ? `<span class="chip text-[10px]">⏱ ${dur}</span>` : '',
           tokens ? `<span class="chip text-[10px]">🔤 ${typeof tokens === 'number' ? tokens.toLocaleString() : tokens}</span>` : '',
           cost ? `<span class="chip chip-warn text-[10px]">${cost}</span>` : '',
+          // QQ105 (v2.68.15) — surface the fallback flag so users see
+          // when a node's primary assignee failed and was retried via
+          // the workflow policy's fallback provider.
+          nr.fallbackUsed ? `<span class="chip chip-warn text-[10px]" style="background:rgba(245,158,11,0.20);" title="${t('policy_fallback_hint', 'session 노드가 assignee 로 실패 시 선택한 프로바이더로 1회 재시도. 노드 결과에 fallbackUsed 기록.')}">↻ ${t('fallback')}</span>` : '',
         ].filter(Boolean).join('');
         if (chips) {
           runInfoBlock = `

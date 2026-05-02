@@ -818,6 +818,7 @@
   "err_workflow_stale": "동시 수정 감지 — 새로고침 후 다시 시도",
   "everything-claude-code 플러그인 설치 → 실전 기능 확보": "everything-claude-code 플러그인 설치 → 실전 기능 확보",
   "extended thinking 10,000 토큰 이하로 제한. 무제한은 가성비 나쁨.": "extended thinking 10,000 토큰 이하로 제한. 무제한은 가성비 나쁨.",
+  "fallback": "fallback",
   "fallback_chain": "🔄 폴백 체인",
   "fallback_chain_desc": "워크플로우 노드가 실패하면 다음 프로바이더로 자동 전환됩니다.",
   "feedbackNodeId": "피드백 노드 ID",

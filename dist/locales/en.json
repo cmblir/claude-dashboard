@@ -818,6 +818,7 @@
   "err_workflow_stale": "Concurrent modification detected — refresh and try again",
   "everything-claude-code 플러그인 설치 → 실전 기능 확보": "Install the everything-claude-code plugin for production-grade features",
   "extended thinking 10,000 토큰 이하로 제한. 무제한은 가성비 나쁨.": "Cap extended thinking at ≤10,000 tokens. Unlimited yields poor ROI.",
+  "fallback": "fallback",
   "fallback_chain": "🔄 Fallback Chain",
   "fallback_chain_desc": "Automatically switches to the next provider if a workflow node fails.",
   "feedbackNodeId": "Feedback Node ID",
