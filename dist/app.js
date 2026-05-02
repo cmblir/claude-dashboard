@@ -6923,12 +6923,31 @@ function _wfApplyRunStatus(run) {
     _wfMinimapTimer = requestAnimationFrame(() => { _wfMinimapTimer = null; _wfRenderMinimap(); });
   }
   // Task 3: 브라우저 Notification — 실행 완료/실패 알림
-  if (run.status === 'ok') {
+  // QQ10 (v2.66.85) — guard against duplicate completion notifications
+  // — _wfApplyRunStatus is called every SSE poll, but the run terminal
+  // event arrives just once. Persist a per-run sentinel so the toast
+  // and browser notification fire exactly once per run id.
+  if ((run.status === 'ok' || run.status === 'err') && run.runId
+       && __wf._lastCompletedRunId !== run.runId) {
+    __wf._lastCompletedRunId = run.runId;
     const wfName = (__wf.current && __wf.current.name) || t('워크플로우');
-    _sendBrowserNotification(t('워크플로우 완료'), wfName + ' — ' + t('실행이 성공적으로 완료되었습니다'));
-  } else if (run.status === 'err') {
-    const wfName = (__wf.current && __wf.current.name) || t('워크플로우');
-    _sendBrowserNotification(t('워크플로우 실패'), wfName + ' — ' + (run.error || t('실행 중 오류가 발생했습니다')));
+    if (run.status === 'ok') {
+      _sendBrowserNotification(t('워크플로우 완료'), wfName + ' — ' + t('실행이 성공적으로 완료되었습니다'));
+    } else {
+      _sendBrowserNotification(t('워크플로우 실패'), wfName + ' — ' + (run.error || t('실행 중 오류가 발생했습니다')));
+      // QQ10 — fail-fast summary toast.
+      let realErrs = 0, autoCancels = 0, oks = 0;
+      for (const r of Object.values(results)) {
+        if (!r) continue;
+        if (r.status === 'err') {
+          if (r.error && r.error.includes('cancelled by sibling-node failure')) autoCancels++;
+          else realErrs++;
+        } else if (r.status === 'ok') oks++;
+      }
+      if (autoCancels > 0 && typeof toast === 'function') {
+        toast(`🔴 ${realErrs} ${t('실제 실패')} · ⏹ ${autoCancels} ${t('자동 취소됨')} · ✓ ${oks} ${t('완료')}`, 'err');
+      }
+    }
   }
 }
 
