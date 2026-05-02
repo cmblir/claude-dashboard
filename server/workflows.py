@@ -893,12 +893,23 @@ def _sanitize_workflow(raw: Any) -> Optional[dict]:
         if cleaned and cleaned["id"] not in seen_ids:
             nodes.append(cleaned); seen_ids.add(cleaned["id"])
     node_ids = {n["id"] for n in nodes}
+    # QQ63 (v2.66.138) — defensive: drop edges connected to sticky
+    # nodes at save time too. The client UI won't render ports on
+    # sticky so this should be a no-op for normal flows; it matters
+    # for hand-edited JSON imports.
+    sticky_ids = {n["id"] for n in nodes if n.get("type") == "sticky"}
     edges: list[dict] = []
     seen_pairs: set[tuple] = set()
     for e in edges_raw:
         ce = _sanitize_edge(e, node_ids)
-        if ce and (ce["from"], ce["to"], ce["fromPort"]) not in seen_pairs:
-            edges.append(ce); seen_pairs.add((ce["from"], ce["to"], ce["fromPort"]))
+        if not ce:
+            continue
+        if ce["from"] in sticky_ids or ce["to"] in sticky_ids:
+            continue
+        if (ce["from"], ce["to"], ce["fromPort"]) in seen_pairs:
+            continue
+        edges.append(ce)
+        seen_pairs.add((ce["from"], ce["to"], ce["fromPort"]))
     vp = raw.get("viewport") or {}
     # QQ38 (v2.66.113) — workflow tags. Free-form labels (max 20 chars
     # each, max 10 per workflow) used by the sidebar filter.
