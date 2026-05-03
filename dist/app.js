@@ -28022,12 +28022,19 @@ function _lcChatSlashCommand(line) {
         tOut += m.tokensOut || 0;
         if (typeof m.costUsd === 'number') cost += m.costUsd;
       }
+      // QQ177 — render '$0' for the zero case instead of '$0.000000'.
+      const costStr = cost === 0
+        ? '$0'
+        : '$' + cost.toFixed(cost < 0.01 ? 6 : 4);
       const md = `**${t('현재 세션 비용')}**\n\n` +
         `- ${t('어시스턴트 응답')}: ${msgs}\n` +
         `- ${t('입력 토큰')}: \`${tIn.toLocaleString()}\`\n` +
         `- ${t('출력 토큰')}: \`${tOut.toLocaleString()}\`\n` +
         `- ${t('총 토큰')}: \`${(tIn + tOut).toLocaleString()}\`\n` +
-        `- ${t('누적 비용')}: \`$${cost.toFixed(cost < 0.01 ? 6 : 4)}\``;
+        `- ${t('누적 비용')}: \`${costStr}\`` +
+        (cost === 0 && msgs > 0
+          ? `\n\n_${t('(이 세션에는 토큰·비용 메타데이터가 없습니다)')}_`
+          : '');
       const history = _lcChatLoad();
       history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
       _lcChatSave(history);

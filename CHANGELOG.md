@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.69] — 2026-05-03
+
+**QQ177** — `/cost` on a session with no recorded token metadata
+used to show `$0.000000`, which looked like a precision bug. Now
+displays `$0` plus an italic helper line "(이 세션에는 토큰·비용
+메타데이터가 없습니다)" so the user understands the value is
+literally zero, not an artefact.
+
+### Verified
+- `e2e-chat-slash-cost-status.mjs` extended from 27 → 29 checks.
+  No-meta session displays `$0` (not `$0.000000`) and renders the
+  metadata-missing note.
+
+---
 ## [2.71.68] — 2026-05-03
 
 **QQ165b** — extended the QQ165 shortcut e2e to drive the full

@@ -69,6 +69,23 @@ check('/cost shows total output tokens (125)',
 check('/cost shows cumulative USD',
   /\$0\.0046/.test(lastCost) || /0\.004/.test(lastCost));
 
+// QQ177 — /cost on a session with no token meta shows '$0' + a helpful
+// note instead of '$0.000000' which looked like a bug.
+await page.evaluate(() => {
+  const id = _lcCurrentId();
+  _lcSaveHistory(id, [
+    { role: 'user', text: 'hi', ts: 1, assignee: 'claude:opus' },
+    { role: 'assistant', text: 'hello', ts: 2, assignee: 'claude:opus' },
+  ]);
+  _lcChatRender();
+});
+await slash('/cost');
+const zeroCost = await page.evaluate(() => document.getElementById('lcChatLog').innerText);
+check('/cost on no-meta session shows "$0" not "$0.000000"',
+  /\$0\b/.test(zeroCost) && !/\$0\.000000/.test(zeroCost));
+check('/cost on no-meta session shows the metadata-missing note',
+  /토큰·비용 메타데이터|metadata/i.test(zeroCost));
+
 // 2. /status
 await slash('/status');
 const stat = await page.evaluate(() => document.getElementById('lcChatLog').innerHTML);
