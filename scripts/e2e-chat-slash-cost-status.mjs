@@ -90,6 +90,20 @@ check('/agents lists current assignee claude:opus',
   /claude:opus/.test(agentsOut));
 check('/agents marks current selection with ➜', /➜/.test(agentsOut));
 
+// 4a-bis. /theme toggles dark↔light without args
+const beforeTheme = await page.evaluate(() => document.body.classList.contains('theme-light'));
+await slash('/theme');
+await page.waitForTimeout(200);
+const afterTheme = await page.evaluate(() => document.body.classList.contains('theme-light'));
+check('/theme without args toggles theme-light',
+  beforeTheme !== afterTheme, `before=${beforeTheme} after=${afterTheme}`);
+
+// /theme dark forces dark explicitly
+await slash('/theme dark');
+await page.waitForTimeout(150);
+const dark = await page.evaluate(() => document.body.classList.contains('theme-light'));
+check('/theme dark removes theme-light class', dark === false);
+
 // 4b. /sessions lists current sessions with message counts
 await slash('/sessions');
 const sessOut = await page.evaluate(() => document.getElementById('lcChatLog').innerHTML);
@@ -106,6 +120,8 @@ check('/help lists /status', /\/status/.test(help));
 check('/help lists /rename', /\/rename/.test(help));
 check('/help lists /agents', /\/agents/.test(help));
 check('/help lists /sessions', /\/sessions/.test(help));
+check('/help lists /theme',    /\/theme/.test(help));
+check('/help lists /lang',     /\/lang/.test(help));
 
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

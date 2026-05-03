@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.10] — 2026-05-03
+
+**QQ120** — `/theme` and `/lang` chat slash commands.
+
+- `/theme`             — toggles dark ↔ light.
+- `/theme <name>`      — set explicitly (auto/dark/light/midnight/forest/sunset).
+- `/lang ko|en|zh`     — switch UI language; reuses
+  `_qsApplyAndPersist` so the rest of the dashboard sees the
+  change immediately. `lang` triggers `setLang` which reloads.
+
+`/help` updated to list both.
+
+### Verified
+- `e2e-chat-slash-cost-status.mjs` extended to 18 checks
+  (was 14) — `/theme` toggle flips body class, `/theme dark`
+  forces dark, `/help` listing includes `/theme` + `/lang`.
+  All green.
+
+---
 ## [2.71.9] — 2026-05-03
 
 **QQ119** — `/sessions` chat slash command. Lists every session
