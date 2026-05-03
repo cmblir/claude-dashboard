@@ -27959,13 +27959,32 @@ function _lcChatSlashCommand(line) {
       return true;
     }
     case 'system': {
+      // QQ175 — three modes:
+      //   /system            → SHOW current prompt (was: silently clear)
+      //   /system clear      → explicit clear
+      //   /system <text>     → set
       const sel = document.getElementById('lcChatAssignee');
       const a = (sel && sel.value) || 'default';
       const key = 'cc.lazyclawChat.sys.' + a;
-      try { localStorage.setItem(key, rest || ''); } catch (_) {}
+      const trimmed = rest.trim();
+      if (!trimmed) {
+        // Show current prompt as an inline assistant bubble. No mutation.
+        let cur = '';
+        try { cur = localStorage.getItem(key) || ''; } catch (_) {}
+        const md = `**${t('시스템 프롬프트')}** \`${a}\`\n\n` +
+          (cur ? '```\n' + cur.slice(0, 4000) + '\n```' : `_${t('(설정되지 않음)')}_`) +
+          `\n\n${t('변경:')} \`/system <텍스트>\` · ${t('초기화:')} \`/system clear\``;
+        const history = _lcChatLoad();
+        history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+        _lcChatSave(history);
+        _lcChatRender();
+        return true;
+      }
+      const newVal = trimmed.toLowerCase() === 'clear' ? '' : trimmed;
+      try { localStorage.setItem(key, newVal); } catch (_) {}
       const sysTa = document.getElementById('lcSysPrompt');
-      if (sysTa) sysTa.value = rest || '';
-      toast(rest ? `⚙ ${t('시스템 프롬프트 설정됨')}` : `⚙ ${t('시스템 프롬프트 초기화됨')}`, 'ok');
+      if (sysTa) sysTa.value = newVal;
+      toast(newVal ? `⚙ ${t('시스템 프롬프트 설정됨')}` : `⚙ ${t('시스템 프롬프트 초기화됨')}`, 'ok');
       return true;
     }
     case 'model': {
@@ -28254,7 +28273,7 @@ function _lcChatSlashCommand(line) {
       const helpMd = `**${t('슬래시 명령')}**
 
 \`/clear\` — ${t('현재 세션 비우기')} · \`/clear all\` — ${t('모든 세션 삭제')}
-\`/system [텍스트]\` — ${t('시스템 프롬프트 설정 (인자 없으면 초기화)')}
+\`/system\` — ${t('현재 시스템 프롬프트 보기')} · \`/system <텍스트>\` — ${t('설정')} · \`/system clear\` — ${t('초기화')}
 \`/model <provider:model>\` — ${t('어시니 전환 (예: claude:opus)')}
 \`/cost\` — ${t('현재 세션 토큰·비용 합계')}
 \`/status\` — ${t('어시니·세션·테마·언어 요약')}
