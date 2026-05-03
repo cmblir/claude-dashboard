@@ -5785,19 +5785,27 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       //   ←↑→↓        : 10 px (matches grid snap step)
       //   Shift+arrow : 1 px (fine adjust)
       //   Hold mod    : ignored (browser scroll / shortcuts)
-      if (!mod && !inInput && __wf.current && __wf.selectedNodeId) {
+      // QQ132 — multi-select aware: nudge every node in the selection
+      //   together (matches the QQ28 group-drag behaviour and matches
+      //   n8n's arrow-key affordance when several nodes are selected).
+      if (!mod && !inInput && __wf.current
+          && (__wf.selectedNodeId || (__wfMultiSelected && __wfMultiSelected.size))) {
         const ARROWS = { ArrowLeft: [-1,0], ArrowRight: [1,0], ArrowUp: [0,-1], ArrowDown: [0,1] };
         const dir = ARROWS[e.key];
         if (dir) {
           e.preventDefault();
           const step = e.shiftKey ? 1 : 10;
-          const node = __wf.current.nodes.find(n => n.id === __wf.selectedNodeId);
-          if (node) {
+          const ids = (__wfMultiSelected && __wfMultiSelected.size > 1)
+            ? Array.from(__wfMultiSelected)
+            : [__wf.selectedNodeId];
+          const idSet = new Set(ids);
+          const targets = __wf.current.nodes.filter(n => idSet.has(n.id));
+          for (const node of targets) {
             node.x = (node.x || 0) + dir[0] * step;
             node.y = (node.y || 0) + dir[1] * step;
             if (typeof _wfUpdateNodeTransform === 'function') _wfUpdateNodeTransform(node.id);
-            __wf.dirty = true; _wfUpdateToolbar(); _wfSchedulePatch();
           }
+          if (targets.length) { __wf.dirty = true; _wfUpdateToolbar(); _wfSchedulePatch(); }
           return true;
         }
       }
