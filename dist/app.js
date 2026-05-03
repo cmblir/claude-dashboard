@@ -28143,10 +28143,17 @@ function _lcChatSlashCommand(line) {
       // QQ122 — copy the last assistant response to the clipboard so
       // the user can paste it into another tool without scrolling. With
       // an integer argument copies the Nth-most-recent assistant reply.
+      // QQ185 — explicit 'out of range' message when N exceeds the
+      // available reply count (was the same generic 'no response').
       const id = _lcCurrentId();
       const h = _lcGetHistory(id) || [];
       const assistants = h.filter(m => m.role === 'assistant');
+      if (!assistants.length) { toast(t('복사할 응답이 없습니다'), 'warn'); return true; }
       const n = rest ? Math.max(1, parseInt(rest, 10) || 1) : 1;
+      if (n > assistants.length) {
+        toast(`${t('범위 밖')}: ${n} / ${assistants.length}`, 'warn');
+        return true;
+      }
       const target = assistants[assistants.length - n];
       if (!target || !target.text) { toast(t('복사할 응답이 없습니다'), 'warn'); return true; }
       const txt = String(target.text);

@@ -136,6 +136,26 @@ check('/agents marks current selection with ➜', /➜/.test(agentsOut));
   });
 }
 
+// QQ185 — /copy N out-of-range gets the dedicated "범위 밖" toast
+//          rather than the generic "복사할 응답이 없습니다".
+{
+  await page.evaluate(() => {
+    const id = _lcCurrentId();
+    _lcSaveHistory(id, [
+      { role: 'user',      text: 'q', ts: 1, assignee: 'claude:opus' },
+      { role: 'assistant', text: 'a', ts: 2, assignee: 'claude:opus' },
+    ]);
+    window.__rangeToasts = [];
+    const orig = window.toast;
+    window.toast = (m, k) => { window.__rangeToasts.push({m,k}); return orig && orig(m, k); };
+  });
+  await slash('/copy 99');
+  const tt = await page.evaluate(() => window.__rangeToasts.slice(-1)[0]);
+  check('/copy 99 toasts "범위 밖" with the available count',
+    tt && /범위 밖|range/i.test(tt.m) && /\b1\b/.test(tt.m),
+    JSON.stringify(tt));
+}
+
 // 4a-pre. /copy copies the last assistant reply
 try { await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: URL.replace(/\/$/, '') }); } catch (_) {}
 // Re-seed with a known-last assistant reply so we can assert exact match.
