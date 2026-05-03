@@ -133,13 +133,34 @@ def _npm_present() -> bool:
     return bool(_which("npm"))
 
 
+_CLI_STATUS_CACHE: dict = {"data": None, "ts": 0.0}
+# QQ135 — server-side cache for /api/cli/status. The `--version` subprocess
+# fan-out (4-5 CLIs) was ~750ms on every aiProviders tab open, dominating
+# the perceived load lag for that tab. CLI install state changes rarely;
+# a 30s TTL is plenty and an explicit `?nocache=1` query bypasses the
+# memo so the AI Providers refresh button still gets fresh data.
+_CLI_STATUS_TTL_S = 30.0
+
+
 def api_cli_status(query: dict | None = None) -> dict:
     """4종 CLI 의 설치 여부 · 버전 · 경로 + 설치 도구(brew/npm) 가용성.
 
     v2.33.5 — 도구별 프로브 + brew/npm 존재 확인을 ThreadPoolExecutor 로 병렬.
     `--version` subprocess 가 4-5 개 직렬이면 1-2초, 병렬이면 ~300ms.
+    QQ135 — 30s server-side memo eliminates repeat tab-load lag.
     """
+    import time as _time
     from concurrent.futures import ThreadPoolExecutor
+
+    # query is parse_qs output → values are lists. Pull first element.
+    nc = (query or {}).get("nocache")
+    if isinstance(nc, list):
+        nc = nc[0] if nc else None
+    nocache = nc in ("1", "true", "yes", True)
+    if not nocache:
+        cached = _CLI_STATUS_CACHE.get("data")
+        if cached is not None and (_time.time() - _CLI_STATUS_CACHE.get("ts", 0)) < _CLI_STATUS_TTL_S:
+            return cached
 
     def _probe(item):
         tool_id, meta = item
@@ -170,12 +191,15 @@ def api_cli_status(query: dict | None = None) -> dict:
         brew_ok = brew_fut.result()
         npm_ok = npm_fut.result()
 
-    return {
+    result = {
         "tools": out,
         "brewAvailable": brew_ok,
         "npmAvailable": npm_ok,
         "platform": platform.system(),
     }
+    _CLI_STATUS_CACHE["data"] = result
+    _CLI_STATUS_CACHE["ts"] = _time.time()
+    return result
 
 
 def _run_in_terminal(cmd: str) -> dict:
