@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.7] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Lag budget regression** (`scripts/e2e-lag-budget.mjs`).
+  Three perf invariants get an upper-bound assertion so a future
+  regression yells immediately:
+  1. DOMContentLoaded < 600ms (current ≈ 60–170ms).
+  2. 50-node forced full rebuild < 250ms (current ≈ 2–3ms).
+  3. QQ25 RAF coalesce: 50 `_wfRenderCanvas()` calls in one tick
+     produce exactly 1 actual sync render — measured by hooking
+     `_wfRenderGroups` (always invoked inside `_wfRenderCanvasSync`).
+
+  Pins down the "렉은 아예 존재하지 않게끔" promise with hard
+  numbers.
+
+---
 ## [2.69.6] — 2026-05-03
 
 ### Added (test infra)
