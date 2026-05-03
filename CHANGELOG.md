@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.13] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Multi-node copy/paste with internal edges regression**
+  (`scripts/e2e-multi-copy-paste.mjs`). Pins QQ29:
+  1. Cmd+C with multi-selection captures the selected nodes
+     into `__wf._clipboard`.
+  2. Only edges fully inside the selection land in
+     `__wf._clipboardEdges` — the b→c crossing edge stays out.
+  3. Cmd+V appends fresh nodes (new ids) and remaps the cloned
+     edge endpoints to those new ids.
+  4. The pasted set replaces `__wfMultiSelected` so QQ28 group
+     drag immediately applies.
+
+  6 checks, all pass.
+
+---
 ## [2.69.12] — 2026-05-03
 
 ### Added (test infra)
