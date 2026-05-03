@@ -10,6 +10,27 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.95] — 2026-05-03
+
+**QQ200** — `/branch` and `/fork` chat slash commands. Reuses
+the existing `_lcBranchFrom` plumbing (per-message 🍴 button)
+so lineage chip + parentId metadata stay consistent.
+
+* `/branch` (no arg) → full clone of the current session
+  (branches from the last message).
+* `/branch N` → branches from message #N (1-based, matching
+  `/code` / `/copy` convention). Out-of-range emits
+  `범위 밖: N / total` warn.
+* `/fork` is an alias.
+* `/help` updated.
+
+### Verified
+- `e2e-chat-slash-branch.mjs` 9/9 ✅.
+- Regression: `e2e-chat-branch` (per-message 🍴) +
+  `e2e-chat-slash-{pin,cost-status,smoke,go,unknown}` +
+  `e2e-whoami` all green.
+
+---
 ## [2.71.94] — 2026-05-03
 
 **QQ199** — `/pin` and `/unpin` chat slashes (openclaw-style
