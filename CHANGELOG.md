@@ -10,6 +10,32 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.91] — 2026-05-03
+
+**QQ196** — Stabilise three more e2e scripts that flaked on
+environmental noise.
+
+* `e2e-ports-list-cache` — `nocache=1` and post-TTL hits do
+  real `lsof` calls, but the OS file-table page cache makes
+  the second `lsof` ~30% faster than the cold one. The old
+  assertion `t3 ≥ t1 - 80` busted whenever the cold call was
+  unusually slow. Replaced with `t3 > t2 * 4` ("much slower
+  than cached") which captures the actual invariant.
+* `e2e-auth-status-cache` — same in-browser timing fix as
+  QQ194/QQ195. Wallclocked Playwright overhead alone could
+  bust the 200ms team-tab budget.
+* `e2e-group-drag` — the workflows tab renders a list view
+  above the canvas, so `#wfCanvasHost` can sit below the
+  1200px viewport (y~1070). The mouse drag missed the
+  off-screen node entirely. Added `scrollIntoView` +
+  `_wfFitView()` after injecting the test workflow.
+
+### Verified
+- `e2e-ports-list-cache.mjs` 3/3 ✅.
+- `e2e-auth-status-cache.mjs` 3/3 ✅.
+- `e2e-group-drag.mjs` 4/4 ✅.
+
+---
 ## [2.71.90] — 2026-05-03
 
 **QQ195** — Stabilise two cache-perf e2e scripts that flaked

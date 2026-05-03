@@ -46,10 +46,24 @@ await page.evaluate(() => {
   if (typeof _wfRenderCanvasNow === 'function') _wfRenderCanvasNow();
   else _wfRenderCanvas();
   if (typeof _wfSyncMultiSelectClasses === 'function') _wfSyncMultiSelectClasses();
+  // QQ196 — center the canvas on the injected nodes. Without this the
+  // default viewport (panY=0, zoom=1) places world-y=100 at screen y~1170,
+  // off the bottom of the 1200px viewport, so mouse drags miss the node.
+  if (typeof _wfFitView === 'function') _wfFitView();
 });
-await page.waitForTimeout(120);
+await page.waitForTimeout(180);
 
 const beforeAll = await page.evaluate(() => __wf.current.nodes.map(n => ({ id: n.id, x: n.x, y: n.y })));
+
+// QQ196 — the workflows tab renders a list view above the canvas, so
+// wfCanvasHost can sit below the viewport (y~1070 in a 1200px window).
+// Scroll the canvas into view before grabbing the node rect, otherwise
+// mouse events miss the off-screen node entirely.
+await page.evaluate(() => {
+  const host = document.getElementById('wfCanvasHost');
+  if (host && host.scrollIntoView) host.scrollIntoView({ behavior: 'instant', block: 'center' });
+});
+await page.waitForTimeout(120);
 
 // Read n-a's real on-screen rect rather than computing from world coords:
 // the SVG often uses a viewBox so workflow units ≠ pixels.
