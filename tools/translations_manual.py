@@ -253,6 +253,13 @@ try:
 except Exception:
     _NEW_EN_42, _NEW_ZH_42 = {}, {}
 
+# v2.71.4 — QQ114 nav-tile chat/terminal descriptions (two-sentence Korean
+# strings that previously leaked partial Chinese in the title attribute).
+try:
+    from translations_manual_43 import NEW_EN as _NEW_EN_43, NEW_ZH as _NEW_ZH_43
+except Exception:
+    _NEW_EN_43, _NEW_ZH_43 = {}, {}
+
 # ── 구조화 키 → 한국어 라벨 ──
 MANUAL_KO: dict[str, str] = {
     "settings.theme": "테마",
@@ -846,6 +853,10 @@ for _k, _v in _NEW_ZH_41.items():
 for _k, _v in _NEW_EN_42.items():
     MANUAL_EN[_k] = _v  # override — fixes prior Korean-residue placeholders
 for _k, _v in _NEW_ZH_42.items():
+    MANUAL_ZH[_k] = _v
+for _k, _v in _NEW_EN_43.items():
+    MANUAL_EN[_k] = _v  # QQ114 nav-tile descriptions
+for _k, _v in _NEW_ZH_43.items():
     MANUAL_ZH[_k] = _v
 
 # extractor 오탐(코드/주석)이 초기 MANUAL_EN/ZH 에 한글 원문으로 등록돼 있는 경우 덮어쓰기
