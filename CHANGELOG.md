@@ -10,6 +10,35 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.103] — 2026-05-03
+
+**QQ208** — terminal parity for the chat `/workflows` (QQ206)
+and `/run` (QQ207) slashes:
+
+* `lazyclaude workflows [filter]` — listing with `🟢` live
+  marker + `Nn Nr ok|err|running` summary chips.
+* `lazyclaude run <id|name>` — same exact-id → id-prefix →
+  name-substring resolution. Multiple matches → list.
+  Unique → POST `/api/workflows/run`, prints workflow + run
+  id + `lazyclaude open workflows` watch hint.
+
+`KNOWN_VERBS`, did-you-mean candidates, and `lazyclaude help`
+all extended. Added `wfs` alias.
+
+Also QQ207's e2e was hardened with a unique per-run name tag
+(`qq207-runslash-<timestamp>-<rand>`) so repeated test
+invocations don't accumulate ambiguous matches against the
+same fixture name.
+
+### Verified
+- `e2e-terminal-workflows-run.mjs` 13/13 ✅ (listing,
+  filter, no-arg-warn, unique POST, ambiguous, no-match,
+  help, did-you-mean for typo).
+- `e2e-chat-slash-run.mjs` 10/10 ✅ (after the unique-tag fix).
+- Regression: terminal-set-prefs / builtins-smoke / keys-usage,
+  chat-slash-workflows, whoami all green.
+
+---
 ## [2.71.102] — 2026-05-03
 
 **QQ207** — `/run <id|name>` chat slash. Kicks off a workflow

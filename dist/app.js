@@ -29587,7 +29587,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage'];
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run'];
   const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
@@ -29605,7 +29605,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   if (verb === '__unknown__') {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
-    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage'];
+    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run'];
     // QQ162 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     let best = null, bestScore = 99;
     for (const k of candidates) {
@@ -29634,6 +29634,8 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       'lazyclaude whoami                   — Claude CLI login (email/plan/org)\n' +
       'lazyclaude keys                     — list providers + api-key status (masked)\n' +
       'lazyclaude usage [N]                — cost summary across all sessions (default 7d)\n' +
+      'lazyclaude workflows [filter]       — list workflows (id/name substring)\n' +
+      'lazyclaude run <id|name>            — start a workflow run\n' +
       'lazyclaude diag                     — re-run CLI health check (claude/ollama/gemini/...)\n' +
       'lazyclaude version                  — dashboard version + build info\n' +
       'lazyclaude reset                    — wipe terminal log\n' +
@@ -29740,6 +29742,93 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
         `default model:   ${ai.defaultProvider || '(none)'}`,
         `temperature:     ${ai.temperature != null ? ai.temperature : '(default)'}`,
         `tab:             ${(typeof state !== 'undefined' && state.view) || '?'}`,
+      ];
+      log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'workflows' || verb === 'wfs') {
+    // QQ208 — terminal parity with chat /workflows. Lists workflows
+    // with running/total counts + last-run status chip.
+    try {
+      const r = await fetch('/api/workflows/list', { cache: 'no-store' });
+      const j = await r.json();
+      const wfs = (j && j.workflows) || [];
+      if (!wfs.length) {
+        log.push({ kind: 'err', text: '⚠ ' + t('등록된 워크플로우가 없습니다'), ts: Date.now() });
+        return;
+      }
+      const q = rest.trim().toLowerCase();
+      const matched = q
+        ? wfs.filter(w => (w.name || '').toLowerCase().includes(q)
+                       || (w.id || '').toLowerCase().includes(q))
+        : wfs;
+      if (q && !matched.length) {
+        log.push({ kind: 'err', text: '⚠ ' + t('일치하는 워크플로우 없음') + ': ' + rest, ts: Date.now() });
+        return;
+      }
+      const lines = matched.map(w => {
+        const live = w.runningCount > 0 ? '🟢 ' : '   ';
+        const last = (w.lastRuns && w.lastRuns[0] && w.lastRuns[0].status) || '';
+        const lastChip = last === 'ok' ? ' ok' : last === 'err' ? ' err' : last === 'running' ? ' running' : '';
+        return `${live}${(w.id || '').padEnd(28)} ${w.nodeCount}n ${w.totalRuns || 0}r${lastChip}  ${w.name || ''}`;
+      });
+      log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'run') {
+    // QQ208 — terminal parity with chat /run. Resolves arg by exact id,
+    // id-prefix, then name substring. Ambiguous → list options. Unique →
+    // POST /api/workflows/run.
+    if (!rest) {
+      log.push({ kind: 'err', text: '⚠ ' + t('사용법') + ': lazyclaude run <id-prefix or name>', ts: Date.now() });
+      return;
+    }
+    let listed = null;
+    try {
+      const r = await fetch('/api/workflows/list', { cache: 'no-store' });
+      listed = await r.json();
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+      return;
+    }
+    const wfs = (listed && listed.workflows) || [];
+    const q = rest.trim().toLowerCase();
+    let matches = wfs.filter(w => (w.id || '').toLowerCase() === q);
+    if (!matches.length) matches = wfs.filter(w => (w.id || '').toLowerCase().startsWith(q));
+    if (!matches.length) matches = wfs.filter(w => (w.name || '').toLowerCase().includes(q));
+    if (!matches.length) {
+      log.push({ kind: 'err', text: '⚠ ' + t('일치하는 워크플로우 없음') + ': ' + rest, ts: Date.now() });
+      return;
+    }
+    if (matches.length > 1) {
+      const head = `Multiple matches (${matches.length}) — be more specific:`;
+      const lines = matches.slice(0, 10).map(w => `  ${(w.id || '').padEnd(28)} ${w.name || ''}`);
+      log.push({ kind: 'out', text: head + '\n' + lines.join('\n'), ts: Date.now() });
+      return;
+    }
+    const wf = matches[0];
+    try {
+      const r = await fetch('/api/workflows/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: wf.id }),
+      });
+      const j = await r.json();
+      if (!j || !j.ok) {
+        log.push({ kind: 'err', text: '⚠ ' + t('실행 시작 실패') + ': ' + ((j && j.error) || '?'), ts: Date.now() });
+        return;
+      }
+      const lines = [
+        `Started: ${wf.name || ''}`,
+        `  workflow: ${wf.id}`,
+        `  run:      ${j.runId}`,
+        `  watch:    lazyclaude open workflows`,
       ];
       log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
     } catch (e) {
