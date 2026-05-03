@@ -10,6 +10,45 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.114] — 2026-05-04
+
+**QQ219 — CRITICAL FIX** — chat would render "■ 중단됨"
+(AbortError) on every send despite the server completing the
+stream successfully.
+
+Root cause: the SSE handler in `server/actions.py` sent
+`Connection: keep-alive`. After the SSE `done` event the kernel
+held the socket open for the next request, but Python's
+`BaseHTTPRequestHandler` then tripped on the next
+`raw_requestline = self.rfile.readline(65537)` call (the
+traceback you saw — `socketserver.py:692 process_request_thread`
+→ `finish_request` → … → `readline`). The abnormal post-stream
+close propagated to the browser as a connection drop, which
+Chrome surfaces as `AbortError` on the in-flight fetch — even
+though the response body had already arrived intact. The catch
+block in `_lcChatSend` then rendered the "중단됨" bubble.
+
+Fix:
+* `Connection: close` for SSE — standard pattern for stdlib HTTP
+  servers, makes the lifecycle explicit.
+* `handler.close_connection = True` hint so `BaseHTTPRequestHandler`
+  doesn't try the next-request read.
+* `_sse()` wrap separately catches `BrokenPipeError` /
+  `ConnectionResetError` / `OSError` on both `write()` and
+  `flush()` so client disconnects don't surface as 500.
+
+### Verified
+- Direct curl `POST /api/lazyclaw/chat/stream` returns clean
+  token + done events.
+- Server stderr after the stream — clean, no traceback.
+
+### Action required for users seeing "중단됨"
+1. Restart the dashboard server (`lsof -ti:<port> | xargs kill;
+   make run`).
+2. **Hard-reload the browser** (Cmd+Shift+R) to drop any cached
+   pre-fix `app.js`.
+
+---
 ## [2.71.113] — 2026-05-04
 
 **QQ218 — CRITICAL FIX** — chat send was broken for any input

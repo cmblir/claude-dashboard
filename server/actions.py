@@ -141,18 +141,44 @@ def handle_lazyclaw_chat_stream(handler: "Handler", body: dict) -> None:
     handler.send_response(200)
     handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
     handler.send_header("Cache-Control", "no-cache")
-    handler.send_header("Connection", "keep-alive")
+    # QQ219 — SSE on Python BaseHTTPRequestHandler: force `Connection:
+    # close`. With keep-alive, the server kept the socket open after
+    # the SSE done event; the *next* request on that socket then hit
+    # `readline()` and surfaced as a traceback (process_request_thread →
+    # finish_request → … → readline). That close also propagated to
+    # the browser as an abnormal connection drop, which Chrome surfaces
+    # as AbortError on the in-flight fetch — even though the stream
+    # body had already arrived. close-after-stream is the standard SSE
+    # pattern in stdlib HTTP servers and makes the lifecycle explicit.
+    handler.send_header("Connection", "close")
     handler.send_header("X-Accel-Buffering", "no")
     handler.end_headers()
+    # Tell the wfile to also close cleanly on done so the kernel doesn't
+    # keep dribbling bytes when the body's iterator finishes.
+    try:
+        handler.close_connection = True  # BaseHTTPRequestHandler hint
+    except Exception:
+        pass
 
+    # QQ219 — _sse must survive both write *and* flush errors. Some
+    # client disconnects only surface on flush, not write, leading to
+    # "BrokenPipeError" tracebacks that the previous broad except
+    # didn't always catch in time.
     def _sse(event: str, data: str) -> bool:
         try:
             chunk = f"event: {event}\ndata: {data}\n\n"
             handler.wfile.write(chunk.encode("utf-8"))
-            handler.wfile.flush()
-            return True
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return False
         except Exception:
             return False
+        try:
+            handler.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return False
+        except Exception:
+            return False
+        return True
 
     system_prompt = (body.get("systemPrompt") or "").strip()
     history = body.get("history") or []
