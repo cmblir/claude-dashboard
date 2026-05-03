@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.22] — 2026-05-03
+
+**QQ132** — arrow-key node nudging now honours multi-selection.
+Previously the LL4 handler moved only `__wf.selectedNodeId`, so
+rubber-banding 5 nodes and pressing → only shifted the
+last-clicked one — inconsistent with the QQ28 group-drag and
+n8n's own behaviour. Now ←↑→↓ (10px) and Shift+←↑→↓ (1px) move
+the entire `__wfMultiSelected` set together. Single-select path
+unchanged.
+
+### Verified
+- `scripts/e2e-multi-arrow-nudge.mjs` — Playwright regression:
+  multi-select A+B → ArrowRight nudges both +10x → Shift+ArrowDown
+  nudges both +1y → switching to single-select moves only that
+  node. 3/3 green.
+
+---
 ## [2.71.21] — 2026-05-03
 
 **QQ131** — Playwright coverage for Cmd+X being undoable. The
