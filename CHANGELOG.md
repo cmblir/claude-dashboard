@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.46] — 2026-05-03
+
+**QQ156b** — Playwright regression for the QQ156 cache
+invalidation. Locks in the contract that `_dump_all` zeroes the
+status memo so a write followed immediately by a read returns
+the post-write state, not stale cached data.
+
+### Verified
+- `scripts/e2e-ar-cache-invalidation.mjs` — bind a session via
+  /set, /status sees `enabled:true`; cancel; /status (next call,
+  no wait) sees `enabled:false, state:stopped`. 4/4 green.
+
+---
 ## [2.71.45] — 2026-05-03
 
 **QQ156** — fixed flaky `e2e-auto-resume` regression introduced by
