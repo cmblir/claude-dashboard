@@ -5226,6 +5226,12 @@ window._wfToggleNodeDisabled = function _wfToggleNodeDisabled(nid) {
   if (!__wf.current) return;
   const n = __wf.current.nodes.find(x => x.id === nid);
   if (!n) return;
+  // QQ160 — push undo here so the ctx-menu '비활성화 토글' path is also
+  // covered. The QQ159 keyboard handler already pushes its own undo
+  // before delegating to this fn for the single-select case; that's
+  // fine — undo entries dedupe by snapshot anyway and an extra
+  // entry just costs a Cmd+Z press.
+  if (typeof _wfPushUndo === 'function') _wfPushUndo();
   n.data = n.data || {};
   n.data.disabled = !n.data.disabled;
   __wf.dirty = true;
@@ -5346,6 +5352,7 @@ window._wfShowNodeOutputModal = function _wfShowNodeOutputModal(nid) {
 // Pinning freezes the last output so subsequent runs return it without
 // invoking the provider — saves cost + lets users iterate downstream
 // nodes without re-running expensive LLM calls.
+window._wfTogglePin = _wfTogglePin;
 function _wfTogglePin(nid, pin) {
   if (!__wf.current) return;
   const n = __wf.current.nodes.find(x => x.id === nid);
@@ -5358,10 +5365,13 @@ function _wfTogglePin(nid, pin) {
       toast(t('핀할 마지막 출력이 없습니다 — 먼저 실행하세요'), 'warn');
       return;
     }
+    // QQ160 — push undo BEFORE mutating so Cmd+Z reverts the pin/unpin.
+    if (typeof _wfPushUndo === 'function') _wfPushUndo();
     n.data.pinned = true;
     n.data.pinnedOutput = String(out).slice(0, 32000);
     toast(`📌 ${t('핀 설정됨')} — ${escapeHtml(n.title || n.id)}`, 'ok');
   } else {
+    if (typeof _wfPushUndo === 'function') _wfPushUndo();
     n.data.pinned = false;
     n.data.pinnedOutput = '';
     toast(`${t('핀 해제됨')} — ${escapeHtml(n.title || n.id)}`, 'ok');
@@ -5768,8 +5778,8 @@ function _wfShowEdgeContextMenu(eid, x, y) {
             'ok'
           );
         } else {
-          // QQ159 — single-node toggle also gets an undo entry.
-          if (typeof _wfPushUndo === 'function') _wfPushUndo();
+          // QQ159+QQ160 — single-node case delegates to
+          // _wfToggleNodeDisabled which now pushes its own undo entry.
           _wfToggleNodeDisabled(__wf.selectedNodeId);
         }
         return true;

@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.50] — 2026-05-03
+
+**QQ160** — Pin Data toggle is now undoable (third bug in the
+"missing _wfPushUndo" class — see QQ134 + QQ159). `_wfTogglePin`
+mutated the node directly without pushing an undo entry, so an
+accidental pin/unpin from the ctx menu was permanent.
+
+Same fix applied to `_wfToggleNodeDisabled` so the ctx-menu
+disable-toggle also gets covered (QQ159 only fixed the keyboard
+path; the ctx menu still went through the mutation-without-undo
+path). The QQ159 keyboard handler stops pushing its own undo for
+the single-select path now that the helper handles it.
+
+`_wfTogglePin` is also now exposed on `window` (QQ109/110 pattern)
+so the e2e regression can drive it.
+
+### Verified
+- `scripts/e2e-pin-undo.mjs` — 4/4 green: pin sets data, pushes
+  undo, Cmd+Z removes pin, Cmd+Z after unpin restores pin.
+- `e2e-multi-disable.mjs` still 5/5 green.
+
+---
 ## [2.71.49] — 2026-05-03
 
 **QQ159** — `D` keystroke (toggle disabled) is now undoable.
