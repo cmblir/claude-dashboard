@@ -28705,7 +28705,13 @@ window._lcTermShowHelp = function () {
 // Lets the user tweak theme / lang / behavior without leaving the
 // terminal — same backend as Quick Settings, persisted server-side.
 function _lcTermBuiltin(cmd) {
-  const m = cmd.match(/^(?:lazyclaude|lz)\s+(get|set|help|reset)\b\s*(.*)$/i);
+  // QQ121 — bare `lazyclaude` / `lz` (or `--help` / `-h`) maps to the
+  // help listing so users discover the built-ins on first try.
+  const trimmed = cmd.trim();
+  if (/^(?:lazyclaude|lz)(?:\s+(?:--help|-h))?\s*$/i.test(trimmed)) {
+    return { verb: 'help', rest: '' };
+  }
+  const m = trimmed.match(/^(?:lazyclaude|lz)\s+(get|set|help|reset)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
   const rest = m[2].trim();

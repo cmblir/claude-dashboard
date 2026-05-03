@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.11] — 2026-05-03
+
+**QQ121** — bare `lazyclaude`, `lz`, `lazyclaude --help`, and
+`lz -h` all map to the same help listing, so first-time users
+discover the built-in commands without having to know the verb
+list. Stays client-side (no shell hit).
+
+### Verified
+- `e2e-terminal-set-prefs.mjs` extended to 13 checks
+  (was 10) — bare `lazyclaude` shows help, `lz --help` shows
+  help, neither hits the shell endpoint.
+
+---
 ## [2.71.10] — 2026-05-03
 
 **QQ120** — `/theme` and `/lang` chat slash commands.
