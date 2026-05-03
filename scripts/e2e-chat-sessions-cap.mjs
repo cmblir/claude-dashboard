@@ -57,5 +57,25 @@ check('overflow note shows the remaining count',
 check('total count in header is 50',
   /\(50\)/.test(out));
 
+// QQ190 — `/sessions <filter>` substring matches.
+await page.evaluate(() => _lcChatSlashCommand('/sessions sess-04'));
+await page.waitForTimeout(150);
+const filtered = await page.evaluate(() => document.getElementById('lcChatLog').innerText);
+check('/sessions sess-04 narrows to 04x ids only',
+  /\(10\/50 · "sess-04"\)/.test(filtered),
+  filtered.split('\n').slice(-15).join('\\n').slice(-300));
+
+// No-match case
+await page.evaluate(() => {
+  window.__sessToasts = [];
+  const orig = window.toast;
+  window.toast = (m, k) => { window.__sessToasts.push({m,k}); return orig && orig(m, k); };
+});
+await page.evaluate(() => _lcChatSlashCommand('/sessions zzz-no-such'));
+await page.waitForTimeout(150);
+const noT = await page.evaluate(() => window.__sessToasts.slice(-1)[0]);
+check('/sessions bogus toasts "일치하는 세션 없음"',
+  noT && /일치하는|no match/i.test(noT.m), JSON.stringify(noT));
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

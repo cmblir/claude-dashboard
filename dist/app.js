@@ -28283,11 +28283,23 @@ function _lcChatSlashCommand(line) {
       // QQ188 — cap output at 30 lines so a user with 100+ sessions
       //   doesn't get a wall of text in the chat. Active session is
       //   pinned to the top so it's always visible regardless of cap.
+      // QQ190 — accept a substring filter (label/id/assignee) like /agents.
       const all = _lcGetSessions() || [];
       if (!all.length) { toast(t('세션이 없어요'), 'warn'); return true; }
       const curId = _lcCurrentId();
+      const q = rest.trim().toLowerCase();
+      const matched = q
+        ? all.filter(s =>
+            (s.label || '').toLowerCase().includes(q) ||
+            (s.id || '').toLowerCase().includes(q) ||
+            (s.assignee || '').toLowerCase().includes(q))
+        : all;
+      if (q && !matched.length) {
+        toast(`${t('일치하는 세션 없음')}: ${rest}`, 'warn');
+        return true;
+      }
       // Active first, rest in storage order.
-      const ordered = all.slice().sort((a, b) =>
+      const ordered = matched.slice().sort((a, b) =>
         (a.id === curId ? -1 : 0) - (b.id === curId ? -1 : 0));
       const CAP = 30;
       const visible = ordered.slice(0, CAP);
@@ -28299,7 +28311,10 @@ function _lcChatSlashCommand(line) {
         return `- ${cur} \`${s.id.slice(0, 8)}\` — ${lbl} *(${n} ${t('메시지')})*`;
       });
       const overflow = ordered.length - visible.length;
-      let md = `**${t('세션 목록')}** (${all.length})\n\n` + lines.join('\n');
+      const header = q
+        ? `**${t('세션 목록')}** (${matched.length}/${all.length} · "${rest}")`
+        : `**${t('세션 목록')}** (${all.length})`;
+      let md = header + '\n\n' + lines.join('\n');
       if (overflow > 0) md += `\n\n_… ${overflow} ${t('개 더')}_`;
       const history = _lcChatLoad();
       history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
@@ -28352,7 +28367,7 @@ function _lcChatSlashCommand(line) {
 \`/cost\` — ${t('현재 세션 토큰·비용 합계')}
 \`/status\` — ${t('어시니·세션·테마·언어 요약')}
 \`/agents [필터]\` — ${t('등록된 어시니 목록 (예: /agents claude)')}
-\`/sessions\` — ${t('세션 목록 + 메시지 수')}
+\`/sessions [필터]\` — ${t('세션 목록 + 메시지 수 (라벨/id/모델 부분일치)')}
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
 \`/code [N]\` — ${t('마지막 응답의 코드 블록 (N번째 = 1부터, 기본 마지막) 복사')}
 \`/retry\` (= \`/regenerate\`) — ${t('마지막 사용자 프롬프트 재실행')}
