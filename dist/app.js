@@ -5257,7 +5257,8 @@ async function _wfRunSingleNode(nid) {
 // QQ108 (v2.69.1) — full-output modal for the inspector preview panel.
 // Opens the complete nr.output / nr.error in a scrollable overlay so users
 // can read long responses without leaving the workflow canvas.
-function _wfShowNodeOutputModal(nid) {
+// QQ109 (v2.69.2) — exposed on window so the inline onclick fires.
+window._wfShowNodeOutputModal = function _wfShowNodeOutputModal(nid) {
   const nr = (__wf.lastRunResults || {})[nid];
   if (!nr) return;
   const n = (__wf.current && __wf.current.nodes || []).find(x => x.id === nid);
@@ -5282,7 +5283,7 @@ function _wfShowNodeOutputModal(nid) {
   const wrap = document.createElement('div');
   wrap.innerHTML = html;
   document.body.appendChild(wrap.firstElementChild);
-}
+};
 
 // QQ20 (v2.66.95) — pin/unpin node data (n8n "Pin Data" parity).
 // Pinning freezes the last output so subsequent runs return it without

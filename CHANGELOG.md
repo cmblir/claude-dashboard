@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.2] — 2026-05-03
+
+### Fixed
+- 🐛 **`_wfShowNodeOutputModal` exposed on window** (QQ109). The
+  QQ108 inline `onclick="_wfShowNodeOutputModal(...)"` fired in
+  global scope but the function was a module-private declaration —
+  Playwright caught the resulting `ReferenceError` immediately.
+  Now assigned via `window._wfShowNodeOutputModal = function …`
+  so the inline handler resolves.
+
+### Added (test infra)
+- 🎭 **Playwright regression scripts for QQ108** —
+  `scripts/e2e-qq108-pin-badge.mjs` covers the QQ108 snap-key
+  fix (pin badge appears/disappears via keyed-diff render),
+  `scripts/e2e-qq108-output-panel.mjs` covers the inspector
+  output panel + 전체 보기 modal flow. Both run headlessly
+  against the dev server with no provider key required.
+
+---
 ## [2.69.1] — 2026-05-03
 
 ### Added
