@@ -10,6 +10,27 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.45] — 2026-05-03
+
+**QQ156** — fixed flaky `e2e-auto-resume` regression introduced by
+QQ154. The 1.5s memo on `/api/auto_resume/status` returned stale
+'active' entries for up to 1.5s after a `cancel` or `set`,
+causing the test (and any UI polling) to see a state that didn't
+match the actual store.
+
+### Fixed
+- `_dump_all` (every state-write path) now zeroes
+  `_AR_STATUS_CACHE`. The next `/status` call rebuilds the cache
+  with fresh data. The 1.5s TTL still de-dupes back-to-back reads;
+  it just doesn't outlive a write.
+- Cache decl moved above `_dump_all` so the invalidator can see it.
+
+### Verified
+- `scripts/e2e-auto-resume.mjs` re-greens: 3/3 viewports PASS
+  even with 4 pre-existing bindings in the store. Cache still
+  serves both cold and warm hits in < 2ms.
+
+---
 ## [2.71.44] — 2026-05-03
 
 **QQ155** — sixth perf endpoint memoised. `/api/optimization/score`
