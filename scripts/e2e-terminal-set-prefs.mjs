@@ -134,6 +134,17 @@ const logSize = await page.evaluate(() => {
 check('lazyclaude reset wipes the term log',
   logSize <= 2, `lines=${logSize}`);
 
+// QQ145 — `lazyclaude status` prints version + theme + assignee
+const hitsBeforeStatus = termApiHits;
+await runCmd('lazyclaude status');
+const statOut = (await lastOutput(1)).join('\n');
+check('lazyclaude status prints LazyClaude header',
+  /LazyClaude v\d/.test(statOut));
+check('lazyclaude status mentions theme + lang',
+  /theme:/.test(statOut) && /lang:/.test(statOut));
+check('status did not hit shell endpoint',
+  termApiHits === hitsBeforeStatus);
+
 // QQ142 — `lazyclaude tabs` lists NAV ids
 await runCmd('lazyclaude tabs');
 const tabsOut = (await lastOutput(1)).join('\n');

@@ -10,6 +10,27 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.35] — 2026-05-03
+
+**QQ145** — `lazyclaude status` terminal builtin; also restores
+the `lazyclaude status` autocomplete entry that QQ141 dropped.
+
+The shell whitelist *did* allow `lazyclaude status` but
+`shutil.which("lazyclaude")` returns nothing on most systems, so
+running it ended in `lazyclaude not installed`. Intercepting it
+client-side prints a useful one-screen summary instead — version,
+current theme/lang, default model, temperature, active tab.
+
+`/help` updated.
+
+### Verified
+- `e2e-terminal-set-prefs.mjs` extended to 21 checks (was 18) —
+  `lazyclaude status` prints the header, mentions theme + lang,
+  and never hits the shell.
+- `e2e-terminal.mjs` re-greens (4/4): the autocomplete suggestion
+  for `lazyclaude sta` → `lazyclaude status` works again.
+
+---
 ## [2.71.34] — 2026-05-03
 
 **QQ144** — fourth subprocess-bound endpoint memoised.
