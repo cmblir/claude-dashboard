@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.86] — 2026-05-03
+
+**QQ191** — `lazyclaude tabs <filter>` accepts a substring
+filter (parity with QQ189 `/agents` and QQ190 `/sessions`).
+Header shows `# N/total · "filter"`. No-match prints "⚠ 일치
+하는 탭 없음".
+
+### Verified
+- `e2e-terminal-set-prefs.mjs` extended from 28 → 30 checks:
+  filter narrows the listing, no-match emits the warning.
+
+---
 ## [2.71.85] — 2026-05-03
 
 **QQ190** — `/sessions [filter]` accepts a substring filter
