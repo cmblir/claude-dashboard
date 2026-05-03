@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.27] — 2026-05-03
+
+**QQ137** — server boot now pre-warms the QQ135 / QQ136 subprocess
+caches in a daemon thread. Without this, the *first* AI Providers
+or Team tab visit after a fresh server start still paid the cold
+~750ms / ~400ms `<tool> --version` and `claude auth status` costs;
+only subsequent visits hit the 30s memo. Now the prewarm runs in
+parallel with `warmup_caches()` and finishes inside the typical
+boot window — so the user's first tab open already finds the
+cache populated.
+
+### Verified
+- `scripts/e2e-prewarm-caches.mjs` — Playwright regression: first
+  /api/cli/status hit 31ms (was 750ms), first /api/auth/status hit
+  2ms (was 400ms), repeat hits stay <60ms. 4/4 green.
+
+---
 ## [2.71.26] — 2026-05-03
 
 **QQ136** — second perf bug. `/api/auth/status` runs
