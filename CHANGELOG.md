@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.62] — 2026-05-03
+
+**QQ171** — `/code` chat slash. Copies just the LAST fenced
+code block from the most recent assistant reply — useful when
+the answer is prose + code and you only want the snippet.
+Falls back to `document.execCommand('copy')` like `/copy`.
+Tab autocomplete + unknown-slash heuristic + `/help` updated.
+
+### Verified
+- `scripts/e2e-chat-slash-code.mjs` — 4/4 green: single-block
+  reply copies the JS, multi-block reply copies the LAST,
+  no-code reply toasts warning, `/help` listing.
+
+---
 ## [2.71.61] — 2026-05-03
 
 **QQ170** — direct Playwright coverage for the QQ163 shared
