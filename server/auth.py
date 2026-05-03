@@ -53,8 +53,37 @@ def api_team_info() -> dict:
     }
 
 
+_AUTH_STATUS_CACHE: dict = {"data": None, "ts": 0.0, "claude_json_mtime": 0.0}
+# QQ136 — server-side cache for /api/auth/status. The endpoint runs
+# `claude --version` AND `claude auth status` subprocess calls (~450ms
+# combined). Auth state is stable except when the user re-runs
+# `claude auth login`, which mutates ~/.claude.json's mtime — so the
+# memo invalidates automatically when that file changes. 30s TTL
+# otherwise.
+_AUTH_STATUS_TTL_S = 30.0
+
+
 def api_auth_status() -> dict:
-    """~/.claude.json 에서 oauth 정보 읽어 연결 상태 반환 + claude CLI 설치 여부."""
+    """~/.claude.json 에서 oauth 정보 읽어 연결 상태 반환 + claude CLI 설치 여부.
+
+    QQ136 — Memoised for up to 30s; auto-invalidates when ~/.claude.json
+    mtime changes (covers `claude auth login` / refresh).
+    """
+    import time as _time
+    cur_mtime = 0.0
+    try:
+        if CLAUDE_JSON.exists():
+            cur_mtime = CLAUDE_JSON.stat().st_mtime
+    except Exception:
+        pass
+    cached = _AUTH_STATUS_CACHE.get("data")
+    if (
+        cached is not None
+        and (_time.time() - _AUTH_STATUS_CACHE.get("ts", 0)) < _AUTH_STATUS_TTL_S
+        and _AUTH_STATUS_CACHE.get("claude_json_mtime") == cur_mtime
+    ):
+        return cached
+
     cli_path = shutil.which("claude") or ""
     cli_version = ""
     if cli_path:
@@ -119,7 +148,7 @@ def api_auth_status() -> dict:
         plan_label = f"Claude {sub_map.get(sub_type, sub_type)}"
 
     projects_count = len(data.get("projects", {}) or {})
-    return {
+    result = {
         "connected": True,
         "email": cli_auth.get("email") or oauth.get("emailAddress", ""),
         "displayName": oauth.get("displayName", ""),
@@ -144,6 +173,10 @@ def api_auth_status() -> dict:
         "cliPath": cli_path,
         "cliVersion": cli_version,
     }
+    _AUTH_STATUS_CACHE["data"] = result
+    _AUTH_STATUS_CACHE["ts"] = _time.time()
+    _AUTH_STATUS_CACHE["claude_json_mtime"] = cur_mtime
+    return result
 
 
 def api_set_claimed_plan(body: dict) -> dict:

@@ -10,6 +10,34 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.26] — 2026-05-03
+
+**QQ136** — second perf bug. `/api/auth/status` runs
+`claude --version` *and* `claude auth status` subprocesses
+(~400ms combined). The endpoint is touched by team / projects /
+memoryManager / openPorts and was the single biggest factor
+behind their slow tab-switches.
+
+### Fixed
+- 30s server-side memo for `/api/auth/status` in
+  `server/auth.py`. Auto-invalidates when `~/.claude.json`'s
+  mtime changes — so `claude auth login` is reflected without
+  waiting for the TTL.
+
+### Verified
+- `scripts/e2e-auth-status-cache.mjs` — Playwright regression:
+  cold ≈ 415ms, cached = 3ms, repeat = 1ms, warm team
+  tab-switch 16-39ms (was 871ms). 3/3 green.
+
+### Cumulative tab-switch wins (QQ135 + QQ136)
+| Tab            | Before  | After |
+|----------------|---------|-------|
+| aiProviders    | 3752ms  | 55ms  |
+| team           |  871ms  | 16ms  |
+| memoryManager  |  685ms  | 198ms |
+| openPorts      |  584ms  | 180ms |
+
+---
 ## [2.71.25] — 2026-05-03
 
 **QQ135** — real perf bug. `/api/cli/status` ran `<tool> --version`
