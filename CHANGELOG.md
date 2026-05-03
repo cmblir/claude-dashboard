@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.58] — 2026-05-03
+
+**QQ168** — `Cmd/Ctrl+Shift+E` on the workflow tab exports the
+current workflow as JSON. Parallels the chat QQ166 export
+shortcut so the same chord does "export current view" across
+both. Shortcut help modal lists it.
+
+### Verified
+- `scripts/e2e-workflow-export-shortcut.mjs` — Playwright
+  regression: shortcut invokes `_wfExport`, help modal lists
+  `Ctrl+Shift+E`, suppressed on non-workflow tabs. 3/3 green.
+
+---
 ## [2.71.57] — 2026-05-03
 
 **QQ167** — regression test that locks in QQ164 (chat
