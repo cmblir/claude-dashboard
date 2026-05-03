@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.84] — 2026-05-03
+
+**QQ189** — `/agents [filter]` accepts a substring filter so
+users with many registered assignees (Ollama models alone can
+hit 30+) can narrow down: `/agents claude` shows only the 4
+Claude variants. Output also caps at 30 with the same overflow
+note as QQ188 `/sessions`. No-match case toasts "일치하는
+어시니 없음" instead of dumping a 0-result list. Header reflects
+filter context: `(4/14 · "claude")`.
+
+`/help` updated.
+
+### Verified
+- `e2e-chat-slash-cost-status.mjs` extended from 31 → 34 checks:
+  filtered header, non-claude assignees suppressed, no-match
+  toast.
+
+---
 ## [2.71.83] — 2026-05-03
 
 **QQ188** — `/sessions` caps at 30 entries with an overflow line
