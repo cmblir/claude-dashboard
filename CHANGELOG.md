@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.8] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Node right-click context menu regression**
+  (`scripts/e2e-node-ctxmenu.mjs`). Pins LL14 + QQ19:
+  1. `contextmenu` MouseEvent on a session node opens
+     `#wfNodeCtxMenu` with the expected items: 편집, 복제,
+     비활성화, 단독 실행, 출력 복사, 마지막 출력 핀 설정,
+     삭제 (the conditional ▶/📋/📌 entries appear because
+     `lastRunResults[nid].output` is seeded).
+  2. Clicking 복제 appends a new clone (nodes.length += 1)
+     and the menu auto-closes.
+  3. Re-opening the menu and dispatching `mousedown` on
+     `<body>` triggers the once-listener cleanup that
+     removes the menu.
+
+  Total e2e suite: **31/31 pass**.
+
+---
 ## [2.70.7] — 2026-05-03
 
 ### Added (test infra)
