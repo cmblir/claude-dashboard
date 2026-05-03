@@ -57,6 +57,8 @@ const cases = [
   ['/copy', 'copy'],
   ['/copy 1', 'copy N'],
   ['/version', 'version'],
+  ['/tabs', 'tabs'],
+  ['/code 1', 'code N'],
   // Note: /clear, /clear all, /go, /lang, /theme, /retry have side effects
   //       that would break subsequent runs in this single-tab smoke; they
   //       have dedicated regressions instead.
