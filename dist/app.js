@@ -27493,7 +27493,7 @@ AFTER.lazyclawChat = () => {
           // switch + the unknown-command heuristic's `known` array.
           const cmds = ['clear', 'system', 'model', 'export', 'help',
                         'cost', 'status', 'agents', 'sessions',
-                        'rename', 'theme', 'lang', 'copy',
+                        'rename', 'theme', 'lang', 'copy', 'code',
                         'retry', 'regenerate', 'go', 'open', 'version'];
           // Use a stored "seed partial" so repeated Tab cycles through
           // matches based on the original prefix, not the auto-completed one.
@@ -28048,6 +28048,41 @@ function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'code': {
+      // QQ171 — copy the LAST fenced code block from the most recent
+      // assistant reply. Useful when the assistant returned text +
+      // code; /copy grabs everything, /code grabs just the snippet.
+      const id = _lcCurrentId();
+      const h = _lcGetHistory(id) || [];
+      let last = null;
+      for (let i = h.length - 1; i >= 0; i--) {
+        if (h[i].role === 'assistant' && h[i].text) { last = h[i]; break; }
+      }
+      if (!last) { toast(t('복사할 응답이 없습니다'), 'warn'); return true; }
+      const fenceRe = /```(?:[a-zA-Z0-9_+-]*)?\n([\s\S]*?)```/g;
+      const matches = [];
+      let m;
+      while ((m = fenceRe.exec(last.text)) !== null) matches.push(m[1]);
+      if (!matches.length) { toast(t('마지막 응답에 코드 블록이 없습니다'), 'warn'); return true; }
+      // Use the LAST code block (most recent / typically the answer).
+      const code = matches[matches.length - 1];
+      (async () => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(code);
+          } else {
+            const ta = document.createElement('textarea');
+            ta.value = code;
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
+          }
+          toast(`📋 ${t('코드 블록 복사됨')} (${code.length} chars · ${matches.length} ${t('블록')})`, 'ok');
+        } catch (e) {
+          toast(t('복사 실패') + ': ' + (e && e.message || e), 'err');
+        }
+      })();
+      return true;
+    }
     case 'copy': {
       // QQ122 — copy the last assistant response to the clipboard so
       // the user can paste it into another tool without scrolling. With
@@ -28209,6 +28244,7 @@ function _lcChatSlashCommand(line) {
 \`/agents\` — ${t('등록된 어시니 목록')}
 \`/sessions\` — ${t('세션 목록 + 메시지 수')}
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
+\`/code\` — ${t('마지막 응답의 코드 블록만 복사')}
 \`/retry\` (= \`/regenerate\`) — ${t('마지막 사용자 프롬프트 재실행')}
 \`/go <tab>\` (= \`/open\`) — ${t('다른 탭으로 이동 (term/wf/proj/ai/settings)')}
 \`/version\` — ${t('대시보드 버전 + 빌드 정보')}
@@ -28248,7 +28284,7 @@ function _lcChatSlashCommand(line) {
   // the provider as before.
   if (/^\/[a-z][a-z0-9_-]*\s*$/i.test(line)) {
     const known = ['clear','system','model','export','help','cost','status',
-                   'agents','sessions','rename','theme','lang','copy',
+                   'agents','sessions','rename','theme','lang','copy','code',
                    'retry','regenerate','go','open','version'];
     // QQ161 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     const hint = (() => {
