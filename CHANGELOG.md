@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.70] — 2026-05-03
+
+**QQ178** — comprehensive smoke regression for every chat slash
+command. Runs each non-destructive verb (help/cost/status/
+agents/sessions/system/code/copy/version + /rename) once, asserts
+`_lcChatSlashCommand` returns `true` and the chat DOM survives.
+Catches the class of bugs where a new verb throws or silently
+returns false (forgotten case label).
+
+### Verified
+- `scripts/e2e-chat-slash-smoke.mjs` — 12/12 green covering 11
+  verbs + the /rename round-trip.
+
+---
 ## [2.71.69] — 2026-05-03
 
 **QQ177** — `/cost` on a session with no recorded token metadata
