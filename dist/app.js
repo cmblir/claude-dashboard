@@ -5751,6 +5751,9 @@ function _wfShowEdgeContextMenu(eid, x, y) {
           const ids = Array.from(__wfMultiSelected);
           const targets = __wf.current.nodes.filter(n => ids.includes(n.id));
           if (!targets.length) return true;
+          // QQ159 — push a single undo entry for the whole batch toggle
+          // so Cmd+Z reverses the entire D press, not one-per-node.
+          if (typeof _wfPushUndo === 'function') _wfPushUndo();
           const desiredDisabled = !(targets[0].data && targets[0].data.disabled);
           for (const n of targets) {
             n.data = n.data || {};
@@ -5765,6 +5768,8 @@ function _wfShowEdgeContextMenu(eid, x, y) {
             'ok'
           );
         } else {
+          // QQ159 — single-node toggle also gets an undo entry.
+          if (typeof _wfPushUndo === 'function') _wfPushUndo();
           _wfToggleNodeDisabled(__wf.selectedNodeId);
         }
         return true;
