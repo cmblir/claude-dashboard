@@ -84,12 +84,27 @@ const density = await page.evaluate(() => window.CC_PREFS.ui.density);
 check('lazyclaude set persists into CC_PREFS', density === 'compact',
   `density=${density}`);
 
-// Reset to default so the test is idempotent
+// Same via lz alias.
 await page.evaluate(() => {
   const inp = document.getElementById('lcTermInput');
-  inp.value = 'lazyclaude set ui density comfortable';
+  inp.value = 'lz set ui density comfortable';
   return window._lcTermRun();
 });
+await page.waitForTimeout(150);
+const densityAfter = await page.evaluate(() => window.CC_PREFS.ui.density);
+check('lz set persists via the alias path', densityAfter === 'comfortable',
+  `density=${densityAfter}`);
+
+// QQ186 — `lz reset` wipes log via the alias path.
+await page.evaluate(() => {
+  const inp = document.getElementById('lcTermInput');
+  inp.value = 'lz reset';
+  return window._lcTermRun();
+});
+await page.waitForTimeout(150);
+const wiped = await page.evaluate(() =>
+  document.querySelectorAll('#lcTermLog > div').length);
+check('lz reset wipes the log via alias', wiped <= 2, `lines=${wiped}`);
 
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

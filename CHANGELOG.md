@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.81] — 2026-05-03
+
+**QQ186c** — terminal smoke now also exercises `lz set` (alias
+write) and `lz reset` (alias side-effect). Together with QQ186b,
+every `lz` verb now has end-to-end coverage: autocomplete,
+parser, side-effect.
+
+### Verified
+- `e2e-terminal-builtins-smoke.mjs` extended from 15 → 17:
+  `lz set ui density comfortable` round-trips to CC_PREFS and
+  `lz reset` clears the log.
+
+---
 ## [2.71.80] — 2026-05-03
 
 **QQ186b** — terminal smoke regression (QQ179) extended to also
