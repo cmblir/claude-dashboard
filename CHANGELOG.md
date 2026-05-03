@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.28] — 2026-05-03
+
+**QQ138** — workflow webhook URL + curl snippet hardcoded
+`http://localhost:8080/...` so anyone running the dashboard on a
+non-default port (PORT=19500, container, remote tunnel) had to
+hand-edit the URL after copying. Both the inspector input and
+the curl `<pre>` now use `location.origin`.
+
+### Verified
+- `scripts/e2e-webhook-url-origin.mjs` — Playwright regression:
+  saves a workflow, opens it, asserts the rendered webhook URL
+  starts with `http://127.0.0.1:19500` (current origin) and no
+  longer contains `localhost:8080`; same for the curl snippet.
+  5/5 green.
+
+---
 ## [2.71.27] — 2026-05-03
 
 **QQ137** — server boot now pre-warms the QQ135 / QQ136 subprocess
