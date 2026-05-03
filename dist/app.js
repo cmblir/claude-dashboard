@@ -29672,12 +29672,14 @@ function _lcTermSuggest(prefix) {
     // tab-suggest list too. Without this, `lazyclaude wh<Tab>` was
     // a no-op even though `lazyclaude whoami` is fully implemented.
     'lazyclaude whoami', 'lazyclaude keys', 'lazyclaude uptime',
+    'lazyclaude refresh', 'lazyclaude reload',
     'lazyclaude usage', 'lazyclaude usage 7', 'lazyclaude usage 30',
     'lazyclaude workflows', 'lazyclaude workflows ',
     'lazyclaude run ', 'lazyclaude cancel', 'lazyclaude cancel ',
     'lz get', 'lz set', 'lz help', 'lz version', 'lz status',
     'lz tabs', 'lz reset', 'lz diag',
     'lz whoami', 'lz keys', 'lz uptime', 'lz usage', 'lz workflows',
+    'lz refresh', 'lz reload',
     'lz run ', 'lz cancel',
     'lz open chat', 'lz open wf', 'lz open term', 'lz open ai',
     'git status', 'git status -s', 'git status -sb',
@@ -29798,7 +29800,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel','uptime'];
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel','uptime','refresh','reload'];
   const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
@@ -29816,7 +29818,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   if (verb === '__unknown__') {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
-    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel','uptime'];
+    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel','uptime','refresh','reload'];
     // QQ162 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     let best = null, bestScore = 99;
     for (const k of candidates) {
@@ -29864,6 +29866,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       ]],
       ['Terminal', [
         ['lazyclaude reset',                   'wipe terminal log'],
+        ['lazyclaude refresh  (= reload)',     'clear client-side API cache (no page reload)'],
         ['lazyclaude help [filter]',           'this listing (filter narrows by group/cmd)'],
       ]],
     ];
@@ -29873,7 +29876,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       'Workflow':    'workflow workflows wf run cancel',
       'Provider / Status': 'provider providers keys whoami status diag claude',
       'Cost / Version': 'cost usage version uptime',
-      'Terminal':    'terminal reset help',
+      'Terminal':    'terminal reset help refresh reload cache',
     };
     const q = (rest || '').trim().toLowerCase();
     const sectionsOut = [];
@@ -30033,6 +30036,19 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
     } catch (e) {
       log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
     }
+    return;
+  }
+  if (verb === 'refresh' || verb === 'reload') {
+    // QQ217 — terminal parity with chat /refresh. Busts the
+    // client-side _apiCache Map.
+    let n = 0;
+    try {
+      if (typeof _apiCache !== 'undefined' && _apiCache.size != null) {
+        n = _apiCache.size;
+        _apiCache.clear();
+      }
+    } catch (_) {}
+    log.push({ kind: 'out', text: `cache cleared (${n} entries)`, ts: Date.now() });
     return;
   }
   if (verb === 'uptime') {
