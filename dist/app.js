@@ -28175,19 +28175,32 @@ function _lcChatSlashCommand(line) {
     const known = ['clear','system','model','export','help','cost','status',
                    'agents','sessions','rename','theme','lang','copy',
                    'retry','regenerate','go','open','version'];
+    // QQ161 — proper Levenshtein edit distance so `/vrsion` (one
+    // missing char) suggests `/version`. The previous Hamming-on-
+    // shorter implementation scored that as 6 because it walked
+    // characters in lockstep without aligning around the gap.
+    const lev = (a, b) => {
+      if (a === b) return 0;
+      if (!a.length) return b.length;
+      if (!b.length) return a.length;
+      const dp = new Array(b.length + 1);
+      for (let j = 0; j <= b.length; j++) dp[j] = j;
+      for (let i = 1; i <= a.length; i++) {
+        let prev = dp[0]; dp[0] = i;
+        for (let j = 1; j <= b.length; j++) {
+          const tmp = dp[j];
+          dp[j] = a[i - 1] === b[j - 1]
+            ? prev
+            : 1 + Math.min(prev, dp[j], dp[j - 1]);
+          prev = tmp;
+        }
+      }
+      return dp[b.length];
+    };
     const hint = (() => {
-      // Cheap "edit distance ≤ 2 OR shared prefix ≥ 2" heuristic.
       let best = null, bestScore = 99;
       for (const k of known) {
-        let score = 99;
-        if (k.startsWith(cmd) || cmd.startsWith(k)) score = Math.abs(k.length - cmd.length);
-        else {
-          // Hamming-on-shorter
-          const m = Math.min(k.length, cmd.length);
-          let diff = Math.abs(k.length - cmd.length);
-          for (let i = 0; i < m; i++) if (k[i] !== cmd[i]) diff++;
-          score = diff;
-        }
+        const score = lev(k, cmd);
         if (score < bestScore) { bestScore = score; best = k; }
       }
       return bestScore <= 3 ? best : null;
