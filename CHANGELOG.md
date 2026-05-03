@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.12] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Node editor save flow regression**
+  (`scripts/e2e-node-editor-save.mjs`):
+  1. `_wfOpenNodeEditor('n-s')` opens the editor with title +
+     subject inputs prefilled.
+  2. Mutating values + dispatching `input` then clicking the
+     localized 저장/Save button updates `node.title` /
+     `node.data.subject`.
+  3. Canvas re-renders with the new title text and the
+     keyed-diff cache picks up the change.
+
+  Total e2e suite: **35/35 pass**.
+
+---
 ## [2.70.11] — 2026-05-03
 
 ### Added (test infra)
