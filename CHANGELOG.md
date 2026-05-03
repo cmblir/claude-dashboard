@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.82] — 2026-05-03
+
+**QQ187** — extended `e2e-chat-slash-smoke` to cover the QQ182
+`/tabs` slash and the QQ184 `/code N` form. Together with
+QQ178/QQ186, the chat slash + terminal builtin surfaces are
+now end-to-end covered: parser + autocomplete + side-effects.
+
+### Verified
+- `e2e-chat-slash-smoke.mjs` extended from 12 → 14 checks.
+
+---
 ## [2.71.81] — 2026-05-03
 
 **QQ186c** — terminal smoke now also exercises `lz set` (alias
