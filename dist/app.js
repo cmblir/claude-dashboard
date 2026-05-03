@@ -4587,6 +4587,7 @@ function _wfShowShortcutHelp() {
     { key: 'Ctrl+Enter', desc: t('워크플로우 실행 / 중단') },
     { key: 'Ctrl+N', desc: t('새 노드 추가') },
     { key: 'Ctrl+Shift+N', desc: t('새 워크플로우 만들기') },
+    { key: 'Ctrl+Shift+E', desc: t('워크플로우 JSON 내보내기') },
     { key: 'Ctrl+[ / ]', desc: t('이전 / 다음 워크플로우로 전환') },
     { key: 'Ctrl+0', desc: t('화면 맞춤') },
     { key: 'Ctrl+1', desc: t('100% 줌으로 리셋') },
@@ -5669,6 +5670,14 @@ function _wfShowEdgeContextMenu(eid, x, y) {
           && state.view === 'workflows') {
         e.preventDefault();
         if (typeof _wfCreateNew === 'function') _wfCreateNew();
+        return true;
+      }
+      // QQ168 — Cmd/Ctrl+Shift+E exports the current workflow as JSON.
+      // Parallels the chat QQ166 export shortcut.
+      if (mod && e.shiftKey && (e.key === 'e' || e.key === 'E') && !inInput
+          && state.view === 'workflows') {
+        e.preventDefault();
+        if (typeof _wfExport === 'function') _wfExport();
         return true;
       }
       if (mod && (e.key === 'n' || e.key === 'N') && !inInput
