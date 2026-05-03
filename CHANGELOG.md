@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.75] — 2026-05-03
+
+**QQ182** — `/tabs` chat slash command. Lists every NAV id +
+emoji + label so users can pick a target for `/go`. Parity
+with the terminal `lazyclaude tabs` (QQ142). `/help` lists it,
+Tab autocomplete and unknown-slash heuristic learn about it.
+
+### Verified
+- `e2e-chat-slash-go.mjs` extended from 12 → 14 checks: `/tabs`
+  lists `workflows` and `lazyclawChat`.
+
+---
 ## [2.71.74] — 2026-05-03
 
 **QQ181** — extended `/go` (chat) and `lazyclaude open`

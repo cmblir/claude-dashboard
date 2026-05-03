@@ -69,6 +69,12 @@ const stayed = await page.evaluate(() => state.view);
 check('/go without arg toasts usage', /\/go|tab/i.test(t4), `toast="${t4}"`);
 check('/go without arg stays on lazyclawChat', stayed === 'lazyclawChat');
 
+// QQ182 — `/tabs` lists every NAV id+label.
+await slash('/tabs');
+const tabsHtml = await page.evaluate(() => document.getElementById('lcChatLog').innerHTML);
+check('/tabs lists workflows', /workflows/.test(tabsHtml));
+check('/tabs lists lazyclawChat', /lazyclawChat/.test(tabsHtml));
+
 // QQ181 — extended alias map.
 for (const [alias, expected] of [
   ['home',  'overview'],
