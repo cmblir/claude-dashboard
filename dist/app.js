@@ -28099,6 +28099,32 @@ async function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'temp':
+    case 'temperature': {
+      // QQ201 — quick temperature read/set without leaving the chat.
+      // No arg → echo current value. Numeric arg → setPref('ai',
+      // 'temperature', n) (debounced 250ms persist via /api/prefs/set).
+      // Range clamped to [0, 2] to match the quick-settings slider.
+      const ai = (window.CC_PREFS && window.CC_PREFS.ai) || {};
+      if (!rest) {
+        const md = `**${t('현재 temperature')}**: \`${ai.temperature != null ? ai.temperature : '(default)'}\``;
+        const history = _lcChatLoad();
+        history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+        _lcChatSave(history);
+        _lcChatRender();
+        return true;
+      }
+      const n = parseFloat(rest);
+      if (!Number.isFinite(n) || n < 0 || n > 2) {
+        toast(`${t('범위 밖')}: ${rest} (0 ~ 2)`, 'warn');
+        return true;
+      }
+      if (typeof setPref === 'function') {
+        setPref('ai', 'temperature', n);
+        toast(`🌡 temperature → ${n}`, 'ok');
+      }
+      return true;
+    }
     case 'branch':
     case 'fork': {
       // QQ200 — slash-form of the per-message 🍴 fork button. With no
@@ -28470,6 +28496,7 @@ async function _lcChatSlashCommand(line) {
 \`/rename <이름>\` — ${t('세션 이름 변경')}
 \`/pin\` · \`/unpin\` — ${t('현재 세션 상단 고정/해제')}
 \`/branch [N]\` (= \`/fork\`) — ${t('현재 세션을 N번째 메시지에서 분기 (기본: 끝 = 전체 복제)')}
+\`/temperature [0-2]\` (= \`/temp\`) — ${t('어시니 temperature 읽기/설정')}
 \`/export\` — ${t('마크다운으로 내보내기')}
 \`/help\` — ${t('이 목록')}
 

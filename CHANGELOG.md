@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.96] — 2026-05-03
+
+**QQ201** — `/temperature` (and alias `/temp`) chat slash. Read
+or set `CC_PREFS.ai.temperature` without leaving the chat. The
+numeric path goes through the existing `setPref()` helper, so
+the value persists to `/api/prefs/set` (debounced 250ms) and
+shows up immediately in the quick-settings slider. Range
+clamped to [0, 2] to match the schema.
+
+* `/temperature` (no arg) — echo current value.
+* `/temperature <n>` — set; out-of-range emits
+  `범위 밖: n (0 ~ 2)` warn.
+* `/temp` alias.
+* `/help` updated.
+
+### Verified
+- `e2e-chat-slash-temperature.mjs` 9/9 ✅ (read, set, alias,
+  range guard, backend persistence, /help listing).
+- Regression: chat-slash-{pin,branch,cost-status,smoke,go,
+  unknown} + whoami + terminal-set-prefs all green.
+
+---
 ## [2.71.95] — 2026-05-03
 
 **QQ200** — `/branch` and `/fork` chat slash commands. Reuses
