@@ -29338,10 +29338,24 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   }
   if (verb === 'tabs') {
     // QQ142 — list every NAV tab id with its emoji + label.
-    const lines = (typeof NAV !== 'undefined' ? NAV : [])
-      .map(n => `${(n.icon || '·').padEnd(2)} ${(n.id || '').padEnd(22)} ${n.label || ''}`);
+    // QQ191 — accept a substring filter (parity with /sessions /agents).
+    const all = (typeof NAV !== 'undefined' ? NAV : []);
+    const q = (rest || '').trim().toLowerCase();
+    const matched = q
+      ? all.filter(n => (n.id || '').toLowerCase().includes(q) ||
+                        (n.label || '').toLowerCase().includes(q))
+      : all;
+    if (q && !matched.length) {
+      log.push({ kind: 'err', text: '⚠ ' + t('일치하는 탭 없음') + ': ' + rest, ts: Date.now() });
+      return;
+    }
+    const lines = matched.map(n =>
+      `${(n.icon || '·').padEnd(2)} ${(n.id || '').padEnd(22)} ${n.label || ''}`);
+    const header = q
+      ? `# ${matched.length}/${all.length} · "${rest}"`
+      : `# ${all.length} tabs`;
     log.push({ kind: 'out', text: lines.length
-      ? lines.join('\n')
+      ? header + '\n' + lines.join('\n')
       : '(NAV not loaded)', ts: Date.now() });
     return;
   }

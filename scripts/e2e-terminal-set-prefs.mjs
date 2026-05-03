@@ -185,6 +185,18 @@ const tabsOut = (await lastOutput(1)).join('\n');
 check('lazyclaude tabs lists workflows + lazyclawChat',
   /workflows/.test(tabsOut) && /lazyclawChat/.test(tabsOut));
 
+// QQ191 — `lazyclaude tabs <filter>` substring matches.
+await runCmd('lazyclaude tabs claude');
+const filteredOut = (await lastOutput(1)).join('\n');
+check('lazyclaude tabs claude shows filtered count header',
+  /\b\d+\/\d+\b.*claude/i.test(filteredOut),
+  `out=${filteredOut.split('\n')[0].slice(0, 80)}`);
+
+await runCmd('lazyclaude tabs nosuch-zzz');
+const noMatchOut = (await lastOutput(1)).join('\n');
+check('lazyclaude tabs <bogus> emits 일치하는 탭 없음',
+  /일치하는 탭 없음|no match/i.test(noMatchOut));
+
 // QQ142 — `lazyclaude open wf` navigates
 const beforeView = await page.evaluate(() => state.view);
 await runCmd('lazyclaude open wf');
