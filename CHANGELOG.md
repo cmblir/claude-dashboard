@@ -10,6 +10,26 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.37] — 2026-05-03
+
+**QQ147** — terminal got the same did-you-mean treatment as the
+chat slash commands (QQ124). `lazyclaude xet ui theme dark` used
+to fall through to the shell whitelist and return a terse
+"argument combination not in whitelist" — useless when the user
+just typo'd `set`.
+
+The terminal parser now matches *any* `lazyclaude <word>` /
+`lz <word>` shape; if `<word>` isn't a known verb (get / set /
+help / reset / version / open / tabs / status), we emit a
+friendly hint with the closest match (≤ 3 edits) plus
+`lazyclaude help`. Stays client-side, never hits the shell.
+
+### Verified
+- `e2e-terminal-set-prefs.mjs` extended to 24 checks (was 21):
+  the typo warning fires, suggests SOME known verb, and never
+  hits `/api/lazyclaw/term`. `e2e-terminal.mjs` still 4/4.
+
+---
 ## [2.71.36] — 2026-05-03
 
 **QQ146** — bare `/` (or `/   ` whitespace-only) on its own line

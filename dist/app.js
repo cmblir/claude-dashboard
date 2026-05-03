@@ -28950,15 +28950,47 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const m = trimmed.match(/^(?:lazyclaude|lz)\s+(get|set|help|reset|version|open|go|tabs|status)\b\s*(.*)$/i);
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status'];
+  const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
   const rest = m[2].trim();
-  return { verb, rest };
+  if (KNOWN_VERBS.includes(verb)) return { verb, rest };
+  // QQ147 — unknown verb after `lazyclaude`/`lz`. Don't dump the user
+  // into the shell whitelist's terse "argument combination not in
+  // whitelist" — synthesise a `did-you-mean` verb that the handler
+  // turns into a friendly hint.
+  return { verb: '__unknown__', rest: verb };
 }
 async function _lcTermHandleBuiltin(verb, rest, log) {
   const prefs = window.CC_PREFS;
   const schema = window.CC_PREFS_SCHEMA;
+  if (verb === '__unknown__') {
+    // QQ147 — the parser found `lazyclaude <something>` where <something>
+    // isn't a known verb. Suggest the closest one by edit distance.
+    const candidates = ['get','set','help','reset','version','open','tabs','status'];
+    let best = null, bestScore = 99;
+    for (const k of candidates) {
+      let score = 99;
+      if (k.startsWith(rest) || rest.startsWith(k)) score = Math.abs(k.length - rest.length);
+      else {
+        const m = Math.min(k.length, rest.length);
+        let diff = Math.abs(k.length - rest.length);
+        for (let i = 0; i < m; i++) if (k[i] !== rest[i]) diff++;
+        score = diff;
+      }
+      if (score < bestScore) { bestScore = score; best = k; }
+    }
+    const suggest = bestScore <= 3 ? best : null;
+    log.push({
+      kind: 'err',
+      text: '⚠ ' + t('알 수 없는 명령') + `: lazyclaude ${rest}`
+        + (suggest ? ` — ${t('혹시')} lazyclaude ${suggest}?` : '')
+        + ` · lazyclaude help`,
+      ts: Date.now(),
+    });
+    return;
+  }
   if (verb === 'help') {
     // QQ117 — terse command listing so users discover the built-ins.
     // QQ141 — also list `version`.

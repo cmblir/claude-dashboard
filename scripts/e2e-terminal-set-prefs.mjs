@@ -134,6 +134,19 @@ const logSize = await page.evaluate(() => {
 check('lazyclaude reset wipes the term log',
   logSize <= 2, `lines=${logSize}`);
 
+// QQ147 — typo'd verb suggests a near match instead of the unhelpful
+//         shell whitelist error.
+const hitsBeforeTypo = termApiHits;
+await runCmd('lazyclaude xet ui theme dark');
+const typoOut = (await lastOutput(1)).join('\n');
+check('typo "xet" emits an unknown-command warning',
+  /알 수 없는 명령|unknown/i.test(typoOut),
+  `out=${typoOut.slice(0, 120)}`);
+check('typo response suggests SOME known verb',
+  /lazyclaude (get|set|help|reset|version|status|tabs|open)/.test(typoOut));
+check('typo did not hit shell endpoint',
+  termApiHits === hitsBeforeTypo);
+
 // QQ145 — `lazyclaude status` prints version + theme + assignee
 const hitsBeforeStatus = termApiHits;
 await runCmd('lazyclaude status');
