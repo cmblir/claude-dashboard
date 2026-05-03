@@ -14,10 +14,13 @@
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 
-const BASE = process.env.BASE || 'http://127.0.0.1:8080';
+const BASE = process.env.BASE || `http://127.0.0.1:${process.env.PORT || 8080}`;
 const HEADLESS = process.env.HEADLESS !== '0';
 const ONLY = process.env.TAB_ID || null;
-const THRESHOLD = parseFloat(process.env.CONTRAST_MIN || '4.5');
+// WCAG 1.4.3 AA: 4.5 for body text, 3.0 for "large" text
+// (≥24px regular OR ≥18.66px bold). The CONTRAST_MIN env still
+// works as a hard floor override for both.
+const HARD_FLOOR = parseFloat(process.env.CONTRAST_MIN || '0');
 
 function readTabIds() {
   const src = readFileSync(new URL('../server/nav_catalog.py', import.meta.url), 'utf8');
@@ -43,7 +46,7 @@ const targets = ONLY ? tabs.filter(t => t === ONLY) : tabs;
 console.log(`🎨 light-theme contrast audit: ${targets.length} tabs`);
 
 function inject() {
-  window.__contrastCheck = function(threshold) {
+  window.__contrastCheck = function(hardFloor) {
     function parseRGB(str) {
       const m = str.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s]+([\d.]+))?/);
       if (!m) return null;
@@ -101,6 +104,13 @@ function inject() {
       if (!fg) continue;
       const bg = effectiveBg(n);
       const r = ratio([fg[0],fg[1],fg[2]], [bg[0],bg[1],bg[2]]);
+      // WCAG 1.4.3 AA: 4.5 for body text, 3.0 for "large" text
+      // (≥24px regular OR ≥18.66px bold).
+      const px = parseFloat(cs.fontSize) || 16;
+      const w = parseInt(cs.fontWeight, 10) || 400;
+      const isLarge = px >= 24 || (px >= 18.66 && w >= 700);
+      const wcagThreshold = isLarge ? 3.0 : 4.5;
+      const threshold = Math.max(wcagThreshold, hardFloor);
       if (r < threshold) {
         const sample = n.textContent.trim().slice(0, 50);
         const path = (function(el){ const p=[]; while(el && el.id!=='content' && p.length<4){ p.unshift(el.tagName+(el.className?'.'+String(el.className).split(' ')[0]:'')); el=el.parentElement; } return p.join('>'); })(n);
@@ -138,7 +148,7 @@ for (const id of targets) {
   await page.evaluate((t) => { location.hash = '#/' + t; }, id);
   await page.waitForTimeout(700);
   try {
-    const hits = await page.evaluate((th) => window.__contrastCheck(th), THRESHOLD);
+    const hits = await page.evaluate((th) => window.__contrastCheck(th), HARD_FLOOR);
     if (hits.length) totalHits[id] = hits;
   } catch (e) {
     console.log(`[${id}] eval failed: ${e.message}`);
@@ -146,7 +156,7 @@ for (const id of targets) {
 }
 
 // Summarize
-console.log(`\n==== Contrast audit (light theme, threshold=${THRESHOLD}) ====\n`);
+console.log(`\n==== Contrast audit (light theme, WCAG AA — 4.5 body / 3.0 large${HARD_FLOOR ? `, hard floor=${HARD_FLOOR}` : ''}) ====\n`);
 const tabEntries = Object.entries(totalHits);
 console.log(`Tabs with violations: ${tabEntries.length} / ${targets.length}`);
 let total = 0;

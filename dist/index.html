@@ -118,10 +118,10 @@ window._loadVendor = (() => {
     --text-dim: #5a5a62;
     --accent: #9e4422;
     --accent-2: #853814;
-    --cyan: #0284c7;
-    --ok: #16a34a;
-    --warn: #ca8a04;
-    --err: #dc2626;
+    --cyan: #075985;
+    --ok: #166534;
+    --warn: #854d0e;
+    --err: #991b1b;
     --grad: linear-gradient(135deg, #d97757 0%, #c96442 100%);
     --grad-soft: linear-gradient(135deg, rgba(217,119,87,0.1), rgba(201,100,66,0.06));
     --code-bg: rgba(0,0,0,0.05);
@@ -151,9 +151,61 @@ window._loadVendor = (() => {
   body.theme-light .card { background: rgba(255,255,255,0.6); border-color: rgba(0,0,0,0.08); }
   body.theme-light .hover-lift:hover { background: rgba(255,255,255,0.8); }
   body.theme-light .chip { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.1); color: var(--text-mute); }
-  body.theme-light .chip-ok { background: rgba(22,163,74,0.1); border-color: rgba(22,163,74,0.25); color: #15803d; }
-  body.theme-light .chip-warn { background: rgba(202,138,4,0.1); border-color: rgba(202,138,4,0.25); color: #a16207; }
-  body.theme-light .chip-err { background: rgba(220,38,38,0.1); border-color: rgba(220,38,38,0.25); color: #dc2626; }
+  /* WCAG AA — bump chip text colors past 4.5 ratio on tinted backgrounds. */
+  body.theme-light .chip-ok { background: rgba(22,163,74,0.1); border-color: rgba(22,163,74,0.25); color: #166534; }
+  body.theme-light .chip-warn { background: rgba(202,138,4,0.1); border-color: rgba(202,138,4,0.25); color: #854d0e; }
+  body.theme-light .chip-err { background: rgba(220,38,38,0.1); border-color: rgba(220,38,38,0.25); color: #b91c1c; }
+  /* WCAG AA — remap low-contrast inline-style colors used inside the SPA
+     for state badges. These are inline styles emitted by app.js and cannot
+     be overridden by class rules without !important; the substring match
+     on the style attribute is intentional. */
+  body.theme-light [style*="color:#f87171"] { color: #b91c1c !important; }     /* red-400 → red-700  */
+  body.theme-light [style*="color:#a78bfa"] { color: #6d28d9 !important; }     /* purple-400 → 700  */
+  body.theme-light [style*="color:#ca8a04"] { color: #854d0e !important; }     /* yellow-600 → 800  */
+  body.theme-light [style*="color:#9ca3af"] { color: #4b5563 !important; }     /* gray-400 → 600    */
+  body.theme-light [style*="color:#67e8f9"] { color: #0e7490 !important; }     /* cyan-300 → 700    */
+  body.theme-light [style*="color:#0284c7"] { color: #075985 !important; }     /* sky-600 → 800     */
+  body.theme-light [style*="color:#22d3ee"] { color: #0e7490 !important; }     /* cyan-400 → 700    */
+  body.theme-light [style*="color:#38bdf8"] { color: #075985 !important; }     /* sky-400 → 800     */
+  body.theme-light [style*="color:#fcd34d"] { color: #854d0e !important; }     /* amber-300 → 800   */
+  body.theme-light [style*="color:#fca5a5"] { color: #991b1b !important; }     /* red-300 → 800     */
+  body.theme-light [style*="color:#86efac"] { color: #166534 !important; }     /* green-300 → 800   */
+  body.theme-light [style*="color:#60a5fa"] { color: #1d4ed8 !important; }     /* blue-400 → 700    */
+  body.theme-light [style*="color:#7dd3fc"] { color: #075985 !important; }     /* sky-300 → 800     */
+  body.theme-light [style*="color:#93c5fd"] { color: #1e40af !important; }     /* blue-300 → 800    */
+  body.theme-light [style*="color:#16a34a"] { color: #14532d !important; }     /* green-600 → 900   */
+  body.theme-light [style*="color:#dc2626"] { color: #991b1b !important; }     /* red-600 → 800     */
+  body.theme-light [style*="color:#a16207"] { color: #713f12 !important; }     /* yellow-700 → 900  */
+  /* Same overrides but matching `color: #...` with a space (some emit
+     code paths set via cssText / template literals leave a space). */
+  body.theme-light [style*="color: #f87171"] { color: #b91c1c !important; }
+  body.theme-light [style*="color: #a78bfa"] { color: #6d28d9 !important; }
+  body.theme-light [style*="color: #ca8a04"] { color: #854d0e !important; }
+  body.theme-light [style*="color: #67e8f9"] { color: #0e7490 !important; }
+  body.theme-light [style*="color: #16a34a"] { color: #14532d !important; }
+  body.theme-light [style*="color: #0284c7"] { color: #075985 !important; }
+  body.theme-light [style*="color: #dc2626"] { color: #991b1b !important; }
+  body.theme-light [style*="color: #fca5a5"] { color: #991b1b !important; }
+  body.theme-light [style*="color: #fcd34d"] { color: #854d0e !important; }
+  body.theme-light [style*="color: #86efac"] { color: #166534 !important; }
+  body.theme-light [style*="color: #9ca3af"] { color: #4b5563 !important; }
+  /* gray-text token for "..." idle marker */
+  body.theme-light [style*="color:#9aa0aa"] { color: #4b5563 !important; }
+  body.theme-light [style*="color: #9aa0aa"] { color: #4b5563 !important; }
+  /* When inline styles are touched by JS (animation-delay etc.), browsers
+     re-serialise hex to rgb(). Mirror the worst-offender colours here. */
+  body.theme-light [style*="rgb(248, 113, 113)"] { color: #b91c1c !important; }   /* red-400 */
+  body.theme-light [style*="rgb(167, 139, 250)"] { color: #6d28d9 !important; }   /* purple-400 */
+  body.theme-light [style*="rgb(202, 138, 4)"]   { color: #854d0e !important; }   /* yellow-600 */
+  body.theme-light [style*="rgb(103, 232, 249)"] { color: #0e7490 !important; }   /* cyan-300 */
+  body.theme-light [style*="rgb(2, 132, 199)"]   { color: #075985 !important; }   /* sky-600 */
+  body.theme-light [style*="rgb(22, 163, 74)"]   { color: #14532d !important; }   /* green-600 */
+  body.theme-light [style*="rgb(96, 165, 250)"]  { color: #1d4ed8 !important; }   /* blue-400 */
+  body.theme-light [style*="rgb(125, 211, 252)"] { color: #075985 !important; }   /* sky-300 */
+  body.theme-light [style*="rgb(252, 211, 77)"]  { color: #854d0e !important; }   /* amber-300 */
+  body.theme-light [style*="rgb(252, 165, 165)"] { color: #991b1b !important; }   /* red-300 */
+  body.theme-light [style*="rgb(134, 239, 172)"] { color: #166534 !important; }   /* green-300 */
+  body.theme-light [style*="rgb(154, 160, 170)"] { color: #4b5563 !important; }   /* mute */
   body.theme-light .btn { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.12); color: var(--text); }
   body.theme-light .btn:hover { background: rgba(0,0,0,0.1); }
   body.theme-light .btn-ghost:hover { background: rgba(0,0,0,0.06); }

@@ -10,6 +10,36 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.3] — 2026-05-03
+
+**QQ113** — Light theme had 200+ WCAG AA contrast failures across
+the 66 tabs (every chip, every state badge, every stat tile). The
+audit script `e2e-light-contrast.mjs` was using a flat 4.5
+threshold instead of WCAG 1.4.3's two-tier rule, but even after
+applying the proper threshold ~14% of text was still below 4.5.
+
+### Fixed
+- `--ok` / `--warn` / `--err` / `--cyan` light-theme tokens now
+  resolve to AA-compliant darker variants (green-800, yellow-800,
+  red-800, sky-800).
+- `.chip-ok` / `.chip-warn` / `.chip-err` text bumped to the same
+  darker shade.
+- ~25 light-theme attribute-substring overrides for inline-style
+  hex/rgb tuples that the SPA emits via `style="color:#..."`
+  (`#f87171`, `#a78bfa`, `#ca8a04`, `#67e8f9`, `#0284c7`, `#16a34a`,
+  `#dc2626`, `#9ca3af`, `#9aa0aa`, `#60a5fa`, `#7dd3fc`, `#93c5fd`,
+  `#a16207`, `#fcd34d`, `#fca5a5`, `#86efac`, `#22d3ee`, `#38bdf8`).
+  Browsers normalise hex→rgb when JS touches `style.cssText`, so
+  both forms are matched.
+- `e2e-light-contrast.mjs` now applies WCAG 1.4.3 AA correctly
+  (4.5 body, 3.0 for ≥24px or ≥18.66px-bold) and honours `$PORT`.
+
+### Verified
+- Playwright audit: **0 violations across 66 tabs** (was 200+
+  pre-fix, 106 after just the threshold fix).
+- Dark theme unaffected — overrides scoped to `body.theme-light`.
+
+---
 ## [2.71.2] — 2026-05-03
 
 **QQ112** — Auto-Resume panel could not bind dormant (not currently
