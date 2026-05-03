@@ -10,6 +10,17 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.42] — 2026-05-03
+
+**QQ152** — minor coverage extension. Added a Tab-completion
+assertion for the QQ151 `/version` chat slash so the
+auto-complete cycle keeps working as more verbs are added.
+
+### Verified
+- `e2e-chat-slash-tab-complete.mjs` extended from 8 → 9 checks.
+  `/v<Tab>` → `/version`. All green.
+
+---
 ## [2.71.41] — 2026-05-03
 
 **QQ151** — `/version` chat slash command (parity with the
