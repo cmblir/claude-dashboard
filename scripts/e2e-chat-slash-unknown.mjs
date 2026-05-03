@@ -92,5 +92,21 @@ check('bare `/` toast points to /help',
 const r7 = await page.evaluate(() => _lcChatSlashCommand('/   '));
 check('`/   ` (whitespace) is swallowed', r7 === true);
 
+// 8. QQ161 — Levenshtein-based suggestion handles missing/extra
+//    characters that the old Hamming-on-shorter heuristic couldn't.
+const cases = [
+  ['/vrsion',  '/version'],   // missing 'e' — Hamming saw 6, Lev sees 1
+  ['/seshns',  '/sessions'],  // missing 'sio' — Lev = 2
+  ['/cot',     '/cost'],      // shifted — Lev = 1
+  ['/agnts',   '/agents'],    // missing 'e' — Lev = 1
+];
+for (const [typo, expected] of cases) {
+  await page.evaluate(() => { window.__toasts.length = 0; });
+  await page.evaluate((c) => _lcChatSlashCommand(c), typo);
+  const t = await page.evaluate(() => window.__toasts.slice(-1)[0]);
+  check(`${typo} → suggests ${expected}`,
+    t && t.msg && t.msg.includes(expected), `toast=${JSON.stringify(t)}`);
+}
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

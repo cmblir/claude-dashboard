@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.51] — 2026-05-03
+
+**QQ161** — proper Levenshtein for chat slash typo suggestions.
+The QQ124 Hamming-on-shorter heuristic only worked for
+substitution-style typos (`/clearr`); missing-character typos
+like `/vrsion`, `/seshns`, `/cot`, `/agnts` scored too high
+because the walker didn't align around the gap. Replaced with
+real Levenshtein edit distance — same `≤3` threshold.
+
+### Verified
+- `e2e-chat-slash-unknown.mjs` extended from 11 → 15 checks,
+  covering `/vrsion → /version`, `/seshns → /sessions`,
+  `/cot → /cost`, `/agnts → /agents`. All green.
+
+---
 ## [2.71.50] — 2026-05-03
 
 **QQ160** — Pin Data toggle is now undoable (third bug in the
