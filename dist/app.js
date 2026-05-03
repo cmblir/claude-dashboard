@@ -5739,10 +5739,34 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       // PP2 (v2.66.72) — `D` (no modifier) — toggle disabled on
       // selected node (n8n parity). Cmd/Ctrl+D below stays as
       // duplicate.
+      // QQ133 — multi-select aware: if a multi-selection is active,
+      // flip every selected node to the SAME new state (the inverse
+      // of the first selected node's current `disabled` value) so
+      // users get a deterministic batch-disable / batch-enable.
       if (!mod && (e.key === 'd' || e.key === 'D') && !inInput
-          && __wf.current && __wf.selectedNodeId) {
+          && __wf.current
+          && (__wf.selectedNodeId || (__wfMultiSelected && __wfMultiSelected.size))) {
         e.preventDefault();
-        _wfToggleNodeDisabled(__wf.selectedNodeId);
+        if (__wfMultiSelected && __wfMultiSelected.size > 1) {
+          const ids = Array.from(__wfMultiSelected);
+          const targets = __wf.current.nodes.filter(n => ids.includes(n.id));
+          if (!targets.length) return true;
+          const desiredDisabled = !(targets[0].data && targets[0].data.disabled);
+          for (const n of targets) {
+            n.data = n.data || {};
+            n.data.disabled = desiredDisabled;
+          }
+          __wf.dirty = true;
+          if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
+          _wfUpdateToolbar();
+          toast(
+            (desiredDisabled ? `⏸ ${t('비활성화됨')}` : `▶ ${t('활성화됨')}`)
+              + ` · ${targets.length}`,
+            'ok'
+          );
+        } else {
+          _wfToggleNodeDisabled(__wf.selectedNodeId);
+        }
         return true;
       }
 

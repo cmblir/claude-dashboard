@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.23] — 2026-05-03
+
+**QQ133** — `D` keystroke (toggle disabled) now operates on the
+whole multi-selection. Previously the PP2 handler only flipped
+`__wf.selectedNodeId`, so rubber-banding 5 nodes and pressing
+`D` toggled exactly one of them.
+
+Picks the inverse of the **first** selected node's current
+`disabled` state, then forces every selected node to that same
+state — so the result is always a deterministic batch-disable
+(or batch-enable) regardless of mixed prior state.
+
+### Verified
+- `scripts/e2e-multi-disable.mjs` — Playwright regression: A
+  enabled, B disabled, C enabled. After first `D` all 3
+  disabled; after second `D` all 3 enabled; single-select `D`
+  toggles only that node. 3/3 green.
+
+---
 ## [2.71.22] — 2026-05-03
 
 **QQ132** — arrow-key node nudging now honours multi-selection.
