@@ -28119,6 +28119,14 @@ function _lcChatSlashCommand(line) {
       };
       const target = ALIAS[rest.toLowerCase()] || rest;
       if (!target) { toast(t('사용법: /go <tab>'), 'warn'); return true; }
+      // QQ169 — validate against NAV before navigating; an unknown tab id
+      // used to change state.view to garbage and silently fall back to
+      // overview on render. Now we toast and stay put.
+      const valid = (typeof NAV !== 'undefined') && NAV.some(n => n.id === target);
+      if (!valid) {
+        toast(`${t('알 수 없는 탭')}: ${target} — /tabs`, 'warn');
+        return true;
+      }
       if (typeof window.go === 'function') window.go(target);
       else { try { location.hash = '#/' + target; } catch (_) {} }
       return true;
@@ -29135,6 +29143,13 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
     const target = ALIAS[rest.toLowerCase()] || rest;
     if (!target) {
       log.push({ kind: 'err', text: '⚠ ' + t('사용법') + ': lazyclaude open <tab>', ts: Date.now() });
+      return;
+    }
+    // QQ169 — validate before navigating so an unknown tab id doesn't
+    // poison state.view (matches the chat /go fix).
+    const valid = (typeof NAV !== 'undefined') && NAV.some(n => n.id === target);
+    if (!valid) {
+      log.push({ kind: 'err', text: '⚠ ' + t('알 수 없는 탭') + ': ' + target + ' — lazyclaude tabs', ts: Date.now() });
       return;
     }
     if (typeof window.go === 'function') window.go(target);

@@ -10,6 +10,26 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.59] — 2026-05-03
+
+**QQ169** — `/go bogusXYZ` (chat) and `lazyclaude open bogus`
+(terminal) used to set `state.view` to whatever the user passed
+without validation. The dashboard then silently fell back to
+overview on render but `state.view` stayed garbage, polluting
+any code that gates on it.
+
+Both paths now validate the resolved target against `NAV` first
+and toast/print "알 수 없는 탭" pointing at `/tabs` (chat) or
+`lazyclaude tabs` (terminal) when unrecognised. The user stays
+on the current tab.
+
+### Verified
+- chat: `/go bogusXYZ` → toast "알 수 없는 탭: bogusXYZ — /tabs",
+  `state.view` stays `lazyclawChat`.
+- terminal: `lazyclaude open bogus` → log "⚠ 알 수 없는 탭: bogus
+  — lazyclaude tabs", `state.view` stays `lazyclawTerm`.
+
+---
 ## [2.71.58] — 2026-05-03
 
 **QQ168** — `Cmd/Ctrl+Shift+E` on the workflow tab exports the
