@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.79] — 2026-05-03
+
+**QQ186** — `lz` autocomplete suggested only `lz get` and
+`lz set`. The `lz` shorthand is supposed to be a faster alias
+for every `lazyclaude` verb, but Tab couldn't surface most of
+them. Added `lz help/version/status/tabs/reset/diag/open
+chat|wf|term|ai`. `lz<Tab>` now returns 12 candidates.
+
+### Verified
+- Manual probe: `lz` → 12, `lz s` → 2, `lz h` → 1, `lz d` → 1,
+  `lz o` → 4.
+
+---
 ## [2.71.78] — 2026-05-03
 
 **QQ185** — `/copy N` out-of-range now gets a dedicated
