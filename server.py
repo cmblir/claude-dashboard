@@ -149,6 +149,25 @@ def main() -> None:
     # late-finishing migration doesn't change behaviour.
     threading.Thread(target=_migrate_runs_to_db, daemon=True, name="runs-migrate").start()
     threading.Thread(target=background_index, daemon=True, name="bg-index").start()
+    # QQ137 — pre-warm the slow `<tool> --version` and `claude auth status`
+    # subprocess fan-outs in a daemon thread so the first AI Providers / Team
+    # tab visit hits the 30s memo (QQ135 / QQ136) instead of paying the cold
+    # cost on the user's critical path.
+    def _prewarm_subprocess_caches() -> None:
+        try:
+            from server.cli_tools import api_cli_status
+            api_cli_status()
+        except Exception:
+            pass
+        try:
+            from server.auth import api_auth_status
+            api_auth_status()
+        except Exception:
+            pass
+    threading.Thread(
+        target=_prewarm_subprocess_caches,
+        daemon=True, name="prewarm-subprocs",
+    ).start()
     warmup_caches()
     start_scheduler()
     start_auto_resume()
