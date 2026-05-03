@@ -27979,6 +27979,43 @@ function _lcChatSlashCommand(line) {
       return true;
     }
   }
+  // QQ124 — Unknown slash command. Don't silently send the user's
+  // typo to the LLM (waste of tokens). Show a hint toast with the
+  // closest match by Levenshtein-ish prefix and tell them /help works.
+  // Only fires when input was a single-word `/word` shape; multi-word
+  // lines beginning with `/` (e.g. "/path/to/file") fall through to
+  // the provider as before.
+  if (/^\/[a-z][a-z0-9_-]*\s*$/i.test(line)) {
+    const known = ['clear','system','model','export','help','cost','status',
+                   'agents','sessions','rename','theme','lang','copy',
+                   'retry','regenerate'];
+    const hint = (() => {
+      // Cheap "edit distance ≤ 2 OR shared prefix ≥ 2" heuristic.
+      let best = null, bestScore = 99;
+      for (const k of known) {
+        let score = 99;
+        if (k.startsWith(cmd) || cmd.startsWith(k)) score = Math.abs(k.length - cmd.length);
+        else {
+          // Hamming-on-shorter
+          const m = Math.min(k.length, cmd.length);
+          let diff = Math.abs(k.length - cmd.length);
+          for (let i = 0; i < m; i++) if (k[i] !== cmd[i]) diff++;
+          score = diff;
+        }
+        if (score < bestScore) { bestScore = score; best = k; }
+      }
+      return bestScore <= 3 ? best : null;
+    })();
+    if (typeof toast === 'function') {
+      toast(
+        `${t('알 수 없는 명령')}: /${cmd}` +
+          (hint ? ` — ${t('혹시')} /${hint}?` : '') +
+          ` · /help`,
+        'warn'
+      );
+    }
+    return true;  // swallow — don't ship the typo to the provider
+  }
   return false;
 }
 

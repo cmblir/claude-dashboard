@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.14] — 2026-05-03
+
+**QQ124** — typo'd chat slash commands no longer leak to the
+provider. `/clearr`, `/xyzzy`, etc. were silently passed through
+to `_lcChatSend` because the slash handler only intercepted
+*known* commands. Now an unknown single-word `/<word>` is
+swallowed locally and a toast suggests the closest known command
+(plus `/help`). Multi-word slashes that look like paths
+(`/path/to/file`) still fall through to the provider so users
+can paste filesystem references.
+
+### Added
+- Unknown-command guard inside `_lcChatSlashCommand` with a
+  cheap edit-distance heuristic ("혹시 /clear?" / "did you mean").
+  Returns `true` (swallow) only when input matches `/^\\/[a-z][a-z0-9_-]*\\s*$/`.
+- `scripts/e2e-chat-slash-unknown.mjs` — Playwright regression:
+  `/clearr` toast suggests `/clear`, `/xyzzy` falls back to
+  `/help`, `/path/to/file` falls through, real `/help` still
+  works, no `/api/lazyclaw/chat` requests fired.
+
+### Verified
+- 8/8 Playwright checks green.
+
+---
 ## [2.71.13] — 2026-05-03
 
 **QQ123** — `/retry` (alias `/regenerate`) chat slash command.
