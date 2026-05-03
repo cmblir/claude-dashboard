@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.30] — 2026-05-03
+
+**QQ140** — perf gap I missed in QQ137. The boot prewarm only
+fired once, so the QQ135 / QQ136 memos expired after 30s of idle
+and the next tab-switch into AI Providers / Team paid the full
+cold cost (~750ms / ~400ms) again.
+
+Replaced the one-shot prewarm with a **daemon refresh loop**
+that re-runs every 25s — five seconds before the original TTL —
+keeping both caches permanently hot at the cost of one
+subprocess fan-out per 25s. Negligible CPU; CLI / auth state
+changes rarely.
+
+### Verified
+- `scripts/e2e-cache-refresh-loop.mjs` — Playwright regression:
+  hits both endpoints at boot+ and again 32s later (past the
+  original 30s TTL); both stay <60ms. 4/4 green.
+
+---
 ## [2.71.29] — 2026-05-03
 
 **QQ139** — same class of bug as QQ138, different surface. The
