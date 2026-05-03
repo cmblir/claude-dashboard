@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.13] — 2026-05-03
+
+**QQ123** — `/retry` (alias `/regenerate`) chat slash command.
+Reuses the existing per-message `_lcRegenerate` flow — finds the
+last user prompt, trims any trailing assistant replies, refills
+the composer, and re-sends. Mirrors the per-bubble 🔄 button but
+keyboard-friendly.
+
+`/help` updated.
+
+### Verified
+- `e2e-chat-slash-cost-status.mjs` extended to 24 checks
+  (was 20) — stubs `_lcChatSend`, asserts (a) history is trimmed
+  to the last user message, (b) composer is repopulated, (c)
+  `_lcChatSend` was called.
+
+---
 ## [2.71.12] — 2026-05-03
 
 **QQ122** — `/copy [N]` chat slash command. Copies the last (or

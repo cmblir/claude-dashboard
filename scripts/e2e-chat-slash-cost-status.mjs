@@ -143,6 +143,44 @@ check('/help lists /sessions', /\/sessions/.test(help));
 check('/help lists /theme',    /\/theme/.test(help));
 check('/help lists /lang',     /\/lang/.test(help));
 check('/help lists /copy',     /\/copy/.test(help));
+check('/help lists /retry',    /\/retry/.test(help));
+
+// 7. /retry trims trailing assistant replies and queues the last user msg.
+//    Run AFTER /theme (which schedules a deferred renderView) has fully
+//    settled — wait long enough for both 550ms theme-switch timers to
+//    fire and the chat AFTER hook to re-bind the textarea.
+await page.waitForTimeout(1300);
+await page.waitForFunction(() => !!document.getElementById('lcChatInput'), { timeout: 3000 });
+await page.evaluate(() => {
+  // Reset to a known shape: U,A,U,A
+  const id = _lcCurrentId();
+  _lcSaveHistory(id, [
+    { role: 'user',      text: 'q1', ts: 1, assignee: 'claude:opus' },
+    { role: 'assistant', text: 'a1', ts: 2, assignee: 'claude:opus' },
+    { role: 'user',      text: 'q2-LASTUSER', ts: 3, assignee: 'claude:opus' },
+    { role: 'assistant', text: 'a2', ts: 4, assignee: 'claude:opus' },
+  ]);
+  _lcChatRender();
+  // Stub the send so we don't hit /api/lazyclaw/chat in headless.
+  window.__sendCalled = false;
+  window._lcChatSend = async () => { window.__sendCalled = true; };
+});
+await slash('/retry');
+await page.waitForTimeout(250);
+const retryProbe = await page.evaluate(() => {
+  const id = _lcCurrentId();
+  const ta = document.getElementById('lcChatInput');
+  return {
+    hist: _lcGetHistory(id).map(m => m.text),
+    input: ta ? ta.value : '<no-input>',
+    sent: window.__sendCalled,
+  };
+});
+check('/retry trimmed history at last user msg',
+  retryProbe.hist.length === 3 && retryProbe.hist[2] === 'q2-LASTUSER');
+check('/retry repopulated the composer with last user text',
+  retryProbe.input === 'q2-LASTUSER', `input="${retryProbe.input}"`);
+check('/retry called _lcChatSend', retryProbe.sent === true);
 
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

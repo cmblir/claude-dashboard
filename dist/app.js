@@ -27829,6 +27829,28 @@ function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'retry':
+    case 'regenerate': {
+      // QQ123 — re-run the last user prompt (trim any trailing assistant
+      // replies, then call _lcChatSend which will hit the provider).
+      // Mirrors the per-message 🔄 button but accessible from kbd flow.
+      if (_lcChatAbortCtrl) { toast(t('현재 응답을 먼저 중단하세요'), 'warn'); return true; }
+      const id = _lcCurrentId();
+      const h = _lcGetHistory(id) || [];
+      let lastUserIdx = -1;
+      for (let j = h.length - 1; j >= 0; j--) {
+        if (h[j].role === 'user') { lastUserIdx = j; break; }
+      }
+      if (lastUserIdx < 0) { toast(t('재시도할 메시지가 없습니다'), 'warn'); return true; }
+      if (typeof _lcRegenerate === 'function') {
+        // _lcRegenerate(idx) trims AT idx and re-sends; pass the index of
+        // the assistant reply right after the last user message (if any),
+        // else just past the user msg so trim is a no-op.
+        const idx = lastUserIdx + 1;
+        _lcRegenerate(idx);
+      }
+      return true;
+    }
     case 'copy': {
       // QQ122 — copy the last assistant response to the clipboard so
       // the user can paste it into another tool without scrolling. With
@@ -27936,6 +27958,7 @@ function _lcChatSlashCommand(line) {
 \`/agents\` — ${t('등록된 어시니 목록')}
 \`/sessions\` — ${t('세션 목록 + 메시지 수')}
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
+\`/retry\` (= \`/regenerate\`) — ${t('마지막 사용자 프롬프트 재실행')}
 \`/theme [auto|dark|light|midnight|forest|sunset]\` — ${t('테마 토글/지정')}
 \`/lang ko|en|zh\` — ${t('언어 전환 (페이지 리로드)')}
 \`/rename <이름>\` — ${t('세션 이름 변경')}
