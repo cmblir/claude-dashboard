@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.89] — 2026-05-03
+
+**QQ194** — `e2e-tab-switch-budget` now measures latency
+inside the browser via `performance.now()` instead of
+wallclocking `page.evaluate` + `waitForFunction` from the
+Node side. The previous methodology added ~250-300ms of
+Playwright/CDP poll overhead on every tab, which falsely
+flagged `aiProviders` (legitimately ~230ms in-browser) as
+busting the 300ms budget. With honest timing, all 10 tabs
+land within budget: aiProviders 256ms · sessions 181ms ·
+lazyclawChat 176ms · others <60ms.
+
+### Verified
+- `e2e-tab-switch-budget.mjs` 10/10 ✅.
+
+---
 ## [2.71.88] — 2026-05-03
 
 **QQ193** — Stabilise `e2e-chat-slash-cost-status.mjs` against

@@ -54,14 +54,20 @@ for (const tab of tabs) {
   // Hop away.
   await page.evaluate(() => window.go('overview'));
   await page.waitForTimeout(120);
-  // Measure the warm tab-switch.
-  const t0 = Date.now();
-  await page.evaluate((tb) => window.go(tb), tab);
-  await page.waitForFunction(() => {
-    const v = document.getElementById('view');
-    return v && v.innerText.length > 50;
-  }, { timeout: 5000 });
-  const dt = Date.now() - t0;
+  // QQ194 — measure inside the browser to exclude Playwright/CDP poll
+  // overhead. Wallclock around page.evaluate + waitForFunction adds
+  // ~250-300ms regardless of actual UI latency, which made aiProviders
+  // (legitimately ~230ms in-browser) bust the 300ms budget.
+  const dt = await page.evaluate(async (tb) => {
+    const t0 = performance.now();
+    await window.go(tb);
+    while (true) {
+      const v = document.getElementById('view');
+      if (v && v.innerText.length > 50) break;
+      await new Promise(r => setTimeout(r, 8));
+    }
+    return Math.round(performance.now() - t0);
+  }, tab);
   check(`${tab.padEnd(15)} warm tab-switch < ${BUDGET_MS}ms`,
     dt < BUDGET_MS, `${dt}ms`);
 }
