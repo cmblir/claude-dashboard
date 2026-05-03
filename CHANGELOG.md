@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.1] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Sticky note inspector form regression**
+  (`scripts/e2e-sticky-editor.mjs`). Opens the QQ36 sticky
+  editor (`_wfOpenNodeEditor`), changes text + color + width
+  + height through the actual form fields, clicks save, and
+  asserts:
+  1. Form has 1 textarea (text), 5 color buttons
+     (yellow/blue/green/pink/gray), 2 number inputs (w/h).
+  2. After save: `data.text/color/width/height` all updated.
+  3. Canvas rect re-renders with new fill (#dbeafe for blue)
+     and new width attribute. Validates the QQ108 snap-key
+     digest catches sticky form mutations end-to-end.
+
+  10 checks. Total e2e suite: **24/24 pass**.
+
+---
 ## [2.70.0] — 2026-05-03
 
 **Playwright Verification Sprint** — milestone marker for the
