@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.8] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Chat history recall regression**
+  (`scripts/e2e-chat-history-recall.mjs`). Seeds 3 user messages,
+  then verifies QQ51 + QQ85:
+  1. Cmd+↑ pulls the most recent user message.
+  2. Cmd+↑ again walks one further back.
+  3. Cmd+↓ walks forward.
+  4. Typing any character resets `__lcHistIdx` to -1 (QQ85
+     guard).
+  5. Post-reset Cmd+↑ starts fresh from the most recent.
+
+---
 ## [2.69.7] — 2026-05-03
 
 ### Added (test infra)
