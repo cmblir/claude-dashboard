@@ -28114,6 +28114,50 @@ async function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'workflows':
+    case 'wfs': {
+      // QQ206 — list workflows from chat (parity with /tabs, /sessions,
+      // /agents, /keys). Shows running/total run counts so the user can
+      // see at a glance which flows are in flight without leaving chat.
+      let d = null;
+      try { d = await cachedApi('/api/workflows/list'); } catch (_) {}
+      const wfs = (d && d.workflows) || [];
+      if (!wfs.length) {
+        toast(t('등록된 워크플로우가 없습니다'), 'warn');
+        return true;
+      }
+      const q = rest.trim().toLowerCase();
+      const matched = q
+        ? wfs.filter(w => (w.name || '').toLowerCase().includes(q)
+                       || (w.id || '').toLowerCase().includes(q)
+                       || (w.tags || []).some(tag => String(tag).toLowerCase().includes(q)))
+        : wfs;
+      if (q && !matched.length) {
+        toast(`${t('일치하는 워크플로우 없음')}: ${rest}`, 'warn');
+        return true;
+      }
+      const CAP = 30;
+      const visible = matched.slice(0, CAP);
+      const lines = visible.map(w => {
+        const runMark = (w.runningCount > 0) ? '🟢 ' : '   ';
+        const total = w.totalRuns || 0;
+        const last = (w.lastRuns && w.lastRuns[0] && w.lastRuns[0].status) || '';
+        const lastChip = last === 'ok' ? ' ✅' : last === 'err' ? ' ❌' : last === 'running' ? ' 🟢' : '';
+        return `- ${runMark}\`${(w.id || '').slice(0, 12)}\` — ${w.name || t('이름 없음')} *(${w.nodeCount} ${t('노드')} · ${total} ${t('실행')}${lastChip})*`;
+      });
+      const overflow = matched.length - visible.length;
+      const header = q
+        ? `**${t('워크플로우')}** (${matched.length}/${wfs.length} · "${rest}")`
+        : `**${t('워크플로우')}** (${wfs.length})`;
+      let md = header + '\n\n' + lines.join('\n');
+      if (overflow > 0) md += `\n\n_… ${overflow} ${t('개 더')}_`;
+      md += `\n\n_${t('편집은 /go workflows')}_`;
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      return true;
+    }
     case 'usage': {
       // QQ203 — aggregate cost summary across ALL sessions, not just
       // the current one (which /cost already covers). Hits the existing
@@ -28598,6 +28642,7 @@ async function _lcChatSlashCommand(line) {
 \`/whoami\` — ${t('Claude CLI 로그인 + 어시니 식별')}
 \`/agents [필터]\` — ${t('등록된 어시니 목록 (예: /agents claude)')}
 \`/keys [필터]\` (= \`/providers\`) — ${t('프로바이더 가용성 + API 키 상태 (마스킹)')}
+\`/workflows [필터]\` (= \`/wfs\`) — ${t('워크플로우 목록 + 실행 카운트 + 최근 상태')}
 \`/sessions [필터]\` — ${t('세션 목록 + 메시지 수 (라벨/id/모델 부분일치)')}
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
 \`/code [N]\` — ${t('마지막 응답의 코드 블록 (N번째 = 1부터, 기본 마지막) 복사')}
