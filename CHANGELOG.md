@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.25] — 2026-05-03
+
+**QQ135** — real perf bug. `/api/cli/status` ran `<tool> --version`
+in parallel for every CLI in CLI_CATALOG (~750ms wall-clock), and
+the **AI Providers** tab awaited it on every open. Tab-switch
+into AI Providers was ~3.7s — clearly outside the user's "렉은
+아예 존재하지 않게끔" goal.
+
+### Fixed
+- 30s server-side memo for `/api/cli/status` in
+  `server/cli_tools.py`. CLI install state changes rarely; the
+  TTL is plenty for the AI Providers tab and the AI Providers
+  refresh button can bypass via `?nocache=1`.
+- Query parsing fix — `parse_qs` returns list-form values, so
+  the bypass check unwraps `["1"]` correctly.
+
+### Verified
+- `scripts/e2e-cli-status-cache.mjs` — Playwright regression:
+  cold ≈ 755ms, cached < 50ms (got 2ms), `?nocache=1` forces
+  re-probe (~751ms again), and warm aiProviders tab-switch under
+  500ms (saw 84ms then 55ms — was 3752ms before the fix). 3/3
+  green.
+
+---
 ## [2.71.24] — 2026-05-03
 
 **QQ134** — arrow-key nudges are undoable. The LL4 handler set
