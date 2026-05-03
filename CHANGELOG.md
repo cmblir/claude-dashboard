@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.61] — 2026-05-03
+
+**QQ170** — direct Playwright coverage for the QQ163 shared
+`_lcLevenshtein(a, b)` helper. The QQ161 chat / QQ162 terminal
+typo suggesters depend on it returning correct edit distances;
+locking the math in via dedicated tests means a stray
+"optimisation" that breaks an edge case fails fast instead of
+silently degrading every typo hint.
+
+### Verified
+- `scripts/e2e-levenshtein-helper.mjs` — 9/9 green:
+  empty/empty, empty-vs-string, identical, single-substitute,
+  single-insert (`vrsion`/`version`), single-delete, and the
+  textbook `kitten`/`sitting` = 3 case.
+
+---
 ## [2.71.60] — 2026-05-03
 
 **QQ169b** — Playwright regression for the QQ169 unknown-tab
