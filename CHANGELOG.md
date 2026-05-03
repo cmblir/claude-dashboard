@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.11] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Auto-layout regression** (`scripts/e2e-auto-layout.mjs`).
+  Pins the longest-path layering algorithm:
+  1. 4-node chain a→b→c→d with all nodes overlapping at
+     (100,100).
+  2. `_wfBeautifyLayout()` returns truthy.
+  3. After layout: `a.x < b.x < c.x < d.x` (left-to-right
+     longest-path order).
+  4. All y-coordinates equal (single-row chain → same band).
+
+  Total e2e suite: **34/34 pass**.
+
+---
 ## [2.70.10] — 2026-05-03
 
 ### Added (test infra)
