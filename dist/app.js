@@ -28959,7 +28959,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status'];
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag'];
   const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
@@ -29009,6 +29009,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       'lazyclaude open <tab>               — jump to another dashboard tab\n' +
       'lazyclaude tabs                     — list every NAV tab id\n' +
       'lazyclaude status                   — quick summary (version + theme + assignee)\n' +
+      'lazyclaude diag                     — re-run CLI health check (claude/ollama/gemini/...)\n' +
       'lazyclaude version                  — dashboard version + build info\n' +
       'lazyclaude reset                    — wipe terminal log\n' +
       'lazyclaude help                     — this listing\n' +
@@ -29053,6 +29054,21 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
     log.push({ kind: 'out', text: lines.length
       ? lines.join('\n')
       : '(NAV not loaded)', ts: Date.now() });
+    return;
+  }
+  if (verb === 'diag') {
+    // QQ150 — `lazyclaude diag` runs the existing health-check
+    // (claude/ollama/gemini/codex/git probes) on demand. Same code
+    // path as the auto-fired healthcheck; just lets users re-run it
+    // explicitly without waiting an hour for the 1-per-hour gate.
+    if (typeof _lcTermHealthCheck === 'function') {
+      _lcTermSaveLog(log);
+      _lcTermRender();
+      try { localStorage.setItem('cc.lazyclawTerm.healthCheckedAt', String(Date.now())); } catch (_) {}
+      _lcTermHealthCheck();
+    } else {
+      log.push({ kind: 'err', text: '⚠ ' + t('헬스체크 함수를 찾을 수 없음'), ts: Date.now() });
+    }
     return;
   }
   if (verb === 'status') {
