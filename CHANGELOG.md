@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.24] — 2026-05-03
+
+**QQ134** — arrow-key nudges are undoable. The LL4 handler set
+`__wf.dirty = true` but never pushed an undo entry, so accidental
+nudges were permanent (Cmd+Z went back further than the user
+intended, or did nothing at all).
+
+Push exactly **one** undo entry per "nudge burst" — defined as
+arrow keys pressed within 500ms of the previous one. Holding →
+for a second creates a single undo entry; Cmd+Z reverses the
+entire burst at once. n8n behaviour.
+
+### Verified
+- `e2e-multi-arrow-nudge.mjs` extended from 3 → 6 checks: 5
+  quick Right presses move both nodes by +50, the undo stack
+  grows by exactly 1, then Cmd+Z reverts both back. All green.
+
+---
 ## [2.71.23] — 2026-05-03
 
 **QQ133** — `D` keystroke (toggle disabled) now operates on the

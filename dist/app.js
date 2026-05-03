@@ -5809,9 +5809,10 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       //   ←↑→↓        : 10 px (matches grid snap step)
       //   Shift+arrow : 1 px (fine adjust)
       //   Hold mod    : ignored (browser scroll / shortcuts)
-      // QQ132 — multi-select aware: nudge every node in the selection
-      //   together (matches the QQ28 group-drag behaviour and matches
-      //   n8n's arrow-key affordance when several nodes are selected).
+      // QQ132 — multi-select aware: nudge every node in the selection.
+      // QQ134 — push a single undo entry per "nudge burst" (gap > 500ms
+      //   since last arrow press) so Cmd+Z reverses the whole burst at
+      //   once instead of needing 1 undo per pixel.
       if (!mod && !inInput && __wf.current
           && (__wf.selectedNodeId || (__wfMultiSelected && __wfMultiSelected.size))) {
         const ARROWS = { ArrowLeft: [-1,0], ArrowRight: [1,0], ArrowUp: [0,-1], ArrowDown: [0,1] };
@@ -5824,12 +5825,19 @@ function _wfShowEdgeContextMenu(eid, x, y) {
             : [__wf.selectedNodeId];
           const idSet = new Set(ids);
           const targets = __wf.current.nodes.filter(n => idSet.has(n.id));
+          if (!targets.length) return true;
+          const now = Date.now();
+          const last = __wf._lastNudgeAt || 0;
+          if (now - last > 500) {
+            if (typeof _wfPushUndo === 'function') _wfPushUndo();
+          }
+          __wf._lastNudgeAt = now;
           for (const node of targets) {
             node.x = (node.x || 0) + dir[0] * step;
             node.y = (node.y || 0) + dir[1] * step;
             if (typeof _wfUpdateNodeTransform === 'function') _wfUpdateNodeTransform(node.id);
           }
-          if (targets.length) { __wf.dirty = true; _wfUpdateToolbar(); _wfSchedulePatch(); }
+          __wf.dirty = true; _wfUpdateToolbar(); _wfSchedulePatch();
           return true;
         }
       }

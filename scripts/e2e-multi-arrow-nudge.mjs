@@ -76,5 +76,51 @@ check('Single-select ArrowLeft moves only n-a',
   a3.x === 100 && b3.x === 310,
   `a=${a3.x} b=${b3.x}`);
 
+// QQ134 — nudge bursts are undoable as one atomic operation.
+// Reset and seed two nodes at known coords.
+await page.evaluate(() => {
+  __wf.current = {
+    id: 'wf-arrow-undo-' + Date.now(),
+    name: 'arrow-undo',
+    nodes: [
+      { id: 'n-x', type: 'session', x: 100, y: 100, data: { subject: 'X', assignee: 'claude:opus' } },
+      { id: 'n-y', type: 'session', x: 300, y: 100, data: { subject: 'Y', assignee: 'claude:opus' } },
+    ],
+    edges: [],
+  };
+  __wf._undoStack = [];
+  __wf._lastNudgeAt = 0;
+  _wfRenderCanvas();
+  __wfMultiSelected.clear();
+  __wfMultiSelected.add('n-x');
+  __wfMultiSelected.add('n-y');
+  __wf.selectedNodeId = null;
+  _wfSyncMultiSelectClasses();
+});
+
+// Press → 5 times in quick succession (one burst).
+for (let i = 0; i < 5; i++) {
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(20);
+}
+const burst = await page.evaluate(() => ({
+  xs: __wf.current.nodes.map(n => n.x),
+  undoLen: __wf._undoStack.length,
+}));
+check('5 quick Right presses moved both nodes by +50',
+  burst.xs[0] === 150 && burst.xs[1] === 350,
+  `xs=${burst.xs}`);
+check('only ONE undo entry pushed for the burst',
+  burst.undoLen === 1,
+  `undoLen=${burst.undoLen}`);
+
+// Cmd+Z reverts the whole burst.
+await page.keyboard.press('Meta+KeyZ');
+await page.waitForTimeout(120);
+const undone = await page.evaluate(() => __wf.current.nodes.map(n => n.x));
+check('Cmd+Z reverts both nodes back to 100/300',
+  undone[0] === 100 && undone[1] === 300,
+  `xs=${undone}`);
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
