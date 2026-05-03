@@ -146,5 +146,42 @@ check('ctx-menu duplicate updated multi-selection to the new clones',
   ctxAfter.selected.length === 2,
   `selected=${ctxAfter.selected.length}`);
 
+// QQ158 — verify Cmd+Z undoes the multi-duplicate atomically.
+await page.evaluate(() => {
+  __wf.current = {
+    id: 'wf-dup-undo-' + Date.now(),
+    name: 'dup-undo',
+    nodes: [
+      { id: 'n-1', type: 'session', x: 100, y: 300, data: { subject: '1', assignee: 'claude:opus' } },
+      { id: 'n-2', type: 'session', x: 300, y: 300, data: { subject: '2', assignee: 'claude:opus' } },
+    ],
+    edges: [{ id: 'e-12', from: 'n-1', to: 'n-2' }],
+  };
+  __wf._undoStack = [];
+  _wfRenderCanvas();
+  __wfMultiSelected.clear();
+  __wfMultiSelected.add('n-1');
+  __wfMultiSelected.add('n-2');
+  __wf.selectedNodeId = null;
+  _wfSyncMultiSelectClasses();
+});
+
+await page.keyboard.press('Meta+KeyD');
+await page.waitForTimeout(150);
+
+const dupd = await page.evaluate(() => __wf.current.nodes.length);
+check('multi-duplicate creates 2 clones (4 total)', dupd === 4, `count=${dupd}`);
+
+await page.keyboard.press('Meta+KeyZ');
+await page.waitForTimeout(150);
+
+const undone = await page.evaluate(() => ({
+  count: __wf.current.nodes.length,
+  ids: __wf.current.nodes.map(n => n.id).sort(),
+}));
+check('Cmd+Z reverts the multi-duplicate atomically',
+  undone.count === 2 && undone.ids.join(',') === 'n-1,n-2',
+  `count=${undone.count} ids=${undone.ids}`);
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

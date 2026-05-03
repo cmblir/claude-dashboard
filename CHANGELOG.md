@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.48] — 2026-05-03
+
+**QQ158** — Playwright coverage for Cmd+Z undoing a
+multi-duplicate atomically. The QQ127 / QQ128 duplicate path
+already pushed `_wfPushUndo` once per `_wfDuplicateNodes` call;
+this regression locks that contract so a future refactor can't
+accidentally make the undo step-by-step (one per cloned node).
+
+### Verified
+- `e2e-multi-duplicate.mjs` extended from 11 → 13 checks. Seeds
+  n-1→n-2, multi-selects both, presses Cmd+D (now 4 nodes), then
+  Cmd+Z reverts back to {n-1, n-2}. All green.
+
+---
 ## [2.71.47] — 2026-05-03
 
 **QQ157** — small consistency fix. The QQ147 did-you-mean
