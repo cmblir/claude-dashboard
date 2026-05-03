@@ -4549,6 +4549,7 @@ function _wfShowShortcutHelp() {
   const shortcuts = [
     { key: 'Delete / Backspace', desc: t('선택 노드/엣지 삭제') },
     { key: 'Ctrl+C', desc: t('선택 노드 복사') },
+    { key: 'Ctrl+X', desc: t('선택 노드 잘라내기') },
     { key: 'Ctrl+V', desc: t('노드 붙여넣기') },
     { key: 'Ctrl+D', desc: t('선택 노드 복제') },
     { key: 'Ctrl+A', desc: t('전체 노드 선택') },
