@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.55] — 2026-05-03
+
+**QQ165** — Cmd/Ctrl+Shift+N on the workflow tab opens
+`_wfCreateNew` (creates a new workflow). Mirrors the chat
+QQ164 shortcut so the same chord means "new container" across
+both tabs. Plain Cmd+N still opens the new-node editor (LL16).
+Shortcut help modal lists both.
+
+### Verified
+- `scripts/e2e-workflow-new-shortcut.mjs` — Playwright
+  regression: Cmd+Shift+N invokes `_wfCreateNew`, shortcut help
+  modal lists `Ctrl+Shift+N` AND `Ctrl+N`. 3/3 green.
+
+---
 ## [2.71.54] — 2026-05-03
 
 **QQ164** — Cmd/Ctrl+Shift+N keyboard shortcut creates a fresh

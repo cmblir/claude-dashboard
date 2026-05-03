@@ -4586,6 +4586,7 @@ function _wfShowShortcutHelp() {
     { key: 'Ctrl+E / Enter', desc: t('선택 노드 편집창 열기') },
     { key: 'Ctrl+Enter', desc: t('워크플로우 실행 / 중단') },
     { key: 'Ctrl+N', desc: t('새 노드 추가') },
+    { key: 'Ctrl+Shift+N', desc: t('새 워크플로우 만들기') },
     { key: 'Ctrl+[ / ]', desc: t('이전 / 다음 워크플로우로 전환') },
     { key: 'Ctrl+0', desc: t('화면 맞춤') },
     { key: 'Ctrl+1', desc: t('100% 줌으로 리셋') },
@@ -5662,6 +5663,14 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       // LL16 (v2.66.45) — Cmd/Ctrl + N — open the new-node editor.
       // Browser intercepts plain Cmd+N for new window, but inside our
       // event scope (workflows tab + non-input) we get a chance.
+      // QQ165 — Cmd/Ctrl+Shift+N creates a new WORKFLOW. Mirrors the
+      // chat QQ164 shortcut for a parallel experience.
+      if (mod && e.shiftKey && (e.key === 'n' || e.key === 'N') && !inInput
+          && state.view === 'workflows') {
+        e.preventDefault();
+        if (typeof _wfCreateNew === 'function') _wfCreateNew();
+        return true;
+      }
       if (mod && (e.key === 'n' || e.key === 'N') && !inInput
           && state.view === 'workflows') {
         e.preventDefault();
