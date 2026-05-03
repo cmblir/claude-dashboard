@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.19] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Code block copy + long message collapse regression**
+  (`scripts/e2e-chat-codeblock-collapse.mjs`). Pins QQ31 + QQ32:
+  1. Assistant message with a fenced ```js block renders <pre>
+     and a 📋 overlay button.
+  2. Clicking 📋 actually writes the inner <code> text to the
+     real clipboard (verified via `navigator.clipboard.readText`,
+     with the playwright context granted clipboard permissions).
+  3. A 1700-char assistant reply gets wrapped in a `<div
+     id="_lcCollapsed_…">` with `max-height: 300px`.
+  4. Clicking the "▾ 더보기" sibling button flips
+     `wrap.style.maxHeight = 'none'` (full expansion).
+
+  7 checks, all pass.
+
+---
 ## [2.69.18] — 2026-05-03
 
 ### Added (test infra)
