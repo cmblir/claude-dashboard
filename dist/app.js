@@ -28308,19 +28308,35 @@ function _lcChatSlashCommand(line) {
       return true;
     }
     case 'agents': {
-      // QQ118 — list every currently-registered assignee in the dropdown
-      // so users can see what's bindable via /model. Marks the current
-      // selection.
+      // QQ118 — list every currently-registered assignee.
+      // QQ189 — accept an optional substring filter, e.g.
+      //   /agents claude   → only assignees matching 'claude'
+      // and cap at 30 lines with an overflow note (parallels QQ188 /sessions).
       const sel = document.getElementById('lcChatAssignee');
       if (!sel) return true;
-      const opts = Array.from(sel.options).map(o => ({
+      const allOpts = Array.from(sel.options).map(o => ({
         value: o.value,
         label: o.textContent || o.value,
         cur: o.value === sel.value,
       }));
-      const md = `**${t('등록된 어시니')}** (${opts.length})\n\n` +
-        opts.map(o => `- ${o.cur ? '➜ ' : '  '}\`${o.value}\` — ${o.label}`).join('\n') +
-        `\n\n${t('전환:')} \`/model <provider:model>\``;
+      const q = rest.trim().toLowerCase();
+      const opts = q
+        ? allOpts.filter(o => o.value.toLowerCase().includes(q) || (o.label || '').toLowerCase().includes(q))
+        : allOpts;
+      if (q && !opts.length) {
+        toast(`${t('일치하는 어시니 없음')}: ${rest}`, 'warn');
+        return true;
+      }
+      const CAP = 30;
+      const visible = opts.slice(0, CAP);
+      const overflow = opts.length - visible.length;
+      const header = q
+        ? `**${t('등록된 어시니')}** (${opts.length}/${allOpts.length} · "${rest}")`
+        : `**${t('등록된 어시니')}** (${opts.length})`;
+      let md = header + '\n\n' +
+        visible.map(o => `- ${o.cur ? '➜ ' : '  '}\`${o.value}\` — ${o.label}`).join('\n');
+      if (overflow > 0) md += `\n\n_… ${overflow} ${t('개 더')}_`;
+      md += `\n\n${t('전환:')} \`/model <provider:model>\``;
       const history = _lcChatLoad();
       history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
       _lcChatSave(history);
@@ -28335,7 +28351,7 @@ function _lcChatSlashCommand(line) {
 \`/model <provider:model>\` — ${t('어시니 전환 (예: claude:opus)')}
 \`/cost\` — ${t('현재 세션 토큰·비용 합계')}
 \`/status\` — ${t('어시니·세션·테마·언어 요약')}
-\`/agents\` — ${t('등록된 어시니 목록')}
+\`/agents [필터]\` — ${t('등록된 어시니 목록 (예: /agents claude)')}
 \`/sessions\` — ${t('세션 목록 + 메시지 수')}
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
 \`/code [N]\` — ${t('마지막 응답의 코드 블록 (N번째 = 1부터, 기본 마지막) 복사')}

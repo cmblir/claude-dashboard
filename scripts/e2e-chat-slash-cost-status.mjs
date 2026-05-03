@@ -107,6 +107,27 @@ check('/agents lists current assignee claude:opus',
   /claude:opus/.test(agentsOut));
 check('/agents marks current selection with ➜', /➜/.test(agentsOut));
 
+// QQ189 — `/agents <filter>` substring-matches the assignee dropdown.
+await slash('/agents claude');
+const agentsFiltered = await page.evaluate(() => document.getElementById('lcChatLog').innerText);
+check('/agents claude filters to assignees containing "claude"',
+  /\(\d+\/\d+ · "claude"\)/.test(agentsFiltered),
+  agentsFiltered.split('\n').slice(-12).join('\\n'));
+check('/agents claude does NOT include non-claude assignees',
+  !/ollama|gemini|codex/i.test(agentsFiltered.split('\n')
+    .filter(l => /^- /.test(l)).join('\n')));
+
+// /agents bogusquery → toast warning, no list rendered
+await page.evaluate(() => {
+  window.__filterToasts = [];
+  const orig = window.toast;
+  window.toast = (m, k) => { window.__filterToasts.push({m,k}); return orig && orig(m, k); };
+});
+await slash('/agents bogusquery-zzz');
+const noMatchToast = await page.evaluate(() => window.__filterToasts.slice(-1)[0]);
+check('/agents bogus toasts "일치하는 어시니 없음"',
+  noMatchToast && /일치하는|no match/i.test(noMatchToast.m), JSON.stringify(noMatchToast));
+
 // QQ183 — /copy falls back to document.execCommand when the async
 // Clipboard API isn't available (e.g. permission denied, http-only
 // origin, or older browsers).
