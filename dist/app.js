@@ -28519,6 +28519,7 @@ function _lcTermSuggest(prefix) {
     'gemini --version', 'gemini --help',
     'codex --version', 'codex --help',
     'lazyclaude status', 'lazyclaude version', 'lazyclaude --version', 'lazyclaude --help',
+    'lazyclaude help', 'lazyclaude reset',
     'lazyclaude get', 'lazyclaude get ui', 'lazyclaude get ai', 'lazyclaude get behavior', 'lazyclaude get workflow',
     'lazyclaude set ui theme dark', 'lazyclaude set ui theme light', 'lazyclaude set ui lang ko',
     'lazyclaude set ui lang en', 'lazyclaude set ui lang zh',
@@ -28633,7 +28634,7 @@ window._lcTermShowHelp = function () {
 // Lets the user tweak theme / lang / behavior without leaving the
 // terminal — same backend as Quick Settings, persisted server-side.
 function _lcTermBuiltin(cmd) {
-  const m = cmd.match(/^(?:lazyclaude|lz)\s+(get|set)\b\s*(.*)$/i);
+  const m = cmd.match(/^(?:lazyclaude|lz)\s+(get|set|help|reset)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
   const rest = m[2].trim();
@@ -28642,6 +28643,32 @@ function _lcTermBuiltin(cmd) {
 async function _lcTermHandleBuiltin(verb, rest, log) {
   const prefs = window.CC_PREFS;
   const schema = window.CC_PREFS_SCHEMA;
+  if (verb === 'help') {
+    // QQ117 — terse command listing so users discover the built-ins.
+    const helpText =
+      'lazyclaude get [section[.key]]      — read current preference\n' +
+      'lazyclaude set <section> <key> <v>  — write preference (bool/int/float coerced)\n' +
+      'lazyclaude reset                    — wipe terminal log\n' +
+      'lazyclaude help                     — this listing\n' +
+      '\n' +
+      'Sections: ui · ai · behavior · workflow · current\n' +
+      'Examples:\n' +
+      '  lazyclaude set ui theme light\n' +
+      '  lazyclaude set ai temperature 1.2\n' +
+      '  lz get ui.theme\n' +
+      '\n' +
+      'Shell whitelist: claude/ollama/gemini/codex/git/which/uname/uptime/df/docker/node/python3.\n' +
+      "Type a partial command and press Tab for autocomplete.";
+    log.push({ kind: 'out', text: helpText, ts: Date.now() });
+    return;
+  }
+  if (verb === 'reset') {
+    // QQ117 — wipe the terminal log buffer (prefs untouched).
+    try { localStorage.removeItem('cc.lazyclawTerm.log'); } catch (_) {}
+    log.length = 0;
+    log.push({ kind: 'out', text: '✓ ' + t('터미널 로그 비움'), ts: Date.now() });
+    return;
+  }
   if (!prefs || !schema) {
     log.push({ kind: 'err', text: '⚠ ' + t('Quick Settings 가 아직 로드되지 않았어요. 잠시 후 다시 시도하세요.'), ts: Date.now() });
     return;
