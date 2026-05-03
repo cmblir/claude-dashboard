@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.52] — 2026-05-03
+
+**QQ162** — terminal-side parity for the QQ161 Levenshtein
+upgrade. The QQ147 unknown-verb suggestion used the same
+Hamming-on-shorter heuristic, so `lazyclaude vrsion` couldn't
+find `version`. Same fix, same threshold (≤3).
+
+### Verified
+- `e2e-terminal-set-prefs.mjs` extended from 24 → 26 checks:
+  `lazyclaude vrsion → version`, `lazyclaude resett → reset`.
+
+---
 ## [2.71.51] — 2026-05-03
 
 **QQ161** — proper Levenshtein for chat slash typo suggestions.
