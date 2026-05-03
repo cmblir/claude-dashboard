@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.67] — 2026-05-03
+
+**QQ176** — robustness fix for QQ174 `/clear all`. The check
+was a strict equality on `rest.trim().toLowerCase()`, so
+`/clear all please` (extra trailing junk) silently fell back
+to the single-session clear path. Now matches on the first
+whitespace token, so the all-wipe always wins when the user
+intent is clear.
+
+### Verified
+- `e2e-chat-clear-all.mjs` extended from 5 → 6 checks:
+  `/clear all please` still wipes everything in one confirm.
+
+---
 ## [2.71.66] — 2026-05-03
 
 **QQ175** — `/system` is three-modal now:

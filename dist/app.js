@@ -27940,8 +27940,12 @@ function _lcChatSlashCommand(line) {
   switch (cmd) {
     case 'clear': {
       // QQ174 — `/clear all` wipes EVERY session after a confirm.
+      // QQ176 — match on the first whitespace-delimited token so
+      //   `/clear all extra junk` still triggers the wipe path
+      //   instead of silently degrading to single-session clear.
       // `/clear` (no arg) keeps the session-scoped behaviour (QQ173).
-      if (rest.toLowerCase().trim() === 'all') {
+      const firstTok = rest.trim().split(/\s+/)[0].toLowerCase();
+      if (firstTok === 'all') {
         if (!confirm(t('모든 대화를 삭제하시겠습니까? 되돌릴 수 없습니다.'))) return true;
         try {
           _lcSaveSessions([]);

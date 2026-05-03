@@ -68,5 +68,26 @@ await page.waitForTimeout(150);
 const help = await page.evaluate(() => document.getElementById('lcChatLog').innerText);
 check('/help mentions /clear all', /\/clear\s*all/.test(help));
 
+// QQ176 — `/clear all <junk>` still triggers the all-wipe path
+//   (token-based match) instead of silently degrading to single-session.
+await page.evaluate(() => {
+  _lcSaveSessions([]);
+  for (let i = 0; i < 3; i++) {
+    _lcNewSession('claude:opus');
+    _lcSaveHistory(_lcCurrentId(), [{role:'user',text:'x',ts:i,assignee:'claude:opus'}]);
+  }
+  window.__confirms = 0;
+});
+await page.evaluate(() => _lcChatSlashCommand('/clear all please'));
+await page.waitForTimeout(200);
+const r4 = await page.evaluate(() => ({
+  sessions: _lcGetSessions().length,
+  histCount: Object.keys(localStorage).filter(k => k.startsWith('cc.lc.hist.')).length,
+  confirms: window.__confirms,
+}));
+check('/clear all <junk> still wipes everything (token match)',
+  r4.sessions <= 1 && r4.histCount === 0 && r4.confirms === 1,
+  JSON.stringify(r4));
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
