@@ -24,10 +24,10 @@ await page.keyboard.press('Meta+Comma');
 await page.waitForSelector('#qsDrawer.open', { timeout: 3000 });
 console.log('OK: meta+comma opens drawer');
 
-// 2) All four sections render
+// 2) All five sections render (ui, ai, behavior, workflow, current)
 const tabCount = await page.$$eval('.qs-tab', els => els.length);
-if (tabCount !== 4) errors.push(`expected 4 tabs, got ${tabCount}`);
-else console.log('OK: 4 section tabs');
+if (tabCount !== 5) errors.push(`expected 5 tabs, got ${tabCount}`);
+else console.log('OK: 5 section tabs');
 
 // 3) Toggle a bool (autoResume — flip)
 const before = await page.evaluate(() => window.CC_PREFS.behavior.autoResume);

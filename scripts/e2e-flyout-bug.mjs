@@ -2,7 +2,7 @@
 import { chromium } from 'playwright';
 import { writeFileSync } from 'fs';
 
-const BASE = process.env.BASE || 'http://127.0.0.1:19503';
+const BASE = process.env.BASE || `http://127.0.0.1:${process.env.PORT || 19500}`;
 const OUT = process.env.OUT || './scripts/_flyout-debug';
 
 (async () => {
