@@ -14,13 +14,13 @@ page.on('response', async (resp) => {
     const url = resp.url();
     const size = parseInt(resp.headers()['content-length'] || '0', 10);
     if (size > 50_000) {
-      resourceSummary.push({ url: url.replace('http://127.0.0.1:8080', ''), size });
+      resourceSummary.push({ url: url.replace(`http://127.0.0.1:${process.env.PORT || 8080}`, ''), size });
     }
   } catch (e) {}
 });
 
 const t0 = Date.now();
-await page.goto('http://127.0.0.1:8080/#/workflows', { waitUntil: 'networkidle' });
+await page.goto(`http://127.0.0.1:${process.env.PORT || 8080}/#/workflows`, { waitUntil: 'networkidle' });
 const loadMs = Date.now() - t0;
 
 await page.waitForTimeout(800);

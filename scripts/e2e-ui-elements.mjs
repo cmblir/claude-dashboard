@@ -16,7 +16,7 @@
  */
 import { chromium } from 'playwright';
 
-const BASE = process.env.BASE || 'http://127.0.0.1:8080';
+const BASE = process.env.BASE || `http://127.0.0.1:${process.env.PORT || 8080}`;
 const HEADLESS = process.env.HEADLESS !== '0';
 const TPL = process.env.TPL_ID || 'bt-multi-ai-compare';
 

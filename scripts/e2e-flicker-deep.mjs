@@ -11,7 +11,7 @@ const page = await ctx.newPage();
 const TABS = ['orchestrator', 'aiProviders', 'ralph', 'overview', 'workflows'];
 
 for (const tab of TABS) {
-  await page.goto(`http://127.0.0.1:8080/#/${tab}`, { waitUntil: 'networkidle' });
+  await page.goto(`http://127.0.0.1:${process.env.PORT || 8080}/#/${tab}`, { waitUntil: 'networkidle' });
   // Wait for AFTER hooks to settle
   await page.waitForTimeout(1500);
 

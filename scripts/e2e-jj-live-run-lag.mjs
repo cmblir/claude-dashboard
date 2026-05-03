@@ -7,7 +7,7 @@ const browser = await chromium.launch({ headless: true });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
 await page.addInitScript(() => { localStorage.setItem('dashboard-entered', '1'); });
-await page.goto('http://127.0.0.1:8080/#/workflows', { waitUntil: 'networkidle' });
+await page.goto(`http://127.0.0.1:${process.env.PORT || 8080}/#/workflows`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1500);
 
 const r = await page.evaluate(async () => {

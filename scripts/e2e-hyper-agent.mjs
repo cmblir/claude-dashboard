@@ -6,7 +6,7 @@ import { writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
-const BASE = process.env.BASE_URL || 'http://127.0.0.1:8080';
+const BASE = process.env.BASE_URL || `http://127.0.0.1:${process.env.PORT || 8080}`;
 const errors = [];
 
 // Seed a real test agent at ~/.claude/agents/hyper-test.md so the modal has something to open.
