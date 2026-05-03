@@ -2,7 +2,7 @@
 // Verifies: prefs API boot · drawer renders · toggle persists · keyboard ⌘,
 import { chromium } from 'playwright';
 
-const BASE = process.env.BASE_URL || 'http://127.0.0.1:8080';
+const BASE = process.env.BASE_URL || `http://127.0.0.1:${process.env.PORT || 8080}`;
 const errors = [];
 
 const browser = await chromium.launch();

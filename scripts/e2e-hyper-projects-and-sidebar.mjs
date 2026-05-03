@@ -15,7 +15,7 @@ import { writeFileSync, existsSync, unlinkSync, mkdirSync, mkdtempSync, rmSync }
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 
-const BASE = process.env.BASE_URL || 'http://127.0.0.1:8080';
+const BASE = process.env.BASE_URL || `http://127.0.0.1:${process.env.PORT || 8080}`;
 const errors = [];
 
 const AGENTS_DIR = path.join(homedir(), '.claude', 'agents');

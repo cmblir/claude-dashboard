@@ -8,7 +8,7 @@
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
 
-const BASE = process.env.BASE || 'http://127.0.0.1:8080';
+const BASE = process.env.BASE || `http://127.0.0.1:${process.env.PORT || 8080}`;
 const browser = await chromium.launch({ headless: true });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 await ctx.addInitScript(() => {

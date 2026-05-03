@@ -15,7 +15,7 @@
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 
-const BASE = process.env.BASE || 'http://127.0.0.1:8080';
+const BASE = process.env.BASE || `http://127.0.0.1:${process.env.PORT || 8080}`;
 const HEADLESS = process.env.HEADLESS !== '0';
 
 function readTabIds() {
