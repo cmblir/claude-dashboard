@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.97] — 2026-05-03
+
+**QQ202** — `/keys` (alias `/providers`) chat slash. Lists every
+registered provider with availability + (for `api`-type) API
+key status, showing whatever `/api/ai-providers/list` returns
+in `apiKeys` (already pre-masked server-side, e.g. `sk-…abc`).
+Filter accepts a substring against id/name (parity with
+`/agents`, `/sessions`, `/tabs`). Footer points users at
+`/go ai` for actual key configuration.
+
+* `❌` for unavailable providers, `🔑 …mask` for keyed apis,
+  `⚠ 키 없음` for missing api keys, `(cli)` chip for CLIs
+  (no key needed).
+* No-match → `일치하는 프로바이더 없음` warn toast.
+* `/help` updated.
+
+### Verified
+- `e2e-chat-slash-keys.mjs` 10/10 ✅.
+- Regression: chat-slash-{pin,branch,temperature,cost-status,
+  go,unknown,smoke} + whoami all green.
+
+---
 ## [2.71.96] — 2026-05-03
 
 **QQ201** — `/temperature` (and alias `/temp`) chat slash. Read

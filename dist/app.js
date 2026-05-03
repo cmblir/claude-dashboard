@@ -28099,6 +28099,50 @@ async function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'keys':
+    case 'providers': {
+      // QQ202 — quick provider audit. Shows every registered provider
+      // with availability + (for api-type) whether an API key is
+      // configured. Keys themselves come back masked from the server
+      // (apiKeys map values are pre-masked, e.g. "sk-…abc"). Useful for
+      // verifying setup without leaving the chat.
+      let d = null;
+      try { d = await cachedApi('/api/ai-providers/list'); } catch (_) {}
+      const providers = (d && d.providers) || [];
+      const apiKeys = (d && d.apiKeys) || {};
+      if (!providers.length) {
+        toast(t('등록된 프로바이더가 없습니다'), 'warn');
+        return true;
+      }
+      const q = rest.trim().toLowerCase();
+      const matched = q
+        ? providers.filter(p => (p.id || '').toLowerCase().includes(q) || (p.name || '').toLowerCase().includes(q))
+        : providers;
+      if (q && !matched.length) {
+        toast(`${t('일치하는 프로바이더 없음')}: ${rest}`, 'warn');
+        return true;
+      }
+      const lines = matched.map(p => {
+        const avail = p.available ? '✅' : '❌';
+        const kind  = p.type === 'cli' ? 'cli' : 'api';
+        let keyChip = '';
+        if (p.type === 'api') {
+          const k = apiKeys[p.id];
+          keyChip = k ? ` · 🔑 \`${k}\`` : ` · ⚠ ${t('키 없음')}`;
+        }
+        return `- ${avail} \`${p.id}\` *(${kind})* — ${p.name || ''}${keyChip}`;
+      });
+      const header = q
+        ? `**${t('프로바이더')}** (${matched.length}/${providers.length} · "${rest}")`
+        : `**${t('프로바이더')}** (${providers.length})`;
+      const md = header + '\n\n' + lines.join('\n') + '\n\n_' +
+        t('키 등록은 AI Providers 탭(/go ai)에서') + '_';
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      return true;
+    }
     case 'temp':
     case 'temperature': {
       // QQ201 — quick temperature read/set without leaving the chat.
@@ -28484,6 +28528,7 @@ async function _lcChatSlashCommand(line) {
 \`/status\` — ${t('어시니·세션·테마·언어 요약')}
 \`/whoami\` — ${t('Claude CLI 로그인 + 어시니 식별')}
 \`/agents [필터]\` — ${t('등록된 어시니 목록 (예: /agents claude)')}
+\`/keys [필터]\` (= \`/providers\`) — ${t('프로바이더 가용성 + API 키 상태 (마스킹)')}
 \`/sessions [필터]\` — ${t('세션 목록 + 메시지 수 (라벨/id/모델 부분일치)')}
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
 \`/code [N]\` — ${t('마지막 응답의 코드 블록 (N번째 = 1부터, 기본 마지막) 복사')}
