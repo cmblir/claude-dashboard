@@ -29806,35 +29806,76 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
     return;
   }
   if (verb === 'help') {
-    // QQ117 — terse command listing so users discover the built-ins.
-    // QQ141 — also list `version`.
-    const helpText =
-      'lazyclaude get [section[.key]]      — read current preference\n' +
-      'lazyclaude set <section> <key> <v>  — write preference (bool/int/float coerced)\n' +
-      'lazyclaude open <tab>               — jump to another dashboard tab\n' +
-      'lazyclaude tabs                     — list every NAV tab id\n' +
-      'lazyclaude status                   — quick summary (version + theme + assignee)\n' +
-      'lazyclaude whoami                   — Claude CLI login (email/plan/org)\n' +
-      'lazyclaude keys                     — list providers + api-key status (masked)\n' +
-      'lazyclaude usage [N]                — cost summary across all sessions (default 7d)\n' +
-      'lazyclaude workflows [filter]       — list workflows (id/name substring)\n' +
-      'lazyclaude run <id|name>            — start a workflow run\n' +
-      'lazyclaude cancel [runId|wf]        — cancel a running workflow\n' +
-      'lazyclaude uptime                   — server uptime + start time\n' +
-      'lazyclaude diag                     — re-run CLI health check (claude/ollama/gemini/...)\n' +
-      'lazyclaude version                  — dashboard version + build info\n' +
-      'lazyclaude reset                    — wipe terminal log\n' +
-      'lazyclaude help                     — this listing\n' +
-      '\n' +
-      'Sections: ui · ai · behavior · workflow · current\n' +
-      'Examples:\n' +
-      '  lazyclaude set ui theme light\n' +
-      '  lazyclaude set ai temperature 1.2\n' +
-      '  lz get ui.theme\n' +
-      '\n' +
-      'Shell whitelist: claude/ollama/gemini/codex/git/which/uname/uptime/df/docker/node/python3.\n' +
-      "Type a partial command and press Tab for autocomplete.";
-    log.push({ kind: 'out', text: helpText, ts: Date.now() });
+    // QQ214 — section-grouped + filterable, parity with chat /help
+    // (QQ213). `lazyclaude help` shows everything; `lazyclaude help
+    // workflow` narrows to the Workflow group.
+    const groups = [
+      ['Preferences', [
+        ['lazyclaude get [section[.key]]',     'read current preference'],
+        ['lazyclaude set <section> <key> <v>', 'write preference (bool/int/float coerced)'],
+      ]],
+      ['Navigation', [
+        ['lazyclaude open <tab>',              'jump to another dashboard tab'],
+        ['lazyclaude tabs',                    'list every NAV tab id'],
+      ]],
+      ['Workflow', [
+        ['lazyclaude workflows [filter]',      'list workflows (id/name substring)'],
+        ['lazyclaude run <id|name>',           'start a workflow run'],
+        ['lazyclaude cancel [runId|wf]',       'cancel a running workflow'],
+      ]],
+      ['Provider / Status', [
+        ['lazyclaude whoami',                  'Claude CLI login (email/plan/org)'],
+        ['lazyclaude keys',                    'list providers + api-key status (masked)'],
+        ['lazyclaude status',                  'quick summary (version + theme + assignee)'],
+        ['lazyclaude diag',                    're-run CLI health check (claude/ollama/gemini/...)'],
+      ]],
+      ['Cost / Version', [
+        ['lazyclaude usage [N]',               'cost summary across all sessions (default 7d)'],
+        ['lazyclaude version',                 'dashboard version + build info'],
+        ['lazyclaude uptime',                  'server uptime + start time'],
+      ]],
+      ['Terminal', [
+        ['lazyclaude reset',                   'wipe terminal log'],
+        ['lazyclaude help [filter]',           'this listing (filter narrows by group/cmd)'],
+      ]],
+    ];
+    const aliases = {
+      'Preferences': 'pref prefs preference settings get set ui ai behavior',
+      'Navigation':  'navigation tab tabs open go nav',
+      'Workflow':    'workflow workflows wf run cancel',
+      'Provider / Status': 'provider providers keys whoami status diag claude',
+      'Cost / Version': 'cost usage version uptime',
+      'Terminal':    'terminal reset help',
+    };
+    const q = (rest || '').trim().toLowerCase();
+    const sectionsOut = [];
+    for (const [name, rows] of groups) {
+      const aliasBlob = (aliases[name] || '').toLowerCase();
+      const sectionMatchesAll = q && (name.toLowerCase().includes(q) || aliasBlob.includes(q));
+      const matched = q
+        ? (sectionMatchesAll ? rows
+                             : rows.filter(([cmd, desc]) => (cmd + ' ' + desc).toLowerCase().includes(q)))
+        : rows;
+      if (!matched.length) continue;
+      const lines = [name];
+      for (const [cmd, desc] of matched) lines.push('  ' + cmd.padEnd(38) + ' — ' + desc);
+      sectionsOut.push(lines.join('\n'));
+    }
+    if (q && !sectionsOut.length) {
+      log.push({ kind: 'err', text: '⚠ no match: ' + rest, ts: Date.now() });
+      return;
+    }
+    const trailer = q
+      ? ''
+      : '\n\nSections: ui · ai · behavior · workflow · current' +
+        '\nExamples:' +
+        '\n  lazyclaude set ui theme light' +
+        '\n  lazyclaude set ai temperature 1.2' +
+        '\n  lz get ui.theme' +
+        '\n' +
+        '\nShell whitelist: claude/ollama/gemini/codex/git/which/uname/uptime/df/docker/node/python3.' +
+        '\nType a partial command and press Tab for autocomplete.';
+    log.push({ kind: 'out', text: sectionsOut.join('\n\n') + trailer, ts: Date.now() });
     return;
   }
   if (verb === 'open' || verb === 'go') {
