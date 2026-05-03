@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.83] — 2026-05-03
+
+**QQ188** — `/sessions` caps at 30 entries with an overflow line
+"_… N 개 더_". Active session is pinned to the top so it's
+always in the rendered chunk regardless of where it lives in
+storage. Power users with 50-100+ sessions no longer get a
+wall of text dumped into chat.
+
+### Verified
+- `scripts/e2e-chat-sessions-cap.mjs` — 4/4 green: 50-session
+  seed produces ≤30 visible lines, active session-025 pinned in
+  the rendered chunk, "20 개 더" overflow line, header count 50.
+
+---
 ## [2.71.82] — 2026-05-03
 
 **QQ187** — extended `e2e-chat-slash-smoke` to cover the QQ182
