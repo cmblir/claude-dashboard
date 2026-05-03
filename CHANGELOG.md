@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.106] — 2026-05-03
+
+**QQ211** — `/uptime` chat slash + `lazyclaude uptime`
+terminal verb. Both surface server uptime, version, and start
+timestamp from the existing `/api/version` payload (which
+already exposes `serverStartedAt`). Format: `Nd Nh Nm Ns`
+elapsed counter, ISO timestamp, version chip.
+
+`KNOWN_VERBS` / did-you-mean candidates / chat `/help` /
+`lazyclaude help` all extended.
+
+### Verified
+- `e2e-uptime.mjs` 9/9 ✅ (chat + terminal output, /help
+  listings, did-you-mean for `uptiime` typo).
+- Regression: chat-slash-cancel / terminal-cancel /
+  terminal-set-prefs / whoami all green.
+
+---
 ## [2.71.105] — 2026-05-03
 
 **QQ210** — `lazyclaude cancel [runId|wf]` terminal verb
