@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.88] — 2026-05-03
+
+**QQ193** — Stabilise `e2e-chat-slash-cost-status.mjs` against
+the deferred `setTheme` renderView teardown. Both `/theme`
+toggle and `/theme dark` schedule a +550ms `renderView()` that
+removes `#lcChatInput` mid-flight; the next `slash()` call hit
+a null textarea. Mirrors QQ123: insert a 1300ms wait +
+`waitForFunction(#lcChatInput)` between `/theme*` and the next
+slash. All 34 checks now stable.
+
+### Verified
+- `e2e-chat-slash-cost-status.mjs` 34/34 ✅.
+
+---
 ## [2.71.87] — 2026-05-03
 
 **QQ192** — `/tabs [filter]` chat slash matches the QQ191
