@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.80] — 2026-05-03
+
+**QQ186b** — terminal smoke regression (QQ179) extended to also
+exercise `lz version` / `lz status` / `lz tabs` / `lz get ui`
+through the actual handler, not just the autocomplete list. So
+QQ186 is locked end-to-end now: autocomplete surfaces lz
+candidates AND the parser routes them client-side.
+
+### Verified
+- `e2e-terminal-builtins-smoke.mjs` extended from 11 → 15
+  checks. All shell-short-circuit assertions still green.
+
+---
 ## [2.71.79] — 2026-05-03
 
 **QQ186** — `lz` autocomplete suggested only `lz get` and
