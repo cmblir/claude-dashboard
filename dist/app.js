@@ -28099,6 +28099,30 @@ async function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'branch':
+    case 'fork': {
+      // QQ200 — slash-form of the per-message 🍴 fork button. With no
+      // arg, clones the entire current session (branches from the last
+      // message). With an integer N, branches from message #N (1-based,
+      // matching /code/copy convention). Reuses _lcBranchFrom so the
+      // sidebar lineage chip + parentId metadata work identically.
+      const id = _lcCurrentId();
+      const h = _lcGetHistory(id) || [];
+      if (!h.length) { toast(t('분기할 메시지가 없습니다'), 'warn'); return true; }
+      let idx = h.length - 1;
+      if (rest) {
+        const n = parseInt(rest, 10);
+        if (!Number.isFinite(n) || n < 1 || n > h.length) {
+          toast(`${t('범위 밖')}: ${rest} / ${h.length}`, 'warn');
+          return true;
+        }
+        idx = n - 1;
+      }
+      if (typeof window._lcBranchFrom === 'function') {
+        window._lcBranchFrom(id, idx);
+      }
+      return true;
+    }
     case 'pin':
     case 'unpin': {
       // QQ199 — openclaw-style session pinning. /pin marks the current
@@ -28445,6 +28469,7 @@ async function _lcChatSlashCommand(line) {
 \`/lang ko|en|zh\` — ${t('언어 전환 (페이지 리로드)')}
 \`/rename <이름>\` — ${t('세션 이름 변경')}
 \`/pin\` · \`/unpin\` — ${t('현재 세션 상단 고정/해제')}
+\`/branch [N]\` (= \`/fork\`) — ${t('현재 세션을 N번째 메시지에서 분기 (기본: 끝 = 전체 복제)')}
 \`/export\` — ${t('마크다운으로 내보내기')}
 \`/help\` — ${t('이 목록')}
 
