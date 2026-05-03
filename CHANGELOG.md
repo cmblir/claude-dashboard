@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.63] — 2026-05-03
+
+**QQ172** — coverage extension for the QQ171 `/code` slash. Tab
+autocomplete from `/co` now cycles three candidates
+(`/cost`, `/copy`, `/code`); regression test extended.
+
+### Verified
+- `e2e-chat-slash-tab-complete.mjs` extended from 9 → 10 checks:
+  `/co<Tab>×3` cycles all three; original 2-step assertion
+  loosened to "picks one of cost/copy/code, second is different".
+
+---
 ## [2.71.62] — 2026-05-03
 
 **QQ171** — `/code` chat slash. Copies just the LAST fenced
