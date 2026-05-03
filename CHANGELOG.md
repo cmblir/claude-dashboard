@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.68] — 2026-05-03
+
+**QQ165b** — extended the QQ165 shortcut e2e to drive the full
+flow (stub `promptModal` to auto-respond with a name, fire
+Cmd+Shift+N, assert a new workflow id appears AND the name
+reflects the prompted value). Cleans up the created workflow
+afterwards via /api/workflows/delete.
+
+### Verified
+- `e2e-workflow-new-shortcut.mjs` extended from 3 → 5 checks.
+  Locks the full happy path end-to-end.
+
+---
 ## [2.71.67] — 2026-05-03
 
 **QQ176** — robustness fix for QQ174 `/clear all`. The check
