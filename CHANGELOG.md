@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.7] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Chat star toggle + ⭐ search filter regression**
+  (`scripts/e2e-chat-star.mjs`). Pins QQ15:
+  1. `_lcToggleStar(sid, idx)` flips `m.starred` and the rendered
+     toolbar swaps ☆ → ⭐.
+  2. Cmd+K search modal with the ⭐ filter checked returns
+     exactly the starred message; non-starred ones drop out.
+  3. Re-toggling clears `m.starred`.
+
+  Total e2e suite: **30/30 pass**.
+
+---
 ## [2.70.6] — 2026-05-03
 
 ### Fixed
