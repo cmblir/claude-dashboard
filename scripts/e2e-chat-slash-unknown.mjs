@@ -80,5 +80,17 @@ check('/help still works', r4 === true);
 check('no chat API requests for typo paths', chatApiHits === 0,
   `hits=${chatApiHits}`);
 
+// 6. QQ146 — bare `/` is swallowed with a /help hint, not sent to LLM.
+await page.evaluate(() => { window.__toasts.length = 0; });
+const r6 = await page.evaluate(() => _lcChatSlashCommand('/'));
+const t6 = await page.evaluate(() => window.__toasts.slice(-1)[0]);
+check('bare `/` is swallowed', r6 === true);
+check('bare `/` toast points to /help',
+  t6 && /\/help/.test(t6.msg), `toast=${JSON.stringify(t6)}`);
+
+// 7. `/   ` (whitespace) also swallowed
+const r7 = await page.evaluate(() => _lcChatSlashCommand('/   '));
+check('`/   ` (whitespace) is swallowed', r7 === true);
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

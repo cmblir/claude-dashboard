@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.36] — 2026-05-03
+
+**QQ146** — bare `/` (or `/   ` whitespace-only) on its own line
+no longer leaks to the LLM. The QQ124 unknown-command guard
+required at least one alphanumeric letter (`/x`) to swallow,
+so a stray `/` ended up shipped to the provider.
+
+Now any all-whitespace input that starts with `/` is swallowed
+locally with a `/help` hint toast.
+
+### Verified
+- `e2e-chat-slash-unknown.mjs` extended from 8 → 11 checks
+  (bare `/` swallowed, toast points to `/help`, `/   ` swallowed
+  too). All green.
+
+---
 ## [2.71.35] — 2026-05-03
 
 **QQ145** — `lazyclaude status` terminal builtin; also restores
