@@ -10,6 +10,27 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.33] — 2026-05-03
+
+**QQ143** — third subprocess-bound endpoint memoised.
+`/api/memory/snapshot` runs `_top_processes(30)` (a `ps` fan-out)
+and `api_cli_sessions_list` (full Claude sessions scan) on every
+hit — ~150-360ms. With the live ticker calling it every couple of
+seconds AND the Memory tab querying it on open, the cumulative
+cost was visible.
+
+### Fixed
+- 1.5s server-side memo for `/api/memory/snapshot` in
+  `server/process_monitor.py`. Short enough that live monitoring
+  stays real-time, long enough to coalesce the back-to-back hits
+  that share the same wall-clock second. `?nocache=1` bypass.
+
+### Verified
+- `scripts/e2e-memory-snapshot-cache.mjs` — Playwright regression:
+  cold ≈ 172ms, cached = 2ms, `?nocache=1` re-probes at 145ms,
+  hit after 1.7s wait re-probes (TTL expired). 3/3 green.
+
+---
 ## [2.71.32] — 2026-05-03
 
 **QQ142** — `lazyclaude open <tab>` and `lazyclaude tabs` terminal
