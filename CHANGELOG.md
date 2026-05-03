@@ -10,6 +10,29 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.109] — 2026-05-04
+
+**QQ214** — `lazyclaude help` now uses the same section-grouped
++ filterable shape as chat `/help` (QQ213). Six groups —
+Preferences, Navigation, Workflow, Provider / Status,
+Cost / Version, Terminal — with an alias blob per group so
+`lazyclaude help cost` matches via "cost usage version uptime"
+even though `usage` doesn't have "cost" in its row.
+
+* Bare `help` keeps the trailing Sections / Examples / Shell
+  whitelist / Tab-autocomplete trailer.
+* Filtered `help` drops the trailer (filter is about commands).
+* No match → `⚠ no match: <q>`.
+
+### Verified
+- `e2e-terminal-help-grouped.mjs` 19/19 ✅ (six group headers,
+  trailer presence/absence, alias matching for "cost",
+  no-match warn, cmd-name partial like "diag").
+- Regression: terminal-set-prefs / builtins-smoke /
+  workflows-run / keys-usage / cancel + uptime + whoami
+  all green.
+
+---
 ## [2.71.108] — 2026-05-04
 
 **QQ213** — `/help` is now section-grouped + filterable. The
