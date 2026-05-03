@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.3] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Workflow undo regression**
+  (`scripts/e2e-workflow-undo.mjs`). 9 checks:
+  1. Setup 3 nodes + 2 edges, undo stack starts empty.
+  2. Delete n-b → 2 nodes, 0 incident edges, undo stack += 1.
+  3. `_wfUndo()` restores n-b + both edges, undo stack drained,
+     canvas DOM repopulates the n-b group.
+  4. Calling `_wfUndo()` on an empty stack is a no-op.
+
+  Total e2e suite: **26/26 pass**.
+
+---
 ## [2.70.2] — 2026-05-03
 
 ### Added (test infra)
