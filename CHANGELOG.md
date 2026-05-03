@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.29] — 2026-05-03
+
+**QQ139** — same class of bug as QQ138, different surface. The
+SessionEnd "dashboard reindex" hook preset (`session-end-save`)
+hardcoded `http://127.0.0.1:8080` in its command, so anyone
+running the dashboard on PORT=19500 (or in a container) who
+installed the preset would silently lose the reindex on session
+end. Now the command uses `location.origin`.
+
+### Verified
+- `scripts/e2e-hook-preset-origin.mjs` — Playwright regression:
+  preset exists, command no longer contains `127.0.0.1:8080`,
+  command starts with the current origin. 3/3 green.
+
+---
 ## [2.71.28] — 2026-05-03
 
 **QQ138** — workflow webhook URL + curl snippet hardcoded

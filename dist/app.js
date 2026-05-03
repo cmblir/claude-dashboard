@@ -15380,7 +15380,7 @@ const _HOOK_PRESETS = [
     event: 'SessionEnd',
     matcher: '',
     type: 'command',
-    command: "curl -s -X POST http://127.0.0.1:8080/api/sessions/reindex -d '{}' -H 'Content-Type: application/json' > /dev/null 2>&1; true",
+    command: "curl -s -X POST " + location.origin + "/api/sessions/reindex -d '{}' -H 'Content-Type: application/json' > /dev/null 2>&1; true",
     timeout: 5000,
   },
 ];
