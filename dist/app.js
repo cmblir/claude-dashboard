@@ -29003,7 +29003,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   if (verb === '__unknown__') {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
-    const candidates = ['get','set','help','reset','version','open','tabs','status'];
+    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag'];
     let best = null, bestScore = 99;
     for (const k of candidates) {
       let score = 99;
