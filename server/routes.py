@@ -748,8 +748,18 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             self.send_response(500); self.end_headers(); return
         key = str(fp)
+        # QQ198 — when index.html embeds app.js?v=<app_mtime>, also key
+        # the cache on app.js's mtime. Otherwise editing app.js without
+        # touching index.html serves a stale tag (the cached entry stays
+        # valid because index.html's own mtime hasn't changed).
+        cache_mtime = mtime
+        if rel == "index.html":
+            try:
+                cache_mtime = (mtime, (DIST / "app.js").stat().st_mtime)
+            except Exception:
+                pass
         entry = _STATIC_CACHE.get(key)
-        if not entry or entry[0] != mtime:
+        if not entry or entry[0] != cache_mtime:
             try:
                 data = fp.read_bytes()
             except Exception:
@@ -773,7 +783,7 @@ class Handler(BaseHTTPRequestHandler):
                 gz = gzip.compress(data, compresslevel=6)
             else:
                 gz = None
-            entry = (mtime, data, gz)
+            entry = (cache_mtime, data, gz)
             _cache_put(_STATIC_CACHE, key, entry, _STATIC_CACHE_MAX)
         else:
             _STATIC_CACHE.move_to_end(key)
