@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.87] — 2026-05-03
+
+**QQ192** — `/tabs [filter]` chat slash matches the QQ191
+terminal `lazyclaude tabs <filter>` UX. Header shows
+`(N/total · "filter")`. No-match toasts "일치하는 탭 없음".
+All four list-style verbs (`/agents`, `/sessions`, `/tabs`,
+`lazyclaude tabs`) now share consistent filter UX.
+
+`/help` updated.
+
+### Verified
+- `e2e-chat-slash-go.mjs` extended from 14 → 16 checks.
+
+---
 ## [2.71.86] — 2026-05-03
 
 **QQ191** — `lazyclaude tabs <filter>` accepts a substring
