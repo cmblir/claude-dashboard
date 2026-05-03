@@ -10,6 +10,31 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.17] — 2026-05-03
+
+**QQ127** — Cmd/Ctrl+D duplicates **all** multi-selected nodes,
+not just `__wf.selectedNodeId`. Previously selecting 5 nodes via
+rubber-band and pressing Cmd+D cloned only the last-clicked one;
+the other 4 were silently ignored. n8n parity gap.
+
+### Changes
+- `dist/app.js` — duplicate handler now reads
+  `__wfMultiSelected` (falls back to single selection), clones
+  every match preserving the +40px offset, and **also clones any
+  edge whose endpoints both live in the duplicated set** so the
+  sub-graph stays wired. The new clones become the active
+  multi-selection so a follow-up drag/Delete affects them.
+- Single-node duplicate still works unchanged (verified).
+
+### Verified
+- `scripts/e2e-multi-duplicate.mjs` — Playwright regression:
+  seeds 3 session nodes A→B→C, multi-selects A+B, presses Cmd+D,
+  asserts 5 total nodes, 2 clones with correct subjects + offsets,
+  the A→B edge is cloned, the B→C edge is NOT (C wasn't selected),
+  and `__wfMultiSelected` points to the clones afterwards.
+  8/8 green.
+
+---
 ## [2.71.16] — 2026-05-03
 
 **QQ126** — Tab autocomplete inside the chat composer was stuck

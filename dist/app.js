@@ -5664,25 +5664,63 @@ function _wfShowEdgeContextMenu(eid, x, y) {
         return true;
       }
 
-      // LL5 (v2.66.34) — Cmd/Ctrl + D — duplicate selected node in
-      // place (n8n parity). New node lands +40px offset and becomes
-      // the selection.
-      if (mod && e.key === 'd' && !inInput && __wf.current && __wf.selectedNodeId) {
+      // LL5 (v2.66.34) — Cmd/Ctrl + D — duplicate selected node(s).
+      // QQ127 — multi-select aware: when __wfMultiSelected has more
+      //   than one entry, clone all of them, preserve relative offsets,
+      //   and re-select the clones so a follow-up drag/Delete affects
+      //   the duplicates (n8n parity).
+      if (mod && e.key === 'd' && !inInput && __wf.current
+          && (__wf.selectedNodeId || (__wfMultiSelected && __wfMultiSelected.size))) {
         e.preventDefault();
-        const src = __wf.current.nodes.find(n => n.id === __wf.selectedNodeId);
-        if (src) {
-          if (typeof _wfPushUndo === 'function') _wfPushUndo();
+        const ids = (__wfMultiSelected && __wfMultiSelected.size > 1)
+          ? new Set(__wfMultiSelected)
+          : new Set([__wf.selectedNodeId]);
+        const sources = __wf.current.nodes.filter(n => ids.has(n.id));
+        if (!sources.length) return true;
+        if (typeof _wfPushUndo === 'function') _wfPushUndo();
+        const clones = [];
+        const idMap = {};
+        for (const src of sources) {
           const clone = JSON.parse(JSON.stringify(src));
+          const oldId = clone.id;
           clone.id = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+          idMap[oldId] = clone.id;
           clone.x = (clone.x || 0) + 40;
           clone.y = (clone.y || 0) + 40;
-          __wf.current.nodes.push(clone);
-          __wf.selectedNodeId = clone.id;
-          __wf.dirty = true;
-          if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
-          if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
-          _wfUpdateToolbar();
-          if (typeof toast === 'function') toast(t('노드 복제됨'), 'ok');
+          clones.push(clone);
+        }
+        __wf.current.nodes.push(...clones);
+        // Also clone edges that lived entirely between the duplicated
+        // set so the new sub-graph stays wired.
+        const oldEdges = (__wf.current.edges || []);
+        const newEdges = [];
+        for (const ed of oldEdges) {
+          if (idMap[ed.from] && idMap[ed.to]) {
+            newEdges.push(Object.assign({}, ed, {
+              id: 'e-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+              from: idMap[ed.from],
+              to:   idMap[ed.to],
+            }));
+          }
+        }
+        if (newEdges.length) __wf.current.edges = oldEdges.concat(newEdges);
+        if (clones.length === 1) {
+          __wf.selectedNodeId = clones[0].id;
+          if (__wfMultiSelected) __wfMultiSelected.clear();
+        } else {
+          __wf.selectedNodeId = null;
+          if (__wfMultiSelected) {
+            __wfMultiSelected.clear();
+            for (const c of clones) __wfMultiSelected.add(c.id);
+          }
+        }
+        __wf.dirty = true;
+        if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
+        if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
+        if (typeof _wfSyncMultiSelectClasses === 'function') _wfSyncMultiSelectClasses();
+        _wfUpdateToolbar();
+        if (typeof toast === 'function') {
+          toast(`${clones.length} ${t('노드 복제됨')}` + (newEdges.length ? ` · ${newEdges.length} ${t('연결')}` : ''), 'ok');
         }
         return true;
       }
