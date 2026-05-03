@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.39] — 2026-05-03
+
+**QQ149** — Playwright perf budget regression for tab-switch
+latency. Locks in the QQ135-QQ144 cumulative wins (cli/status,
+auth/status, memory/snapshot, ports/list memos + boot prewarm +
+refresh loop) so a future change can't silently re-introduce
+the 750ms / 400ms / 150ms subprocess fan-outs.
+
+### Verified
+- `scripts/e2e-tab-switch-budget.mjs` — Playwright regression:
+  asserts each of aiProviders / team / memoryManager / openPorts
+  finishes a warm tab-switch under 300ms (default budget,
+  override via `TAB_BUDGET_MS`). Currently:
+    aiProviders 40ms · team 39ms · memoryManager 68ms · openPorts 21ms.
+  All 4 green.
+
+---
 ## [2.71.38] — 2026-05-03
 
 **QQ148** — Ctrl+L (and Cmd+L) wipes the terminal log in place,
