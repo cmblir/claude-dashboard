@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.66] — 2026-05-03
+
+**QQ175** — `/system` is three-modal now:
+
+```
+/system           → show current prompt (was: silent clear)
+/system <text>    → set prompt
+/system clear     → explicit clear
+```
+
+Previously typing bare `/system` thinking "what's set?"
+silently wiped the user's carefully-crafted prompt — a real
+footgun. Now bare `/system` posts the current value as an
+inline assistant bubble (with a `(설정되지 않음)` placeholder
+if empty). Setting and clearing are unchanged otherwise.
+
+`/help` updated.
+
+### Verified
+- `scripts/e2e-chat-system-modes.mjs` — 5/5 green: set
+  persists, bare does NOT clear, displays inline, `clear`
+  empties, bare on empty shows the placeholder.
+
+---
 ## [2.71.65] — 2026-05-03
 
 **QQ174** — `/clear all` chat slash. Wipes every chat session
