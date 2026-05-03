@@ -28114,6 +28114,33 @@ async function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'uptime': {
+      // QQ211 — show server uptime + version + boot timestamp. Uses
+      // existing /api/version which already exposes serverStartedAt.
+      let v = null;
+      try { v = await api('/api/version'); } catch (_) {}
+      if (!v) { toast(t('서버 정보를 가져오지 못했습니다'), 'warn'); return true; }
+      const started = Number(v.serverStartedAt) || 0;
+      const now = Date.now();
+      let ago = '';
+      if (started) {
+        const sec = Math.max(0, Math.floor((now - started) / 1000));
+        const d = Math.floor(sec / 86400);
+        const h = Math.floor((sec % 86400) / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        ago = (d ? `${d}d ` : '') + (h ? `${h}h ` : '') + (m ? `${m}m ` : '') + `${s}s`;
+      }
+      const md = `**${t('서버 가동 시간')}**\n\n` +
+        `- ${t('버전')}: \`v${v.version || '?'}\`\n` +
+        `- ${t('가동 시간')}: \`${ago || '?'}\`\n` +
+        `- ${t('시작 시각')}: ${started ? new Date(started).toLocaleString() : '?'}`;
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      return true;
+    }
     case 'cancel': {
       // QQ209 — cancel a running workflow without leaving chat. With
       // no arg, lists every workflow with a live run (one row per
@@ -28814,6 +28841,7 @@ async function _lcChatSlashCommand(line) {
 \`/go <tab>\` (= \`/open\`) — ${t('다른 탭으로 이동 (term/wf/proj/ai/settings)')}
 \`/tabs [필터]\` — ${t('전체 탭 목록 (id/label 부분일치)')}
 \`/version\` — ${t('대시보드 버전 + 빌드 정보')}
+\`/uptime\` — ${t('서버 가동 시간 + 시작 시각')}
 \`/theme [auto|dark|light|midnight|forest|sunset]\` — ${t('테마 토글/지정')}
 \`/lang ko|en|zh\` — ${t('언어 전환 (페이지 리로드)')}
 \`/rename <이름>\` — ${t('세션 이름 변경')}
@@ -29684,7 +29712,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel'];
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel','uptime'];
   const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
@@ -29702,7 +29730,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   if (verb === '__unknown__') {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
-    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel'];
+    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel','uptime'];
     // QQ162 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     let best = null, bestScore = 99;
     for (const k of candidates) {
@@ -29734,6 +29762,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       'lazyclaude workflows [filter]       — list workflows (id/name substring)\n' +
       'lazyclaude run <id|name>            — start a workflow run\n' +
       'lazyclaude cancel [runId|wf]        — cancel a running workflow\n' +
+      'lazyclaude uptime                   — server uptime + start time\n' +
       'lazyclaude diag                     — re-run CLI health check (claude/ollama/gemini/...)\n' +
       'lazyclaude version                  — dashboard version + build info\n' +
       'lazyclaude reset                    — wipe terminal log\n' +
@@ -29873,6 +29902,26 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
         const lastChip = last === 'ok' ? ' ok' : last === 'err' ? ' err' : last === 'running' ? ' running' : '';
         return `${live}${(w.id || '').padEnd(28)} ${w.nodeCount}n ${w.totalRuns || 0}r${lastChip}  ${w.name || ''}`;
       });
+      log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'uptime') {
+    // QQ211 — terminal parity with chat /uptime.
+    try {
+      const r = await fetch('/api/version', { cache: 'no-store' });
+      const j = await r.json();
+      const started = Number(j.serverStartedAt) || 0;
+      const sec = started ? Math.max(0, Math.floor((Date.now() - started) / 1000)) : 0;
+      const d = Math.floor(sec / 86400), h = Math.floor((sec%86400)/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+      const ago = (d?`${d}d `:'') + (h?`${h}h `:'') + (m?`${m}m `:'') + `${s}s`;
+      const lines = [
+        `version:    v${j.version || '?'}`,
+        `uptime:     ${ago || '?'}`,
+        `started:    ${started ? new Date(started).toISOString() : '?'}`,
+      ];
       log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
     } catch (e) {
       log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
