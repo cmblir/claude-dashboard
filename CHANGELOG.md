@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.16] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Per-session assignee restore + model badge regression**
+  (`scripts/e2e-session-assignee-restore.mjs`). Pins
+  QQ65 + QQ67 + QQ91 + QQ104:
+  1. Switching to session A flips the dropdown to
+     `claude:opus`.
+  2. Switching to session B injects `ollama:llama3.1:8b`
+     (multi-colon assignee) into the dropdown — exercises the
+     QQ65 option-injection path AND the QQ104 model-badge
+     fix that keeps the full model spec after the first colon.
+  3. Sidebar row for B shows the `llama3.1:8b` model badge.
+  4. Switching to a legacy session with no `assignee` field
+     backfills it with the current dropdown value (QQ67).
+
+  Total e2e suite: **40/40 pass**. 🎉
+
+---
 ## [2.70.15] — 2026-05-03
 
 ### Added (test infra)
