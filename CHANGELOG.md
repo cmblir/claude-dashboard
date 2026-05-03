@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.44] — 2026-05-03
+
+**QQ155** — sixth perf endpoint memoised. `/api/optimization/score`
+aggregates settings + 30-day quality metrics + agents/plugins/
+permissions counts (~50ms cold). The Overview tab calls it on
+every load. 30-day metrics change on the minute scale; a 10s
+TTL coalesces tab-switch redundancy.
+
+### Verified
+- `scripts/e2e-opt-score-cache.mjs` — Playwright regression: cold
+  42ms, cached 3ms, 5 back-to-back hits avg 1.4ms. 2/2 green.
+- Overview tab in `e2e-tab-switch-budget` dropped from 148ms → 24ms.
+
+---
 ## [2.71.43] — 2026-05-03
 
 **QQ153 + QQ154** — extended tab-switch perf coverage and closed
