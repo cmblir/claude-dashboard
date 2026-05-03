@@ -10,6 +10,27 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.1] — 2026-05-03
+
+**QQ111** — Fix QQ76 pre-token "_…_" placeholder never rendering.
+Root cause: `_lcChatRender` always re-read history from
+localStorage via `_lcGetHistory(id)`, but `_lcSaveHistory` (QQ77)
+filters `pending: true` entries before persisting. The placeholder
+pushed into the in-memory history array in `_lcChatSend` was
+therefore invisible — the assistant bubble stayed empty until the
+first SSE token arrived.
+
+### Fixed
+- `_lcChatRender(opts)` now accepts an optional `opts.history`
+  override; `_lcChatSend` passes the live history through after
+  pushing the pending placeholder so the bubble actually renders.
+
+### Added (test infra)
+- `scripts/e2e-chat-scroll.mjs` — verifies QQ35 ⬇ scroll-button +
+  QQ88 force-scroll-on-send + QQ76 placeholder visibility (the
+  regression that caught QQ111).
+
+---
 ## [2.71.0] — 2026-05-03
 
 **Playwright Verification Sprint II** — 41 e2e regression scripts
