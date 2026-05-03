@@ -82,5 +82,9 @@ check('/re<Tab> cycles through rename/retry/regenerate',
   set.has('/rename') && set.has('/retry') && set.has('/regenerate'),
   `seen=${[...set].join(',')}`);
 
+// 8. /v<Tab> expands to /version (QQ151).
+const r8 = await tab('/v');
+check('/v<Tab> expands to /version', r8 === '/version', `got="${r8}"`);
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
