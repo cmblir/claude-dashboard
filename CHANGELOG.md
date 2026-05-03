@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.17] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Workflow success-rate badge + sticky count split**
+  (`scripts/e2e-success-badge-sticky-count.mjs`). Pins
+  QQ78 + QQ79:
+  1. Save a workflow with 1 sticky + 1 start + 1 session via
+     REST and assert the list API returns
+     `nodeCount=2, stickyCount=1, edgeCount=1`.
+  2. Inject 5 synthetic `lastRuns` (4 ok, 1 err) into the
+     client cache → `_wfRenderList()` shows the QQ78 `80%`
+     success-rate badge in the row.
+
+  5 checks, all pass. Auto-cleans the test workflow.
+
+---
 ## [2.69.16] — 2026-05-03
 
 ### Added (test infra)
