@@ -10,6 +10,38 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.93] — 2026-05-03
+
+**QQ198** — `/whoami` chat slash + `lazyclaude whoami` terminal
+verb (openclaw-style identity introspection). Both surface
+Claude CLI login state — email, plan label, organization,
+`claude --version` — pulled from the existing
+`/api/auth/status` server-side memo. Graceful fallback when not
+logged in points the user at `claude auth login`.
+
+Also fixes a static-cache bug uncovered while testing this:
+`server/routes.py` keyed the `index.html` cache entry only on
+its own mtime, but the cache-buster query string is derived
+from `app.js`'s mtime. Editing `app.js` without touching
+`index.html` served a stale `?v=` tag, so the browser kept
+running the previous app.js. The cache key now includes both
+mtimes for `index.html`.
+
+* Chat: `/whoami` (also added to `/help` listing).
+* Terminal: `lazyclaude whoami` + appended to `lazyclaude help`.
+* Both share the same `/api/auth/status` (cached, ~5ms warm).
+* `_lcChatSlashCommand` is now `async` to support the await on
+  the auth fetch — no behaviour change for existing callers
+  (they already discarded the return value or ignored the
+  promise).
+
+### Verified
+- `e2e-whoami.mjs` 6/6 ✅ (chat + terminal + help listing).
+- No regressions: chat-slash-smoke / go / cost-status /
+  tab-complete / unknown / code / commands all green;
+  tabs-smoke 66/66; terminal-set-prefs 30/30.
+
+---
 ## [2.71.92] — 2026-05-03
 
 **QQ197** — `e2e-rubber-band` now scrolls `#wfCanvasHost` into

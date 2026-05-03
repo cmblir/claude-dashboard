@@ -27932,7 +27932,7 @@ let _lcChatAbortCtrl = null;
 //   /export           → download as markdown
 //   /help             → list available commands
 // Returns true if the line was handled as a command.
-function _lcChatSlashCommand(line) {
+async function _lcChatSlashCommand(line) {
   if (!line.startsWith('/')) return false;
   const space = line.indexOf(' ');
   const cmd = (space >= 0 ? line.slice(1, space) : line.slice(1)).toLowerCase();
@@ -28055,6 +28055,32 @@ function _lcChatSlashCommand(line) {
         `- ${t('언어')}: \`${ui.lang || 'ko'}\` · ${t('테마')}: \`${ui.theme || 'auto'}\``;
       const history = _lcChatLoad();
       history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      return true;
+    }
+    case 'whoami': {
+      // QQ198 — openclaw-style identity introspection. Shows the current
+      // Claude auth login (email/plan) + active assignee + dashboard
+      // user. Reads /api/auth/status (server-side memo, ~5ms warm).
+      const sel = document.getElementById('lcChatAssignee');
+      const assignee = (sel && sel.value) || 'default';
+      let auth = null;
+      try { auth = await api('/api/auth/status'); } catch (_) {}
+      const lines = [`**${t('현재 사용자')}**`, ''];
+      if (auth && auth.connected) {
+        if (auth.email) lines.push(`- ${t('이메일')}: \`${auth.email}\``);
+        if (auth.displayName) lines.push(`- ${t('이름')}: ${auth.displayName}`);
+        if (auth.planLabel) lines.push(`- ${t('플랜')}: ${auth.planLabel}`);
+        if (auth.organizationName) lines.push(`- ${t('조직')}: ${auth.organizationName}`);
+        if (auth.cliVersion) lines.push(`- claude CLI: \`${auth.cliVersion}\``);
+      } else {
+        lines.push(`- ${t('Claude CLI 로그인 안 됨')} — \`claude auth login\``);
+        if (auth && auth.reason) lines.push(`  · ${auth.reason}`);
+      }
+      lines.push(`- ${t('현재 어시니')}: \`${assignee}\``);
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: lines.join('\n'), assignee: 'system', ts: Date.now() });
       _lcChatSave(history);
       _lcChatRender();
       return true;
@@ -28378,6 +28404,7 @@ function _lcChatSlashCommand(line) {
 \`/model <provider:model>\` — ${t('어시니 전환 (예: claude:opus)')}
 \`/cost\` — ${t('현재 세션 토큰·비용 합계')}
 \`/status\` — ${t('어시니·세션·테마·언어 요약')}
+\`/whoami\` — ${t('Claude CLI 로그인 + 어시니 식별')}
 \`/agents [필터]\` — ${t('등록된 어시니 목록 (예: /agents claude)')}
 \`/sessions [필터]\` — ${t('세션 목록 + 메시지 수 (라벨/id/모델 부분일치)')}
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
@@ -29253,7 +29280,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag'];
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami'];
   const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
@@ -29271,7 +29298,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   if (verb === '__unknown__') {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
-    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag'];
+    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami'];
     // QQ162 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     let best = null, bestScore = 99;
     for (const k of candidates) {
@@ -29297,6 +29324,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       'lazyclaude open <tab>               — jump to another dashboard tab\n' +
       'lazyclaude tabs                     — list every NAV tab id\n' +
       'lazyclaude status                   — quick summary (version + theme + assignee)\n' +
+      'lazyclaude whoami                   — Claude CLI login (email/plan/org)\n' +
       'lazyclaude diag                     — re-run CLI health check (claude/ollama/gemini/...)\n' +
       'lazyclaude version                  — dashboard version + build info\n' +
       'lazyclaude reset                    — wipe terminal log\n' +
@@ -29405,6 +29433,29 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
         `tab:             ${(typeof state !== 'undefined' && state.view) || '?'}`,
       ];
       log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'whoami') {
+    // QQ198 — terminal parity with the chat /whoami slash. Reads
+    // /api/auth/status (server-side memo) and prints CLI identity.
+    try {
+      const r = await fetch('/api/auth/status', { cache: 'no-store' });
+      const j = await r.json();
+      const lines = [];
+      if (j && j.connected) {
+        if (j.email)            lines.push(`email:           ${j.email}`);
+        if (j.displayName)      lines.push(`name:            ${j.displayName}`);
+        if (j.planLabel)        lines.push(`plan:            ${j.planLabel}`);
+        if (j.organizationName) lines.push(`organization:    ${j.organizationName}`);
+        if (j.cliVersion)       lines.push(`claude --version ${j.cliVersion}`);
+      } else {
+        lines.push('Claude CLI: not logged in — run `claude auth login`');
+        if (j && j.reason) lines.push(`reason:          ${j.reason}`);
+      }
+      log.push({ kind: 'out', text: lines.join('\n') || '(no auth data)', ts: Date.now() });
     } catch (e) {
       log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
     }
