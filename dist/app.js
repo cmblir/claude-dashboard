@@ -28096,9 +28096,9 @@ function _lcChatSlashCommand(line) {
       return true;
     }
     case 'code': {
-      // QQ171 — copy the LAST fenced code block from the most recent
-      // assistant reply. Useful when the assistant returned text +
-      // code; /copy grabs everything, /code grabs just the snippet.
+      // QQ171 — copy a fenced code block from the most recent assistant
+      // reply. Default: the LAST block. QQ184 — `/code N` (1-indexed)
+      // picks a specific block when the reply has many.
       const id = _lcCurrentId();
       const h = _lcGetHistory(id) || [];
       let last = null;
@@ -28111,8 +28111,17 @@ function _lcChatSlashCommand(line) {
       let m;
       while ((m = fenceRe.exec(last.text)) !== null) matches.push(m[1]);
       if (!matches.length) { toast(t('마지막 응답에 코드 블록이 없습니다'), 'warn'); return true; }
-      // Use the LAST code block (most recent / typically the answer).
-      const code = matches[matches.length - 1];
+      // QQ184 — N-arg picks the Nth (1-indexed) code block;
+      // negative N or out-of-range silently clamps to the last one.
+      let pick = matches.length - 1;
+      if (rest) {
+        const n = parseInt(rest, 10);
+        if (!Number.isNaN(n)) {
+          if (n >= 1 && n <= matches.length) pick = n - 1;
+          else { toast(`${t('범위 밖')}: ${n} / ${matches.length}`, 'warn'); return true; }
+        }
+      }
+      const code = matches[pick];
       (async () => {
         try {
           if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -28123,7 +28132,7 @@ function _lcChatSlashCommand(line) {
             document.body.appendChild(ta); ta.select();
             try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
           }
-          toast(`📋 ${t('코드 블록 복사됨')} (${code.length} chars · ${matches.length} ${t('블록')})`, 'ok');
+          toast(`📋 ${t('코드 블록 복사됨')} (${pick + 1}/${matches.length} · ${code.length} chars)`, 'ok');
         } catch (e) {
           toast(t('복사 실패') + ': ' + (e && e.message || e), 'err');
         }
@@ -28312,7 +28321,7 @@ function _lcChatSlashCommand(line) {
 \`/agents\` — ${t('등록된 어시니 목록')}
 \`/sessions\` — ${t('세션 목록 + 메시지 수')}
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
-\`/code\` — ${t('마지막 응답의 코드 블록만 복사')}
+\`/code [N]\` — ${t('마지막 응답의 코드 블록 (N번째 = 1부터, 기본 마지막) 복사')}
 \`/retry\` (= \`/regenerate\`) — ${t('마지막 사용자 프롬프트 재실행')}
 \`/go <tab>\` (= \`/open\`) — ${t('다른 탭으로 이동 (term/wf/proj/ai/settings)')}
 \`/tabs\` — ${t('전체 탭 목록')}

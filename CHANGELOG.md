@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.77] — 2026-05-03
+
+**QQ184** — `/code [N]` accepts an N argument now (1-indexed) so
+users can pick a specific code block when an assistant reply
+returned several. Out-of-range N toasts "범위 밖: N / total".
+Default (no N) still picks the last block (QQ171 contract).
+
+`/help` updated to reflect the new arg syntax.
+
+### Verified
+- `e2e-chat-slash-code.mjs` extended from 4 → 7 checks: pick
+  2nd block, pick 1st block, out-of-range toast.
+
+---
 ## [2.71.76] — 2026-05-03
 
 **QQ183** — Playwright regression locking in the QQ122 `/copy`

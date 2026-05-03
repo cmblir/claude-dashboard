@@ -94,6 +94,41 @@ const t3 = await page.evaluate(() => window.__toasts.slice(-1)[0]);
 check('/code on a no-code reply toasts a warning',
   t3 && /코드 블록|code/i.test(t3.m), JSON.stringify(t3));
 
+// QQ184 — `/code N` (1-indexed) picks a specific block.
+await page.evaluate(() => {
+  const id = _lcCurrentId();
+  _lcSaveHistory(id, [
+    { role: 'user', text: 'three flavours', ts: 1, assignee: 'claude:opus' },
+    { role: 'assistant',
+      text: 'Pick:\n\n```js\nA\n```\n\n```py\nB\n```\n\n```rb\nC\n```',
+      ts: 2, assignee: 'claude:opus' },
+  ]);
+  navigator.clipboard.writeText('');
+});
+await page.evaluate(() => _lcChatSlashCommand('/code 2'));
+await page.waitForTimeout(200);
+const clipB = await page.evaluate(async () => {
+  try { return await navigator.clipboard.readText(); } catch (_) { return null; }
+});
+check('/code 2 picks the 2nd block (B)',
+  clipB && /^B/m.test(clipB) && !/A/.test(clipB),
+  `clip="${(clipB || '').slice(0, 30)}"`);
+
+await page.evaluate(() => _lcChatSlashCommand('/code 1'));
+await page.waitForTimeout(200);
+const clipA = await page.evaluate(async () => {
+  try { return await navigator.clipboard.readText(); } catch (_) { return null; }
+});
+check('/code 1 picks the 1st block (A)',
+  clipA && /^A/m.test(clipA), `clip="${(clipA || '').slice(0, 30)}"`);
+
+// Out-of-range
+await page.evaluate(() => { window.__toasts.length = 0; });
+await page.evaluate(() => _lcChatSlashCommand('/code 99'));
+const t99 = await page.evaluate(() => window.__toasts.slice(-1)[0]);
+check('/code 99 (out of range) toasts warning',
+  t99 && /범위 밖|range/i.test(t99.m), JSON.stringify(t99));
+
 // 4. /help lists /code
 await page.evaluate(() => _lcChatSlashCommand('/help'));
 await page.waitForTimeout(150);
