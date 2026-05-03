@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.16] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Workflow tags + sidebar filter regression**
+  (`scripts/e2e-workflow-tags.mjs`). End-to-end via the public
+  REST API:
+  1. Three workflows saved with tags `["alpha", "demo"]`,
+     `["alpha"]`, `["beta"]`. Server round-trips the tags
+     intact.
+  2. Sidebar `#wfTagFilter` chip strip visible and lists the
+     full union (alpha + beta + demo + 전체).
+  3. `_wfSetTagFilter('alpha')` → only the alpha-tagged rows
+     remain in `#wfListItems`; the beta-only row is hidden.
+
+  Cleans up the test workflows via `/api/workflows/delete` so
+  the dev store stays tidy. 8 checks total, all pass.
+
+---
 ## [2.69.15] — 2026-05-03
 
 ### Added (test infra)
