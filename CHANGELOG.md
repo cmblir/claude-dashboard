@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.5] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Node search filter + inspector webhook URL regression**
+  (`scripts/e2e-node-search-webhook.mjs`):
+  1. LL24 fuzzy match: `"fnd"` → `frontend` (subsequence f, n, d)
+     gets opacity 1; sibling nodes dim to 0.2.
+  2. Empty query restores all opacity to ''.
+  3. Inspector renders `#wfWebhookUrl` input bound to
+     `/api/workflows/webhook/<id>`.
+
+  First attempt's "fy" expectation was wrong — `frontend` has
+  no `y`. Fixed test to use `fnd` which is a real subsequence
+  match.
+
+  Total e2e suite: **28/28 pass**.
+
+---
 ## [2.70.4] — 2026-05-03
 
 ### Added (test infra)
