@@ -10,6 +10,27 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.101] — 2026-05-03
+
+**QQ206** — `/workflows` (alias `/wfs`) chat slash. Lists every
+workflow with running/total run counts + a status chip for the
+most recent run (✅ ok · ❌ err · 🟢 running). Same filter
+shape as `/tabs`, `/sessions`, `/agents`, `/keys` — substring
+match against name / id / tag, no-match → warn toast,
+`(N/total · "filter")` header.
+
+* Filter searches name, id, AND tags.
+* `🟢` row prefix flags any workflow with a live run.
+* CAP=30 lines + overflow note.
+* Footer points to `/go workflows` for actual editing.
+* `/help` lists both forms.
+
+### Verified
+- `e2e-chat-slash-workflows.mjs` 8/8 ✅.
+- Regression: chat-slash-{keys,usage,clear-n,pin,cost-status,
+  go,smoke} all green.
+
+---
 ## [2.71.100] — 2026-05-03
 
 **QQ205** — `/clear N` drops the last N messages of the
