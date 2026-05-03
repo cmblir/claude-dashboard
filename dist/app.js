@@ -3802,6 +3802,16 @@ function _wfNodeSnapKey(n) {
     x: n.x, y: n.y,
     a: d.assignee || '',
     ma: d.multiAssignee || null,
+    // QQ108 (v2.69.1) — include pin + disabled in the keyed-diff
+    // snapshot so the pin/disable badge actually appears/disappears
+    // without needing __wf._forceFullCanvasRebuild.
+    p: !!(d.pinned && (d.pinnedOutput || '').trim()),
+    di: !!d.disabled,
+    // Sticky text changes should also trigger re-render of the node
+    // (text/color/dim affect SVG content directly).
+    sk: n.type === 'sticky'
+      ? `${(d.text||'').length}|${d.color||''}|${d.width||0}|${d.height||0}`
+      : '',
   });
 }
 let _wfMinimapTimer = null;
@@ -5244,6 +5254,36 @@ async function _wfRunSingleNode(nid) {
   _wfRenderInspector();
 }
 
+// QQ108 (v2.69.1) — full-output modal for the inspector preview panel.
+// Opens the complete nr.output / nr.error in a scrollable overlay so users
+// can read long responses without leaving the workflow canvas.
+function _wfShowNodeOutputModal(nid) {
+  const nr = (__wf.lastRunResults || {})[nid];
+  if (!nr) return;
+  const n = (__wf.current && __wf.current.nodes || []).find(x => x.id === nid);
+  const title = (n && (n.title || (WF_TYPE_MAP[n.type] || {}).label)) || nid;
+  const outText = nr.output || nr.error || '';
+  const isErr = !nr.output && nr.error;
+  const html = `
+    <div style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.remove()">
+      <div class="card" style="max-width:820px;width:100%;max-height:85vh;overflow:auto;padding:16px;">
+        <div class="flex items-center gap-2 mb-3">
+          <span style="font-size:1.2rem;">${isErr ? '❌' : '📄'}</span>
+          <div class="text-sm font-semibold flex-1 truncate">${escapeHtml(title)} — ${t('노드 출력')}</div>
+          <button class="btn text-xs" onclick="this.closest('[style*=\\'z-index:99999\\']').remove()">✕</button>
+        </div>
+        <pre style="background:var(--code-bg);border:1px solid var(--border);padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;${isErr?'color:#fca5a5;':''}">${escapeHtml(outText)}</pre>
+        <div class="flex gap-2 mt-3">
+          <button class="btn text-xs" onclick="navigator.clipboard.writeText(${JSON.stringify(outText)}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
+          <span class="text-[10px] text-[var(--text-dim)] self-center">${outText.length.toLocaleString()} ${t('자')}</span>
+        </div>
+      </div>
+    </div>`;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap.firstElementChild);
+}
+
 // QQ20 (v2.66.95) — pin/unpin node data (n8n "Pin Data" parity).
 // Pinning freezes the last output so subsequent runs return it without
 // invoking the provider — saves cost + lets users iterate downstream
@@ -6060,11 +6100,28 @@ function _wfRenderInspector(opts) {
           // the workflow policy's fallback provider.
           nr.fallbackUsed ? `<span class="chip chip-warn text-[10px]" style="background:rgba(245,158,11,0.20);" title="${t('policy_fallback_hint', 'session 노드가 assignee 로 실패 시 선택한 프로바이더로 1회 재시도. 노드 결과에 fallbackUsed 기록.')}">↻ ${t('fallback')}</span>` : '',
         ].filter(Boolean).join('');
-        if (chips) {
+        // QQ108 (v2.69.1) — node output preview panel in the inspector
+        // (n8n parity: clicking a completed node shows its data output).
+        // Shows first 600 chars with a copy button; overflow opens a modal.
+        const outText = nr.output || nr.error || '';
+        const outPreview = outText.slice(0, 600);
+        const outOverflow = outText.length > 600;
+        const outColor = nr.error ? 'color:#fca5a5;' : 'color:var(--text-mute);';
+        const outPanel = outText ? `
+          <details class="mt-2" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:rgba(0,0,0,0.15);">
+            <summary class="text-[10px] cursor-pointer select-none" style="color:var(--text-dim);user-select:none;">📄 ${t('출력')} · ${outText.length.toLocaleString()} ${t('자')}</summary>
+            <pre class="text-[10px] mt-1 max-h-32 overflow-auto" style="white-space:pre-wrap;word-break:break-word;${outColor}">${escapeHtml(outPreview)}${outOverflow ? '…' : ''}</pre>
+            <div class="flex gap-1 mt-1">
+              <button class="btn text-[10px]" onclick="navigator.clipboard.writeText(${JSON.stringify(outText)}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
+              ${outOverflow ? `<button class="btn text-[10px]" onclick="_wfShowNodeOutputModal('${n.id}')">⬆ ${t('전체 보기')}</button>` : ''}
+            </div>
+          </details>` : '';
+        if (chips || outPanel) {
           runInfoBlock = `
             <div class="mt-2 pt-2 border-t border-[var(--border)]">
               <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${t('실행 결과')}</div>
-              <div class="flex flex-wrap gap-1">${chips}</div>
+              ${chips ? `<div class="flex flex-wrap gap-1">${chips}</div>` : ''}
+              ${outPanel}
             </div>`;
         }
       }

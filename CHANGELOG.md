@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.1] — 2026-05-03
+
+### Added
+- 📄 **Node output preview panel in inspector** (QQ108). Each
+  completed node in the inspector now shows a collapsible
+  `<details>` panel with the first 600 chars of its output (or
+  red-tinted error), a 📋 copy button, and an `⬆ 전체 보기`
+  button when the output overflows — opens a full-screen scroll-
+  able modal via `_wfShowNodeOutputModal`. n8n parity: clicking
+  a completed node reveals its data without leaving the canvas.
+
+### Fixed
+- 📌 **Pin / disabled / sticky badges now repaint via keyed diff**
+  (QQ108 follow-up). `_wfNodeSnapKey` previously omitted
+  `data.pinned`, `data.disabled`, and sticky-text fields, so
+  toggling those flags didn't change the snapshot — the keyed-
+  diff renderer skipped the node and the canvas badge stayed
+  stale until a full rebuild. Snapshot now includes the pin
+  state, disable state, and a compact sticky digest
+  `len|color|w|h`, so badge state matches truth on every render.
+
+---
 ## [2.69.0] — 2026-05-03
 
 **QQ91–QQ107 rollup** — third tier of Q-series work since v2.68.0.
