@@ -5524,6 +5524,33 @@ function _wfShowEdgeContextMenu(eid, x, y) {
         return true;
       }
 
+      // QQ129 — Ctrl+X / Cmd+X — Cut. Copy + delete in one shot so the
+      // user can move a selection across workflows or just relocate it
+      // within the same canvas (n8n parity).
+      if (mod && e.key === 'x' && !inInput) {
+        if (!__wf.current) return true;
+        const ids = (__wfMultiSelected && __wfMultiSelected.size > 0)
+          ? Array.from(__wfMultiSelected)
+          : (__wf.selectedNodeId ? [__wf.selectedNodeId] : []);
+        if (!ids.length) return true;
+        e.preventDefault();
+        const idSet = new Set(ids);
+        const nodes = __wf.current.nodes.filter(n => idSet.has(n.id));
+        const edges = (__wf.current.edges || []).filter(ed => idSet.has(ed.from) && idSet.has(ed.to));
+        __wf._clipboard = nodes.map(n => JSON.parse(JSON.stringify(n)));
+        __wf._clipboardEdges = edges.map(ed => JSON.parse(JSON.stringify(ed)));
+        if (typeof _wfPushUndo === 'function') _wfPushUndo();
+        __wf.current.nodes = __wf.current.nodes.filter(n => !idSet.has(n.id));
+        __wf.current.edges = (__wf.current.edges || []).filter(ed => !idSet.has(ed.from) && !idSet.has(ed.to));
+        __wfMultiSelected.clear();
+        __wf.selectedNodeId = null;
+        __wf.dirty = true;
+        _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
+        if (typeof _wfSyncMultiSelectClasses === 'function') _wfSyncMultiSelectClasses();
+        toast(`${nodes.length} ${t('노드 잘라내기 완료')}${edges.length?` · ${edges.length} ${t('엣지')}`:''}`, 'ok');
+        return true;
+      }
+
       // Ctrl+V — paste node(s) with edges remapped.
       if (mod && e.key === 'v' && !inInput) {
         if (__wf.current && __wf._clipboard && __wf._clipboard.length) {
