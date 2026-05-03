@@ -82,5 +82,21 @@ await page.waitForTimeout(80);
 const afterEsc = await page.$eval('#lcTermInput', el => el.value);
 check('Esc clears terminal input', afterEsc === '');
 
+// QQ180 — Tab autocomplete knows the QQ142/QQ150 builtins.
+for (const [seed, expectFirst] of [
+  ['lazyclaude di', 'lazyclaude diag'],
+  ['lazyclaude ta', 'lazyclaude tabs'],
+]) {
+  const got = await page.evaluate((s) => {
+    const matches = window._lcTermSuggest(s);
+    return matches[0] || null;
+  }, seed);
+  check(`autocomplete: '${seed}' → '${expectFirst}'`,
+    got === expectFirst, `got=${got}`);
+}
+const opMatches = await page.evaluate(() => window._lcTermSuggest('lazyclaude op'));
+check('autocomplete: "lazyclaude op" returns ≥3 candidates',
+  opMatches.length >= 3, `len=${opMatches.length}`);
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
