@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.74] — 2026-05-03
+
+**QQ181** — extended `/go` (chat) and `lazyclaude open`
+(terminal) alias maps with common navigation aliases the user
+might type:
+
+```
+home / dashboard / overview      → overview
+mem / memory                     → memoryManager
+ar / autoresume                  → autoResumeManager
+ports                            → openPorts
+agents / mcp / hooks             → as named
+chat                             → lazyclawChat
+```
+
+Chat and terminal alias maps stay aligned.
+
+### Verified
+- `e2e-chat-slash-go.mjs` extended from 8 → 12 checks: 4 new
+  alias roundtrips (home, mem, ports, ar). All green.
+
+---
 ## [2.71.73] — 2026-05-03
 
 **QQ180b** — Playwright regression for the QQ180 autocomplete
