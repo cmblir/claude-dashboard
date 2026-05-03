@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.92] — 2026-05-03
+
+**QQ197** — `e2e-rubber-band` now scrolls `#wfCanvasHost` into
+view before computing the shift-drag pixel rectangle. Same
+root cause as QQ196 group-drag: the workflows tab renders a
+list view above the canvas, so the SVG can sit below the
+1200px viewport (y~1070). Without scroll, the screen-space
+rectangle landed off the canvas and selected nothing.
+
+After this, the comprehensive sweep (~80 e2e scripts) is
+fully green: tabs-smoke 66/66, all chat slash commands,
+all workflow + node + multi-select + canvas interactions,
+all cache-perf scripts, all terminal/UI/perf budgets.
+
+### Verified
+- `e2e-rubber-band.mjs` 4/4 ✅.
+- ~80-script sweep — no failures.
+
+---
 ## [2.71.91] — 2026-05-03
 
 **QQ196** — Stabilise three more e2e scripts that flaked on
