@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.12] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Align / distribute toolbar regression**
+  (`scripts/e2e-align-distribute.mjs`). Verifies QQ34:
+  1. `wfAlignBar` shows when `__wfMultiSelected.size >= 2`,
+     hides at 1.
+  2. `_wfAlignSelected('left')` collapses every selected node
+     to `min(x)`.
+  3. `_wfAlignSelected('vcenter')` collapses every selected
+     node to the rounded average y.
+  4. `_wfAlignSelected('hdist')` keeps the leftmost / rightmost
+     and places the middle node at the geometric midpoint.
+  5. `_wfAlignSelected('right')` collapses to `max(x)`.
+
+  6 checks, all pass.
+
+---
 ## [2.69.11] — 2026-05-03
 
 ### Added (test infra)
