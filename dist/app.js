@@ -27560,7 +27560,13 @@ function _lcChatRender(opts) {
   const log = document.getElementById('lcChatLog');
   if (!log) return;
   const id = _lcEnsureSession('');
-  const history = _lcGetHistory(id);
+  // QQ111 (v2.71.1) — accept an in-memory history override so the
+  // QQ76 pre-token "_…_" placeholder (live-only, never persisted by
+  // QQ77) actually renders. Fallback to localStorage when no
+  // override is passed.
+  const history = (opts && Array.isArray(opts.history))
+    ? opts.history
+    : _lcGetHistory(id);
   // QQ102 (v2.68.12) — show cumulative session cost in composer footer.
   try {
     let s = 0;
@@ -27859,9 +27865,12 @@ async function _lcChatSend() {
   // look broken before the first token arrives. Cleared by the first
   // 'token' SSE event (see the streaming loop below).
   // QQ77 (v2.67.14) — render the placeholder but don't persist it.
+  // QQ111 (v2.71.1) — pass the live history through render so the
+  // pending bubble actually shows (without it, the call below reads
+  // localStorage which QQ77 strips).
   const reply = { role: 'assistant', text: '_…_', assignee, ts: Date.now(), pending: true };
   history.push(reply);
-  _lcChatRender();
+  _lcChatRender({ history });
   // QQ88 (v2.67.25) — always jump to bottom when the user sends so
   // they see their own new message + the placeholder, even if they
   // had scrolled up to reread earlier context.
