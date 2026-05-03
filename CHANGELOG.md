@@ -10,6 +10,34 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.102] — 2026-05-03
+
+**QQ207** — `/run <id|name>` chat slash. Kicks off a workflow
+without leaving chat. Resolves the argument by exact id match,
+then id-prefix, then name substring (case-insensitive). The
+success bubble shows workflow + runId so the user can `/go
+workflows` to watch it live.
+
+* No arg → usage hint toast.
+* No match → `일치하는 워크플로우 없음` warn.
+* >1 match → list bubble (no POST), user re-tries with a
+  more specific identifier.
+* Unique match → POST /api/workflows/run, bubble shows
+  workflow id + runId + pointer to /go workflows.
+* Uses raw `api()` (not the 30s-cached helper) so a workflow
+  saved seconds ago is immediately runnable.
+* Invalidates `/api/workflows/list` cache on success so
+  `/workflows` shows the live indicator immediately.
+* `/help` updated.
+
+### Verified
+- `e2e-chat-slash-run.mjs` 10/10 ✅ (no-arg, unique-name
+  POST, bubble content, no-match, ambiguous-listing,
+  /help listing).
+- Regression: chat-slash-{workflows,keys,cost-status,go,
+  pin} + tabs-smoke 66/66 all green.
+
+---
 ## [2.71.101] — 2026-05-03
 
 **QQ206** — `/workflows` (alias `/wfs`) chat slash. Lists every
