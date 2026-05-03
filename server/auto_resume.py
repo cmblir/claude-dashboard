@@ -199,9 +199,21 @@ def _load_all() -> dict:
         return {}
 
 
+# QQ154/156 — module-scope cache for /api/auto_resume/status. Defined
+# above _dump_all so the invalidator below can reference it. Real TTL
+# constant lives next to api_auto_resume_status further down.
+_AR_STATUS_CACHE: dict = {"data": None, "ts": 0.0}
+
+
 def _dump_all(data: dict) -> bool:
     try:
         AUTO_RESUME_PATH.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    # QQ156 — invalidate the QQ154 /status memo on every state mutation
+    # so the next caller sees the new state immediately (no 1.5s wait).
+    try:
+        _AR_STATUS_CACHE["data"] = None
     except Exception:
         pass
     return _safe_write(AUTO_RESUME_PATH, json.dumps(data, indent=2, ensure_ascii=False))
@@ -681,10 +693,13 @@ def api_auto_resume_cancel(body: dict) -> dict:
         except Exception:
             pass
 
+    # QQ156 — invalidate the QQ154 status cache so the next /status
+    # request reflects the cancel immediately (the e2e was flaking
+    # because the 1.5s TTL was returning stale 'active' entries).
+    _AR_STATUS_CACHE["data"] = None
     return {"ok": True, "entry": _public_state(entry)}
 
 
-_AR_STATUS_CACHE: dict = {"data": None, "ts": 0.0}
 # QQ154 — when at least one binding exists, _live_cli_sessions runs an
 # lsof+ps cross-reference (~140ms). The Sessions tab + the auto-resume
 # manager poll this every couple seconds, so coalescing back-to-back
