@@ -205,11 +205,21 @@ const afterTheme = await page.evaluate(() => document.body.classList.contains('t
 check('/theme without args toggles theme-light',
   beforeTheme !== afterTheme, `before=${beforeTheme} after=${afterTheme}`);
 
+// Wait for the prior /theme's deferred setTheme renderView (+550ms) to finish
+// tearing down and rebuilding the chat DOM before the next slash call
+// (mirrors QQ123 retry).
+await page.waitForTimeout(1300);
+await page.waitForFunction(() => !!document.getElementById('lcChatInput'), { timeout: 3000 });
+
 // /theme dark forces dark explicitly
 await slash('/theme dark');
 await page.waitForTimeout(150);
 const dark = await page.evaluate(() => document.body.classList.contains('theme-light'));
 check('/theme dark removes theme-light class', dark === false);
+
+// Same wait pattern: /theme dark also triggers the deferred renderView teardown.
+await page.waitForTimeout(1300);
+await page.waitForFunction(() => !!document.getElementById('lcChatInput'), { timeout: 3000 });
 
 // 4b. /sessions lists current sessions with message counts
 await slash('/sessions');
