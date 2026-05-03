@@ -10,6 +10,31 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.110] — 2026-05-04
+
+**QQ215** — terminal Tab-suggest (`_lcTermSuggest`) was the
+**fourth** stale glue list missed during QQ198-QQ211 (after
+QQ212 caught the chat-side ones). `lazyclaude wh<Tab>` was
+silently a no-op even though `lazyclaude whoami` was fully
+implemented.
+
+Now extended to cover all new verbs:
+
+* `lazyclaude {whoami,keys,uptime,workflows,run,cancel,usage}`
+  + the `lz` shorthand variants.
+* `lazyclaude usage 7` / `usage 30` quick presets.
+* `lazyclaude help workflow` / `help cost` / `help provider`
+  for the QQ214 filter form.
+
+### Verified
+- `e2e-terminal-tab-suggest-new.mjs` 8/8 ✅ (single-match
+  expansions, multi-candidate `lazyclaude w<Tab>` listing,
+  `help w<Tab>` filter expansion).
+- Regression: terminal-set-prefs, builtins-smoke,
+  help-grouped, cancel, keys-usage, workflows-run, uptime
+  all green.
+
+---
 ## [2.71.109] — 2026-05-04
 
 **QQ214** — `lazyclaude help` now uses the same section-grouped

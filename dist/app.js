@@ -29641,7 +29641,8 @@ function _lcTermSuggest(prefix) {
     'gemini --version', 'gemini --help',
     'codex --version', 'codex --help',
     'lazyclaude status', 'lazyclaude version', 'lazyclaude --version', 'lazyclaude -v', 'lazyclaude --help',
-    'lazyclaude help', 'lazyclaude reset', 'lazyclaude diag', 'lazyclaude tabs',
+    'lazyclaude help', 'lazyclaude help workflow', 'lazyclaude help cost', 'lazyclaude help provider',
+    'lazyclaude reset', 'lazyclaude diag', 'lazyclaude tabs',
     'lazyclaude open ', 'lazyclaude open chat', 'lazyclaude open wf', 'lazyclaude open term',
     'lazyclaude open ai', 'lazyclaude open settings',
     'lazyclaude get', 'lazyclaude get ui', 'lazyclaude get ai', 'lazyclaude get behavior', 'lazyclaude get workflow',
@@ -29649,8 +29650,17 @@ function _lcTermSuggest(prefix) {
     'lazyclaude set ui lang en', 'lazyclaude set ui lang zh',
     'lazyclaude set ai temperature ', 'lazyclaude set ai effort ',
     'lazyclaude set behavior autoResume ',
+    // QQ215 — terminal verbs added in QQ198-QQ211 belong on the
+    // tab-suggest list too. Without this, `lazyclaude wh<Tab>` was
+    // a no-op even though `lazyclaude whoami` is fully implemented.
+    'lazyclaude whoami', 'lazyclaude keys', 'lazyclaude uptime',
+    'lazyclaude usage', 'lazyclaude usage 7', 'lazyclaude usage 30',
+    'lazyclaude workflows', 'lazyclaude workflows ',
+    'lazyclaude run ', 'lazyclaude cancel', 'lazyclaude cancel ',
     'lz get', 'lz set', 'lz help', 'lz version', 'lz status',
     'lz tabs', 'lz reset', 'lz diag',
+    'lz whoami', 'lz keys', 'lz uptime', 'lz usage', 'lz workflows',
+    'lz run ', 'lz cancel',
     'lz open chat', 'lz open wf', 'lz open term', 'lz open ai',
     'git status', 'git status -s', 'git status -sb',
     'git log -5', 'git log --oneline -10', 'git log --oneline -20',
