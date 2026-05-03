@@ -29460,7 +29460,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami'];
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage'];
   const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
@@ -29478,7 +29478,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   if (verb === '__unknown__') {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
-    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami'];
+    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage'];
     // QQ162 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     let best = null, bestScore = 99;
     for (const k of candidates) {
@@ -29505,6 +29505,8 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       'lazyclaude tabs                     — list every NAV tab id\n' +
       'lazyclaude status                   — quick summary (version + theme + assignee)\n' +
       'lazyclaude whoami                   — Claude CLI login (email/plan/org)\n' +
+      'lazyclaude keys                     — list providers + api-key status (masked)\n' +
+      'lazyclaude usage [N]                — cost summary across all sessions (default 7d)\n' +
       'lazyclaude diag                     — re-run CLI health check (claude/ollama/gemini/...)\n' +
       'lazyclaude version                  — dashboard version + build info\n' +
       'lazyclaude reset                    — wipe terminal log\n' +
@@ -29612,6 +29614,74 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
         `temperature:     ${ai.temperature != null ? ai.temperature : '(default)'}`,
         `tab:             ${(typeof state !== 'undefined' && state.view) || '?'}`,
       ];
+      log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'keys') {
+    // QQ204 — terminal parity with chat /keys. Lists registered
+    // providers + (for api-type) masked API key state. Read-only;
+    // wallclock-cheap because /api/ai-providers/list is cached.
+    try {
+      const r = await fetch('/api/ai-providers/list', { cache: 'no-store' });
+      const j = await r.json();
+      const providers = (j && j.providers) || [];
+      const apiKeys = (j && j.apiKeys) || {};
+      if (!providers.length) {
+        log.push({ kind: 'err', text: '⚠ ' + t('등록된 프로바이더가 없습니다'), ts: Date.now() });
+        return;
+      }
+      const lines = providers.map(p => {
+        const mark = p.available ? '✅' : '❌';
+        const kind = p.type === 'cli' ? 'cli' : 'api';
+        let key = '';
+        if (p.type === 'api') {
+          const k = apiKeys[p.id];
+          key = k ? `  key=${k}` : `  key=(missing)`;
+        }
+        return `${mark} ${p.id.padEnd(18)} (${kind})${key}`;
+      });
+      log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'usage') {
+    // QQ204 — terminal parity with chat /usage. Default 7d, accepts
+    // integer arg 1-365.
+    let days = 7;
+    if (rest) {
+      const n = parseInt(rest, 10);
+      if (!Number.isFinite(n) || n < 1 || n > 365) {
+        log.push({ kind: 'err', text: '⚠ ' + t('범위 밖') + ': ' + rest + ' (1 ~ 365)', ts: Date.now() });
+        return;
+      }
+      days = n;
+    }
+    try {
+      const r = await fetch('/api/cost-timeline/summary?days=' + days, { cache: 'no-store' });
+      const j = await r.json();
+      if (!j || !j.ok) {
+        log.push({ kind: 'err', text: '⚠ ' + t('비용 데이터를 가져오지 못했습니다'), ts: Date.now() });
+        return;
+      }
+      const lines = [
+        `Usage · ${days}d`,
+        `total:  $${(Number(j.totalUsd) || 0).toFixed(4)}`,
+        `calls:  ${j.totalCount || 0}`,
+      ];
+      const top = (j.byModel || []).slice(0, 3);
+      if (top.length) {
+        lines.push('', 'Top models:');
+        for (const m of top) {
+          const u = Number(m.usd || m.totalUsd || 0).toFixed(4);
+          lines.push(`  ${(m.model || m.id || '?').padEnd(28)} $${u}  (${m.count || m.totalCount || 0})`);
+        }
+      }
+      if (!j.totalCount) lines.push('', '(no recorded calls yet)');
       log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
     } catch (e) {
       log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });

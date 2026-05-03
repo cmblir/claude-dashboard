@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.99] — 2026-05-03
+
+**QQ204** — terminal parity for the chat `/keys` (QQ202) and
+`/usage` (QQ203) slashes:
+
+* `lazyclaude keys` — providers + `(cli)` / `(api)` chip +
+  `key=…mask` / `key=(missing)` for api-type providers.
+* `lazyclaude usage [N]` — total USD + call count + top-3
+  models. Default 7d, integer arg 1-365, out-of-range
+  emits `⚠ 범위 밖`.
+
+Also extended the `KNOWN_VERBS` + did-you-mean candidate
+lists so `lazyclaude kez` Levenshtein-suggests `keys`.
+
+`lazyclaude help` lists both new verbs.
+
+### Verified
+- `e2e-terminal-keys-usage.mjs` 11/11 ✅.
+- Regression: terminal-set-prefs / builtins-smoke +
+  chat-slash-keys / usage / whoami all green.
+
+---
 ## [2.71.98] — 2026-05-03
 
 **QQ203** — `/usage [N]` chat slash. Where `/cost` shows the
