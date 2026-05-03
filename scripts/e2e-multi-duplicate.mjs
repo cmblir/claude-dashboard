@@ -91,5 +91,60 @@ check('multi-selection now points to the clones',
     && after.selected.includes(bClone.id),
   `sel=${after.selected.join(',')}`);
 
+// QQ128 — ctx-menu '복제' should also use the multi-aware helper.
+// Reset to a clean 3-node graph and multi-select n-a + n-b again.
+await page.evaluate(() => {
+  __wf.current = {
+    id: 'wf-ctx-dup-' + Date.now(),
+    name: 'ctx-dup',
+    nodes: [
+      { id: 'n-a', type: 'session',  x: 100, y: 200, data: { subject: 'A', assignee: 'claude:opus' } },
+      { id: 'n-b', type: 'session',  x: 300, y: 200, data: { subject: 'B', assignee: 'claude:opus' } },
+      { id: 'n-c', type: 'session',  x: 500, y: 200, data: { subject: 'C', assignee: 'claude:opus' } },
+    ],
+    edges: [
+      { id: 'e-ab', from: 'n-a', to: 'n-b' },
+      { id: 'e-bc', from: 'n-b', to: 'n-c' },
+    ],
+  };
+  __wf.dirty = true;
+  _wfRenderCanvas();
+  __wfMultiSelected.clear();
+  __wfMultiSelected.add('n-a');
+  __wfMultiSelected.add('n-b');
+  __wf.selectedNodeId = null;
+  _wfSyncMultiSelectClasses();
+  // Open the ctx menu programmatically and click the 복제 item — we
+  // can't reliably synthesise a real right-click on the SVG node here
+  // without dealing with viewport coords, so we drive the rendered
+  // menu directly.
+  _wfShowNodeContextMenu('n-a', 200, 200);
+});
+
+// Click the 복제 row (it's the second row after Edit).
+const dupClicked = await page.evaluate(() => {
+  const menu = document.getElementById('wfNodeCtxMenu');
+  if (!menu) return false;
+  const rows = Array.from(menu.querySelectorAll('div'));
+  // Find the row whose text starts with the duplicate emoji or label.
+  const row = rows.find(el => /복제|Duplicate|复制/.test(el.textContent || ''));
+  if (!row) return false;
+  row.click();
+  return true;
+});
+check('ctx-menu 복제 row found + clicked', dupClicked);
+await page.waitForTimeout(150);
+
+const ctxAfter = await page.evaluate(() => ({
+  total:    __wf.current.nodes.length,
+  selected: Array.from(__wfMultiSelected || []),
+}));
+check('ctx-menu duplicate cloned BOTH multi-selected nodes',
+  ctxAfter.total === 5,
+  `total=${ctxAfter.total}`);
+check('ctx-menu duplicate updated multi-selection to the new clones',
+  ctxAfter.selected.length === 2,
+  `selected=${ctxAfter.selected.length}`);
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

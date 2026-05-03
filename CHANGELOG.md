@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.18] — 2026-05-03
+
+**QQ128** — context-menu **복제** entry was the older single-node
+clone path that ignored multi-selection (orthogonal to QQ127's
+keyboard fix). Right-clicking inside a multi-select then choosing
+복제 cloned only the right-clicked node. Now both the keyboard
+shortcut and the ctx menu share `window._wfDuplicateNodes` so
+they behave identically.
+
+### Changes
+- Extracted the duplicate logic into a single
+  `window._wfDuplicateNodes(ids[])` helper.
+- Cmd/Ctrl+D and the ctx-menu 복제 entry both call it.
+- `_wfShowNodeContextMenu` exposed on `window` (needed for the
+  e2e regression and for parity with the other lazyclaw window
+  exposures — QQ109/110 pattern).
+
+### Verified
+- `scripts/e2e-multi-duplicate.mjs` extended to 11 checks
+  (was 8) — opens the ctx menu programmatically with two nodes
+  multi-selected, clicks 복제, asserts both clones land and the
+  selection points at them. All green.
+
+---
 ## [2.71.17] — 2026-05-03
 
 **QQ127** — Cmd/Ctrl+D duplicates **all** multi-selected nodes,
