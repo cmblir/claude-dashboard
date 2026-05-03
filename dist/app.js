@@ -27439,6 +27439,16 @@ AFTER.lazyclawChat = () => {
         }
         return;
       }
+      // QQ166 — Cmd/Ctrl+Shift+E — export the current chat to
+      // markdown. Mirrors the toolbar 📥 button. Skips inside an
+      // input/textarea.
+      if (mod && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+        const tag = (e.target && e.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        e.preventDefault();
+        if (typeof _lcChatExport === 'function') _lcChatExport();
+        return;
+      }
       // QQ50 (v2.66.125) — Cmd+Shift+[ / ] — prev/next chat session
       // (mirrors workflow Cmd+[/]). Skips when typing in an input.
       if (mod && e.shiftKey && (e.key === '[' || e.key === ']' || e.key === '{' || e.key === '}')) {
@@ -28195,6 +28205,7 @@ function _lcChatSlashCommand(line) {
 
 - \`Cmd/Ctrl + K\` — ${t('대화 검색')}
 - \`Cmd/Ctrl + Shift + N\` — ${t('새 대화')}
+- \`Cmd/Ctrl + Shift + E\` — ${t('마크다운으로 내보내기')}
 - \`Cmd/Ctrl + Shift + [\` / \`]\` — ${t('이전/다음 세션')}
 - \`Cmd/Ctrl + ↑\` / \`↓\` — ${t('이전 사용자 메시지 recall')}
 - \`Enter\` — ${t('전송')} · \`Shift+Enter\` — ${t('줄바꿈')}
