@@ -27829,6 +27829,34 @@ function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'theme': {
+      // QQ120 — quick theme toggle/set without leaving the chat.
+      //   /theme            → toggle dark ↔ light
+      //   /theme <name>     → set (auto/dark/light/midnight/forest/sunset)
+      const cur = (window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.theme) || 'auto';
+      let next = rest.toLowerCase().trim();
+      if (!next) next = cur === 'light' ? 'dark' : 'light';
+      if (typeof _qsApplyAndPersist === 'function') {
+        _qsApplyAndPersist('ui', 'theme', next);
+      } else if (typeof setTheme === 'function') {
+        setTheme(next);
+      }
+      toast(`🎨 ${t('테마')}: ${next}`, 'ok');
+      return true;
+    }
+    case 'lang': {
+      // QQ120 — switch ko/en/zh; triggers location.reload via setLang.
+      if (!rest || !['ko', 'en', 'zh'].includes(rest.toLowerCase())) {
+        toast(t('사용법: /lang ko|en|zh'), 'warn');
+        return true;
+      }
+      if (typeof _qsApplyAndPersist === 'function') {
+        _qsApplyAndPersist('ui', 'lang', rest.toLowerCase());
+      } else if (typeof setLang === 'function') {
+        setLang(rest.toLowerCase());
+      }
+      return true;
+    }
     case 'sessions': {
       // QQ119 — list every chat session with msg count + active marker.
       const all = _lcGetSessions() || [];
@@ -27878,6 +27906,8 @@ function _lcChatSlashCommand(line) {
 \`/status\` — ${t('어시니·세션·테마·언어 요약')}
 \`/agents\` — ${t('등록된 어시니 목록')}
 \`/sessions\` — ${t('세션 목록 + 메시지 수')}
+\`/theme [auto|dark|light|midnight|forest|sunset]\` — ${t('테마 토글/지정')}
+\`/lang ko|en|zh\` — ${t('언어 전환 (페이지 리로드)')}
 \`/rename <이름>\` — ${t('세션 이름 변경')}
 \`/export\` — ${t('마크다운으로 내보내기')}
 \`/help\` — ${t('이 목록')}
