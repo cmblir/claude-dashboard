@@ -98,5 +98,14 @@ const opMatches = await page.evaluate(() => window._lcTermSuggest('lazyclaude op
 check('autocomplete: "lazyclaude op" returns ≥3 candidates',
   opMatches.length >= 3, `len=${opMatches.length}`);
 
+// QQ186 — `lz<Tab>` now covers every builtin (was just lz get / lz set).
+const lzMatches = await page.evaluate(() => window._lcTermSuggest('lz'));
+check('autocomplete: "lz" returns ≥10 candidates (QQ186)',
+  lzMatches.length >= 10, `len=${lzMatches.length}`);
+const lzHasHelp = lzMatches.includes('lz help');
+const lzHasStatus = lzMatches.includes('lz status');
+check('"lz" candidates include lz help', lzHasHelp);
+check('"lz" candidates include lz status', lzHasStatus);
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
