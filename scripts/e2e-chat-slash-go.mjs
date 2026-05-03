@@ -74,5 +74,22 @@ await slash('/help');
 const help = await page.evaluate(() => document.getElementById('lcChatLog').innerHTML);
 check('/help lists /go', /\/go/.test(help));
 
+// QQ169 — `/go bogusXYZ` must NOT navigate; toast warns + view stays put.
+await page.evaluate(() => window.go('lazyclawChat'));
+await page.waitForSelector('#lcChatInput');
+await page.evaluate(() => {
+  window.__toastMsg = '';
+  const orig = window.toast;
+  window.toast = (m, k) => { window.__toastMsg = m; return orig && orig(m, k); };
+});
+await slash('/go bogusXYZ');
+const v = await page.evaluate(() => state.view);
+const toast = await page.evaluate(() => window.__toastMsg);
+check('/go bogusXYZ stays on lazyclawChat', v === 'lazyclawChat',
+  `view=${v}`);
+check('/go bogusXYZ toasts unknown-tab + points to /tabs',
+  /알 수 없는 탭|unknown/i.test(toast) && /tabs|\/tabs/.test(toast),
+  `toast="${toast}"`);
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
