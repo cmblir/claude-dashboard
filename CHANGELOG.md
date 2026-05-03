@@ -10,6 +10,26 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.2] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Chat slash commands regression**
+  (`scripts/e2e-chat-slash-commands.mjs`). 8 checks across
+  QQ1 / QQ62 / QQ70:
+  1. Tab autocompletes `/cl` → `/clear` (QQ62).
+  2. `/clear` empties the current session's history,
+     composer is cleared, and the QQ33 draft entry is also
+     deleted (QQ70).
+  3. `/system <text>` saves text under
+     `cc.lazyclawChat.sys.<assignee>`.
+  4. `/model claude:haiku` flips the dropdown value and
+     persists to `cc.lazyclawChat.assignee`.
+  5. `/help` appends a help message into the active session
+     containing the localized "슬래시 명령" header.
+
+  Total e2e suite: **25/25 pass**.
+
+---
 ## [2.70.1] — 2026-05-03
 
 ### Added (test infra)
