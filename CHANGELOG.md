@@ -10,6 +10,29 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.6] — 2026-05-03
+
+**QQ116** — three new openclaw-style chat slash commands plus a
+`/help` refresh.
+
+### Added
+- `/cost` — sums `tokensIn / tokensOut / costUsd` across the
+  current session and posts the totals as an inline assistant
+  bubble.
+- `/status` — prints assignee, session label + short id, current
+  language and theme.
+- `/rename <name>` — rename the current session in place; pushes
+  through to `_lcRenderSessions` so the sidebar updates.
+- `/help` lists the three new commands.
+
+### Verified
+- `scripts/e2e-chat-slash-cost-status.mjs` — Playwright regression
+  with 8/8 checks (token totals, USD format, status assignee,
+  rename persisted, /help listing). Seeds a fresh session with two
+  fake assistant messages carrying token + cost so /cost can prove
+  the rollup math.
+
+---
 ## [2.71.5] — 2026-05-03
 
 **QQ115** — openclaw-style **settings via the lazyclaw terminal**.
