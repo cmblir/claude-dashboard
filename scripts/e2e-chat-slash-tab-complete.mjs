@@ -48,13 +48,13 @@ async function tab(seed, times = 1) {
 const r1 = await tab('/the');
 check('/the<Tab> expands to /theme', r1 === '/theme', `got="${r1}"`);
 
-// 2. /co<Tab> → cycles between cost / copy.
+// 2. /co<Tab> → cycles between cost / copy / code (QQ171 added /code).
 const r2a = await tab('/co');
 const r2b = await tab('/co', 2);
-check('/co<Tab> picks one of /cost or /copy',
-  r2a === '/cost' || r2a === '/copy', `first=${r2a}`);
-check('/co<Tab><Tab> cycles to the other',
-  (r2a === '/cost' && r2b === '/copy') || (r2a === '/copy' && r2b === '/cost'),
+check('/co<Tab> picks one of /cost, /copy, /code',
+  ['/cost', '/copy', '/code'].includes(r2a), `first=${r2a}`);
+check('/co<Tab><Tab> moves to a different candidate',
+  r2a !== r2b && ['/cost', '/copy', '/code'].includes(r2b),
   `first=${r2a} second=${r2b}`);
 
 // 3. /xyz → no match → unchanged
@@ -85,6 +85,15 @@ check('/re<Tab> cycles through rename/retry/regenerate',
 // 8. /v<Tab> expands to /version (QQ151).
 const r8 = await tab('/v');
 check('/v<Tab> expands to /version', r8 === '/version', `got="${r8}"`);
+
+// 9. /co<Tab>×3 now cycles cost / copy / code (QQ171).
+const seen = new Set();
+seen.add(await tab('/co', 1));
+seen.add(await tab('/co', 2));
+seen.add(await tab('/co', 3));
+check('/co<Tab>×3 cycles cost / copy / code',
+  seen.has('/cost') && seen.has('/copy') && seen.has('/code'),
+  `seen=${[...seen].join(',')}`);
 
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
