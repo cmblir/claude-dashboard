@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.71] — 2026-05-03
+
+**QQ179** — companion to QQ178: comprehensive smoke for every
+`lazyclaude <verb>` terminal built-in. Asserts each verb routes
+to client-side handler (zero `/api/lazyclaw/term` hits) and the
+terminal DOM survives. Also round-trips a `set ui density
+compact` to verify the prefs API integration sticks.
+
+### Verified
+- `scripts/e2e-terminal-builtins-smoke.mjs` — 11/11 green
+  covering help/--help/version/--version/status/tabs/get(×3)/
+  lz-help + a set/get round-trip.
+
+---
 ## [2.71.70] — 2026-05-03
 
 **QQ178** — comprehensive smoke regression for every chat slash
