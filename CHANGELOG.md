@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.65] — 2026-05-03
+
+**QQ174** — `/clear all` chat slash. Wipes every chat session
+(both `cc.lc.sessions` array and every `cc.lc.hist.*`
+localStorage key) after a single confirm. Plain `/clear`
+keeps the QQ173 session-scoped behaviour.
+
+### Verified
+- `scripts/e2e-chat-clear-all.mjs` — 5/5 green: seeds 3
+  sessions, `/clear all` confirms once, ends with ≤1 fresh
+  session, all hist keys gone, `/help` lists `/clear all`.
+- `e2e-chat-clear-empty.mjs` (the QQ173 regression) still 4/4.
+
+---
 ## [2.71.64] — 2026-05-03
 
 **QQ173** — `/clear` no longer prompts for confirmation when
