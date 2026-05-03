@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.9] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Workflow run REST pipeline regression**
+  (`scripts/e2e-workflow-run-rest.mjs`):
+  1. POST `/api/workflows/save` with a start-only workflow.
+  2. POST `/api/workflows/run` returns a `runId`.
+  3. Poll `/api/workflows/run-status?runId=…` until terminal —
+     status reaches `ok`, `nodeResults['n-start']` is populated.
+  4. GET `/api/workflows/runs?wfId=…` lists the run we just
+     fired. (First attempt used the wrong query param name —
+     the API takes `wfId`, not `workflowId` — fixed in v2.70.9.)
+
+  Total e2e suite: **32/32 pass**. Auto-cleans the test workflow.
+
+---
 ## [2.70.8] — 2026-05-03
 
 ### Added (test infra)
