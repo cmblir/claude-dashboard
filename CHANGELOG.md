@@ -10,6 +10,41 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.2] — 2026-05-03
+
+**QQ112** — Auto-Resume panel could not bind dormant (not currently
+running) sessions. The session-detail panel's `_arSubmit` always
+posted `allowUnboundSession=false`, so the API rejected with
+`Session not currently running. Pass allowUnboundSession=true to
+bind anyway.` This is the common case (you typically set up
+Auto-Resume *for* a session that has already exited / hit a token
+limit), so the panel was broken for its primary use case.
+
+### Added
+- **Force-bind checkbox** in the Auto-Resume session-detail panel:
+  새 `arAllowUnbound` 체크박스(advanced settings 안). Tick it to
+  bind a session that isn't currently live — re-resume will spin up
+  a new Claude session at the bound cwd.
+
+### Fixed
+- `scripts/e2e-auto-resume.mjs`:
+  - Honour `$PORT` (default 8080 still works) so the standard
+    `PORT=19500` sweep no longer skips this script.
+  - Set `allowUnboundSession=true` for the inject flow + the badge
+    sub-test, since `pickSessionId` always returns historical (not
+    live) sessions in CI.
+  - Replace one `page.waitForFunction` poll with `waitForSelector`
+    state:visible — the JS-eval poll never returned truthy in the
+    headless test rig despite the button being painted; selector
+    state matching is reliable here.
+
+### Verified
+- 3/3 viewports (mobile 375 / narrow 768 / desktop 1280) PASS:
+  panel renders → inject succeeds → state chip + progress bar
+  appear → cancel reverts → hook install/uninstall round-trip →
+  session list shows 🔄 AR badge.
+
+---
 ## [2.71.1] — 2026-05-03
 
 **QQ111** — Fix QQ76 pre-token "_…_" placeholder never rendering.

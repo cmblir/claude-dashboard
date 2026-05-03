@@ -10755,6 +10755,10 @@ function _arRender(panel, entry) {
             <input type="checkbox" id="arInstallHooks" ${prevHooks} />
             <span title="${t('Stop hook 으로 매 응답 시 스냅샷 저장 + SessionStart 로 자동 주입')}">${t('Stop+SessionStart Hook 자동 설치 (프로젝트)')}</span>
           </label>
+          <label class="cursor-pointer flex items-center gap-1">
+            <input type="checkbox" id="arAllowUnbound" />
+            <span title="${t('이미 종료된 세션이라도 강제로 바인딩 — 재개 시 새 세션이 시작됨')}">${t('비활성 세션 강제 바인딩')}</span>
+          </label>
         </div>
         <div class="flex gap-2 items-center text-xs flex-wrap">
           <label class="text-[var(--text-dim)] w-full text-[10px] uppercase">${t('알림 (선택) — 상태 전이 시 webhook')}</label>
@@ -10863,6 +10867,7 @@ async function _arSubmit(sessionId, cwd) {
   const maxEl      = document.getElementById('arMax');
   const contEl     = document.getElementById('arUseContinue');
   const hooksEl    = document.getElementById('arInstallHooks');
+  const allowEl    = document.getElementById('arAllowUnbound');
   const slackEl    = document.getElementById('arSlackUrl');
   const discordEl  = document.getElementById('arDiscordUrl');
   const body = {
@@ -10874,6 +10879,7 @@ async function _arSubmit(sessionId, cwd) {
     maxAttempts: maxEl ? Number(maxEl.value) || 12 : 12,
     useContinue: !!(contEl && contEl.checked),
     installHooks: !!(hooksEl && hooksEl.checked),
+    allowUnboundSession: !!(allowEl && allowEl.checked),
     notify: {
       slack:   slackEl ? (slackEl.value || '').trim() : '',
       discord: discordEl ? (discordEl.value || '').trim() : '',

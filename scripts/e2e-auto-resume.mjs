@@ -21,7 +21,7 @@ import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const BASE = process.env.BASE || 'http://127.0.0.1:8080';
+const BASE = process.env.BASE || `http://127.0.0.1:${process.env.PORT || 8080}`;
 const HEADLESS = process.env.HEADLESS !== '0';
 
 const VIEWPORTS = [
@@ -145,10 +145,13 @@ async function runViewport(browser, vp, sessionId, sandboxCwd) {
   }
   log(vp.name, '✓ Auto-Resume panel rendered');
 
-  await safeWaitForFunction(page, () => {
-    const btn = document.getElementById('arInjectBtn');
-    return btn && btn.offsetParent !== null;
-  }, { timeout: 8000 });
+  // QQ112 — page.waitForFunction polled an arInjectBtn predicate that
+  // never returned truthy in the loop's test rig (works in isolated
+  // probes; suspected interaction with the AR ticker swapping the
+  // panel innerHTML mid-poll under headless Chromium). waitForSelector
+  // with state:'visible' uses a dedicated DOM observer instead of
+  // page-side eval and is reliable here.
+  await page.waitForSelector('#arInjectBtn', { state: 'visible', timeout: 8000 });
 
   await safeEvaluate(page, () => {
     const det = document.querySelector('#autoResumePanel details');
@@ -161,6 +164,11 @@ async function runViewport(browser, vp, sessionId, sandboxCwd) {
     const poll = document.getElementById('arPoll');
     if (max) max.value = '8';
     if (poll) poll.value = '60';
+    // QQ112 — sessions picked from /api/sessions/list are typically not
+    // currently running, so the API rejects bind requests without
+    // allowUnboundSession=true. Tick the new force-bind checkbox.
+    const allow = document.getElementById('arAllowUnbound');
+    if (allow) allow.checked = true;
   });
 
   await page.click('#arInjectBtn');
@@ -219,7 +227,7 @@ async function runViewport(browser, vp, sessionId, sandboxCwd) {
   await safeEvaluate(page, async (sid) => {
     await fetch('/api/auto_resume/set', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId: sid, prompt: 'badge test', pollInterval: 60, idleSeconds: 30, maxAttempts: 3 }),
+      body: JSON.stringify({ sessionId: sid, prompt: 'badge test', pollInterval: 60, idleSeconds: 30, maxAttempts: 3, allowUnboundSession: true }),
     });
   }, sessionId);
 
