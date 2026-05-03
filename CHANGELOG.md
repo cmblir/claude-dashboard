@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.3] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Playwright regression scripts for chat features** —
+  `scripts/e2e-chat-image-attach.mjs` (QQ39 / QQ61 / QQ92 / QQ93
+  paste-drop-picker → counter → click-to-clear) and
+  `scripts/e2e-chat-session-nav.mjs` (QQ50 Cmd+Shift+[/] +
+  QQ86 active-row data attribute). Both run against the dev
+  server with no provider key required and need only the local
+  `playwright` install.
+
+---
 ## [2.69.2] — 2026-05-03
 
 ### Fixed
