@@ -28280,17 +28280,27 @@ function _lcChatSlashCommand(line) {
     }
     case 'sessions': {
       // QQ119 — list every chat session with msg count + active marker.
+      // QQ188 — cap output at 30 lines so a user with 100+ sessions
+      //   doesn't get a wall of text in the chat. Active session is
+      //   pinned to the top so it's always visible regardless of cap.
       const all = _lcGetSessions() || [];
       if (!all.length) { toast(t('세션이 없어요'), 'warn'); return true; }
       const curId = _lcCurrentId();
-      const lines = all.map(s => {
+      // Active first, rest in storage order.
+      const ordered = all.slice().sort((a, b) =>
+        (a.id === curId ? -1 : 0) - (b.id === curId ? -1 : 0));
+      const CAP = 30;
+      const visible = ordered.slice(0, CAP);
+      const lines = visible.map(s => {
         let n = 0;
         try { n = (_lcGetHistory(s.id) || []).length; } catch (_) {}
         const cur = s.id === curId ? '➜' : '  ';
         const lbl = (s.label || t('이름 없음')).slice(0, 50);
         return `- ${cur} \`${s.id.slice(0, 8)}\` — ${lbl} *(${n} ${t('메시지')})*`;
       });
-      const md = `**${t('세션 목록')}** (${all.length})\n\n` + lines.join('\n');
+      const overflow = ordered.length - visible.length;
+      let md = `**${t('세션 목록')}** (${all.length})\n\n` + lines.join('\n');
+      if (overflow > 0) md += `\n\n_… ${overflow} ${t('개 더')}_`;
       const history = _lcChatLoad();
       history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
       _lcChatSave(history);
