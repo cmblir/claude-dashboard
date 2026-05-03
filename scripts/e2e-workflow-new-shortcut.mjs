@@ -59,5 +59,35 @@ check('shortcut help mentions Ctrl+N', /Ctrl\+N\b/.test(helpHTML));
 // Esc closes the modal cleanly so the test ends in a known state.
 await page.keyboard.press('Escape');
 
+// QQ165b — full end-to-end: stub promptModal to auto-respond and verify
+// the shortcut actually creates AND switches to a new workflow.
+await page.evaluate(() => {
+  window.promptModal = () => Promise.resolve('e2e-shortcut-' + Date.now());
+});
+const idBefore = await page.evaluate(() => __wf.current && __wf.current.id);
+await page.evaluate(() => {
+  document.dispatchEvent(new KeyboardEvent('keydown', {
+    key: 'N', code: 'KeyN', metaKey: true, shiftKey: true, bubbles: true,
+  }));
+});
+await page.waitForTimeout(1500);
+const after = await page.evaluate(() => ({
+  id: __wf.current && __wf.current.id,
+  name: __wf.current && __wf.current.name,
+}));
+check('shortcut actually creates a new workflow id (full flow)',
+  after.id && after.id !== idBefore, `before=${idBefore} after=${after.id}`);
+check('shortcut name reflects the prompted value',
+  /^e2e-shortcut-/.test(after.name || ''), `name=${after.name}`);
+// Cleanup
+if (after.id && after.id.startsWith('wf-')) {
+  await page.evaluate(async (id) => {
+    await fetch('/api/workflows/delete', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({id}),
+    });
+  }, after.id);
+}
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
