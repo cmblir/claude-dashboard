@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.20] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Workflow export/import round-trip regression**
+  (`scripts/e2e-workflow-export-import.mjs`). 12 checks:
+  1. Save a workflow with tags, sticky note, start, session,
+     edge, and a non-default viewport.
+  2. `/api/workflows/export` returns
+     `{ok:true, export:{exportVersion:1, workflow:{...}}}`.
+  3. `/api/workflows/import` (with the envelope) returns a fresh
+     id distinct from the source.
+  4. Re-fetched imported workflow preserves tags, all 3 nodes,
+     1 edge, sticky text/color/dimensions, and viewport.zoom.
+
+  Cleans both source + imported workflow at the end.
+
+---
 ## [2.69.19] — 2026-05-03
 
 ### Added (test infra)
