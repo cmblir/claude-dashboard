@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.105] — 2026-05-03
+
+**QQ210** — `lazyclaude cancel [runId|wf]` terminal verb
+parity with chat `/cancel` (QQ209). Same resolution rules:
+exact runId / runId-prefix / wf-id-or-name (when
+unique-running). No arg → "Running runs (N)" listing or
+"(no workflows currently running)" line.
+
+`KNOWN_VERBS`, did-you-mean candidates, and
+`lazyclaude help` all extended.
+
+### Verified
+- `e2e-terminal-cancel.mjs` 9/9 ✅ (no-arg list, bogus warn,
+  runId POST + body validation, help listing,
+  did-you-mean for `cancl` typo).
+- Regression: terminal-set-prefs / builtins-smoke /
+  workflows-run / keys-usage + chat-slash-cancel all green.
+
+---
 ## [2.71.104] — 2026-05-03
 
 **QQ209** — `/cancel` chat slash. Cancels a running workflow
