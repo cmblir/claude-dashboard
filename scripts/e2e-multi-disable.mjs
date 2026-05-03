@@ -86,5 +86,37 @@ check('single-select D toggles only n-b',
   aOnly === false && bOnly === true && cOnly === false,
   `a=${aOnly} b=${bOnly} c=${cOnly}`);
 
+// QQ159 — D toggle is undoable. Multi-toggle pushes a single undo
+// entry so Cmd+Z restores the original disabled state in one keystroke.
+await page.evaluate(() => {
+  __wf.current = {
+    id: 'wf-disable-undo-' + Date.now(),
+    name: 'disable-undo',
+    nodes: [
+      { id: 'n-x', type: 'session', x: 100, y: 200, data: { subject: 'X', assignee: 'claude:opus', disabled: false } },
+      { id: 'n-y', type: 'session', x: 300, y: 200, data: { subject: 'Y', assignee: 'claude:opus', disabled: false } },
+    ],
+    edges: [],
+  };
+  __wf._undoStack = [];
+  _wfRenderCanvas();
+  __wfMultiSelected.clear();
+  __wfMultiSelected.add('n-x');
+  __wfMultiSelected.add('n-y');
+  __wf.selectedNodeId = null;
+  _wfSyncMultiSelectClasses();
+});
+
+await page.keyboard.press('KeyD');
+await page.waitForTimeout(120);
+const after = await page.evaluate(() => __wf.current.nodes.map(n => !!(n.data && n.data.disabled)));
+check('D disables both nodes', after.every(d => d === true), JSON.stringify(after));
+
+await page.keyboard.press('Meta+KeyZ');
+await page.waitForTimeout(120);
+const undone = await page.evaluate(() => __wf.current.nodes.map(n => !!(n.data && n.data.disabled)));
+check('Cmd+Z reverts both nodes back to enabled in one step',
+  undone.every(d => d === false), JSON.stringify(undone));
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

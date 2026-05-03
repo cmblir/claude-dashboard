@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.49] — 2026-05-03
+
+**QQ159** — `D` keystroke (toggle disabled) is now undoable.
+The QQ133 multi-select handler and the original PP2 single-node
+path both forgot to call `_wfPushUndo`, so an accidental
+disable-burst was permanent — Cmd+Z either went back further
+than the user intended or did nothing.
+
+Both paths now push a single undo entry so Cmd+Z restores the
+pre-toggle state of the entire selection in one keystroke.
+
+### Verified
+- `e2e-multi-disable.mjs` extended from 3 → 5 checks: D disables
+  both nodes, Cmd+Z restores both. All green.
+
+---
 ## [2.71.48] — 2026-05-03
 
 **QQ158** — Playwright coverage for Cmd+Z undoing a
