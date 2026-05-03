@@ -27880,6 +27880,27 @@ function _lcChatSlashCommand(line) {
       })();
       return true;
     }
+    case 'go':
+    case 'open': {
+      // QQ125 — jump to another tab without leaving the chat.
+      // Accepts tab id (lazyclawTerm, workflows, projects) or fuzzy
+      // alias (term, wf, proj, ai, settings). Useful when a chat reply
+      // points the user to a feature elsewhere.
+      const ALIAS = {
+        term: 'lazyclawTerm', terminal: 'lazyclawTerm',
+        wf: 'workflows', workflow: 'workflows', flows: 'workflows',
+        proj: 'projects', projects: 'projects',
+        ai: 'aiProviders', providers: 'aiProviders',
+        settings: 'settings', set: 'settings',
+        sessions: 'sessions', sess: 'sessions',
+        analytics: 'analytics', cost: 'usage', usage: 'usage',
+      };
+      const target = ALIAS[rest.toLowerCase()] || rest;
+      if (!target) { toast(t('사용법: /go <tab>'), 'warn'); return true; }
+      if (typeof window.go === 'function') window.go(target);
+      else { try { location.hash = '#/' + target; } catch (_) {} }
+      return true;
+    }
     case 'theme': {
       // QQ120 — quick theme toggle/set without leaving the chat.
       //   /theme            → toggle dark ↔ light
@@ -27959,6 +27980,7 @@ function _lcChatSlashCommand(line) {
 \`/sessions\` — ${t('세션 목록 + 메시지 수')}
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
 \`/retry\` (= \`/regenerate\`) — ${t('마지막 사용자 프롬프트 재실행')}
+\`/go <tab>\` (= \`/open\`) — ${t('다른 탭으로 이동 (term/wf/proj/ai/settings)')}
 \`/theme [auto|dark|light|midnight|forest|sunset]\` — ${t('테마 토글/지정')}
 \`/lang ko|en|zh\` — ${t('언어 전환 (페이지 리로드)')}
 \`/rename <이름>\` — ${t('세션 이름 변경')}
@@ -27988,7 +28010,7 @@ function _lcChatSlashCommand(line) {
   if (/^\/[a-z][a-z0-9_-]*\s*$/i.test(line)) {
     const known = ['clear','system','model','export','help','cost','status',
                    'agents','sessions','rename','theme','lang','copy',
-                   'retry','regenerate'];
+                   'retry','regenerate','go','open'];
     const hint = (() => {
       // Cheap "edit distance ≤ 2 OR shared prefix ≥ 2" heuristic.
       let best = null, bestScore = 99;

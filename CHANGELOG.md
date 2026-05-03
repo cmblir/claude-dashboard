@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.15] — 2026-05-03
+
+**QQ125** — `/go <tab>` (alias `/open`) chat slash command.
+Jumps to another dashboard tab from chat without keyboard
+gymnastics. Resolves a small alias table — `term` →
+`lazyclawTerm`, `wf` → `workflows`, `proj` → `projects`,
+`ai` → `aiProviders`, `settings`, `cost` → `usage`, etc. — and
+falls through literal tab ids unchanged.
+
+`/help` updated. The unknown-slash heuristic learns about
+`/go` and `/open` so typos route to them.
+
+### Verified
+- `scripts/e2e-chat-slash-go.mjs` — Playwright regression: alias
+  `/go term` lands on lazyclawTerm, `/go wf` on workflows,
+  `/open analytics` on analytics, no-arg toasts and stays put,
+  `/help` listing includes `/go`. 6/6 green.
+
+---
 ## [2.71.14] — 2026-05-03
 
 **QQ124** — typo'd chat slash commands no longer leak to the
