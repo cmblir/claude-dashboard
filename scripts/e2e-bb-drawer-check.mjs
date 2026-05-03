@@ -47,10 +47,16 @@ const m1 = await page.evaluate(() => {
 console.log('initial layout:', JSON.stringify(m1, null, 2));
 await page.screenshot({ path: '/tmp/bb-drawer-initial.png' });
 
-// Type into search to verify filtering
-const inp = await page.$('.wf-pal-search-input');
-if (inp) {
-  await inp.fill('http');
+// Type into search to verify filtering. The palette re-renders on each
+// keystroke, so the input handle goes stale — drive the input via
+// page.evaluate + dispatchEvent('input') instead of an ElementHandle.
+const hasSearch = await page.evaluate(() => !!document.querySelector('.wf-pal-search-input'));
+if (hasSearch) {
+  await page.evaluate(() => {
+    const el = document.querySelector('.wf-pal-search-input');
+    el.value = 'http';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   await page.waitForTimeout(250);
   const m2 = await page.evaluate(() => ({
     visibleCategories: document.querySelectorAll('.wf-node-editor .wf-pal-cat').length,
@@ -59,8 +65,11 @@ if (inp) {
   console.log('after search "http":', m2);
   await page.screenshot({ path: '/tmp/bb-drawer-search.png' });
 
-  // Clear filter
-  await inp.fill('');
+  // Clear filter — re-query because the prior input element was replaced.
+  await page.evaluate(() => {
+    const el = document.querySelector('.wf-pal-search-input');
+    if (el) { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); }
+  });
   await page.waitForTimeout(150);
 }
 
