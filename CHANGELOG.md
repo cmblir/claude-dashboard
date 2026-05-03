@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.10] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Sticky note canvas regression**
+  (`scripts/e2e-sticky-note.mjs`). Pins down the QQ36 sticky
+  rendering contract + QQ108 snap-key sticky-digest:
+  1. Yellow sticky renders with `fill="#fef3c7"`, expected
+     width/height, markdown text in `<foreignObject>`.
+  2. Sticky has zero `.wf-port` children (no I/O).
+  3. `data.color = 'blue'` → fill flips to `#dbeafe` after the
+     keyed-diff renderer picks up the changed snap-key.
+  4. `data.text` mutation likewise triggers a node rebuild and
+     the new text appears in the `<foreignObject>`.
+
+  All 7 checks pass.
+
+---
 ## [2.69.9] — 2026-05-03
 
 ### Added (test infra)
