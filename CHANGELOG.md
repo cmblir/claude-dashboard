@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.14] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Edge connection invariants regression**
+  (`scripts/e2e-edge-connect.mjs`):
+  1. `_wfAddEdge('n-a', 'out', 'n-b', 'in')` returns true; edges
+     length 0 → 1.
+  2. Same connect call again returns false (duplicate).
+  3. Self-loop (`n-a` → `n-a`) rejected.
+  4. Cycle (`n-b` → `n-a` after `a → b` exists) rejected with
+     toast.
+  5. Canvas renders 1 `path.wf-edge` (waiting one frame past
+     RAF coalesce).
+
+  Total e2e suite: **37/37 pass**.
+
+---
 ## [2.70.13] — 2026-05-03
 
 ### Added (test infra)
