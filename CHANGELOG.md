@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.19] — 2026-05-03
+
+**QQ129** — Cmd/Ctrl+X **cut** workflow shortcut (n8n parity).
+The canvas already had Cmd+C / Cmd+V from QQ29, but cut had to
+go through Cmd+C → Delete by hand. Now Cmd+X copies the selection
++ internal edges into `__wf._clipboard`, deletes them from the
+canvas, clears the selection, and pushes an undo entry — so a
+follow-up Cmd+V (or Cmd+Z) Just Works.
+
+### Verified
+- `scripts/e2e-multi-cut.mjs` — Playwright regression: seeds
+  A→B→C, multi-selects A+B, presses Cmd+X, asserts canvas drops
+  to 1 node, clipboard holds 2 nodes + 1 internal edge, then
+  Cmd+V pastes them back with re-wired edge. 8/8 green.
+
+---
 ## [2.71.18] — 2026-05-03
 
 **QQ128** — context-menu **복제** entry was the older single-node
