@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.11] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Chat branch + lineage regression**
+  (`scripts/e2e-chat-branch.mjs`). Pins down the QQ23 + QQ24
+  contract:
+  1. Seeded parent session (4 msgs) → branch from idx 1 →
+     new session created with `parentId`, `branchedAt`, and
+     truncated history (2 msgs).
+  2. Branch label embeds "분기" / "branch".
+  3. QQ24 sidebar lineage chip shows `↳ parent-session`.
+  4. Switching back to the parent restores its full 4-message
+     history.
+
+  9 checks, all pass.
+
+---
 ## [2.69.10] — 2026-05-03
 
 ### Added (test infra)
