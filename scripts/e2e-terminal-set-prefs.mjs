@@ -116,5 +116,23 @@ await runCmd('lz get ai');
 const get2 = (await lastOutput(1)).join('\n');
 check('`lz get ai` shorthand works', /"temperature"/.test(get2));
 
+// 7. QQ117 — `lazyclaude help` shows command listing without hitting shell
+const hitsBefore = termApiHits;
+await runCmd('lazyclaude help');
+const helpOut = (await lastOutput(1)).join('\n');
+check('lazyclaude help lists get/set/reset',
+  /lazyclaude get/.test(helpOut) && /lazyclaude set/.test(helpOut) && /lazyclaude reset/.test(helpOut));
+check('help did not hit /api/lazyclaw/term', termApiHits === hitsBefore);
+
+// 8. QQ117 — `lazyclaude reset` wipes the log
+await runCmd('lazyclaude reset');
+const logSize = await page.evaluate(() => {
+  return document.querySelectorAll('#lcTermLog > div').length;
+});
+// After reset there should be exactly the new "terminal cleared" line +
+// the cmd line emitted by _lcTermRun → 2.
+check('lazyclaude reset wipes the term log',
+  logSize <= 2, `lines=${logSize}`);
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

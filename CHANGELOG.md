@@ -10,6 +10,26 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.7] — 2026-05-03
+
+**QQ117** — two more terminal built-ins so users can discover and
+manage the lazyclaw terminal without leaving it.
+
+### Added
+- `lazyclaude help` (and `lz help`) — terse listing of every
+  built-in (`get` / `set` / `reset` / `help`), the four pref
+  sections, common examples, and a one-line note about the shell
+  whitelist. Stays client-side; never hits `/api/lazyclaw/term`.
+- `lazyclaude reset` — wipes the terminal log buffer
+  (`localStorage['cc.lazyclawTerm.log']`); preferences untouched.
+- Autocomplete suggestions extended.
+
+### Verified
+- `scripts/e2e-terminal-set-prefs.mjs` extended to 10 checks
+  (was 7) — `help` listing, shell short-circuit, `reset` empties
+  the log lines. All green.
+
+---
 ## [2.71.6] — 2026-05-03
 
 **QQ116** — three new openclaw-style chat slash commands plus a
