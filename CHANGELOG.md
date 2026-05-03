@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.0] — 2026-05-03
+
+**Playwright Verification Sprint II** — 41 e2e regression scripts
+all green. Backwards-compatible.
+
+### Added (test infra)
+- 🎭 **Run-cancel API regression**
+  (`scripts/e2e-run-cancel-api.mjs`): POST without runId / with
+  malformed runId both return `{ok:false, error:'invalid runId'}`;
+  with a real runId returns `{ok:true, live:<bool>}` regardless of
+  whether the run already finished.
+
+### Status (cumulative since v2.70.0)
+- **41/41** playwright e2e scripts pass.
+- **441** pytest pass (2 pre-existing FF1-obsoleted assertions
+  remain deselected).
+- **66/66** smoke tabs pass.
+- 2 real bugs caught + fixed by Playwright during the sprint:
+  QQ109 (`_wfShowNodeOutputModal`) and QQ110
+  (`_wfToggleNodeDisabled`) — both inline `onclick` handlers
+  that referenced module-private functions, fixed by
+  `window.…` exposure.
+
+---
 ## [2.70.16] — 2026-05-03
 
 ### Added (test infra)
