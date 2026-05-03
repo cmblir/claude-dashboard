@@ -69,6 +69,21 @@ const stayed = await page.evaluate(() => state.view);
 check('/go without arg toasts usage', /\/go|tab/i.test(t4), `toast="${t4}"`);
 check('/go without arg stays on lazyclawChat', stayed === 'lazyclawChat');
 
+// QQ181 — extended alias map.
+for (const [alias, expected] of [
+  ['home',  'overview'],
+  ['mem',   'memoryManager'],
+  ['ports', 'openPorts'],
+  ['ar',    'autoResumeManager'],
+]) {
+  await slash('/go ' + alias);
+  await page.waitForFunction((tb) => state && state.view === tb, expected, { timeout: 4000 });
+  const v = await page.evaluate(() => state.view);
+  check(`/go ${alias} → ${expected}`, v === expected, `view=${v}`);
+  await page.evaluate(() => window.go('lazyclawChat'));
+  await page.waitForSelector('#lcChatInput');
+}
+
 // 5. /help lists /go
 await slash('/help');
 const help = await page.evaluate(() => document.getElementById('lcChatLog').innerHTML);

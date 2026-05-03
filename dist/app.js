@@ -28192,12 +28192,19 @@ function _lcChatSlashCommand(line) {
       // points the user to a feature elsewhere.
       const ALIAS = {
         term: 'lazyclawTerm', terminal: 'lazyclawTerm',
+        chat: 'lazyclawChat',
         wf: 'workflows', workflow: 'workflows', flows: 'workflows',
         proj: 'projects', projects: 'projects',
         ai: 'aiProviders', providers: 'aiProviders',
         settings: 'settings', set: 'settings',
         sessions: 'sessions', sess: 'sessions',
         analytics: 'analytics', cost: 'usage', usage: 'usage',
+        // QQ181 — common navigation aliases the user might type.
+        home: 'overview', dashboard: 'overview', overview: 'overview',
+        agents: 'agents', mcp: 'mcp', hooks: 'hooks',
+        memory: 'memoryManager', mem: 'memoryManager',
+        ar: 'autoResumeManager', autoresume: 'autoResumeManager',
+        ports: 'openPorts',
       };
       const target = ALIAS[rest.toLowerCase()] || rest;
       if (!target) { toast(t('사용법: /go <tab>'), 'warn'); return true; }
@@ -29232,6 +29239,12 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       settings: 'settings', set: 'settings',
       sessions: 'sessions', sess: 'sessions',
       analytics: 'analytics', cost: 'usage', usage: 'usage',
+      // QQ181 — keep aligned with the chat /go alias map.
+      home: 'overview', dashboard: 'overview', overview: 'overview',
+      agents: 'agents', mcp: 'mcp', hooks: 'hooks',
+      memory: 'memoryManager', mem: 'memoryManager',
+      ar: 'autoResumeManager', autoresume: 'autoResumeManager',
+      ports: 'openPorts',
     };
     const target = ALIAS[rest.toLowerCase()] || rest;
     if (!target) {
