@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.4] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Workflow shortcuts + node-cache regression**
+  (`scripts/e2e-workflow-shortcuts.mjs`):
+  1. QQ11 `_wfToggleGrid()` flips `.wf-grid-on` on the canvas
+     host AND persists `cc.wfGrid` to localStorage; second
+     call toggles back.
+  2. `__wf._nodeEls` cache populated with each node id after a
+     render (proves the Y2 keyed-diff cache build).
+  3. `_wfSave` function exposed so Cm+S handler can dispatch.
+
+  Total e2e suite: **27/27 pass**.
+
+---
 ## [2.70.3] — 2026-05-03
 
 ### Added (test infra)
