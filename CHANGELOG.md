@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.9] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Pin Data context-menu regression**
+  (`scripts/e2e-pin-data-ctxmenu.mjs`). Dispatches a real
+  `contextmenu` MouseEvent on a session node, clicks
+  "📌 마지막 출력 핀 설정", asserts:
+  1. `node.data.pinned == true`.
+  2. `pinnedOutput` captured from `lastRunResults`.
+  3. Canvas pin badge appears.
+  Then opens the menu again, clicks "📌 핀 해제", asserts the
+  inverse. 8 checks total, no provider key needed.
+
+---
 ## [2.69.8] — 2026-05-03
 
 ### Added (test infra)
