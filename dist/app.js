@@ -27416,6 +27416,20 @@ AFTER.lazyclawChat = () => {
         toast(t('스트리밍 중단됨'), 'warn');
         return;
       }
+      // QQ164 — Cmd/Ctrl+Shift+N — new chat session. Mirrors the
+      // "+ New chat" button without forcing the user to grab the
+      // mouse. Skips when typing in an input/textarea so it doesn't
+      // hijack a literal capital N.
+      if (mod && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
+        const tag = (e.target && e.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        e.preventDefault();
+        if (typeof _lcNewSession === 'function') {
+          _lcNewSession();
+          if (typeof toast === 'function') toast(`＋ ${t('새 대화')}`, 'ok');
+        }
+        return;
+      }
       // QQ50 (v2.66.125) — Cmd+Shift+[ / ] — prev/next chat session
       // (mirrors workflow Cmd+[/]). Skips when typing in an input.
       if (mod && e.shiftKey && (e.key === '[' || e.key === ']' || e.key === '{' || e.key === '}')) {
@@ -28171,6 +28185,7 @@ function _lcChatSlashCommand(line) {
 **${t('단축키')}**
 
 - \`Cmd/Ctrl + K\` — ${t('대화 검색')}
+- \`Cmd/Ctrl + Shift + N\` — ${t('새 대화')}
 - \`Cmd/Ctrl + Shift + [\` / \`]\` — ${t('이전/다음 세션')}
 - \`Cmd/Ctrl + ↑\` / \`↓\` — ${t('이전 사용자 메시지 recall')}
 - \`Enter\` — ${t('전송')} · \`Shift+Enter\` — ${t('줄바꿈')}

@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.54] — 2026-05-03
+
+**QQ164** — Cmd/Ctrl+Shift+N keyboard shortcut creates a fresh
+chat session. Mirrors the "+ New chat" button without forcing
+the user to grab the mouse. Suppressed when the focus is inside
+an input/textarea so the shortcut doesn't hijack a literal
+capital N. `/help` updated.
+
+### Verified
+- `scripts/e2e-chat-new-session-shortcut.mjs` — Playwright
+  regression: starts with 1 session, Cmd+Shift+N creates a 2nd
+  and switches to it; suppressed inside the textarea; `/help`
+  lists the shortcut. 5/5 green.
+
+---
 ## [2.71.53] — 2026-05-03
 
 **QQ163** — small refactor: dedupe the duplicated Levenshtein
