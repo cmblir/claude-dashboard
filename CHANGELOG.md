@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.20] — 2026-05-03
+
+**QQ130** — workflow shortcut-help modal (`?` key) was missing
+the new `Ctrl+X` cut entry from QQ129. Added it, plus a
+Playwright regression that loads the help and asserts every
+key combo we document is actually rendered.
+
+### Verified
+- `scripts/e2e-workflow-shortcut-help.mjs` — opens the help via
+  `_wfShowShortcutHelp()`, asserts Ctrl+C/X/V/D/A/Z/S/Enter and
+  Esc are listed, Esc closes the modal, and a second
+  `_wfShowShortcutHelp()` call toggles it off (matching the
+  documented behaviour). 11/11 green.
+
+---
 ## [2.71.19] — 2026-05-03
 
 **QQ129** — Cmd/Ctrl+X **cut** workflow shortcut (n8n parity).
