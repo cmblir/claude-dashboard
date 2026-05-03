@@ -147,8 +147,24 @@ def _parse_lsof_line(line: str, proto: str) -> dict | None:
     }
 
 
+_PORTS_LIST_CACHE: dict = {"data": None, "ts": 0.0}
+# QQ144 — lsof can take 50-150ms on a busy system; the Open Ports tab
+# lives behind a live ticker that re-fetches every couple of seconds.
+# 3s TTL feels live (port table changes are user-noticeable on the
+# scale of seconds, not ms) and coalesces back-to-back hits.
+_PORTS_LIST_TTL_S = 3.0
+
+
 def api_ports_list(query: dict | None = None) -> dict:
     """GET /api/ports/list — listening TCP + all UDP bindings."""
+    import time as _time
+    nc = (query or {}).get("nocache")
+    if isinstance(nc, list):
+        nc = nc[0] if nc else None
+    if nc not in ("1", "true", "yes", True):
+        cached = _PORTS_LIST_CACHE.get("data")
+        if cached is not None and (_time.time() - _PORTS_LIST_CACHE.get("ts", 0)) < _PORTS_LIST_TTL_S:
+            return cached
     rows: list[dict] = []
     # Run TCP-listen and UDP lsof probes concurrently — they are independent.
     with ThreadPoolExecutor(max_workers=2) as ex:
@@ -168,7 +184,10 @@ def api_ports_list(query: dict | None = None) -> dict:
             if row:
                 rows.append(row)
     rows.sort(key=lambda r: (r["proto"], r["local_port"]))
-    return {"ok": True, "ports": rows}
+    result = {"ok": True, "ports": rows}
+    _PORTS_LIST_CACHE["data"] = result
+    _PORTS_LIST_CACHE["ts"] = _time.time()
+    return result
 
 
 # ───────── cli sessions ─────────

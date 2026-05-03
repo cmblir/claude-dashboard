@@ -10,6 +10,33 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.34] — 2026-05-03
+
+**QQ144** — fourth subprocess-bound endpoint memoised.
+`/api/ports/list` shells out to `lsof` for both TCP-listen and
+UDP probes (50-150ms on a busy box). The Open Ports tab polls
+this on a live ticker.
+
+### Fixed
+- 3s server-side memo for `/api/ports/list` in
+  `server/process_monitor.py`. Open ports change on a
+  human-noticeable timescale (seconds), so 3s feels live and
+  still coalesces every redundant tick. `?nocache=1` bypass.
+
+### Verified
+- `scripts/e2e-ports-list-cache.mjs` — Playwright regression:
+  cold ≈ 159ms, cached = 2ms, `?nocache=1` re-probes at 129ms,
+  TTL expires correctly after 3s. 3/3 green.
+
+### Cumulative tab-switch wins
+| Endpoint                     | Before | After (cached) |
+|------------------------------|--------|----------------|
+| /api/cli/status              |  750ms |     1ms        |
+| /api/auth/status             |  400ms |     1ms        |
+| /api/memory/snapshot         |  170ms |     2ms        |
+| /api/ports/list              |  150ms |     2ms        |
+
+---
 ## [2.71.33] — 2026-05-03
 
 **QQ143** — third subprocess-bound endpoint memoised.
