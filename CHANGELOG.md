@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.76] — 2026-05-03
+
+**QQ183** — Playwright regression locking in the QQ122 `/copy`
+fallback path. When `navigator.clipboard` is undefined (older
+browsers, http origins, permission-denied), the slash command
+must use the textarea + `document.execCommand('copy')` shim
+instead of crashing.
+
+### Verified
+- `e2e-chat-slash-cost-status.mjs` extended from 29 → 30 checks.
+  Stubs `navigator.clipboard = undefined`, runs `/copy`, asserts
+  the success toast still fires.
+
+---
 ## [2.71.75] — 2026-05-03
 
 **QQ182** — `/tabs` chat slash command. Lists every NAV id +

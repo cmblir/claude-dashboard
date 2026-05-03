@@ -107,6 +107,35 @@ check('/agents lists current assignee claude:opus',
   /claude:opus/.test(agentsOut));
 check('/agents marks current selection with ➜', /➜/.test(agentsOut));
 
+// QQ183 — /copy falls back to document.execCommand when the async
+// Clipboard API isn't available (e.g. permission denied, http-only
+// origin, or older browsers).
+{
+  const beforeRm = await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    return navigator.clipboard;
+  });
+  await page.evaluate(() => {
+    const id = _lcCurrentId();
+    _lcSaveHistory(id, [
+      { role: 'user', text: 'q', ts: 1, assignee: 'claude:opus' },
+      { role: 'assistant', text: 'FALLBACK-MARKER', ts: 2, assignee: 'claude:opus' },
+    ]);
+    window.__fallbackToasts = [];
+    const orig = window.toast;
+    window.toast = (m, k) => { window.__fallbackToasts.push({m,k}); return orig && orig(m, k); };
+  });
+  await slash('/copy');
+  await page.waitForTimeout(200);
+  const t = await page.evaluate(() => window.__fallbackToasts.slice(-1)[0]);
+  check('/copy falls back to execCommand when clipboard API is undefined',
+    t && /복사됨|copied/i.test(t.m), JSON.stringify(t));
+  // Re-grant for any later tests on this page.
+  await page.evaluate(() => {
+    delete navigator.clipboard;  // best-effort restore — gone but tests ahead don't depend
+  });
+}
+
 // 4a-pre. /copy copies the last assistant reply
 try { await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: URL.replace(/\/$/, '') }); } catch (_) {}
 // Re-seed with a known-last assistant reply so we can assert exact match.
