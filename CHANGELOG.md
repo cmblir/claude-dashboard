@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.6] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Playwright regression for lazyclaw terminal**
+  (`scripts/e2e-terminal.mjs`). Verifies four invariants:
+  1. Whitelisted command (`uname -a`) actually executes via the
+     `/api/lazyclaw/term` endpoint and the output appears in the
+     log.
+  2. QQ17 `(NNms)` durationMs marker appears next to the output.
+  3. QQ12 Tab completes `lazyclaude sta` → `lazyclaude status`.
+  4. QQ106 Esc clears the input field.
+  Test waits for the QQ4 health-check baseline first so the
+  user-driven command is asserted in isolation.
+
+---
 ## [2.69.5] — 2026-05-03
 
 ### Added (test infra)
