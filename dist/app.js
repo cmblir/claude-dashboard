@@ -28202,11 +28202,23 @@ function _lcChatSlashCommand(line) {
     }
     case 'tabs': {
       // QQ182 — chat-side parity with the terminal `lazyclaude tabs`.
-      // Lists every NAV id+label so users can pick a target for /go.
-      const lines = (typeof NAV !== 'undefined' ? NAV : [])
-        .map(n => `- ${(n.icon || '·')} \`${n.id}\` — ${n.label || ''}`);
+      // QQ192 — accept a substring filter (parity with QQ191 terminal).
+      const all = (typeof NAV !== 'undefined' ? NAV : []);
+      const q = rest.trim().toLowerCase();
+      const matched = q
+        ? all.filter(n => (n.id || '').toLowerCase().includes(q) ||
+                          (n.label || '').toLowerCase().includes(q))
+        : all;
+      if (q && !matched.length) {
+        toast(`${t('일치하는 탭 없음')}: ${rest}`, 'warn');
+        return true;
+      }
+      const lines = matched.map(n => `- ${(n.icon || '·')} \`${n.id}\` — ${n.label || ''}`);
+      const header = q
+        ? `**${t('탭 목록')}** (${matched.length}/${all.length} · "${rest}")`
+        : `**${t('탭 목록')}** (${matched.length})`;
       const md = lines.length
-        ? `**${t('탭 목록')}** (${lines.length})\n\n` + lines.join('\n')
+        ? header + '\n\n' + lines.join('\n')
         : '_(NAV not loaded)_';
       const history = _lcChatLoad();
       history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
@@ -28372,7 +28384,7 @@ function _lcChatSlashCommand(line) {
 \`/code [N]\` — ${t('마지막 응답의 코드 블록 (N번째 = 1부터, 기본 마지막) 복사')}
 \`/retry\` (= \`/regenerate\`) — ${t('마지막 사용자 프롬프트 재실행')}
 \`/go <tab>\` (= \`/open\`) — ${t('다른 탭으로 이동 (term/wf/proj/ai/settings)')}
-\`/tabs\` — ${t('전체 탭 목록')}
+\`/tabs [필터]\` — ${t('전체 탭 목록 (id/label 부분일치)')}
 \`/version\` — ${t('대시보드 버전 + 빌드 정보')}
 \`/theme [auto|dark|light|midnight|forest|sunset]\` — ${t('테마 토글/지정')}
 \`/lang ko|en|zh\` — ${t('언어 전환 (페이지 리로드)')}

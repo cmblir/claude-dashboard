@@ -75,6 +75,24 @@ const tabsHtml = await page.evaluate(() => document.getElementById('lcChatLog').
 check('/tabs lists workflows', /workflows/.test(tabsHtml));
 check('/tabs lists lazyclawChat', /lazyclawChat/.test(tabsHtml));
 
+// QQ192 — /tabs <filter> substring matches.
+await slash('/tabs claude');
+const tabsFiltered = await page.evaluate(() => document.getElementById('lcChatLog').innerText);
+check('/tabs <filter> shows filtered count header',
+  /\(\d+\/\d+ · "claude"\)/.test(tabsFiltered),
+  tabsFiltered.split('\n').filter(l => /목록|claude/.test(l))[0]);
+
+// No match
+await page.evaluate(() => {
+  window.__tabsToasts = [];
+  const orig = window.toast;
+  window.toast = (m, k) => { window.__tabsToasts.push({m,k}); return orig && orig(m,k); };
+});
+await slash('/tabs nosuch-zzz');
+const tT = await page.evaluate(() => window.__tabsToasts.slice(-1)[0]);
+check('/tabs <bogus> toasts "일치하는 탭 없음"',
+  tT && /일치하는 탭|no match/i.test(tT.m), JSON.stringify(tT));
+
 // QQ181 — extended alias map.
 for (const [alias, expected] of [
   ['home',  'overview'],
