@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.57] — 2026-05-03
+
+**QQ167** — regression test that locks in QQ164 (chat
+Cmd+Shift+N) and QQ165 (workflow Cmd+Shift+N) don't bleed into
+each other. Each handler gates on `state.view` so the shortcut
+is a no-op on the wrong tab — but a stray refactor could
+silently remove the gate.
+
+### Verified
+- `scripts/e2e-cross-tab-shortcuts.mjs` — 3/3 green: on
+  workflows only `_wfCreateNew` fires, on chat only
+  `_lcNewSession` fires, on overview neither fires.
+
+---
 ## [2.71.56] — 2026-05-03
 
 **QQ166** — `Cmd/Ctrl+Shift+E` exports the current chat to
