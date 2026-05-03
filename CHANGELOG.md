@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.40] — 2026-05-03
+
+**QQ150** — `lazyclaude diag` terminal builtin. Reuses the
+existing `_lcTermHealthCheck` (claude/ollama/gemini/codex/git
+probes) as an explicit on-demand command, so users who just
+installed or updated a CLI can re-run the probe without waiting
+for the 1-hour auto-fire gate.
+
+`/help` updated.
+
+### Verified
+- `scripts/e2e-terminal-diag.mjs` — Playwright regression: clears
+  the log, runs `lazyclaude diag`, asserts the health-check
+  start/end markers and that each CLI probe (claude/ollama/git)
+  was actually fired. 5/5 green.
+
+---
 ## [2.71.39] — 2026-05-03
 
 **QQ149** — Playwright perf budget regression for tab-switch
