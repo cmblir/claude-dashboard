@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.112] — 2026-05-04
+
+**QQ217** — `lazyclaude refresh` (alias `reload`) terminal verb
+parity with chat `/refresh` (QQ216). Same effect: clears the
+`_apiCache` Map, prints `cache cleared (N entries)`. Doesn't
+reload the page.
+
+KNOWN_VERBS / did-you-mean candidates / Tab-suggest /
+help-grouped Terminal section all extended.
+
+### Verified
+- `e2e-terminal-refresh.mjs` 5/5 ✅ (cache-cleared output,
+  alias, help listing, Tab expansion, typo did-you-mean).
+- Regression: terminal-set-prefs / builtins-smoke /
+  help-grouped / tab-suggest-new / cancel / keys-usage /
+  workflows-run / uptime + chat-slash-refresh all green.
+
+---
 ## [2.71.111] — 2026-05-04
 
 **QQ216** — `/refresh` (alias `/reload`) chat slash. Busts the
