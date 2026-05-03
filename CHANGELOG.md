@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.18] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Inspector mini-Gantt regression**
+  (`scripts/e2e-mini-gantt.mjs`). Pins QQ46 + QQ73:
+  1. With 4 nodes + injected `lastRunResults` (durations
+     1500/800/1200pinned/600err), the workflow-meta block in the
+     inspector renders a 4-row Gantt panel.
+  2. Rows sort descending by duration (AAA → PIN → BBB → ERR).
+  3. QQ73 status prefixes appear: 📌 on the pinned row, ❌ on
+     the err row.
+  4. Clicking the AAA row sets `__wf.selectedNodeId = 'n-a'`,
+     so the inspector swaps to that node's detail view.
+
+  6 checks, all pass.
+
+---
 ## [2.69.17] — 2026-05-03
 
 ### Added (test infra)
