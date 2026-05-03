@@ -27829,6 +27829,26 @@ function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'agents': {
+      // QQ118 — list every currently-registered assignee in the dropdown
+      // so users can see what's bindable via /model. Marks the current
+      // selection.
+      const sel = document.getElementById('lcChatAssignee');
+      if (!sel) return true;
+      const opts = Array.from(sel.options).map(o => ({
+        value: o.value,
+        label: o.textContent || o.value,
+        cur: o.value === sel.value,
+      }));
+      const md = `**${t('등록된 어시니')}** (${opts.length})\n\n` +
+        opts.map(o => `- ${o.cur ? '➜ ' : '  '}\`${o.value}\` — ${o.label}`).join('\n') +
+        `\n\n${t('전환:')} \`/model <provider:model>\``;
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      return true;
+    }
     case 'help': {
       const helpMd = `**${t('슬래시 명령')}**
 
@@ -27837,6 +27857,7 @@ function _lcChatSlashCommand(line) {
 \`/model <provider:model>\` — ${t('어시니 전환 (예: claude:opus)')}
 \`/cost\` — ${t('현재 세션 토큰·비용 합계')}
 \`/status\` — ${t('어시니·세션·테마·언어 요약')}
+\`/agents\` — ${t('등록된 어시니 목록')}
 \`/rename <이름>\` — ${t('세션 이름 변경')}
 \`/export\` — ${t('마크다운으로 내보내기')}
 \`/help\` — ${t('이 목록')}

@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.8] — 2026-05-03
+
+**QQ118** — `/agents` chat slash command. Lists every assignee
+currently in the dropdown, marks the active one with `➜`, and
+points to `/model` for switching. Helpful for users who can't
+remember whether they registered `claude:opus`,
+`openai:gpt-4.1`, or `ollama:llama3.1`.
+
+`/help` updated to include the new command.
+
+### Verified
+- `scripts/e2e-chat-slash-cost-status.mjs` extended to 11 checks
+  (was 8) — `/agents` shows current assignee, marks current
+  with `➜`, `/help` listing includes `/agents`. All green.
+
+---
 ## [2.71.7] — 2026-05-03
 
 **QQ117** — two more terminal built-ins so users can discover and
