@@ -28827,38 +28827,81 @@ async function _lcChatSlashCommand(line) {
       return true;
     }
     case 'help': {
-      const helpMd = `**${t('슬래시 명령')}**
-
-\`/clear\` — ${t('현재 세션 비우기')} · \`/clear N\` — ${t('마지막 N개 메시지 삭제')} · \`/clear all\` — ${t('모든 세션 삭제')}
-\`/system\` — ${t('현재 시스템 프롬프트 보기')} · \`/system <텍스트>\` — ${t('설정')} · \`/system clear\` — ${t('초기화')}
-\`/model <provider:model>\` — ${t('어시니 전환 (예: claude:opus)')}
-\`/cost\` — ${t('현재 세션 토큰·비용 합계')}
-\`/usage [N일]\` — ${t('전체 사용량 집계 (기본 7일, 1-365)')}
-\`/status\` — ${t('어시니·세션·테마·언어 요약')}
-\`/whoami\` — ${t('Claude CLI 로그인 + 어시니 식별')}
-\`/agents [필터]\` — ${t('등록된 어시니 목록 (예: /agents claude)')}
-\`/keys [필터]\` (= \`/providers\`) — ${t('프로바이더 가용성 + API 키 상태 (마스킹)')}
-\`/workflows [필터]\` (= \`/wfs\`) — ${t('워크플로우 목록 + 실행 카운트 + 최근 상태')}
-\`/run <id|name>\` — ${t('워크플로우 실행 시작 (id-prefix 또는 이름 부분일치)')}
-\`/cancel [runId|wf]\` — ${t('실행 중 워크플로우 취소 (없으면 목록만)')}
-\`/sessions [필터]\` — ${t('세션 목록 + 메시지 수 (라벨/id/모델 부분일치)')}
-\`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
-\`/code [N]\` — ${t('마지막 응답의 코드 블록 (N번째 = 1부터, 기본 마지막) 복사')}
-\`/retry\` (= \`/regenerate\`) — ${t('마지막 사용자 프롬프트 재실행')}
-\`/go <tab>\` (= \`/open\`) — ${t('다른 탭으로 이동 (term/wf/proj/ai/settings)')}
-\`/tabs [필터]\` — ${t('전체 탭 목록 (id/label 부분일치)')}
-\`/version\` — ${t('대시보드 버전 + 빌드 정보')}
-\`/uptime\` — ${t('서버 가동 시간 + 시작 시각')}
-\`/theme [auto|dark|light|midnight|forest|sunset]\` — ${t('테마 토글/지정')}
-\`/lang ko|en|zh\` — ${t('언어 전환 (페이지 리로드)')}
-\`/rename <이름>\` — ${t('세션 이름 변경')}
-\`/pin\` · \`/unpin\` — ${t('현재 세션 상단 고정/해제')}
-\`/branch [N]\` (= \`/fork\`) — ${t('현재 세션을 N번째 메시지에서 분기 (기본: 끝 = 전체 복제)')}
-\`/temperature [0-2]\` (= \`/temp\`) — ${t('어시니 temperature 읽기/설정')}
-\`/export\` — ${t('마크다운으로 내보내기')}
-\`/help\` — ${t('이 목록')}
-
-**${t('단축키')}**
+      // QQ213 — section-grouped help + optional substring filter so a
+      // 25-command flat wall is scannable. `/help workflow` or
+      // `/help cost` shows only matching rows; bare `/help` shows all.
+      const groups = [
+        [t('세션'), [
+          [`/clear`,                    t('현재 세션 비우기') + ' · /clear N — ' + t('마지막 N개 메시지 삭제') + ' · /clear all — ' + t('모든 세션 삭제')],
+          [`/sessions [필터]`,          t('세션 목록 + 메시지 수 (라벨/id/모델 부분일치)')],
+          [`/rename <이름>`,            t('세션 이름 변경')],
+          [`/pin · /unpin`,             t('현재 세션 상단 고정/해제')],
+          [`/branch [N]  (= /fork)`,    t('현재 세션을 N번째 메시지에서 분기 (기본: 끝 = 전체 복제)')],
+          [`/copy [N]`,                 t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')],
+          [`/code [N]`,                 t('마지막 응답의 코드 블록 (N번째 = 1부터, 기본 마지막) 복사')],
+          [`/retry  (= /regenerate)`,   t('마지막 사용자 프롬프트 재실행')],
+          [`/export`,                   t('마크다운으로 내보내기')],
+        ]],
+        [t('AI 프로바이더 / 모델'), [
+          [`/model <provider:model>`,   t('어시니 전환 (예: claude:opus)')],
+          [`/system [<텍스트>|clear]`,  t('시스템 프롬프트 보기/설정/초기화')],
+          [`/agents [필터]`,            t('등록된 어시니 목록 (예: /agents claude)')],
+          [`/keys [필터]  (= /providers)`, t('프로바이더 가용성 + API 키 상태 (마스킹)')],
+          [`/temperature [0-2]  (= /temp)`, t('어시니 temperature 읽기/설정')],
+          [`/whoami`,                   t('Claude CLI 로그인 + 어시니 식별')],
+        ]],
+        [t('워크플로우'), [
+          [`/workflows [필터]  (= /wfs)`, t('워크플로우 목록 + 실행 카운트 + 최근 상태')],
+          [`/run <id|name>`,            t('워크플로우 실행 시작 (id-prefix 또는 이름 부분일치)')],
+          [`/cancel [runId|wf]`,        t('실행 중 워크플로우 취소 (없으면 목록만)')],
+        ]],
+        [t('비용 / 상태'), [
+          [`/cost`,                     t('현재 세션 토큰·비용 합계')],
+          [`/usage [N일]`,              t('전체 사용량 집계 (기본 7일, 1-365)')],
+          [`/status`,                   t('어시니·세션·테마·언어 요약')],
+          [`/version`,                  t('대시보드 버전 + 빌드 정보')],
+          [`/uptime`,                   t('서버 가동 시간 + 시작 시각')],
+        ]],
+        [t('탐색 / 외관'), [
+          [`/go <tab>  (= /open)`,      t('다른 탭으로 이동 (term/wf/proj/ai/settings)')],
+          [`/tabs [필터]`,              t('전체 탭 목록 (id/label 부분일치)')],
+          [`/theme [auto|dark|light|midnight|forest|sunset]`, t('테마 토글/지정')],
+          [`/lang ko|en|zh`,            t('언어 전환 (페이지 리로드)')],
+          [`/help [필터]`,              t('이 목록 (필터로 좁히기)')],
+        ]],
+      ];
+      const q = rest.trim().toLowerCase();
+      const sections = [];
+      for (const [name, rows] of groups) {
+        // QQ213 — also match the group name + romanised section
+        // labels so an English query like "workflow" filters the
+        // Korean "워크플로우" section without having to type it.
+        const sectionAliases = {
+          [t('워크플로우')]: 'workflow workflows wf run cancel',
+          [t('AI 프로바이더 / 모델')]: 'ai provider model agent agents key keys temperature whoami',
+          [t('세션')]: 'session chat clear pin branch fork copy code retry export rename',
+          [t('비용 / 상태')]: 'cost usage status version uptime',
+          [t('탐색 / 외관')]: 'go open tabs theme lang help nav',
+        };
+        const aliasBlob = (sectionAliases[name] || '').toLowerCase();
+        const sectionMatchesAll = q && (name.toLowerCase().includes(q) || aliasBlob.includes(q));
+        const matched = q
+          ? (sectionMatchesAll
+              ? rows
+              : rows.filter(([cmd, desc]) => (cmd + ' ' + desc).toLowerCase().includes(q)))
+          : rows;
+        if (!matched.length) continue;
+        const lines = matched.map(([cmd, desc]) => `\`${cmd}\` — ${desc}`);
+        sections.push(`**${name}**\n\n` + lines.join('\n'));
+      }
+      if (q && !sections.length) {
+        toast(`${t('일치하는 명령 없음')}: ${rest}`, 'warn');
+        return true;
+      }
+      const header = q
+        ? `**${t('슬래시 명령')}** _(필터: "${rest}")_`
+        : `**${t('슬래시 명령')}**`;
+      const shortcuts = `**${t('단축키')}**
 
 - \`Cmd/Ctrl + K\` — ${t('대화 검색')}
 - \`Cmd/Ctrl + Shift + N\` — ${t('새 대화')}
@@ -28866,7 +28909,10 @@ async function _lcChatSlashCommand(line) {
 - \`Cmd/Ctrl + Shift + [\` / \`]\` — ${t('이전/다음 세션')}
 - \`Cmd/Ctrl + ↑\` / \`↓\` — ${t('이전 사용자 메시지 recall')}
 - \`Enter\` — ${t('전송')} · \`Shift+Enter\` — ${t('줄바꿈')}
-- ${t('이미지 paste / drop 으로 첨부')}`;
+- ${t('이미지 paste / drop 으로 첨부')}
+- \`Tab\` — ${t('슬래시 자동완성')}`;
+      const helpMd = header + '\n\n' + sections.join('\n\n') +
+        (q ? '' : '\n\n' + shortcuts);
       const history = _lcChatLoad();
       history.push({ role: 'assistant', text: helpMd, assignee: 'system', ts: Date.now() });
       _lcChatSave(history);

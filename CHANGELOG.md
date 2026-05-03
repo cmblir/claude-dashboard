@@ -10,6 +10,35 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.108] — 2026-05-04
+
+**QQ213** — `/help` is now section-grouped + filterable. The
+flat list had grown to ~25 rows after QQ198-QQ211; section
+headers (Session, AI 프로바이더 / 모델, 워크플로우, 비용 /
+상태, 탐색 / 외관) make it scannable, and `/help <filter>`
+narrows to matching rows.
+
+The filter matches against `cmd + desc` for individual rows
+and against a romanised alias blob per section ("workflow
+workflows wf run cancel" etc.) so an English query like
+`/help workflow` filters the Korean 워크플로우 group without
+having to type Korean. `/help no-such` warns "일치하는 명령
+없음".
+
+Bare `/help` keeps the trailing keyboard-shortcuts section;
+filtered `/help` drops it (the filter is about commands).
+Also added `Tab — 슬래시 자동완성` to the shortcut list.
+
+### Verified
+- `e2e-chat-help-grouped.mjs` 16/16 ✅ (group headers, every
+  added command listed, English-query→Korean-section
+  filtering, no-match warn, filter mode hides shortcuts).
+- Regression: 17 chat-slash + adjacent tests all green
+  (smoke, go, cost-status, pin, branch, temperature, keys,
+  usage, cancel, workflows, run, uptime, whoami,
+  tab-complete + new, unknown, clear-n).
+
+---
 ## [2.71.107] — 2026-05-04
 
 **QQ212** — Tab-completion vocab + unknown-command
