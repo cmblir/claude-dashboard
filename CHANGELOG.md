@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.15] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Edge delete + single-node REST run regression** — two new
+  scripts:
+  - `scripts/e2e-edge-delete.mjs` (LL20): selecting an edge and
+    calling `_wfDeleteSelectedEdge()` removes it; right-click on
+    the path opens the ctx menu and clicking 삭제 removes it
+    (4 checks).
+  - `scripts/e2e-run-node-rest.mjs` (QQ18): POST
+    `/api/workflows/run-node` against a session node with
+    `data.pinned + pinnedOutput` set, asserting the response is
+    `{ok, nodeId, result: {status:"ok", output:"frozen-cache-hit",
+    provider:"pinned", cost:0}}` — exercises the QQ20 short-
+    circuit so the test runs without any API key (7 checks).
+
+  Total e2e suite: **39/39 pass**.
+
+---
 ## [2.70.14] — 2026-05-03
 
 ### Added (test infra)
