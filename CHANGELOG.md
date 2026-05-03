@@ -10,6 +10,27 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.94] — 2026-05-03
+
+**QQ199** — `/pin` and `/unpin` chat slashes (openclaw-style
+session pinning). Toggle a `pinned` flag on the current
+session; `/sessions` then sorts pinned sessions above
+unpinned (after the active one) and prepends a 📌 marker.
+Persisted via the existing sessions array — no new storage
+key, no migration needed.
+
+* `/pin` on already-pinned → "이미 고정된 세션입니다" warn.
+* `/unpin` on unpinned → "고정되지 않은 세션입니다" warn.
+* `/help` lists both.
+
+### Verified
+- `e2e-chat-slash-pin.mjs` 8/8 ✅ (sets/clears flag, sorts
+  pinned above other in /sessions, 📌 marker, idempotent
+  toasts, /help listing).
+- No regressions: chat-slash-cost-status / smoke / go /
+  sessions-cap / whoami all green.
+
+---
 ## [2.71.93] — 2026-05-03
 
 **QQ198** — `/whoami` chat slash + `lazyclaude whoami` terminal

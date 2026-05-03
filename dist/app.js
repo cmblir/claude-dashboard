@@ -28099,6 +28099,29 @@ async function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'pin':
+    case 'unpin': {
+      // QQ199 — openclaw-style session pinning. /pin marks the current
+      // session so it sticks at the top of /sessions regardless of
+      // recency; /unpin clears the flag. Persisted via the existing
+      // sessions array, no new storage key.
+      const id = _lcCurrentId();
+      if (!id) { toast(t('현재 세션이 없습니다'), 'warn'); return true; }
+      const sessions = _lcGetSessions();
+      const s = sessions.find(x => x.id === id);
+      if (!s) { toast(t('현재 세션을 찾을 수 없습니다'), 'warn'); return true; }
+      const wantPin = (cmd === 'pin');
+      if (!!s.pinned === wantPin) {
+        toast(wantPin ? t('이미 고정된 세션입니다') : t('고정되지 않은 세션입니다'), 'warn');
+        return true;
+      }
+      s.pinned = wantPin;
+      _lcSaveSessions(sessions);
+      if (typeof _lcRenderSessions === 'function') _lcRenderSessions();
+      toast(wantPin ? `📌 ${t('세션 고정')}: ${s.label || t('이름 없음')}`
+                    : `${t('세션 고정 해제')}: ${s.label || t('이름 없음')}`, 'ok');
+      return true;
+    }
     case 'retry':
     case 'regenerate': {
       // QQ123 — re-run the last user prompt (trim any trailing assistant
@@ -28336,17 +28359,22 @@ async function _lcChatSlashCommand(line) {
         toast(`${t('일치하는 세션 없음')}: ${rest}`, 'warn');
         return true;
       }
-      // Active first, rest in storage order.
-      const ordered = matched.slice().sort((a, b) =>
-        (a.id === curId ? -1 : 0) - (b.id === curId ? -1 : 0));
+      // QQ199 — sort: active first, then pinned, then storage order.
+      const ordered = matched.slice().sort((a, b) => {
+        if (a.id === curId) return -1;
+        if (b.id === curId) return 1;
+        const pa = a.pinned ? 1 : 0, pb = b.pinned ? 1 : 0;
+        return pb - pa;
+      });
       const CAP = 30;
       const visible = ordered.slice(0, CAP);
       const lines = visible.map(s => {
         let n = 0;
         try { n = (_lcGetHistory(s.id) || []).length; } catch (_) {}
         const cur = s.id === curId ? '➜' : '  ';
+        const pin = s.pinned ? '📌 ' : '';
         const lbl = (s.label || t('이름 없음')).slice(0, 50);
-        return `- ${cur} \`${s.id.slice(0, 8)}\` — ${lbl} *(${n} ${t('메시지')})*`;
+        return `- ${cur} ${pin}\`${s.id.slice(0, 8)}\` — ${lbl} *(${n} ${t('메시지')})*`;
       });
       const overflow = ordered.length - visible.length;
       const header = q
@@ -28416,6 +28444,7 @@ async function _lcChatSlashCommand(line) {
 \`/theme [auto|dark|light|midnight|forest|sunset]\` — ${t('테마 토글/지정')}
 \`/lang ko|en|zh\` — ${t('언어 전환 (페이지 리로드)')}
 \`/rename <이름>\` — ${t('세션 이름 변경')}
+\`/pin\` · \`/unpin\` — ${t('현재 세션 상단 고정/해제')}
 \`/export\` — ${t('마크다운으로 내보내기')}
 \`/help\` — ${t('이 목록')}
 
