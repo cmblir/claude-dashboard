@@ -5165,7 +5165,9 @@ function _wfShowEmptyCanvasContextMenu(x, y) {
 
 // PP2 (v2.66.72) — toggle node disabled state. Disabled nodes skip on
 // the next run and render at half opacity / grayscale on the canvas.
-function _wfToggleNodeDisabled(nid) {
+// QQ110 (v2.70.6) — exposed on window so the inline checkbox in the
+// inspector node-card (line ~6146) and the QQ19 ctx-menu can resolve.
+window._wfToggleNodeDisabled = function _wfToggleNodeDisabled(nid) {
   if (!__wf.current) return;
   const n = __wf.current.nodes.find(x => x.id === nid);
   if (!n) return;
@@ -5175,7 +5177,7 @@ function _wfToggleNodeDisabled(nid) {
   if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
   _wfUpdateToolbar();
   toast(n.data.disabled ? `⏸ ${t('비활성화됨')}` : `▶ ${t('활성화됨')}`, 'ok');
-}
+};
 
 // QQ18 (v2.66.93) — single-node execution (n8n "Execute Node" parity).
 // Fires one session/subagent node in isolation and shows the raw response

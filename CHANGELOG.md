@@ -10,6 +10,31 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.6] — 2026-05-03
+
+### Fixed
+- 🐛 **`_wfToggleNodeDisabled` exposed on window** (QQ110). The
+  inspector node-card has an inline `onchange="_wfToggleNodeDisabled(...)"`
+  checkbox and the QQ19 ctx-menu also called the function from
+  the global scope. The function was a module-private declaration,
+  so both inline handlers would have hit a ReferenceError in
+  some bundle paths. Now assigned via
+  `window._wfToggleNodeDisabled = …` so every entry point
+  resolves consistently.
+
+### Added (test infra)
+- 🎭 **Node disable + ⏸ badge regression**
+  (`scripts/e2e-node-disable.mjs`). 9 checks:
+  1. Initial state has no `.wf-disabled` class and the
+     `.wf-node-disabled-badge` SVG group is hidden via CSS.
+  2. `_wfToggleNodeDisabled('n-a')` flips
+     `data.disabled = true`, adds `.wf-disabled`, and the badge's
+     computed `display !== 'none'`.
+  3. Second toggle restores the original state.
+
+  Total e2e suite: **29/29 pass**.
+
+---
 ## [2.70.5] — 2026-05-03
 
 ### Added (test infra)
