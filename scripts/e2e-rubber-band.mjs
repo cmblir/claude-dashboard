@@ -52,6 +52,15 @@ await page.evaluate(() => {
 
 await page.waitForTimeout(150);
 
+// QQ197 — workflows tab renders a list view above the canvas host, so
+// wfCanvasHost can sit below the 1200px viewport. Scroll it into view
+// before computing drag pixel coords (mirrors QQ196 group-drag fix).
+await page.evaluate(() => {
+  const host = document.getElementById('wfCanvasHost');
+  if (host && host.scrollIntoView) host.scrollIntoView({ behavior: 'instant', block: 'center' });
+});
+await page.waitForTimeout(120);
+
 // Find the SVG client-rect so we can convert workflow-space x/y to
 // screen pixels. The SVG covers the canvas host with viewport (0,0)
 // + zoom 1 so workflow coords are SVG coords are pixel offsets.
