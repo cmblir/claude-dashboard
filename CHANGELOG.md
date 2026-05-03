@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.72] — 2026-05-03
+
+**QQ180** — terminal Tab autocomplete suggestion list missed
+the QQ142 `open` and QQ150 `diag` builtins (and `tabs`).
+Hitting Tab after `lazyclaude di`/`ta`/`op` now expands as
+expected.
+
+### Verified
+- Manual probe: `lazyclaude di` → `lazyclaude diag`,
+  `lazyclaude ta` → `lazyclaude tabs`, `lazyclaude op` cycles
+  through `open`, `open chat`, `open wf`, `open term`,
+  `open ai`, `open settings`.
+
+---
 ## [2.71.71] — 2026-05-03
 
 **QQ179** — companion to QQ178: comprehensive smoke for every
