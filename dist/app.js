@@ -4511,6 +4511,29 @@ window._wfDuplicateNodes = function (ids) {
   }
 };
 
+// QQ163 — shared Levenshtein edit-distance helper. Used by both the
+// chat slash typo suggester (QQ161) and the terminal lazyclaude verb
+// suggester (QQ162). 10 lines, O(n*m) on the always-tiny known-list
+// strings, so the perf is irrelevant — this exists to dedupe.
+window._lcLevenshtein = function (a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const dp = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) dp[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0]; dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1]
+        ? prev
+        : 1 + Math.min(prev, dp[j], dp[j - 1]);
+      prev = tmp;
+    }
+  }
+  return dp[b.length];
+};
+
 function _wfPushUndo() {
   if (!__wf.current) return;
   const snap = {
@@ -28175,32 +28198,11 @@ function _lcChatSlashCommand(line) {
     const known = ['clear','system','model','export','help','cost','status',
                    'agents','sessions','rename','theme','lang','copy',
                    'retry','regenerate','go','open','version'];
-    // QQ161 — proper Levenshtein edit distance so `/vrsion` (one
-    // missing char) suggests `/version`. The previous Hamming-on-
-    // shorter implementation scored that as 6 because it walked
-    // characters in lockstep without aligning around the gap.
-    const lev = (a, b) => {
-      if (a === b) return 0;
-      if (!a.length) return b.length;
-      if (!b.length) return a.length;
-      const dp = new Array(b.length + 1);
-      for (let j = 0; j <= b.length; j++) dp[j] = j;
-      for (let i = 1; i <= a.length; i++) {
-        let prev = dp[0]; dp[0] = i;
-        for (let j = 1; j <= b.length; j++) {
-          const tmp = dp[j];
-          dp[j] = a[i - 1] === b[j - 1]
-            ? prev
-            : 1 + Math.min(prev, dp[j], dp[j - 1]);
-          prev = tmp;
-        }
-      }
-      return dp[b.length];
-    };
+    // QQ161 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     const hint = (() => {
       let best = null, bestScore = 99;
       for (const k of known) {
-        const score = lev(k, cmd);
+        const score = window._lcLevenshtein(k, cmd);
         if (score < bestScore) { bestScore = score; best = k; }
       }
       return bestScore <= 3 ? best : null;
@@ -29032,30 +29034,10 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
     const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag'];
-    // QQ162 — Levenshtein, parity with the QQ161 chat-side fix.
-    // Hamming-on-shorter scored 'verzion'/'vrsion' too high to suggest
-    // 'version'; a real edit distance handles missing/inserted chars.
-    const lev = (a, b) => {
-      if (a === b) return 0;
-      if (!a.length) return b.length;
-      if (!b.length) return a.length;
-      const dp = new Array(b.length + 1);
-      for (let j = 0; j <= b.length; j++) dp[j] = j;
-      for (let i = 1; i <= a.length; i++) {
-        let prev = dp[0]; dp[0] = i;
-        for (let j = 1; j <= b.length; j++) {
-          const tmp = dp[j];
-          dp[j] = a[i - 1] === b[j - 1]
-            ? prev
-            : 1 + Math.min(prev, dp[j], dp[j - 1]);
-          prev = tmp;
-        }
-      }
-      return dp[b.length];
-    };
+    // QQ162 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     let best = null, bestScore = 99;
     for (const k of candidates) {
-      const score = lev(k, rest);
+      const score = window._lcLevenshtein(k, rest);
       if (score < bestScore) { bestScore = score; best = k; }
     }
     const suggest = bestScore <= 3 ? best : null;
