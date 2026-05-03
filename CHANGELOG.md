@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.15] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Chat search + cost visibility chain regression**
+  (`scripts/e2e-chat-search-cost.mjs`). Pins QQ45 + QQ97-QQ102:
+  1. Cmd+K opens the search modal; query "unicorn" finds the
+     assistant message in session-A.
+  2. Sidebar header (QQ99/QQ100) shows today + total markers
+     in the format `오늘 $X · 총 누적 $Y`.
+  3. Per-session row chip (QQ98) shows the session's cumulative
+     spend.
+  4. Composer footer (QQ102) shows the current session's
+     cumulative spend.
+
+  Seeds 2 sessions with mixed today/yesterday timestamps and
+  cost-bearing assistant turns, then asserts each surface
+  reads the right total. 7 checks, all pass.
+
+---
 ## [2.69.14] — 2026-05-03
 
 ### Added (test infra)
