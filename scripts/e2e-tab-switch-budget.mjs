@@ -33,22 +33,28 @@ await page.waitForSelector('#view h1', { timeout: 5000 });
 // the cli/auth caches before we start measuring.
 await page.waitForTimeout(1500);
 
-const tabs = ['aiProviders', 'team', 'memoryManager', 'openPorts'];
-// Warm each once so cachedApi (frontend memo) is also hot.
+// QQ153 — gate the most-trafficked tabs on the same warm budget so a
+// future regression in user-facing critical paths is caught early.
+// QQ154 — sessions tab now hits the auto_resume/status memo so it
+// joins the budget too.
+const tabs = ['aiProviders', 'team', 'memoryManager', 'openPorts',
+              'workflows', 'lazyclawChat', 'lazyclawTerm', 'overview',
+              'projects', 'sessions'];
+// Per-tab: warm THIS tab (so its caches are hot RIGHT before we
+// measure), hop to overview, then measure the warm switch back. This
+// avoids the case where a 1-pass-warm-up + N-pass-measure approach
+// races short server-side TTLs (e.g. auto_resume/status @ 1.5s).
 for (const tab of tabs) {
+  // Warm this tab specifically.
   await page.evaluate((tb) => window.go(tb), tab);
   await page.waitForFunction(() => {
     const v = document.getElementById('view');
     return v && v.innerText.length > 50;
   }, { timeout: 8000 });
-}
-
-// Measure warm switches.
-for (const tab of tabs) {
-  // Hop to overview between hits to force a tab-switch event each time.
+  // Hop away.
   await page.evaluate(() => window.go('overview'));
-  await page.waitForTimeout(150);
-
+  await page.waitForTimeout(120);
+  // Measure the warm tab-switch.
   const t0 = Date.now();
   await page.evaluate((tb) => window.go(tb), tab);
   await page.waitForFunction(() => {

@@ -684,7 +684,17 @@ def api_auto_resume_cancel(body: dict) -> dict:
     return {"ok": True, "entry": _public_state(entry)}
 
 
+_AR_STATUS_CACHE: dict = {"data": None, "ts": 0.0}
+# QQ154 — when at least one binding exists, _live_cli_sessions runs an
+# lsof+ps cross-reference (~140ms). The Sessions tab + the auto-resume
+# manager poll this every couple seconds, so coalescing back-to-back
+# hits at a 1.5s TTL is a free win without sacrificing freshness.
+# Empty-store fast-path stays unchanged (already <1ms).
+_AR_STATUS_TTL_S = 1.5
+
+
 def api_auto_resume_status(query: dict) -> dict:
+    import time as _time
     store = _load_all()
     # perf(v2.52.0): short-circuit when no bindings exist — skip the
     # ~150-300 ms lsof + ps cross-reference. Most installs sit at zero
@@ -697,6 +707,13 @@ def api_auto_resume_status(query: dict) -> dict:
             "entries": [],
             "active": [],
         }
+    nc = (query or {}).get("nocache")
+    if isinstance(nc, list):
+        nc = nc[0] if nc else None
+    if nc not in ("1", "true", "yes", True):
+        cached = _AR_STATUS_CACHE.get("data")
+        if cached is not None and (_time.time() - _AR_STATUS_CACHE.get("ts", 0)) < _AR_STATUS_TTL_S:
+            return cached
     live_map = _live_cli_sessions()
     entries = []
     for e in store.values():
@@ -715,13 +732,16 @@ def api_auto_resume_status(query: dict) -> dict:
         entries.append(ps)
     # Sort: live first, then by createdAt desc.
     entries.sort(key=lambda e: (0 if e.get("liveSession") else 1, -(e.get("createdAt") or 0)))
-    return {
+    result = {
         "ok": True,
         "workerAlive": bool(_WORKER_THREAD and _WORKER_THREAD.is_alive()),
         "claudeBin": _claude_bin() or "",
         "entries": entries,
         "active": [e for e in entries if e.get("enabled")],
     }
+    _AR_STATUS_CACHE["data"] = result
+    _AR_STATUS_CACHE["ts"] = _time.time()
+    return result
 
 
 def api_auto_resume_get(query: dict) -> dict:

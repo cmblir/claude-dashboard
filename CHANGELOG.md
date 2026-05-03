@@ -10,6 +10,32 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.43] — 2026-05-03
+
+**QQ153 + QQ154** — extended tab-switch perf coverage and closed
+a 5th cache hole.
+
+### Fixed (QQ154)
+- `/api/auto_resume/status` runs a `_live_cli_sessions()` lsof+ps
+  cross-reference (~140ms) whenever at least one binding exists.
+  The Sessions tab + Auto-Resume Manager poll it on a live ticker,
+  so coalescing back-to-back hits at a 1.5s TTL is free latency
+  for free freshness. `?nocache=1` bypass kept.
+
+### Changed (QQ153)
+- `e2e-tab-switch-budget.mjs` now also gates `workflows`,
+  `lazyclawChat`, `lazyclawTerm`, `overview`, `projects`,
+  `sessions` (4 → 10 tabs).
+- Per-tab warm-then-measure pattern so short-TTL caches don't
+  expire between warm-up and measurement.
+
+### Verified
+- 10/10 tabs under 300ms warm budget. Currently:
+  aiProviders 35ms · team 16ms · memoryManager 21ms · openPorts 22ms ·
+  workflows 33ms · lazyclawChat 19ms · lazyclawTerm 7ms · overview 148ms ·
+  projects 17ms · sessions 31ms.
+
+---
 ## [2.71.42] — 2026-05-03
 
 **QQ152** — minor coverage extension. Added a Tab-completion
