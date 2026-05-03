@@ -90,6 +90,14 @@ check('/agents lists current assignee claude:opus',
   /claude:opus/.test(agentsOut));
 check('/agents marks current selection with ➜', /➜/.test(agentsOut));
 
+// 4b. /sessions lists current sessions with message counts
+await slash('/sessions');
+const sessOut = await page.evaluate(() => document.getElementById('lcChatLog').innerHTML);
+check('/sessions shows the active session with ➜', /➜/.test(sessOut));
+// We seeded 4 history entries above + several /-bubbles; expect a non-zero
+// message count to render.
+check('/sessions includes a message count', /\d+\s*메시지|\d+\s*messages|\d+\s*消息/.test(sessOut) || /\d+ 메시지/.test(sessOut));
+
 // 5. /help lists the new commands
 await slash('/help');
 const help = await page.evaluate(() => document.getElementById('lcChatLog').innerHTML);
@@ -97,6 +105,7 @@ check('/help lists /cost',   /\/cost/.test(help));
 check('/help lists /status', /\/status/.test(help));
 check('/help lists /rename', /\/rename/.test(help));
 check('/help lists /agents', /\/agents/.test(help));
+check('/help lists /sessions', /\/sessions/.test(help));
 
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
