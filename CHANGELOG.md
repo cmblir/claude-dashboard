@@ -10,6 +10,22 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.10] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Chat draft autosave regression**
+  (`scripts/e2e-chat-draft-autosave.mjs`). Pins QQ33 + QQ70:
+  1. Type into composer → after 350 ms debounce, draft sits
+     in `cc.lc.draft.<sid>`.
+  2. Switch tab away + back → composer pre-fills with the
+     persisted draft.
+  3. Slash commands (`/help`) clear the draft entry (QQ70).
+  4. Re-typing produces a fresh draft; explicit cleanup is
+     symmetric with the send path's `removeItem`.
+
+  Total e2e suite: **33/33 pass**.
+
+---
 ## [2.70.9] — 2026-05-03
 
 ### Added (test infra)
