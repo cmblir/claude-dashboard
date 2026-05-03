@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.32] — 2026-05-03
+
+**QQ142** — `lazyclaude open <tab>` and `lazyclaude tabs` terminal
+built-ins. Mirrors the chat `/go` alias map so users can jump
+between dashboard tabs from the terminal too:
+
+```
+lazyclaude open wf       # → workflows
+lazyclaude open chat     # → lazyclawChat
+lazyclaude open ai       # → aiProviders
+lazyclaude tabs          # list every NAV tab id with emoji + label
+```
+
+`/help` updated.
+
+### Verified
+- `e2e-terminal-set-prefs.mjs` extended to 18 checks (was 16):
+  `lazyclaude tabs` lists `workflows` + `lazyclawChat`,
+  `lazyclaude open wf` actually flips `state.view` to
+  `workflows`. All green.
+
+---
 ## [2.71.31] — 2026-05-03
 
 **QQ141** — `lazyclaude version` (and `--version` / `-v`) terminal

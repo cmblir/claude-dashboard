@@ -134,6 +134,26 @@ const logSize = await page.evaluate(() => {
 check('lazyclaude reset wipes the term log',
   logSize <= 2, `lines=${logSize}`);
 
+// QQ142 — `lazyclaude tabs` lists NAV ids
+await runCmd('lazyclaude tabs');
+const tabsOut = (await lastOutput(1)).join('\n');
+check('lazyclaude tabs lists workflows + lazyclawChat',
+  /workflows/.test(tabsOut) && /lazyclawChat/.test(tabsOut));
+
+// QQ142 — `lazyclaude open wf` navigates
+const beforeView = await page.evaluate(() => state.view);
+await runCmd('lazyclaude open wf');
+await page.waitForFunction(() => state && state.view === 'workflows', { timeout: 4000 });
+const afterView = await page.evaluate(() => state.view);
+check('lazyclaude open wf navigates to workflows',
+  beforeView !== 'workflows' && afterView === 'workflows',
+  `before=${beforeView} after=${afterView}`);
+
+// Hop back to terminal so the rest of the test can keep running
+await page.evaluate(() => window.go('lazyclawTerm'));
+await page.waitForSelector('#lcTermInput');
+await page.waitForTimeout(200);
+
 // QQ141 — `lazyclaude version` and `--version` / `-v` print dashboard info
 const hitsBeforeVer = termApiHits;
 await runCmd('lazyclaude version');

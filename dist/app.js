@@ -28944,7 +28944,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const m = trimmed.match(/^(?:lazyclaude|lz)\s+(get|set|help|reset|version)\b\s*(.*)$/i);
+  const m = trimmed.match(/^(?:lazyclaude|lz)\s+(get|set|help|reset|version|open|go|tabs)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
   const rest = m[2].trim();
@@ -28959,6 +28959,8 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
     const helpText =
       'lazyclaude get [section[.key]]      — read current preference\n' +
       'lazyclaude set <section> <key> <v>  — write preference (bool/int/float coerced)\n' +
+      'lazyclaude open <tab>               — jump to another dashboard tab\n' +
+      'lazyclaude tabs                     — list every NAV tab id\n' +
       'lazyclaude version                  — dashboard version + build info\n' +
       'lazyclaude reset                    — wipe terminal log\n' +
       'lazyclaude help                     — this listing\n' +
@@ -28972,6 +28974,37 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       'Shell whitelist: claude/ollama/gemini/codex/git/which/uname/uptime/df/docker/node/python3.\n' +
       "Type a partial command and press Tab for autocomplete.";
     log.push({ kind: 'out', text: helpText, ts: Date.now() });
+    return;
+  }
+  if (verb === 'open' || verb === 'go') {
+    // QQ142 — jump to another dashboard tab from the terminal.
+    // Mirrors the chat /go alias map.
+    const ALIAS = {
+      term: 'lazyclawTerm', terminal: 'lazyclawTerm',
+      chat: 'lazyclawChat',
+      wf: 'workflows', workflow: 'workflows', flows: 'workflows',
+      proj: 'projects', projects: 'projects',
+      ai: 'aiProviders', providers: 'aiProviders',
+      settings: 'settings', set: 'settings',
+      sessions: 'sessions', sess: 'sessions',
+      analytics: 'analytics', cost: 'usage', usage: 'usage',
+    };
+    const target = ALIAS[rest.toLowerCase()] || rest;
+    if (!target) {
+      log.push({ kind: 'err', text: '⚠ ' + t('사용법') + ': lazyclaude open <tab>', ts: Date.now() });
+      return;
+    }
+    if (typeof window.go === 'function') window.go(target);
+    log.push({ kind: 'out', text: '→ ' + target, ts: Date.now() });
+    return;
+  }
+  if (verb === 'tabs') {
+    // QQ142 — list every NAV tab id with its emoji + label.
+    const lines = (typeof NAV !== 'undefined' ? NAV : [])
+      .map(n => `${(n.icon || '·').padEnd(2)} ${(n.id || '').padEnd(22)} ${n.label || ''}`);
+    log.push({ kind: 'out', text: lines.length
+      ? lines.join('\n')
+      : '(NAV not loaded)', ts: Date.now() });
     return;
   }
   if (verb === 'version') {
