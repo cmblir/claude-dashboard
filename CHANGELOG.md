@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.98] — 2026-05-03
+
+**QQ203** — `/usage [N]` chat slash. Where `/cost` shows the
+*current session* totals, `/usage` aggregates across **all**
+sessions via the existing `/api/cost-timeline/summary?days=N`
+endpoint. Default 7-day window; integer arg 1-365.
+
+* Renders total USD + call count + top-3 model breakdown +
+  per-day list (last 14 entries max).
+* Out-of-range arg → `범위 밖: N (1 ~ 365)` warn, endpoint
+  not called.
+* Endpoint failure / `ok=false` → `비용 데이터를 가져오지 못
+  했습니다` warn.
+* Empty data → "_아직 기록된 호출이 없습니다_" footer.
+* `/help` updated.
+
+### Verified
+- `e2e-chat-slash-usage.mjs` 8/8 ✅ (default window,
+  explicit N, range guard, no-endpoint-call on bad input,
+  /help listing).
+- Regression: chat-slash-{keys,temperature,pin,branch,
+  cost-status,go} + whoami all green.
+
+---
 ## [2.71.97] — 2026-05-03
 
 **QQ202** — `/keys` (alias `/providers`) chat slash. Lists every

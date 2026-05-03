@@ -28099,6 +28099,59 @@ async function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'usage': {
+      // QQ203 — aggregate cost summary across ALL sessions, not just
+      // the current one (which /cost already covers). Hits the existing
+      // /api/cost-timeline/summary?days=N endpoint. Default 7-day window;
+      // accepts an integer arg (1-365). Renders total + top-3 model
+      // breakdown + sparkline-ish per-day list.
+      let days = 7;
+      if (rest) {
+        const n = parseInt(rest, 10);
+        if (Number.isFinite(n) && n >= 1 && n <= 365) days = n;
+        else { toast(`${t('범위 밖')}: ${rest} (1 ~ 365)`, 'warn'); return true; }
+      }
+      let d = null;
+      try {
+        const r = await fetch('/api/cost-timeline/summary?days=' + days);
+        d = await r.json();
+      } catch (_) {}
+      if (!d || !d.ok) {
+        toast(t('비용 데이터를 가져오지 못했습니다'), 'warn');
+        return true;
+      }
+      const totalUsd = Number(d.totalUsd) || 0;
+      const totalCount = Number(d.totalCount) || 0;
+      const lines = [`**${t('사용량')}** · ${days}d`, ''];
+      lines.push(`- ${t('총 비용')}: \`$${totalUsd.toFixed(4)}\``);
+      lines.push(`- ${t('호출 수')}: \`${totalCount}\``);
+      const topModels = (d.byModel || []).slice(0, 3);
+      if (topModels.length) {
+        lines.push('', `**${t('모델별 상위 3')}**`, '');
+        for (const m of topModels) {
+          const mUsd = Number(m.usd || m.totalUsd || 0).toFixed(4);
+          const mCount = m.count || m.totalCount || 0;
+          lines.push(`- \`${m.model || m.id || '?'}\` — $${mUsd} · ${mCount} ${t('호출')}`);
+        }
+      }
+      const dayRows = (d.days || []).slice(-Math.min(days, 14));
+      if (dayRows.length) {
+        lines.push('', `**${t('일자별')}**`, '');
+        for (const row of dayRows) {
+          const dt = row.date || row.day || '?';
+          const u = Number(row.usd || row.totalUsd || 0).toFixed(4);
+          lines.push(`- \`${dt}\` — $${u}`);
+        }
+      }
+      if (!totalCount) {
+        lines.push('', `_${t('아직 기록된 호출이 없습니다')}_`);
+      }
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: lines.join('\n'), assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      return true;
+    }
     case 'keys':
     case 'providers': {
       // QQ202 — quick provider audit. Shows every registered provider
@@ -28525,6 +28578,7 @@ async function _lcChatSlashCommand(line) {
 \`/system\` — ${t('현재 시스템 프롬프트 보기')} · \`/system <텍스트>\` — ${t('설정')} · \`/system clear\` — ${t('초기화')}
 \`/model <provider:model>\` — ${t('어시니 전환 (예: claude:opus)')}
 \`/cost\` — ${t('현재 세션 토큰·비용 합계')}
+\`/usage [N일]\` — ${t('전체 사용량 집계 (기본 7일, 1-365)')}
 \`/status\` — ${t('어시니·세션·테마·언어 요약')}
 \`/whoami\` — ${t('Claude CLI 로그인 + 어시니 식별')}
 \`/agents [필터]\` — ${t('등록된 어시니 목록 (예: /agents claude)')}
