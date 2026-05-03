@@ -5984,7 +5984,7 @@ function _wfRenderInspector(opts) {
     <div class="mb-4 pt-3 border-t border-[var(--border)]">
       <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">🔗 ${t('Webhook URL')}</div>
       <div class="flex items-center gap-1 mb-2">
-        <input class="input w-full text-[11px] font-mono" readonly value="http://localhost:8080/api/workflows/webhook/${escapeHtml(__wf.current.id)}" id="wfWebhookUrl" />
+        <input class="input w-full text-[11px] font-mono" readonly value="${escapeHtml(location.origin)}/api/workflows/webhook/${escapeHtml(__wf.current.id)}" id="wfWebhookUrl" />
         <button class="btn text-[10px] flex-shrink-0" onclick="navigator.clipboard.writeText(document.getElementById('wfWebhookUrl').value).then(()=>toast(t('복사됨'),'ok')).catch(()=>toast(t('복사 실패'),'err'))" title="${t('복사')}">📋</button>
       </div>
       <div id="wfWebhookSecretPanel" class="mt-2 p-2 rounded" style="background:var(--code-bg);border:1px solid var(--border);">
@@ -5993,7 +5993,7 @@ function _wfRenderInspector(opts) {
       </div>
       <details class="text-[10px] mt-2">
         <summary class="text-[var(--text-dim)] cursor-pointer select-none">${t('curl 예시')}</summary>
-        <pre id="wfWebhookCurl" class="mt-1 p-2 rounded text-[10px] font-mono overflow-x-auto" style="background:var(--code-bg);color:var(--text-mute);white-space:pre-wrap;word-break:break-all;">curl -X POST http://localhost:8080/api/workflows/webhook/${escapeHtml(__wf.current.id)} \\
+        <pre id="wfWebhookCurl" class="mt-1 p-2 rounded text-[10px] font-mono overflow-x-auto" style="background:var(--code-bg);color:var(--text-mute);white-space:pre-wrap;word-break:break-all;">curl -X POST ${escapeHtml(location.origin)}/api/workflows/webhook/${escapeHtml(__wf.current.id)} \\
   -H "Content-Type: application/json" \\
   -H "X-Webhook-Secret: &lt;${t('webhook_secret_placeholder', '위 Generate 버튼으로 발급')}&gt;" \\
   -d '{"input": "your text"}'</pre>
@@ -6388,7 +6388,7 @@ async function _wfWebhookSecretAction(action) {
 function _wfBuildCurlExample(wfId, sec) {
   const placeholder = t('webhook_secret_placeholder', '위 Generate 버튼으로 발급');
   const secPart = sec || `<${placeholder}>`;
-  return `curl -X POST http://localhost:8080/api/workflows/webhook/${wfId} \\
+  return `curl -X POST ${location.origin}/api/workflows/webhook/${wfId} \\
   -H "Content-Type: application/json" \\
   -H "X-Webhook-Secret: ${secPart}" \\
   -d '{"input": "your text"}'`;
