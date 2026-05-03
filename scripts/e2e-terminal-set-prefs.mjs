@@ -169,6 +169,16 @@ check('lazyclaude status mentions theme + lang',
 check('status did not hit shell endpoint',
   termApiHits === hitsBeforeStatus);
 
+// QQ169 — `lazyclaude open bogus` rejects unknown tab without poisoning state.view
+const beforeViewOpen = await page.evaluate(() => state.view);
+await runCmd('lazyclaude open bogusXYZ');
+const rejOut = (await lastOutput(1)).join('\n');
+const afterViewOpen = await page.evaluate(() => state.view);
+check('lazyclaude open bogus toasts unknown-tab',
+  /알 수 없는 탭|unknown/i.test(rejOut), `out=${rejOut.slice(0, 100)}`);
+check('lazyclaude open bogus does NOT change state.view',
+  afterViewOpen === beforeViewOpen, `before=${beforeViewOpen} after=${afterViewOpen}`);
+
 // QQ142 — `lazyclaude tabs` lists NAV ids
 await runCmd('lazyclaude tabs');
 const tabsOut = (await lastOutput(1)).join('\n');

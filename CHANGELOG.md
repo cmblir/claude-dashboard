@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.60] — 2026-05-03
+
+**QQ169b** — Playwright regression for the QQ169 unknown-tab
+guard. Locks the contract so a future refactor that drops the
+NAV check (chat or terminal) breaks a test instead of silently
+poisoning `state.view`.
+
+### Verified
+- `e2e-chat-slash-go.mjs` extended from 6 → 8 checks: `/go
+  bogusXYZ` doesn't change view, toast points to `/tabs`.
+- `e2e-terminal-set-prefs.mjs` extended from 26 → 28 checks:
+  `lazyclaude open bogusXYZ` doesn't change view, log line
+  mentions unknown-tab.
+
+---
 ## [2.71.59] — 2026-05-03
 
 **QQ169** — `/go bogusXYZ` (chat) and `lazyclaude open bogus`
