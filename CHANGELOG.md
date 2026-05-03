@@ -10,6 +10,56 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.113] — 2026-05-04
+
+**QQ218 — CRITICAL FIX** — chat send was broken for any input
+that *looked* like a slash command (`/anything`).
+
+QQ198 made `_lcChatSlashCommand` async, but the call site in
+`_lcChatSend` (line 28997) wasn't updated:
+
+```js
+// before (broken since QQ198):
+if (text.startsWith('/') && _lcChatSlashCommand(text)) { ... }
+```
+
+`_lcChatSlashCommand(text)` now returns a `Promise`, which is
+always truthy. So every `/`-prefixed message was eaten by the
+slash early-return, including legitimate slashes whose handler
+returned `false` (deferring to the LLM) and unknown slashes
+whose toast path was supposed to also let the input through to
+the unknown-cmd warn. Adding `await` resolves the Promise to
+the real boolean.
+
+```js
+if (text.startsWith('/') && (await _lcChatSlashCommand(text))) { ... }
+```
+
+(Plain non-slash chat sends were unaffected, but related catch
+paths could surface "중단됨" if the server-side endpoint chain
+errored — see "if you still see 중단됨" below.)
+
+### If you still see "중단됨" after upgrading
+
+The "중단됨" surface comes from the `AbortError` catch path in
+`_lcChatSend`. Most common cause: the dashboard server hasn't
+been restarted since `/api/lazyclaw/chat/stream` (added v2.66.66
+on 2026-05-02) was introduced. The new `dist/app.js` POSTs to
+that endpoint; an older `server.py` returns 404, the fallback
+also 404s, and the error chain may surface as the abort message
+on some browsers. **Restart the server** (kill the existing
+`python3 server.py` PID and `make run` / `python3 server.py`
+fresh) and the chat will work.
+
+### Verified
+- 19-script chat-slash regression sweep all green
+  (smoke, go, cost-status, pin, branch, temperature, keys,
+  usage, cancel, workflows, run, tab-complete x2, unknown,
+  clear-n, help-grouped, refresh, uptime, whoami).
+- Manual: regular "hello there" send + `/help` directly,
+  both routed correctly post-fix.
+
+---
 ## [2.71.112] — 2026-05-04
 
 **QQ217** — `lazyclaude refresh` (alias `reload`) terminal verb

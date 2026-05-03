@@ -28994,7 +28994,12 @@ async function _lcChatSend() {
   const text = (ta.value || '').trim();
   if (!text) return;
   // QQ1 — slash commands intercept before sending to provider.
-  if (text.startsWith('/') && _lcChatSlashCommand(text)) {
+  // QQ218 — _lcChatSlashCommand became async in QQ198, so its return
+  // is now a Promise (always truthy). Awaiting the Promise resolves to
+  // the real boolean (true = handled, false = not a slash). Without
+  // this await, every `/`-prefixed message was eaten by the slash path
+  // even when no command matched.
+  if (text.startsWith('/') && (await _lcChatSlashCommand(text))) {
     ta.value = ''; ta.style.height = 'auto';
     // QQ70 (v2.67.7) — also drop the QQ33 draft so a refresh after
     // a slash command doesn't restore the slashed-out text.
