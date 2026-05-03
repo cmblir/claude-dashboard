@@ -26,12 +26,15 @@ const t3 = await timed(`http://127.0.0.1:${PORT}/api/ports/list?nocache=1`);
 
 check(`cached call < 30ms (got ${t2}ms; cold was ${t1}ms)`,
   t2 < 30, `t2=${t2}`);
-check(`nocache=1 forces re-probe`,
-  t3 >= Math.max(40, t1 - 80), `t1=${t1} t3=${t3}`);
+// QQ196 — nocache and post-TTL hits do a real lsof, but the OS file-table
+// page cache makes subsequent lsof runs ~30% faster than the cold one.
+// Assert "much slower than the cached path" rather than "≥ cold − 80ms".
+check(`nocache=1 forces re-probe (>> cached)`,
+  t3 >= 60 && t3 > t2 * 4, `t1=${t1} t2=${t2} t3=${t3}`);
 
 await new Promise(r => setTimeout(r, 3500));
 const t4 = await timed(`http://127.0.0.1:${PORT}/api/ports/list`);
 check(`TTL expires after 3s — new hit is uncached again`,
-  t4 >= Math.max(40, t1 - 80), `t1=${t1} t4=${t4}`);
+  t4 >= 60 && t4 > t2 * 4, `t1=${t1} t2=${t2} t4=${t4}`);
 
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

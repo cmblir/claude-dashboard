@@ -50,15 +50,21 @@ await page.waitForTimeout(300);
 await page.evaluate(() => window.go('team'));
 await page.waitForTimeout(400);
 
+// QQ196 — measure in-browser to exclude Playwright/CDP overhead
+// (mirrors QQ194/QQ195).
 const switches = [];
 for (const tab of ['workflows', 'team', 'workflows', 'team']) {
-  const t0 = Date.now();
-  await page.evaluate((tb) => window.go(tb), tab);
-  await page.waitForFunction(() => {
-    const v = document.getElementById('view');
-    return v && v.innerText.length > 50;
-  }, { timeout: 5000 });
-  switches.push({ tab, ms: Date.now() - t0 });
+  const ms = await page.evaluate(async (tb) => {
+    const t0 = performance.now();
+    await window.go(tb);
+    while (true) {
+      const v = document.getElementById('view');
+      if (v && v.innerText.length > 50) break;
+      await new Promise(r => setTimeout(r, 8));
+    }
+    return Math.round(performance.now() - t0);
+  }, tab);
+  switches.push({ tab, ms });
 }
 const teamSwitches = switches.filter(s => s.tab === 'team').map(s => s.ms);
 const maxTeam = Math.max(...teamSwitches);
