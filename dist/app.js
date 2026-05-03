@@ -4457,6 +4457,60 @@ function _wfUpdateNodeTransform(nid) {
 }
 
 // ─── Undo 스냅샷 ──────────────────────────────────────────────
+// QQ128 — shared duplicate path used by Cmd+D, the ctx-menu's 복제,
+// and any future entry points. Clones the node set + every edge that
+// lives entirely between them, applies the +40 offset, and updates
+// the selection to point at the clones (n8n parity).
+window._wfDuplicateNodes = function (ids) {
+  if (!__wf.current || !Array.isArray(ids) || !ids.length) return;
+  const idSet = new Set(ids.filter(Boolean));
+  const sources = (__wf.current.nodes || []).filter(n => idSet.has(n.id));
+  if (!sources.length) return;
+  if (typeof _wfPushUndo === 'function') _wfPushUndo();
+  const clones = [];
+  const idMap = {};
+  for (const src of sources) {
+    const clone = JSON.parse(JSON.stringify(src));
+    const oldId = clone.id;
+    clone.id = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    idMap[oldId] = clone.id;
+    clone.x = (clone.x || 0) + 40;
+    clone.y = (clone.y || 0) + 40;
+    clones.push(clone);
+  }
+  __wf.current.nodes.push(...clones);
+  const oldEdges = (__wf.current.edges || []);
+  const newEdges = [];
+  for (const ed of oldEdges) {
+    if (idMap[ed.from] && idMap[ed.to]) {
+      newEdges.push(Object.assign({}, ed, {
+        id: 'e-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        from: idMap[ed.from],
+        to:   idMap[ed.to],
+      }));
+    }
+  }
+  if (newEdges.length) __wf.current.edges = oldEdges.concat(newEdges);
+  if (clones.length === 1) {
+    __wf.selectedNodeId = clones[0].id;
+    if (typeof __wfMultiSelected !== 'undefined' && __wfMultiSelected) __wfMultiSelected.clear();
+  } else {
+    __wf.selectedNodeId = null;
+    if (typeof __wfMultiSelected !== 'undefined' && __wfMultiSelected) {
+      __wfMultiSelected.clear();
+      for (const c of clones) __wfMultiSelected.add(c.id);
+    }
+  }
+  __wf.dirty = true;
+  if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
+  if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
+  if (typeof _wfSyncMultiSelectClasses === 'function') _wfSyncMultiSelectClasses();
+  if (typeof _wfUpdateToolbar === 'function') _wfUpdateToolbar();
+  if (typeof toast === 'function') {
+    toast(`${clones.length} ${t('노드 복제됨')}` + (newEdges.length ? ` · ${newEdges.length} ${t('연결')}` : ''), 'ok');
+  }
+};
+
 function _wfPushUndo() {
   if (!__wf.current) return;
   const snap = {
@@ -5013,6 +5067,7 @@ function _wfBindCanvas() {
     _wfShowEmptyCanvasContextMenu(e.clientX, e.clientY);
   });
 
+window._wfShowNodeContextMenu = _wfShowNodeContextMenu;
 function _wfShowNodeContextMenu(nid, x, y) {
   // Remove any existing menu first.
   const old = document.getElementById('wfNodeCtxMenu');
@@ -5026,15 +5081,14 @@ function _wfShowNodeContextMenu(nid, x, y) {
   const items = [
     { icon: '✏️', label: t('편집'),   shortcut: '⏎',  fn: () => _wfOpenNodeEditor(nid) },
     { icon: '📑', label: t('복제'),   shortcut: '⌘D', fn: () => {
-        const src = (__wf.current.nodes || []).find(n => n.id === nid);
-        if (!src) return;
-        _wfPushUndo();
-        const clone = JSON.parse(JSON.stringify(src));
-        clone.id = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-        clone.x = (clone.x || 0) + 40; clone.y = (clone.y || 0) + 40;
-        __wf.current.nodes.push(clone); __wf.selectedNodeId = clone.id;
-        __wf.dirty = true;
-        _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
+        // QQ128 — multi-select aware. If the right-clicked node is part
+        // of a multi-selection, duplicate the whole set (matching the
+        // QQ127 Cmd/Ctrl+D path); otherwise duplicate just this node.
+        if (typeof _wfDuplicateNodes === 'function') {
+          const ids = (__wfMultiSelected && __wfMultiSelected.has(nid) && __wfMultiSelected.size > 1)
+            ? Array.from(__wfMultiSelected) : [nid];
+          _wfDuplicateNodes(ids);
+        }
       } },
     // PP2 (v2.66.72) — toggle node enabled / disabled
     { icon: '⏸', label: t('비활성화 토글'), shortcut: 'D', fn: () => _wfToggleNodeDisabled(nid) },
@@ -5665,63 +5719,15 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       }
 
       // LL5 (v2.66.34) — Cmd/Ctrl + D — duplicate selected node(s).
-      // QQ127 — multi-select aware: when __wfMultiSelected has more
-      //   than one entry, clone all of them, preserve relative offsets,
-      //   and re-select the clones so a follow-up drag/Delete affects
-      //   the duplicates (n8n parity).
+      // QQ127 — multi-select aware. QQ128 — extracted into
+      // window._wfDuplicateNodes so the ctx menu shares the same path.
       if (mod && e.key === 'd' && !inInput && __wf.current
           && (__wf.selectedNodeId || (__wfMultiSelected && __wfMultiSelected.size))) {
         e.preventDefault();
         const ids = (__wfMultiSelected && __wfMultiSelected.size > 1)
-          ? new Set(__wfMultiSelected)
-          : new Set([__wf.selectedNodeId]);
-        const sources = __wf.current.nodes.filter(n => ids.has(n.id));
-        if (!sources.length) return true;
-        if (typeof _wfPushUndo === 'function') _wfPushUndo();
-        const clones = [];
-        const idMap = {};
-        for (const src of sources) {
-          const clone = JSON.parse(JSON.stringify(src));
-          const oldId = clone.id;
-          clone.id = 'n-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-          idMap[oldId] = clone.id;
-          clone.x = (clone.x || 0) + 40;
-          clone.y = (clone.y || 0) + 40;
-          clones.push(clone);
-        }
-        __wf.current.nodes.push(...clones);
-        // Also clone edges that lived entirely between the duplicated
-        // set so the new sub-graph stays wired.
-        const oldEdges = (__wf.current.edges || []);
-        const newEdges = [];
-        for (const ed of oldEdges) {
-          if (idMap[ed.from] && idMap[ed.to]) {
-            newEdges.push(Object.assign({}, ed, {
-              id: 'e-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-              from: idMap[ed.from],
-              to:   idMap[ed.to],
-            }));
-          }
-        }
-        if (newEdges.length) __wf.current.edges = oldEdges.concat(newEdges);
-        if (clones.length === 1) {
-          __wf.selectedNodeId = clones[0].id;
-          if (__wfMultiSelected) __wfMultiSelected.clear();
-        } else {
-          __wf.selectedNodeId = null;
-          if (__wfMultiSelected) {
-            __wfMultiSelected.clear();
-            for (const c of clones) __wfMultiSelected.add(c.id);
-          }
-        }
-        __wf.dirty = true;
-        if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
-        if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
-        if (typeof _wfSyncMultiSelectClasses === 'function') _wfSyncMultiSelectClasses();
-        _wfUpdateToolbar();
-        if (typeof toast === 'function') {
-          toast(`${clones.length} ${t('노드 복제됨')}` + (newEdges.length ? ` · ${newEdges.length} ${t('연결')}` : ''), 'ok');
-        }
+          ? Array.from(__wfMultiSelected)
+          : [__wf.selectedNodeId];
+        if (typeof _wfDuplicateNodes === 'function') _wfDuplicateNodes(ids);
         return true;
       }
 
