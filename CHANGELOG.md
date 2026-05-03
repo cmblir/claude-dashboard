@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.9] — 2026-05-03
+
+**QQ119** — `/sessions` chat slash command. Lists every session
+in storage with its short id, label, and message count; marks
+the active one with `➜`. Lets users see at a glance which
+sessions exist without opening the sidebar.
+
+`/help` updated to list it.
+
+### Verified
+- `e2e-chat-slash-cost-status.mjs` extended to 14 checks
+  (was 11) — `/sessions` shows active marker + message count,
+  `/help` listing includes `/sessions`. All green.
+
+---
 ## [2.71.8] — 2026-05-03
 
 **QQ118** — `/agents` chat slash command. Lists every assignee

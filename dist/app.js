@@ -27829,6 +27829,25 @@ function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'sessions': {
+      // QQ119 — list every chat session with msg count + active marker.
+      const all = _lcGetSessions() || [];
+      if (!all.length) { toast(t('세션이 없어요'), 'warn'); return true; }
+      const curId = _lcCurrentId();
+      const lines = all.map(s => {
+        let n = 0;
+        try { n = (_lcGetHistory(s.id) || []).length; } catch (_) {}
+        const cur = s.id === curId ? '➜' : '  ';
+        const lbl = (s.label || t('이름 없음')).slice(0, 50);
+        return `- ${cur} \`${s.id.slice(0, 8)}\` — ${lbl} *(${n} ${t('메시지')})*`;
+      });
+      const md = `**${t('세션 목록')}** (${all.length})\n\n` + lines.join('\n');
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      return true;
+    }
     case 'agents': {
       // QQ118 — list every currently-registered assignee in the dropdown
       // so users can see what's bindable via /model. Marks the current
@@ -27858,6 +27877,7 @@ function _lcChatSlashCommand(line) {
 \`/cost\` — ${t('현재 세션 토큰·비용 합계')}
 \`/status\` — ${t('어시니·세션·테마·언어 요약')}
 \`/agents\` — ${t('등록된 어시니 목록')}
+\`/sessions\` — ${t('세션 목록 + 메시지 수')}
 \`/rename <이름>\` — ${t('세션 이름 변경')}
 \`/export\` — ${t('마크다운으로 내보내기')}
 \`/help\` — ${t('이 목록')}
