@@ -10,6 +10,26 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.100] — 2026-05-03
+
+**QQ205** — `/clear N` drops the last N messages of the
+current session (openclaw-style undo). Pure positive-integer
+match, so it doesn't collide with `/clear all` (token match)
+or bare `/clear` (whole-session clear with confirm).
+
+* `/clear 2` → drops the last 2 messages.
+* `/clear 99` on a 4-message session → drops all 4 (clamped).
+* `/clear 3` on an empty session → `비울 메시지가 없습니다` warn.
+* No confirm needed for the partial-clear path — it's a much
+  smaller blast radius than wiping the whole session.
+* `/help` now reads `/clear · /clear N · /clear all`.
+
+### Verified
+- `e2e-chat-slash-clear-n.mjs` 8/8 ✅.
+- Regression: chat-clear-all / chat-clear-empty +
+  chat-slash-{cost-status,smoke,go,pin} all green.
+
+---
 ## [2.71.99] — 2026-05-03
 
 **QQ204** — terminal parity for the chat `/keys` (QQ202) and

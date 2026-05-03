@@ -27945,6 +27945,21 @@ async function _lcChatSlashCommand(line) {
       //   instead of silently degrading to single-session clear.
       // `/clear` (no arg) keeps the session-scoped behaviour (QQ173).
       const firstTok = rest.trim().split(/\s+/)[0].toLowerCase();
+      // QQ205 — `/clear N` drops the last N messages of the current
+      // session (openclaw-style undo). Pure positive integer; doesn't
+      // collide with `/clear all` (token match) or bare `/clear`.
+      if (/^\d+$/.test(firstTok)) {
+        const n = parseInt(firstTok, 10);
+        if (n < 1) { toast(t('1 이상 정수를 입력하세요'), 'warn'); return true; }
+        const id = _lcCurrentId();
+        const h = _lcGetHistory(id) || [];
+        if (!h.length) { toast(t('비울 메시지가 없습니다'), 'warn'); return true; }
+        const dropN = Math.min(n, h.length);
+        _lcSaveHistory(id, h.slice(0, h.length - dropN));
+        if (typeof _lcChatRender === 'function') _lcChatRender();
+        toast(`🧹 ${t('마지막')} ${dropN} ${t('개 메시지 삭제됨')}`, 'ok');
+        return true;
+      }
       if (firstTok === 'all') {
         if (!confirm(t('모든 대화를 삭제하시겠습니까? 되돌릴 수 없습니다.'))) return true;
         try {
@@ -28574,7 +28589,7 @@ async function _lcChatSlashCommand(line) {
     case 'help': {
       const helpMd = `**${t('슬래시 명령')}**
 
-\`/clear\` — ${t('현재 세션 비우기')} · \`/clear all\` — ${t('모든 세션 삭제')}
+\`/clear\` — ${t('현재 세션 비우기')} · \`/clear N\` — ${t('마지막 N개 메시지 삭제')} · \`/clear all\` — ${t('모든 세션 삭제')}
 \`/system\` — ${t('현재 시스템 프롬프트 보기')} · \`/system <텍스트>\` — ${t('설정')} · \`/system clear\` — ${t('초기화')}
 \`/model <provider:model>\` — ${t('어시니 전환 (예: claude:opus)')}
 \`/cost\` — ${t('현재 세션 토큰·비용 합계')}
