@@ -32,14 +32,16 @@ page.on('request', req => {
 
 await page.goto(URL, { waitUntil: 'networkidle' });
 
-// Seed an extra workflow with a deterministic name we can match against
-const seed = await page.evaluate(async () => {
+// Seed with a name unique to this test run so repeated invocations
+// don't accumulate ambiguous matches.
+const uniqTag = 'runslash-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+const seed = await page.evaluate(async (tag) => {
   const r = await fetch('/api/workflows/save', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       id: 'wf-run-test-' + Date.now(),
-      name: 'qq207-runslash-target',
+      name: 'qq207-' + tag,
       nodes: [
         { id: 'start',  type: 'start',  x: 100, y: 100, data: {} },
         { id: 'output', type: 'output', x: 300, y: 100, data: {} },
@@ -48,7 +50,7 @@ const seed = await page.evaluate(async () => {
     }),
   });
   return await r.json();
-});
+}, uniqTag);
 check('test prereq: seeded workflow saved',
   seed && seed.ok, JSON.stringify(seed).slice(0, 200));
 
@@ -77,7 +79,7 @@ check('/run with no arg does NOT POST',
 
 // 2. /run <unique substring of name> succeeds + bubble shows runId
 const before2 = runPosts.length;
-await slash('/run qq207-runslash');
+await slash(`/run qq207-${uniqTag}`);
 await page.waitForTimeout(400);
 check('/run by unique name fires POST /api/workflows/run',
   runPosts.length === before2 + 1, `posts=${runPosts.length - before2}`);
