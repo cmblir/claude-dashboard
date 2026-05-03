@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.85] — 2026-05-03
+
+**QQ190** — `/sessions [filter]` accepts a substring filter
+matching label/id/assignee. Mirrors the QQ189 `/agents`
+filter UX: `/sessions sess-04` shows the 10 matching sessions
+with header `(10/50 · "sess-04")`. No-match case toasts "일치
+하는 세션 없음".
+
+`/help` updated.
+
+### Verified
+- `e2e-chat-sessions-cap.mjs` extended from 4 → 6 checks.
+
+---
 ## [2.71.84] — 2026-05-03
 
 **QQ189** — `/agents [filter]` accepts a substring filter so
