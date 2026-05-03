@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.56] — 2026-05-03
+
+**QQ166** — `Cmd/Ctrl+Shift+E` exports the current chat to
+markdown. Mirrors the toolbar 📥 button without forcing the
+mouse. Suppressed inside input/textarea so a literal `E` still
+types. `/help` updated.
+
+### Verified
+- `scripts/e2e-chat-export-shortcut.mjs` — Playwright regression:
+  shortcut invokes `_lcChatExport`, suppressed inside textarea,
+  `/help` lists it. 3/3 green.
+
+---
 ## [2.71.55] — 2026-05-03
 
 **QQ165** — Cmd/Ctrl+Shift+N on the workflow tab opens
