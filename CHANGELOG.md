@@ -10,6 +10,34 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.104] — 2026-05-03
+
+**QQ209** — `/cancel` chat slash. Cancels a running workflow
+without leaving chat, completing the run/cancel cycle that
+QQ207's `/run` started.
+
+* `/cancel` (no arg) — lists every workflow with a live run.
+  Empty → `실행 중인 워크플로우 없음` warn.
+* `/cancel <runId>` — full-format runId is posted directly,
+  even if `/api/workflows/list` lags behind the orchestrator
+  (the server-side `run-cancel` is a no-op for finished runs,
+  so this is safe).
+* `/cancel <prefix>` — runId-prefix match against the live
+  list.
+* `/cancel <wf-id-or-name>` — when the matched workflow has
+  exactly one running run, cancels it. Multiple → "여러 개
+  일치 — runId 로 지정하세요" warn.
+* No match → `일치하는 실행 없음` warn.
+* `/help` updated.
+
+### Verified
+- `e2e-chat-slash-cancel.mjs` 9/9 ✅ (seeded run, list,
+  bogus-no-POST, runId-POST + body validation, /help).
+- Regression: chat-slash-{run,workflows} +
+  terminal-workflows-run + run-cancel-api +
+  fail-fast-status all green.
+
+---
 ## [2.71.103] — 2026-05-03
 
 **QQ208** — terminal parity for the chat `/workflows` (QQ206)

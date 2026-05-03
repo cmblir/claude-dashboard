@@ -28114,6 +28114,102 @@ async function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'cancel': {
+      // QQ209 — cancel a running workflow without leaving chat. With
+      // no arg, lists every workflow with a live run (one row per
+      // run). With an arg, resolves: exact runId → run-prefix →
+      // workflow id-prefix → workflow name substring → if the
+      // matched workflow has exactly one running run, cancel it.
+      let listed = null;
+      try { listed = await api('/api/workflows/list'); } catch (_) {}
+      const wfs = (listed && listed.workflows) || [];
+      // Build the list of in-flight (wf, runId) pairs.
+      const live = [];
+      for (const w of wfs) {
+        const rid = w.activeRunId
+          || (w.lastRuns && w.lastRuns.find(r => r.status === 'running') && w.lastRuns.find(r => r.status === 'running').runId)
+          || '';
+        if (rid) live.push({ wfId: w.id, wfName: w.name || '', runId: rid, runningCount: w.runningCount || 1 });
+      }
+      if (!rest) {
+        if (!live.length) {
+          toast(t('실행 중인 워크플로우 없음'), 'warn');
+          return true;
+        }
+        const lines = live.map(r =>
+          `- \`${r.runId}\` — \`${(r.wfId||'').slice(0,16)}\` *${r.wfName || ''}*`);
+        const md = `**${t('실행 중')}** (${live.length})\n\n` + lines.join('\n') +
+                   `\n\n_${t('취소: /cancel <runId>')}_`;
+        const history = _lcChatLoad();
+        history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+        _lcChatSave(history);
+        _lcChatRender();
+        return true;
+      }
+      const q = rest.trim().toLowerCase();
+      // QQ209 — if the arg already looks like a full runId, accept it
+      // even when /api/workflows/list lags behind the orchestrator
+      // (e.g. immediately after a /run). The server-side
+      // run-cancel endpoint validates and is a no-op for finished
+      // runs, so this is safe.
+      let target = null;
+      if (/^run-\d{10,14}-[a-z0-9]{4,8}$/i.test(q)) {
+        const fromList = live.find(r => r.runId.toLowerCase() === q);
+        target = fromList || { wfId: '', wfName: '', runId: rest.trim() };
+      }
+      // Otherwise prefer exact runId match, then runId-prefix.
+      if (!target) {
+        target = live.find(r => r.runId.toLowerCase() === q)
+              || live.find(r => r.runId.toLowerCase().startsWith(q));
+      }
+      if (!target) {
+        // Try resolving via workflow id/name → if it has exactly one running run.
+        const wfMatches = wfs.filter(w =>
+          (w.id || '').toLowerCase() === q ||
+          (w.id || '').toLowerCase().startsWith(q) ||
+          (w.name || '').toLowerCase().includes(q));
+        const wfRunning = wfMatches.filter(w => w.runningCount > 0);
+        if (wfRunning.length === 1) {
+          const w = wfRunning[0];
+          const rid = w.activeRunId
+            || (w.lastRuns && w.lastRuns.find(r => r.status === 'running') && w.lastRuns.find(r => r.status === 'running').runId)
+            || '';
+          if (rid) target = { wfId: w.id, wfName: w.name || '', runId: rid };
+        } else if (wfRunning.length > 1) {
+          toast(t('여러 개 일치 — runId 로 지정하세요'), 'warn');
+          return true;
+        }
+      }
+      if (!target) {
+        toast(`${t('일치하는 실행 없음')}: ${rest}`, 'warn');
+        return true;
+      }
+      let resp = null;
+      try {
+        resp = await api('/api/workflows/run-cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ runId: target.runId }),
+        });
+      } catch (e) {
+        toast(`${t('취소 요청 실패')}: ${e && e.message || e}`, 'err');
+        return true;
+      }
+      if (!resp || !resp.ok) {
+        toast(`${t('취소 요청 실패')}: ${resp && resp.error || '?'}`, 'err');
+        return true;
+      }
+      const md = `**${t('취소 요청 보냄')}**\n\n` +
+        `- ${t('실행 id')}: \`${target.runId}\`\n` +
+        `- ${t('워크플로우')}: \`${target.wfName || target.wfId}\`\n\n` +
+        `_${t('취소는 다음 노드 경계에서 적용됩니다')}_`;
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      try { _apiCache && _apiCache.delete && _apiCache.delete('/api/workflows/list'); } catch (_) {}
+      return true;
+    }
     case 'run': {
       // QQ207 — kick off a workflow from chat. /run with no arg shows
       // a usage hint; /run <id-or-name> matches by id-prefix OR name
@@ -28710,6 +28806,7 @@ async function _lcChatSlashCommand(line) {
 \`/keys [필터]\` (= \`/providers\`) — ${t('프로바이더 가용성 + API 키 상태 (마스킹)')}
 \`/workflows [필터]\` (= \`/wfs\`) — ${t('워크플로우 목록 + 실행 카운트 + 최근 상태')}
 \`/run <id|name>\` — ${t('워크플로우 실행 시작 (id-prefix 또는 이름 부분일치)')}
+\`/cancel [runId|wf]\` — ${t('실행 중 워크플로우 취소 (없으면 목록만)')}
 \`/sessions [필터]\` — ${t('세션 목록 + 메시지 수 (라벨/id/모델 부분일치)')}
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
 \`/code [N]\` — ${t('마지막 응답의 코드 블록 (N번째 = 1부터, 기본 마지막) 복사')}
