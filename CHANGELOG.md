@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.78] — 2026-05-03
+
+**QQ185** — `/copy N` out-of-range now gets a dedicated
+`"범위 밖: N / total"` toast instead of the generic `"복사할
+응답이 없습니다"`. Matches the QQ184 `/code N` semantics so
+both N-arg slashes report failures the same way.
+
+### Verified
+- `e2e-chat-slash-cost-status.mjs` extended from 30 → 31 checks:
+  `/copy 99` on a 1-reply session toasts "범위 밖" with the
+  count.
+
+---
 ## [2.71.77] — 2026-05-03
 
 **QQ184** — `/code [N]` accepts an N argument now (1-indexed) so
