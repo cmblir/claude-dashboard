@@ -62,20 +62,36 @@ async function scan(lang) {
     return items;
   });
 
-  // 전체 body 에서 한국어 텍스트 노드 스캔 (ko 모드 외에서는 번역 누락)
-  const koLeaks = lang !== 'ko' ? await page.evaluate(() => {
+  // 전체 body 에서 한국어 텍스트 노드 스캔 (ko 모드 외에서는 번역 누락).
+  // User-content containers (chat history, session prompt previews, memory
+  // markdown bodies) intentionally hold raw user text in whatever language
+  // the user typed — those are not translation bugs.
+  const USER_CONTENT_SKIP = [
+    '.first-user-prompt',
+    '.prose', '.prose-claude', '.markdown',
+    'pre', 'code',
+    '[data-user-content]',
+    // session prompt preview tile (truncated first user prompt)
+    '.text-sm.mt-1.truncate',
+  ];
+  const koLeaks = lang !== 'ko' ? await page.evaluate((skipSelectors) => {
     const out = [];
     const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
     let n;
-    while ((n = w.nextNode())) {
+    outer: while ((n = w.nextNode())) {
       const t = (n.textContent||'').trim();
       if (!t) continue;
-      if (/[가-힣]/.test(t)) {
-        out.push({ text: t.slice(0, 80), parent: n.parentElement?.tagName + '.' + (n.parentElement?.className||'').slice(0,40) });
+      if (!/[가-힣]/.test(t)) continue;
+      // walk up parents — skip if any ancestor matches a user-content sel.
+      for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) {
+        for (const sel of skipSelectors) {
+          try { if (p.matches(sel)) continue outer; } catch (_) {}
+        }
       }
+      out.push({ text: t.slice(0, 80), parent: n.parentElement?.tagName + '.' + (n.parentElement?.className||'').slice(0,40) });
     }
     return out.slice(0, 50);  // 과다 방지
-  }) : [];
+  }, USER_CONTENT_SKIP) : [];
 
   // placeholder/title/aria-label 속성에서 한국어 누수
   const attrLeaks = lang !== 'ko' ? await page.evaluate(() => {

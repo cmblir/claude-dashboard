@@ -10,6 +10,32 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.4] — 2026-05-03
+
+**QQ114** — In zh/en mode, the lazyclaw Chat & Terminal nav tiles
+showed mixed-locale title/aria-label text like
+`AI 聊天 — 등록된 AI 提供商(Claude·OpenAI·Gemini·Ollama 등)与 직접 대화...`.
+Root cause: the two two-sentence Korean descriptions were absent
+from the locale dicts, so `_translateDOM`'s substring walker
+chained shorter matches (`프로바이더→提供商`, `와→与`,
+`전환→切换`, etc.) producing the franken-string.
+
+### Added
+- `tools/translations_manual_43.py` — full-sentence EN + ZH
+  translations for both nav-tile descriptions (chat + terminal).
+  Wired into `tools/translations_manual.py`; `make i18n-refresh`
+  rebuilds locales.
+- `scripts/e2e-find-missing-i18n.mjs` skips `.first-user-prompt`,
+  `.prose`, `.prose-claude`, `.markdown`, `pre`/`code`, and the
+  session-preview `.text-sm.mt-1.truncate` tile so user-typed
+  content doesn't trigger false-positive Korean-residue warnings.
+
+### Verified
+- Playwright: 0 text-node leaks, 0 attribute leaks in zh mode
+  (was 3 / 2 before — the 3 text leaks were user content, now
+  filtered; the 2 attr leaks were the bug above).
+
+---
 ## [2.71.3] — 2026-05-03
 
 **QQ113** — Light theme had 200+ WCAG AA contrast failures across
