@@ -10,6 +10,20 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.64] — 2026-05-03
+
+**QQ173** — `/clear` no longer prompts for confirmation when
+the session is already empty. Repeatedly invoking `/clear` on
+an empty buffer (e.g. via Tab autocomplete + Enter) burned a
+needless `confirm()` modal each time. Now: empty → toast "이미
+비어있습니다" and noop. Non-empty → confirm + wipe (unchanged).
+
+### Verified
+- `scripts/e2e-chat-clear-empty.mjs` — 4/4 green: empty session
+  fires zero confirms + warning toast; non-empty session
+  confirms once and wipes history.
+
+---
 ## [2.71.63] — 2026-05-03
 
 **QQ172** — coverage extension for the QQ171 `/code` slash. Tab

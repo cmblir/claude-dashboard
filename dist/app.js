@@ -28744,8 +28744,16 @@ window._lcChatJumpToMatch = function (kind, key, msgIdx) {
 };
 
 window._lcChatClear = function () {
-  if (!confirm(t('이 대화를 비우시겠습니까?'))) return;
+  // QQ173 — skip the confirm when there's nothing to clear. Repeatedly
+  // clicking '/clear' on an already-empty session prompted for confirm
+  // every time, which is just friction.
   const id = _lcCurrentId();
+  const h = _lcGetHistory(id) || [];
+  if (h.length === 0) {
+    if (typeof toast === 'function') toast(t('이미 비어있습니다'), 'warn');
+    return;
+  }
+  if (!confirm(t('이 대화를 비우시겠습니까?'))) return;
   _lcSaveHistory(id, []);
   _lcChatRender();
 };
