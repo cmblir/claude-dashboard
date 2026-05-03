@@ -53,6 +53,10 @@ const cases = [
   ['lazyclaude get ui',          'get section'],
   ['lazyclaude get ui.theme',    'get key'],
   ['lz help',                    'lz help'],
+  ['lz version',                 'lz version'],
+  ['lz status',                  'lz status'],
+  ['lz tabs',                    'lz tabs'],
+  ['lz get ui',                  'lz get section'],
 ];
 
 for (const [line, label] of cases) {
