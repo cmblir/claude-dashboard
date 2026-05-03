@@ -27501,7 +27501,7 @@ AFTER.lazyclawChat = () => {
                         'whoami', 'pin', 'unpin', 'branch', 'fork',
                         'temperature', 'temp', 'keys', 'providers',
                         'usage', 'workflows', 'wfs', 'run', 'cancel',
-                        'uptime'];
+                        'uptime', 'refresh', 'reload'];
           // Use a stored "seed partial" so repeated Tab cycles through
           // matches based on the original prefix, not the auto-completed one.
           const cur = window.__lcTabCycle;
@@ -28119,6 +28119,22 @@ async function _lcChatSlashCommand(line) {
         if (typeof _lcRenderSessions === 'function') _lcRenderSessions();
         toast(`✏ ${t('세션 이름 변경됨')}: ${s.label}`, 'ok');
       }
+      return true;
+    }
+    case 'refresh':
+    case 'reload': {
+      // QQ216 — bust the client-side API cache so the next /workflows,
+      // /sessions, /agents, /keys etc. re-fetches fresh data. Useful
+      // after editing prefs in another tab or saving a workflow that
+      // hasn't propagated yet. Doesn't reload the whole page.
+      let n = 0;
+      try {
+        if (typeof _apiCache !== 'undefined' && _apiCache.size != null) {
+          n = _apiCache.size;
+          _apiCache.clear();
+        }
+      } catch (_) {}
+      toast(`🔄 ${t('캐시 비움')} (${n} ${t('항목')})`, 'ok');
       return true;
     }
     case 'uptime': {
@@ -28868,6 +28884,7 @@ async function _lcChatSlashCommand(line) {
           [`/theme [auto|dark|light|midnight|forest|sunset]`, t('테마 토글/지정')],
           [`/lang ko|en|zh`,            t('언어 전환 (페이지 리로드)')],
           [`/help [필터]`,              t('이 목록 (필터로 좁히기)')],
+          [`/refresh  (= /reload)`,     t('클라이언트 API 캐시 비우기 (페이지 리로드 X)')],
         ]],
       ];
       const q = rest.trim().toLowerCase();
@@ -28940,7 +28957,8 @@ async function _lcChatSlashCommand(line) {
                    'retry','regenerate','go','open','tabs','version',
                    'whoami','pin','unpin','branch','fork',
                    'temperature','temp','keys','providers',
-                   'usage','workflows','wfs','run','cancel','uptime'];
+                   'usage','workflows','wfs','run','cancel','uptime',
+                   'refresh','reload'];
     // QQ161 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     const hint = (() => {
       let best = null, bestScore = 99;

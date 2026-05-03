@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.111] — 2026-05-04
+
+**QQ216** — `/refresh` (alias `/reload`) chat slash. Busts the
+client-side `_apiCache` Map so the next `/workflows`,
+`/agents`, `/keys`, `/sessions` etc. refetches fresh data.
+Doesn't reload the page — useful when you know server state
+changed (e.g. you saved a workflow in another tab) but the
+30s-cached UI hasn't propagated yet.
+
+* Toast: `🔄 캐시 비움 (N 항목)` (ok kind).
+* `/reload` is an alias.
+* `/help` updated; tab-complete + Levenshtein vocabs both
+  extended.
+
+### Verified
+- `e2e-chat-slash-refresh.mjs` 7/7 ✅ (cache-hot baseline,
+  toast, post-refresh refetch, alias, /ref<Tab> expansion,
+  /help listing).
+- Regression: chat-slash-{tab-complete-new, tab-complete,
+  unknown, workflows} + help-grouped all green.
+
+---
 ## [2.71.110] — 2026-05-04
 
 **QQ215** — terminal Tab-suggest (`_lcTermSuggest`) was the
