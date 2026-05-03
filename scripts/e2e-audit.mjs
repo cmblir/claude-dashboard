@@ -77,7 +77,15 @@ for (const id of tabs) {
   // empty-state / error / overflow signals
   const signals = await page.evaluate(() => {
     const view = document.getElementById('view');
-    const text = view ? view.textContent : '';
+    // Build a "live" text string that excludes prose containers like
+    // pre/code/.markdown — those legitimately contain words like
+    // "Error:" inside example snippets and memory notes (memory tab
+    // displays raw .md bodies). Only flag indicators in plain UI chrome.
+    const clone = view ? view.cloneNode(true) : null;
+    if (clone) {
+      clone.querySelectorAll('pre, code, .markdown, .prose, .prose-claude, [data-memory-md]').forEach(el => el.remove());
+    }
+    const text = clone ? clone.textContent : '';
     const hasEmpty = /데이터 없음|데이터가 없습니다|No data|empty|아직 없습니다/.test(text) && text.length < 400;
     const errRe = /(렌더 실패|fetch failed|Error:|에러:|실패:|Internal Server)/;
     const errHit = errRe.exec(text);
