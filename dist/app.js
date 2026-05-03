@@ -28118,6 +28118,12 @@ function _lcChatSlashCommand(line) {
       return true;
     }
   }
+  // QQ146 — bare `/` (or `/   `) on its own. Sending that to an LLM is
+  // wasteful and confusing; route to /help instead.
+  if (/^\/\s*$/.test(line)) {
+    if (typeof toast === 'function') toast(t('빈 슬래시 명령 — /help 로 명령어 목록 확인'), 'warn');
+    return true;
+  }
   // QQ124 — Unknown slash command. Don't silently send the user's
   // typo to the LLM (waste of tokens). Show a hint toast with the
   // closest match by Levenshtein-ish prefix and tell them /help works.
