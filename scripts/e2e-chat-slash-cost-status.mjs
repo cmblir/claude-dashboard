@@ -83,12 +83,20 @@ const renamed = await page.evaluate(() => {
 });
 check('/rename updates session label', renamed === 'ProjectAlpha', `label=${renamed}`);
 
-// 4. /help lists the new commands
+// 4. /agents lists registered assignees
+await slash('/agents');
+const agentsOut = await page.evaluate(() => document.getElementById('lcChatLog').innerHTML);
+check('/agents lists current assignee claude:opus',
+  /claude:opus/.test(agentsOut));
+check('/agents marks current selection with ➜', /➜/.test(agentsOut));
+
+// 5. /help lists the new commands
 await slash('/help');
 const help = await page.evaluate(() => document.getElementById('lcChatLog').innerHTML);
 check('/help lists /cost',   /\/cost/.test(help));
 check('/help lists /status', /\/status/.test(help));
 check('/help lists /rename', /\/rename/.test(help));
+check('/help lists /agents', /\/agents/.test(help));
 
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
