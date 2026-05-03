@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.4] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Playwright regression for rubber-band + group drag** —
+  `scripts/e2e-rubber-band.mjs` (QQ27 Shift+drag rectangle
+  selects intersecting nodes only) and
+  `scripts/e2e-group-drag.mjs` (QQ28 dragging a multi-selected
+  node moves the cluster preserving relative offsets). Both use
+  real `mouse.down/move/up` so the actual canvas onDown / onMove
+  / onUp pipeline is exercised. Viewport sized 1600×1200 so the
+  full sidebar + canvas fits without scroll.
+
+---
 ## [2.69.3] — 2026-05-03
 
 ### Added (test infra)
