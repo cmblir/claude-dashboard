@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.13] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Add-node from palette regression**
+  (`scripts/e2e-add-node.mjs`):
+  1. `_wfOpenNodeEditor(null)` opens the new-node modal (type=null
+     draft on the window).
+  2. `_wfPickNodeType(winId, 'session')` flips draft.type and seeds
+     the session-shape `data` defaults.
+  3. Filling subject + clicking Save adds a fresh node — count
+     1 → 2, type=session, canvas renders 2 .wf-node groups.
+
+  First attempt tried to find a `[data-tp="session"]` palette
+  button; the actual entry point is the public helper
+  `_wfPickNodeType(winId, type)`. Test corrected.
+
+  Total e2e suite: **36/36 pass**.
+
+---
 ## [2.70.12] — 2026-05-03
 
 ### Added (test infra)
