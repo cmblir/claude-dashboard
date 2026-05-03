@@ -134,5 +134,19 @@ const logSize = await page.evaluate(() => {
 check('lazyclaude reset wipes the term log',
   logSize <= 2, `lines=${logSize}`);
 
+// 9. QQ121 — bare `lazyclaude` and `lz` and `--help` / `-h` all show help
+const hitsBefore2 = termApiHits;
+await runCmd('lazyclaude');
+const bareOut = (await lastOutput(1)).join('\n');
+check('bare `lazyclaude` shows help',
+  /lazyclaude get/.test(bareOut) && /lazyclaude set/.test(bareOut));
+
+await runCmd('lz --help');
+const dashHelp = (await lastOutput(1)).join('\n');
+check('`lz --help` shows help', /lazyclaude get/.test(dashHelp));
+
+check('bare/--help did not hit the shell',
+  termApiHits === hitsBefore2);
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
