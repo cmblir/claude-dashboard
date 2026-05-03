@@ -28818,7 +28818,7 @@ function _lcTermSuggest(prefix) {
     'ollama --version', 'ollama list', 'ollama ps', 'ollama show ',
     'gemini --version', 'gemini --help',
     'codex --version', 'codex --help',
-    'lazyclaude version', 'lazyclaude --version', 'lazyclaude -v', 'lazyclaude --help',
+    'lazyclaude status', 'lazyclaude version', 'lazyclaude --version', 'lazyclaude -v', 'lazyclaude --help',
     'lazyclaude help', 'lazyclaude reset',
     'lazyclaude get', 'lazyclaude get ui', 'lazyclaude get ai', 'lazyclaude get behavior', 'lazyclaude get workflow',
     'lazyclaude set ui theme dark', 'lazyclaude set ui theme light', 'lazyclaude set ui lang ko',
@@ -28944,7 +28944,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const m = trimmed.match(/^(?:lazyclaude|lz)\s+(get|set|help|reset|version|open|go|tabs)\b\s*(.*)$/i);
+  const m = trimmed.match(/^(?:lazyclaude|lz)\s+(get|set|help|reset|version|open|go|tabs|status)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
   const rest = m[2].trim();
@@ -28961,6 +28961,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       'lazyclaude set <section> <key> <v>  — write preference (bool/int/float coerced)\n' +
       'lazyclaude open <tab>               — jump to another dashboard tab\n' +
       'lazyclaude tabs                     — list every NAV tab id\n' +
+      'lazyclaude status                   — quick summary (version + theme + assignee)\n' +
       'lazyclaude version                  — dashboard version + build info\n' +
       'lazyclaude reset                    — wipe terminal log\n' +
       'lazyclaude help                     — this listing\n' +
@@ -29005,6 +29006,30 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
     log.push({ kind: 'out', text: lines.length
       ? lines.join('\n')
       : '(NAV not loaded)', ts: Date.now() });
+    return;
+  }
+  if (verb === 'status') {
+    // QQ145 — `lazyclaude status` prints version + active assignee +
+    // current pref summary. The shell whitelist used to route this to
+    // a non-existent `lazyclaude` binary and error out with "not
+    // installed"; intercepting it client-side is much friendlier.
+    try {
+      const r = await fetch('/api/version', { cache: 'no-store' });
+      const j = await r.json();
+      const ui = (window.CC_PREFS && window.CC_PREFS.ui) || {};
+      const ai = (window.CC_PREFS && window.CC_PREFS.ai) || {};
+      const lines = [
+        `LazyClaude v${j.version || '?'}`,
+        `theme:           ${ui.theme || 'auto'}`,
+        `lang:            ${ui.lang || 'ko'}`,
+        `default model:   ${ai.defaultProvider || '(none)'}`,
+        `temperature:     ${ai.temperature != null ? ai.temperature : '(default)'}`,
+        `tab:             ${(typeof state !== 'undefined' && state.view) || '?'}`,
+      ];
+      log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
     return;
   }
   if (verb === 'version') {
