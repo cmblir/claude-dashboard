@@ -27829,6 +27829,35 @@ function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'copy': {
+      // QQ122 — copy the last assistant response to the clipboard so
+      // the user can paste it into another tool without scrolling. With
+      // an integer argument copies the Nth-most-recent assistant reply.
+      const id = _lcCurrentId();
+      const h = _lcGetHistory(id) || [];
+      const assistants = h.filter(m => m.role === 'assistant');
+      const n = rest ? Math.max(1, parseInt(rest, 10) || 1) : 1;
+      const target = assistants[assistants.length - n];
+      if (!target || !target.text) { toast(t('복사할 응답이 없습니다'), 'warn'); return true; }
+      const txt = String(target.text);
+      // Async in IIFE — we fire-and-forget.
+      (async () => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(txt);
+          } else {
+            const ta = document.createElement('textarea');
+            ta.value = txt;
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
+          }
+          toast(`📋 ${t('클립보드로 복사됨')} (${txt.length} chars)`, 'ok');
+        } catch (e) {
+          toast(t('복사 실패') + ': ' + (e && e.message || e), 'err');
+        }
+      })();
+      return true;
+    }
     case 'theme': {
       // QQ120 — quick theme toggle/set without leaving the chat.
       //   /theme            → toggle dark ↔ light
@@ -27906,6 +27935,7 @@ function _lcChatSlashCommand(line) {
 \`/status\` — ${t('어시니·세션·테마·언어 요약')}
 \`/agents\` — ${t('등록된 어시니 목록')}
 \`/sessions\` — ${t('세션 목록 + 메시지 수')}
+\`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
 \`/theme [auto|dark|light|midnight|forest|sunset]\` — ${t('테마 토글/지정')}
 \`/lang ko|en|zh\` — ${t('언어 전환 (페이지 리로드)')}
 \`/rename <이름>\` — ${t('세션 이름 변경')}

@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.12] — 2026-05-03
+
+**QQ122** — `/copy [N]` chat slash command. Copies the last (or
+Nth-most-recent) assistant reply to the clipboard via
+`navigator.clipboard.writeText`, with a `document.execCommand`
+fallback for environments where the async clipboard API isn't
+permitted. Toasts the resulting char count.
+
+`/help` updated.
+
+### Verified
+- `e2e-chat-slash-cost-status.mjs` extended to 20 checks
+  (was 18) — seeds a known marker `COPY-MARKER-LMNO` as the last
+  assistant reply, then asserts `navigator.clipboard.readText()`
+  returns it after `/copy`.
+
+---
 ## [2.71.11] — 2026-05-03
 
 **QQ121** — bare `lazyclaude`, `lz`, `lazyclaude --help`, and

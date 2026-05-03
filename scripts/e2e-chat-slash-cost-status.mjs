@@ -90,6 +90,26 @@ check('/agents lists current assignee claude:opus',
   /claude:opus/.test(agentsOut));
 check('/agents marks current selection with ➜', /➜/.test(agentsOut));
 
+// 4a-pre. /copy copies the last assistant reply
+try { await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: URL.replace(/\/$/, '') }); } catch (_) {}
+// Re-seed with a known-last assistant reply so we can assert exact match.
+await page.evaluate(() => {
+  const id = _lcCurrentId();
+  const h = _lcGetHistory(id);
+  h.push({ role: 'assistant', text: 'COPY-MARKER-LMNO', assignee: 'claude:opus', ts: Date.now() });
+  _lcSaveHistory(id, h);
+  _lcChatRender();
+});
+await slash('/copy');
+await page.waitForTimeout(200);
+const clip = await page.evaluate(async () => {
+  try { return await navigator.clipboard.readText(); }
+  catch (_) { return null; }
+});
+check('/copy puts last assistant reply on clipboard',
+  clip === 'COPY-MARKER-LMNO',
+  clip === null ? 'clipboard read denied (headless permission)' : `clip="${(clip || '').slice(0, 50)}"`);
+
 // 4a-bis. /theme toggles dark↔light without args
 const beforeTheme = await page.evaluate(() => document.body.classList.contains('theme-light'));
 await slash('/theme');
@@ -122,6 +142,7 @@ check('/help lists /agents', /\/agents/.test(help));
 check('/help lists /sessions', /\/sessions/.test(help));
 check('/help lists /theme',    /\/theme/.test(help));
 check('/help lists /lang',     /\/lang/.test(help));
+check('/help lists /copy',     /\/copy/.test(help));
 
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');
