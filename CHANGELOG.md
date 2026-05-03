@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.73] — 2026-05-03
+
+**QQ180b** — Playwright regression for the QQ180 autocomplete
+fix. Locks in `_lcTermSuggest` returning the new `diag`,
+`tabs`, and `open` candidates so a future refactor can't drop
+them silently.
+
+### Verified
+- `e2e-terminal.mjs` extended from 4 → 7 checks: `lazyclaude di`
+  → `diag`, `lazyclaude ta` → `tabs`, `lazyclaude op` returns
+  ≥3 candidates.
+
+---
 ## [2.71.72] — 2026-05-03
 
 **QQ180** — terminal Tab autocomplete suggestion list missed
