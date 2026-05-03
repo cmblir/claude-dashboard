@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.107] — 2026-05-04
+
+**QQ212** — Tab-completion vocab + unknown-command
+Levenshtein hint vocab were both stale. They listed only the
+QQ62-QQ151 commands and missed every chat slash added in
+QQ198-QQ211: `/whoami`, `/pin`, `/unpin`, `/branch`, `/fork`,
+`/temperature`, `/temp`, `/keys`, `/providers`, `/usage`,
+`/workflows`, `/wfs`, `/run`, `/cancel`, `/uptime`. So
+`/who<Tab>` did nothing and `/whoam` (typo) didn't suggest
+`/whoami`.
+
+Both lists now extended + a comment cross-referencing them
+so the next slash addition only needs three edits in
+`dist/app.js` (switch case + tab-complete cmds + Levenshtein
+known) instead of silently degrading these UX paths.
+
+### Verified
+- `e2e-chat-slash-tab-complete-new.mjs` 16/16 ✅ (single-match
+  expansion for 11 new commands, multi-cycle for /te and /w
+  prefixes, typo→suggestion for /whoam and /upitme).
+- Regression: chat-slash-tab-complete (the original) +
+  chat-slash-unknown / smoke / go / cancel + uptime all green.
+
+---
 ## [2.71.106] — 2026-05-03
 
 **QQ211** — `/uptime` chat slash + `lazyclaude uptime`
