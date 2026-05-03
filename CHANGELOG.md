@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.41] — 2026-05-03
+
+**QQ151** — `/version` chat slash command (parity with the
+terminal `lazyclaude version` from QQ141). Hits `/api/version`
+and posts a LazyClaude info bubble inline. Tab autocomplete,
+`/help`, and the unknown-slash heuristic all updated.
+
+### Verified
+- `e2e-chat-slash-cost-status.mjs` extended to 27 checks (was
+  24): `/help` listing includes `/version`, the bubble mentions
+  the LazyClaude header and a version label. All green.
+
+---
 ## [2.71.40] — 2026-05-03
 
 **QQ150** — `lazyclaude diag` terminal builtin. Reuses the

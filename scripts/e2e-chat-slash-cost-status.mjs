@@ -144,6 +144,14 @@ check('/help lists /theme',    /\/theme/.test(help));
 check('/help lists /lang',     /\/lang/.test(help));
 check('/help lists /copy',     /\/copy/.test(help));
 check('/help lists /retry',    /\/retry/.test(help));
+check('/help lists /version',  /\/version/.test(help));
+
+// 8. /version posts a LazyClaude info bubble
+await slash('/version');
+await page.waitForTimeout(300);
+const verLog = await page.evaluate(() => document.getElementById('lcChatLog').innerText);
+check('/version mentions LazyClaude header', /LazyClaude/.test(verLog));
+check('/version includes version label', /\b버전\b|version/i.test(verLog));
 
 // 7. /retry trims trailing assistant replies and queues the last user msg.
 //    Run AFTER /theme (which schedules a deferred renderView) has fully
