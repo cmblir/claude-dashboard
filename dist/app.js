@@ -27414,7 +27414,7 @@ AFTER.lazyclawChat = () => {
           const cmds = ['clear', 'system', 'model', 'export', 'help',
                         'cost', 'status', 'agents', 'sessions',
                         'rename', 'theme', 'lang', 'copy',
-                        'retry', 'regenerate', 'go', 'open'];
+                        'retry', 'regenerate', 'go', 'open', 'version'];
           // Use a stored "seed partial" so repeated Tab cycles through
           // matches based on the original prefix, not the auto-completed one.
           const cur = window.__lcTabCycle;
@@ -27997,6 +27997,31 @@ function _lcChatSlashCommand(line) {
       })();
       return true;
     }
+    case 'version': {
+      // QQ151 — chat-side parity with terminal `lazyclaude version`.
+      // Fetches /api/version and posts the build info as an inline
+      // assistant bubble. Fire-and-forget — _lcChatSlashCommand isn't
+      // async, so we close over the fetch promise.
+      (async () => {
+        try {
+          const r = await fetch('/api/version', { cache: 'no-store' });
+          const j = await r.json();
+          const md = `**LazyClaude**\n\n` +
+            `- ${t('버전')}: \`${j.version || '?'}\`\n` +
+            (j.commit ? `- ${t('커밋')}: \`${j.commit}\`\n` : '') +
+            (j.branch ? `- ${t('브랜치')}: \`${j.branch}\`\n` : '') +
+            (j.builtAt ? `- ${t('빌드')}: \`${j.builtAt}\`\n` : '') +
+            (j.python ? `- Python: \`${j.python}\`` : '');
+          const history = _lcChatLoad();
+          history.push({ role: 'assistant', text: md.trim(), assignee: 'system', ts: Date.now() });
+          _lcChatSave(history);
+          _lcChatRender();
+        } catch (e) {
+          toast(t('버전 정보 조회 실패') + ': ' + (e && e.message || e), 'err');
+        }
+      })();
+      return true;
+    }
     case 'go':
     case 'open': {
       // QQ125 — jump to another tab without leaving the chat.
@@ -28098,6 +28123,7 @@ function _lcChatSlashCommand(line) {
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
 \`/retry\` (= \`/regenerate\`) — ${t('마지막 사용자 프롬프트 재실행')}
 \`/go <tab>\` (= \`/open\`) — ${t('다른 탭으로 이동 (term/wf/proj/ai/settings)')}
+\`/version\` — ${t('대시보드 버전 + 빌드 정보')}
 \`/theme [auto|dark|light|midnight|forest|sunset]\` — ${t('테마 토글/지정')}
 \`/lang ko|en|zh\` — ${t('언어 전환 (페이지 리로드)')}
 \`/rename <이름>\` — ${t('세션 이름 변경')}
@@ -28133,7 +28159,7 @@ function _lcChatSlashCommand(line) {
   if (/^\/[a-z][a-z0-9_-]*\s*$/i.test(line)) {
     const known = ['clear','system','model','export','help','cost','status',
                    'agents','sessions','rename','theme','lang','copy',
-                   'retry','regenerate','go','open'];
+                   'retry','regenerate','go','open','version'];
     const hint = (() => {
       // Cheap "edit distance ≤ 2 OR shared prefix ≥ 2" heuristic.
       let best = null, bestScore = 99;
