@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.38] — 2026-05-03
+
+**QQ148** — Ctrl+L (and Cmd+L) wipes the terminal log in place,
+matching the bash convention. Distinct from `lazyclaude reset`
+in that it doesn't echo a command line — just clears the screen.
+
+### Verified
+- `scripts/e2e-terminal-ctrl-l.mjs` — Playwright regression:
+  fills the log via the auto-healthcheck, presses Ctrl+L, asserts
+  the on-screen DOM is empty AND `localStorage` entry was removed.
+  Cmd+L verified separately. 4/4 green.
+
+---
 ## [2.71.37] — 2026-05-03
 
 **QQ147** — terminal got the same did-you-mean treatment as the
