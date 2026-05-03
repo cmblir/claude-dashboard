@@ -27772,12 +27772,72 @@ function _lcChatSlashCommand(line) {
     case 'export':
       if (typeof _lcChatExport === 'function') _lcChatExport();
       return true;
+    case 'cost': {
+      // QQ116 — sum tokens + USD across the current session, post as
+      // an inline assistant note so the user can see spend without
+      // leaving the chat.
+      const id = _lcCurrentId();
+      const h = _lcGetHistory(id) || [];
+      let tIn = 0, tOut = 0, cost = 0, msgs = 0;
+      for (const m of h) {
+        if (m.role === 'assistant') msgs++;
+        tIn  += m.tokensIn  || 0;
+        tOut += m.tokensOut || 0;
+        if (typeof m.costUsd === 'number') cost += m.costUsd;
+      }
+      const md = `**${t('현재 세션 비용')}**\n\n` +
+        `- ${t('어시스턴트 응답')}: ${msgs}\n` +
+        `- ${t('입력 토큰')}: \`${tIn.toLocaleString()}\`\n` +
+        `- ${t('출력 토큰')}: \`${tOut.toLocaleString()}\`\n` +
+        `- ${t('총 토큰')}: \`${(tIn + tOut).toLocaleString()}\`\n` +
+        `- ${t('누적 비용')}: \`$${cost.toFixed(cost < 0.01 ? 6 : 4)}\``;
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      return true;
+    }
+    case 'status': {
+      // QQ116 — show provider/model/lang/theme + current session id.
+      const sel = document.getElementById('lcChatAssignee');
+      const assignee = (sel && sel.value) || 'default';
+      const id = _lcCurrentId();
+      const sess = (_lcGetSessions() || []).find(s => s.id === id);
+      const label = (sess && sess.label) || t('이름 없음');
+      const ui = (window.CC_PREFS && window.CC_PREFS.ui) || {};
+      const md = `**${t('상태')}**\n\n` +
+        `- ${t('어시니')}: \`${assignee}\`\n` +
+        `- ${t('세션')}: \`${label}\` (id=\`${id.slice(0, 8)}\`)\n` +
+        `- ${t('언어')}: \`${ui.lang || 'ko'}\` · ${t('테마')}: \`${ui.theme || 'auto'}\``;
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      return true;
+    }
+    case 'rename': {
+      // QQ116 — rename current session inline.
+      if (!rest) { toast(t('사용법: /rename <새 이름>'), 'warn'); return true; }
+      const id = _lcCurrentId();
+      const sessions = _lcGetSessions();
+      const s = sessions.find(x => x.id === id);
+      if (s) {
+        s.label = rest.slice(0, 80);
+        _lcSaveSessions(sessions);
+        if (typeof _lcRenderSessions === 'function') _lcRenderSessions();
+        toast(`✏ ${t('세션 이름 변경됨')}: ${s.label}`, 'ok');
+      }
+      return true;
+    }
     case 'help': {
       const helpMd = `**${t('슬래시 명령')}**
 
 \`/clear\` — ${t('대화 기록 비우기')}
 \`/system [텍스트]\` — ${t('시스템 프롬프트 설정 (인자 없으면 초기화)')}
 \`/model <provider:model>\` — ${t('어시니 전환 (예: claude:opus)')}
+\`/cost\` — ${t('현재 세션 토큰·비용 합계')}
+\`/status\` — ${t('어시니·세션·테마·언어 요약')}
+\`/rename <이름>\` — ${t('세션 이름 변경')}
 \`/export\` — ${t('마크다운으로 내보내기')}
 \`/help\` — ${t('이 목록')}
 
