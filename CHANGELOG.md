@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.14] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Multi-delete + chat edit-user-msg regressions** —
+  - `scripts/e2e-multi-delete.mjs` (QQ30): Backspace with 2
+    selected drops both nodes + every incident edge silently;
+    Backspace with 4 selected triggers the confirm dialog
+    (auto-accepted), then drops the entire workflow.
+  - `scripts/e2e-chat-edit-user-msg.mjs` (QQ22): clicking ✏️
+    truncates the history at the chosen idx and pre-fills the
+    composer with the original text. Verified for both
+    edit-from-start (idx 0) and partial edits (idx 2 keeps the
+    first pair).
+
+  10 checks across the two scripts, all pass.
+
+---
 ## [2.69.13] — 2026-05-03
 
 ### Added (test infra)
