@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.31] — 2026-05-03
+
+**QQ141** — `lazyclaude version` (and `--version` / `-v`) terminal
+built-in. Hits `/api/version` and prints the dashboard version,
+git commit, branch, build timestamp and Python version inline —
+without leaving the terminal or hitting the shell whitelist.
+
+`/help` updated.
+
+### Verified
+- `e2e-terminal-set-prefs.mjs` extended to 16 checks (was 13):
+  `lazyclaude version` prints `LazyClaude v2.71.30`, `lz --version`
+  works the same, neither hit `/api/lazyclaw/term`. All green.
+
+---
 ## [2.71.30] — 2026-05-03
 
 **QQ140** — perf gap I missed in QQ137. The boot prewarm only

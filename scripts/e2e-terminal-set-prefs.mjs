@@ -134,6 +134,19 @@ const logSize = await page.evaluate(() => {
 check('lazyclaude reset wipes the term log',
   logSize <= 2, `lines=${logSize}`);
 
+// QQ141 — `lazyclaude version` and `--version` / `-v` print dashboard info
+const hitsBeforeVer = termApiHits;
+await runCmd('lazyclaude version');
+const verOut = (await lastOutput(1)).join('\n');
+check('lazyclaude version prints LazyClaude header',
+  /LazyClaude\s+v\d/.test(verOut), `out=${verOut.slice(0, 80)}`);
+check('version did not hit /api/lazyclaw/term shell',
+  termApiHits === hitsBeforeVer);
+
+await runCmd('lz --version');
+const verOut2 = (await lastOutput(1)).join('\n');
+check('lz --version also prints version', /LazyClaude\s+v/.test(verOut2));
+
 // 9. QQ121 — bare `lazyclaude` and `lz` and `--help` / `-h` all show help
 const hitsBefore2 = termApiHits;
 await runCmd('lazyclaude');
