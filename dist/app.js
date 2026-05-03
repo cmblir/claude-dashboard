@@ -27494,7 +27494,7 @@ AFTER.lazyclawChat = () => {
           const cmds = ['clear', 'system', 'model', 'export', 'help',
                         'cost', 'status', 'agents', 'sessions',
                         'rename', 'theme', 'lang', 'copy', 'code',
-                        'retry', 'regenerate', 'go', 'open', 'version'];
+                        'retry', 'regenerate', 'go', 'open', 'tabs', 'version'];
           // Use a stored "seed partial" so repeated Tab cycles through
           // matches based on the original prefix, not the auto-completed one.
           const cur = window.__lcTabCycle;
@@ -28184,6 +28184,20 @@ function _lcChatSlashCommand(line) {
       })();
       return true;
     }
+    case 'tabs': {
+      // QQ182 — chat-side parity with the terminal `lazyclaude tabs`.
+      // Lists every NAV id+label so users can pick a target for /go.
+      const lines = (typeof NAV !== 'undefined' ? NAV : [])
+        .map(n => `- ${(n.icon || '·')} \`${n.id}\` — ${n.label || ''}`);
+      const md = lines.length
+        ? `**${t('탭 목록')}** (${lines.length})\n\n` + lines.join('\n')
+        : '_(NAV not loaded)_';
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      return true;
+    }
     case 'go':
     case 'open': {
       // QQ125 — jump to another tab without leaving the chat.
@@ -28301,6 +28315,7 @@ function _lcChatSlashCommand(line) {
 \`/code\` — ${t('마지막 응답의 코드 블록만 복사')}
 \`/retry\` (= \`/regenerate\`) — ${t('마지막 사용자 프롬프트 재실행')}
 \`/go <tab>\` (= \`/open\`) — ${t('다른 탭으로 이동 (term/wf/proj/ai/settings)')}
+\`/tabs\` — ${t('전체 탭 목록')}
 \`/version\` — ${t('대시보드 버전 + 빌드 정보')}
 \`/theme [auto|dark|light|midnight|forest|sunset]\` — ${t('테마 토글/지정')}
 \`/lang ko|en|zh\` — ${t('언어 전환 (페이지 리로드)')}
@@ -28339,7 +28354,7 @@ function _lcChatSlashCommand(line) {
   if (/^\/[a-z][a-z0-9_-]*\s*$/i.test(line)) {
     const known = ['clear','system','model','export','help','cost','status',
                    'agents','sessions','rename','theme','lang','copy','code',
-                   'retry','regenerate','go','open','version'];
+                   'retry','regenerate','go','open','tabs','version'];
     // QQ161 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     const hint = (() => {
       let best = null, bestScore = 99;
