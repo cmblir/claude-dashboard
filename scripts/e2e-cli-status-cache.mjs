@@ -48,20 +48,41 @@ await page.goto(URL, { waitUntil: 'networkidle' });
 await page.waitForSelector('#view h1', { timeout: 5000 });
 await page.waitForTimeout(300);
 
-// First hit may still be cold-ish if the page boot beat the cache; do
-// one warm-up to be safe.
-await page.evaluate(() => window.go('aiProviders'));
-await page.waitForTimeout(500);
-
-const switches = [];
-for (const tab of ['workflows', 'aiProviders', 'workflows', 'aiProviders']) {
-  const t0 = Date.now();
-  await page.evaluate((tb) => window.go(tb), tab);
+// QQ195 — warm aiProviders + workflows BOTH twice before measuring. The
+// second visit to either tab pays for any one-shot lazy-init the AFTER
+// hook kicks off (ollama catalog load, health check, cost charts), which
+// would otherwise dominate timing on the first measurement pass.
+for (let i = 0; i < 2; i++) {
+  await page.evaluate(() => window.go('aiProviders'));
   await page.waitForFunction(() => {
     const v = document.getElementById('view');
     return v && v.innerText.length > 50;
   }, { timeout: 5000 });
-  switches.push({ tab, ms: Date.now() - t0 });
+  await page.waitForTimeout(300);
+  await page.evaluate(() => window.go('workflows'));
+  await page.waitForFunction(() => {
+    const v = document.getElementById('view');
+    return v && v.innerText.length > 50;
+  }, { timeout: 5000 });
+  await page.waitForTimeout(300);
+}
+
+// QQ195 — measure inside the browser to exclude Playwright/CDP poll
+// overhead (mirrors QQ194 in e2e-tab-switch-budget). Wallclock from Node
+// adds ~250-300ms of CDP round-trips that are unrelated to cache state.
+const switches = [];
+for (const tab of ['workflows', 'aiProviders', 'workflows', 'aiProviders']) {
+  const ms = await page.evaluate(async (tb) => {
+    const t0 = performance.now();
+    await window.go(tb);
+    while (true) {
+      const v = document.getElementById('view');
+      if (v && v.innerText.length > 50) break;
+      await new Promise(r => setTimeout(r, 8));
+    }
+    return Math.round(performance.now() - t0);
+  }, tab);
+  switches.push({ tab, ms });
 }
 const aiSwitches = switches.filter(s => s.tab === 'aiProviders').map(s => s.ms);
 const maxAi = Math.max(...aiSwitches);

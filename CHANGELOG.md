@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.90] — 2026-05-03
+
+**QQ195** — Stabilise two cache-perf e2e scripts that flaked
+on transient state.
+
+* `e2e-cache-refresh-loop` — Node's first `fetch()` per process
+  pays ~70-90ms of one-time DNS/TCP/agent setup. Add a
+  throwaway `/api/version` hit + warm both target endpoints so
+  the `boot+` assertion measures cache hot/cold state, not Node
+  fetch init. Also absorbs transient `~/.claude.json` mtime
+  invalidations.
+* `e2e-cli-status-cache` — measure tab-switch latency
+  in-browser via `performance.now()` (mirrors QQ194). Also
+  double-warm aiProviders + workflows before measuring, so the
+  AFTER-hook lazy-init (ollama catalog, health, cost charts)
+  doesn't dominate the first measured switch.
+
+### Verified
+- `e2e-cache-refresh-loop.mjs` 4/4 ✅.
+- `e2e-cli-status-cache.mjs` 3/3 ✅ (aiProviders 103/104ms).
+
+---
 ## [2.71.89] — 2026-05-03
 
 **QQ194** — `e2e-tab-switch-budget` now measures latency
