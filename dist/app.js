@@ -27938,9 +27938,26 @@ function _lcChatSlashCommand(line) {
   const cmd = (space >= 0 ? line.slice(1, space) : line.slice(1)).toLowerCase();
   const rest = space >= 0 ? line.slice(space + 1).trim() : '';
   switch (cmd) {
-    case 'clear':
+    case 'clear': {
+      // QQ174 — `/clear all` wipes EVERY session after a confirm.
+      // `/clear` (no arg) keeps the session-scoped behaviour (QQ173).
+      if (rest.toLowerCase().trim() === 'all') {
+        if (!confirm(t('모든 대화를 삭제하시겠습니까? 되돌릴 수 없습니다.'))) return true;
+        try {
+          _lcSaveSessions([]);
+          for (const k of Object.keys(localStorage)) {
+            if (k.startsWith('cc.lc.hist.')) localStorage.removeItem(k);
+          }
+        } catch (_) {}
+        if (typeof _lcEnsureSession === 'function') _lcEnsureSession('');
+        if (typeof _lcRenderSessions === 'function') _lcRenderSessions();
+        if (typeof _lcChatRender === 'function') _lcChatRender();
+        if (typeof toast === 'function') toast(`🧹 ${t('모든 대화 삭제됨')}`, 'ok');
+        return true;
+      }
       if (typeof _lcChatClear === 'function') _lcChatClear();
       return true;
+    }
     case 'system': {
       const sel = document.getElementById('lcChatAssignee');
       const a = (sel && sel.value) || 'default';
@@ -28236,7 +28253,7 @@ function _lcChatSlashCommand(line) {
     case 'help': {
       const helpMd = `**${t('슬래시 명령')}**
 
-\`/clear\` — ${t('대화 기록 비우기')}
+\`/clear\` — ${t('현재 세션 비우기')} · \`/clear all\` — ${t('모든 세션 삭제')}
 \`/system [텍스트]\` — ${t('시스템 프롬프트 설정 (인자 없으면 초기화)')}
 \`/model <provider:model>\` — ${t('어시니 전환 (예: claude:opus)')}
 \`/cost\` — ${t('현재 세션 토큰·비용 합계')}
