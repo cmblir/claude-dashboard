@@ -140,11 +140,25 @@ def _q_axis(value_max: int, *, count: int, used: int, weight: float, base_q: flo
     value = int(round(raw * factor))
     return {"raw": raw, "quality": round(q, 3), "factor": round(factor, 3), "value": min(value_max, value)}
 
+_OPT_SCORE_CACHE: dict = {"data": None, "ts": 0.0}
+# QQ155 — overview tab calls this on every load. The score aggregates
+# settings + quality metrics + agents/plugins/permissions counts —
+# ~50ms per hit. The metrics window is 30 days, so values change on
+# the minute scale; a 10s TTL coalesces tab-switch redundancy without
+# making the dashboard feel stale.
+_OPT_SCORE_TTL_S = 10.0
+
+
 def api_optimization_score() -> dict:
     """전반적 최적화 스코어 — **사용자가 직접 설정한 자원**만 카운트.
     플러그인이 제공하는 자원은 별도 'plugins' 축에서 측정 (이중 가산 ×).
     품질 가중치(Q): 보유한 자원 중 30일 안에 실제로 사용된 비율로 점수 조정.
+    QQ155 — Memoised for 10s; back-to-back hits return the same payload.
     """
+    import time as _time
+    cached = _OPT_SCORE_CACHE.get("data")
+    if cached is not None and (_time.time() - _OPT_SCORE_CACHE.get("ts", 0)) < _OPT_SCORE_TTL_S:
+        return cached
     _db_init()
     qm = _quality_metrics_30d()
     score = {}
@@ -305,7 +319,10 @@ def api_optimization_score() -> dict:
     if mcp_n < 3:
         recs.append({"icon": "🔗", "title": "MCP 커넥터 추가", "detail": "Context7, GitHub, Memory 같은 MCP로 에이전트 능력이 크게 확장됩니다."})
 
-    return {"overall": overall, "breakdown": score, "recommendations": recs}
+    result = {"overall": overall, "breakdown": score, "recommendations": recs}
+    _OPT_SCORE_CACHE["data"] = result
+    _OPT_SCORE_CACHE["ts"] = _time.time()
+    return result
 
 
 # ───────────────── original briefing ─────────────────
