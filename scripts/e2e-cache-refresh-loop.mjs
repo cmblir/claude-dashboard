@@ -30,6 +30,17 @@ async function timed(url) {
   return Date.now() - t0;
 }
 
+// QQ195 — Node's first fetch in a process pays ~70-90ms of one-time DNS /
+// TCP / agent setup. Burn that off with a throwaway hit before measuring,
+// otherwise the first cli/status timing reflects fetch init, not cache
+// hot/cold state. Also warm both target endpoints so transient mtime
+// changes (auth/status invalidates on ~/.claude.json mtime) don't blow up
+// the boot+ assertion — the point of THIS test is the 30s+ idle case
+// downstream, not the cold/hot transition.
+await fetch(`http://127.0.0.1:${PORT}/api/version`).catch(() => {});
+await fetch(`http://127.0.0.1:${PORT}/api/cli/status`).catch(() => {});
+await fetch(`http://127.0.0.1:${PORT}/api/auth/status`).catch(() => {});
+
 const cliFresh = await timed(`http://127.0.0.1:${PORT}/api/cli/status`);
 const authFresh = await timed(`http://127.0.0.1:${PORT}/api/auth/status`);
 
