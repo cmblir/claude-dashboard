@@ -28692,6 +28692,15 @@ AFTER.lazyclawTerm = () => {
       histIdx = -1; draft = '';
       return;
     }
+    // QQ148 — Ctrl+L = clear screen (bash convention). Wipes the term
+    // log buffer like `lazyclaude reset` but without echoing a command.
+    if ((e.key === 'l' || e.key === 'L') && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      try { localStorage.removeItem('cc.lazyclawTerm.log'); } catch (_) {}
+      const log = document.getElementById('lcTermLog');
+      if (log) log.innerHTML = '';
+      return;
+    }
     if (e.key === 'ArrowUp') {
       const h = _hist();
       if (!h.length) return;
