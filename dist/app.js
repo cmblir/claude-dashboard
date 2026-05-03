@@ -28114,6 +28114,72 @@ async function _lcChatSlashCommand(line) {
       }
       return true;
     }
+    case 'run': {
+      // QQ207 — kick off a workflow from chat. /run with no arg shows
+      // a usage hint; /run <id-or-name> matches by id-prefix OR name
+      // substring (case-insensitive). Ambiguous matches list options
+      // instead of guessing. POSTs /api/workflows/run; the runId
+      // comes back in the bubble so the user can /go workflows to
+      // watch it.
+      let listed = null;
+      // Use raw api() — /run is intentful, the user just typed an
+      // explicit identifier and a stale 30s-cached list could mask a
+      // freshly-saved workflow.
+      try { listed = await api('/api/workflows/list'); } catch (_) {}
+      const wfs = (listed && listed.workflows) || [];
+      if (!wfs.length) { toast(t('등록된 워크플로우가 없습니다'), 'warn'); return true; }
+      if (!rest) {
+        toast(t('사용법: /run <id-prefix or name>'), 'warn');
+        return true;
+      }
+      const q = rest.trim().toLowerCase();
+      // Prefer exact id match; else id-prefix; else name substring.
+      let matches = wfs.filter(w => (w.id || '').toLowerCase() === q);
+      if (!matches.length) matches = wfs.filter(w => (w.id || '').toLowerCase().startsWith(q));
+      if (!matches.length) matches = wfs.filter(w => (w.name || '').toLowerCase().includes(q));
+      if (!matches.length) {
+        toast(`${t('일치하는 워크플로우 없음')}: ${rest}`, 'warn');
+        return true;
+      }
+      if (matches.length > 1) {
+        const lines = matches.slice(0, 10).map(w => `- \`${(w.id||'').slice(0,16)}\` — ${w.name || ''}`);
+        const md = `**${t('여러 개 일치 — 더 구체적으로')}** (${matches.length})\n\n` + lines.join('\n');
+        const history = _lcChatLoad();
+        history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+        _lcChatSave(history);
+        _lcChatRender();
+        return true;
+      }
+      const wf = matches[0];
+      let resp = null;
+      try {
+        resp = await api('/api/workflows/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: wf.id }),
+        });
+      } catch (e) {
+        toast(`${t('실행 시작 실패')}: ${e && e.message || e}`, 'err');
+        return true;
+      }
+      if (!resp || !resp.ok) {
+        toast(`${t('실행 시작 실패')}: ${resp && resp.error || '?'}`, 'err');
+        return true;
+      }
+      const md = `**${t('워크플로우 실행 시작')}**\n\n` +
+        `- ${t('이름')}: \`${wf.name || ''}\`\n` +
+        `- ${t('워크플로우 id')}: \`${wf.id}\`\n` +
+        `- ${t('실행 id')}: \`${resp.runId}\`\n\n` +
+        `_${t('실시간 상태는 /go workflows')}_`;
+      const history = _lcChatLoad();
+      history.push({ role: 'assistant', text: md, assignee: 'system', ts: Date.now() });
+      _lcChatSave(history);
+      _lcChatRender();
+      // Invalidate the workflow list cache so /workflows shows the new
+      // running indicator immediately.
+      try { _apiCache && _apiCache.delete && _apiCache.delete('/api/workflows/list'); } catch (_) {}
+      return true;
+    }
     case 'workflows':
     case 'wfs': {
       // QQ206 — list workflows from chat (parity with /tabs, /sessions,
@@ -28643,6 +28709,7 @@ async function _lcChatSlashCommand(line) {
 \`/agents [필터]\` — ${t('등록된 어시니 목록 (예: /agents claude)')}
 \`/keys [필터]\` (= \`/providers\`) — ${t('프로바이더 가용성 + API 키 상태 (마스킹)')}
 \`/workflows [필터]\` (= \`/wfs\`) — ${t('워크플로우 목록 + 실행 카운트 + 최근 상태')}
+\`/run <id|name>\` — ${t('워크플로우 실행 시작 (id-prefix 또는 이름 부분일치)')}
 \`/sessions [필터]\` — ${t('세션 목록 + 메시지 수 (라벨/id/모델 부분일치)')}
 \`/copy [N]\` — ${t('마지막 어시스턴트 응답 (N번째 최근) 클립보드 복사')}
 \`/code [N]\` — ${t('마지막 응답의 코드 블록 (N번째 = 1부터, 기본 마지막) 복사')}
