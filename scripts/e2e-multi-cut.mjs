@@ -97,5 +97,47 @@ check('pasted set is the new multi-selection',
   afterPaste.newSelected.length === 2,
   `sel=${afterPaste.newSelected.length}`);
 
+// QQ129b — Cmd+Z after cut should restore the full A→B→C graph.
+// Reset state, perform the cut again, then undo.
+await page.evaluate(() => {
+  __wf.current = {
+    id: 'wf-cut-undo-' + Date.now(),
+    name: 'cut-undo',
+    nodes: [
+      { id: 'n-a', type: 'session', x: 100, y: 200, data: { subject: 'A', assignee: 'claude:opus' } },
+      { id: 'n-b', type: 'session', x: 300, y: 200, data: { subject: 'B', assignee: 'claude:opus' } },
+      { id: 'n-c', type: 'session', x: 500, y: 200, data: { subject: 'C', assignee: 'claude:opus' } },
+    ],
+    edges: [
+      { id: 'e-ab', from: 'n-a', to: 'n-b' },
+      { id: 'e-bc', from: 'n-b', to: 'n-c' },
+    ],
+  };
+  __wf._undoStack = [];
+  _wfRenderCanvas();
+  __wfMultiSelected.clear();
+  __wfMultiSelected.add('n-a');
+  __wfMultiSelected.add('n-b');
+  __wf.selectedNodeId = null;
+  _wfSyncMultiSelectClasses();
+});
+
+await page.keyboard.press('Meta+KeyX');
+await page.waitForTimeout(120);
+await page.keyboard.press('Meta+KeyZ');
+await page.waitForTimeout(120);
+
+const restored = await page.evaluate(() => ({
+  nodeIds:  __wf.current.nodes.map(n => n.id).sort(),
+  edgeIds:  (__wf.current.edges || []).map(e => `${e.from}->${e.to}`).sort(),
+}));
+
+check('Cmd+Z after cut restores all 3 nodes',
+  restored.nodeIds.join(',') === 'n-a,n-b,n-c',
+  `nodes=${restored.nodeIds}`);
+check('Cmd+Z after cut restores both edges',
+  restored.edgeIds.join(',') === 'n-a->n-b,n-b->n-c',
+  `edges=${restored.edgeIds}`);
+
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.21] — 2026-05-03
+
+**QQ131** — Playwright coverage for Cmd+X being undoable. The
+QQ129 cut handler already pushes an undo entry, but no test
+exercised Cmd+Z after cut. Added two assertions that prove the
+A→B→C graph is fully restored (both nodes and both edges) after
+`cut(A+B) → undo`.
+
+### Verified
+- `e2e-multi-cut.mjs` extended from 8 → 10 checks. All green.
+
+---
 ## [2.71.20] — 2026-05-03
 
 **QQ130** — workflow shortcut-help modal (`?` key) was missing
