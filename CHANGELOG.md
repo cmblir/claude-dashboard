@@ -10,6 +10,18 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.53] — 2026-05-03
+
+**QQ163** — small refactor: dedupe the duplicated Levenshtein
+helper between QQ161 (chat slash typo) and QQ162 (terminal verb
+typo). One `window._lcLevenshtein(a, b)` exported globally,
+both call sites now reuse it.
+
+### Verified
+- `e2e-chat-slash-unknown.mjs` (15/15) and
+  `e2e-terminal-set-prefs.mjs` (26/26) both still green.
+
+---
 ## [2.71.52] — 2026-05-03
 
 **QQ162** — terminal-side parity for the QQ161 Levenshtein
