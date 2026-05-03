@@ -27491,10 +27491,17 @@ AFTER.lazyclawChat = () => {
         if (line.startsWith('/')) {
           // QQ126 — keep this list in sync with `_lcChatSlashCommand`'s
           // switch + the unknown-command heuristic's `known` array.
+          // QQ212 — keep aligned with the slash switch in
+          // _lcChatSlashCommand and the unknown-command heuristic
+          // below. Adding a new slash means three edits in this file.
           const cmds = ['clear', 'system', 'model', 'export', 'help',
                         'cost', 'status', 'agents', 'sessions',
                         'rename', 'theme', 'lang', 'copy', 'code',
-                        'retry', 'regenerate', 'go', 'open', 'tabs', 'version'];
+                        'retry', 'regenerate', 'go', 'open', 'tabs', 'version',
+                        'whoami', 'pin', 'unpin', 'branch', 'fork',
+                        'temperature', 'temp', 'keys', 'providers',
+                        'usage', 'workflows', 'wfs', 'run', 'cancel',
+                        'uptime'];
           // Use a stored "seed partial" so repeated Tab cycles through
           // matches based on the original prefix, not the auto-completed one.
           const cur = window.__lcTabCycle;
@@ -28880,9 +28887,14 @@ async function _lcChatSlashCommand(line) {
   // lines beginning with `/` (e.g. "/path/to/file") fall through to
   // the provider as before.
   if (/^\/[a-z][a-z0-9_-]*\s*$/i.test(line)) {
+    // QQ212 — kept in sync with the tab-complete cmds list above and
+    // the slash switch in _lcChatSlashCommand.
     const known = ['clear','system','model','export','help','cost','status',
                    'agents','sessions','rename','theme','lang','copy','code',
-                   'retry','regenerate','go','open','tabs','version'];
+                   'retry','regenerate','go','open','tabs','version',
+                   'whoami','pin','unpin','branch','fork',
+                   'temperature','temp','keys','providers',
+                   'usage','workflows','wfs','run','cancel','uptime'];
     // QQ161 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     const hint = (() => {
       let best = null, bestScore = 99;
