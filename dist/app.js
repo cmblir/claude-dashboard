@@ -27297,7 +27297,12 @@ AFTER.lazyclawChat = () => {
         const lineStart = v.lastIndexOf('\n', Math.max(0, caret - 1)) + 1;
         const line = v.slice(lineStart, caret);
         if (line.startsWith('/')) {
-          const cmds = ['clear', 'system', 'model', 'export', 'help'];
+          // QQ126 — keep this list in sync with `_lcChatSlashCommand`'s
+          // switch + the unknown-command heuristic's `known` array.
+          const cmds = ['clear', 'system', 'model', 'export', 'help',
+                        'cost', 'status', 'agents', 'sessions',
+                        'rename', 'theme', 'lang', 'copy',
+                        'retry', 'regenerate', 'go', 'open'];
           // Use a stored "seed partial" so repeated Tab cycles through
           // matches based on the original prefix, not the auto-completed one.
           const cur = window.__lcTabCycle;

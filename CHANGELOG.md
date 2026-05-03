@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.16] — 2026-05-03
+
+**QQ126** — Tab autocomplete inside the chat composer was stuck
+on the original five commands `clear/system/model/export/help`
+from QQ62 and silently ignored every slash added since (cost,
+status, agents, sessions, rename, theme, lang, copy, retry,
+regenerate, go, open). Bumped the autocomplete list so Tab now
+cycles all 17 commands.
+
+### Verified
+- `scripts/e2e-chat-slash-tab-complete.mjs` — Playwright
+  regression: `/the<Tab>` → `/theme`, `/co<Tab>` cycles
+  cost↔copy, `/se<Tab>` → `/sessions`, `/g`/`/op` expand,
+  `/re<Tab>` cycles rename/retry/regenerate, `/xyz<Tab>` is a
+  no-op. 8/8 green.
+
+---
 ## [2.71.15] — 2026-05-03
 
 **QQ125** — `/go <tab>` (alias `/open`) chat slash command.
