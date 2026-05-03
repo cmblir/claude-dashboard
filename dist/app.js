@@ -29032,16 +29032,30 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
     const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag'];
+    // QQ162 — Levenshtein, parity with the QQ161 chat-side fix.
+    // Hamming-on-shorter scored 'verzion'/'vrsion' too high to suggest
+    // 'version'; a real edit distance handles missing/inserted chars.
+    const lev = (a, b) => {
+      if (a === b) return 0;
+      if (!a.length) return b.length;
+      if (!b.length) return a.length;
+      const dp = new Array(b.length + 1);
+      for (let j = 0; j <= b.length; j++) dp[j] = j;
+      for (let i = 1; i <= a.length; i++) {
+        let prev = dp[0]; dp[0] = i;
+        for (let j = 1; j <= b.length; j++) {
+          const tmp = dp[j];
+          dp[j] = a[i - 1] === b[j - 1]
+            ? prev
+            : 1 + Math.min(prev, dp[j], dp[j - 1]);
+          prev = tmp;
+        }
+      }
+      return dp[b.length];
+    };
     let best = null, bestScore = 99;
     for (const k of candidates) {
-      let score = 99;
-      if (k.startsWith(rest) || rest.startsWith(k)) score = Math.abs(k.length - rest.length);
-      else {
-        const m = Math.min(k.length, rest.length);
-        let diff = Math.abs(k.length - rest.length);
-        for (let i = 0; i < m; i++) if (k[i] !== rest[i]) diff++;
-        score = diff;
-      }
+      const score = lev(k, rest);
       if (score < bestScore) { bestScore = score; best = k; }
     }
     const suggest = bestScore <= 3 ? best : null;

@@ -147,6 +147,17 @@ check('typo response suggests SOME known verb',
 check('typo did not hit shell endpoint',
   termApiHits === hitsBeforeTypo);
 
+// QQ162 — Levenshtein for terminal typos (parity with QQ161 chat).
+await runCmd('lazyclaude vrsion');
+const vrOut = (await lastOutput(1)).join('\n');
+check('vrsion → suggests version (Lev=1)',
+  /lazyclaude version/.test(vrOut), `out=${vrOut.slice(0, 100)}`);
+
+await runCmd('lazyclaude resett');
+const reOut = (await lastOutput(1)).join('\n');
+check('resett → suggests reset (Lev=1)',
+  /lazyclaude reset/.test(reOut), `out=${reOut.slice(0, 100)}`);
+
 // QQ145 — `lazyclaude status` prints version + theme + assignee
 const hitsBeforeStatus = termApiHits;
 await runCmd('lazyclaude status');
