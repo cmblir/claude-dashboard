@@ -10,6 +10,39 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.115] — 2026-05-04
+
+**QQ220 — CRITICAL** — auto-fallback for external SSE aborts.
+
+QQ219 fixed the server-side traceback path, but real users were
+still seeing "■ 중단됨" because their browser environment
+(extension, service worker, antivirus, network middleware) was
+killing the SSE connection. Playwright headless reproduced
+clean (zero `AbortController.abort()` calls) but production
+browsers cancelled fetch mid-stream. The catch path then went
+straight to the "중단됨" bubble.
+
+Fix: distinguish user-initiated aborts from external aborts.
+* `window.__lcUserAbort = true` is set at the two real abort
+  callsites — Esc handler (line 27433) + Send re-press
+  (line 28991). These render the "중단됨" bubble as before.
+* Any other AbortError where no token has arrived is treated
+  as an environmental SSE block. The catch falls through to
+  the existing non-stream `POST /api/lazyclaw/chat` endpoint
+  and the chat completes transparently.
+* If even the non-stream fallback fails, the error message
+  points at extensions / service workers / private window as
+  the likely cause instead of leaving the user stranded.
+
+### Verified
+- Playwright simulation: monkey-patched fetch to abort the
+  stream at t+200ms (no user input). Client auto-fell back to
+  non-stream and got "안녕하세요! 어떻게 도와드릴까요?" at
+  t+13.4s — no "중단됨" bubble rendered.
+- Regression: chat-slash-smoke / go / cost-status / pin /
+  cancel all green.
+
+---
 ## [2.71.114] — 2026-05-04
 
 **QQ219 — CRITICAL FIX** — chat would render "■ 중단됨"

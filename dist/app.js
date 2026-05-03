@@ -27426,6 +27426,10 @@ AFTER.lazyclawChat = () => {
       }
       // QQ64 (v2.67.1) — Esc cancels active chat streaming.
       if (e.key === 'Escape' && _lcChatAbortCtrl) {
+        // QQ220 — flag this as a user-initiated abort so the catch
+        // block in _lcChatSend renders the "중단됨" bubble instead of
+        // silently falling back to the non-stream endpoint.
+        window.__lcUserAbort = true;
         const tag = (e.target && e.target.tagName) || '';
         // Don't steal Esc when clearing an input/filter.
         if (tag === 'INPUT') return;
@@ -28984,6 +28988,8 @@ async function _lcChatSlashCommand(line) {
 async function _lcChatSend() {
   // OO5 (v2.66.68) — session-aware send with token stats, auto-labelling, regenerate.
   if (_lcChatAbortCtrl) {
+    // QQ220 — mark user-initiated abort (re-pressing Send while in flight).
+    window.__lcUserAbort = true;
     try { _lcChatAbortCtrl.abort(); } catch (_) {}
     return;
   }
@@ -29156,11 +29162,31 @@ async function _lcChatSend() {
     _lcUpdateSessionMeta(sessionId, assignee, reply.text.slice(0, 55));
     _lcRenderSessions();
   } catch (e) {
-    if (e && e.name === 'AbortError') {
+    // QQ220 — AbortError can come from two sources:
+    //   1. user pressing Esc / clicking Stop (window.__lcUserAbort=true)
+    //   2. external (browser extension, service worker, antivirus,
+    //      network middleware) cancelling the SSE connection — Playwright
+    //      doesn't reproduce it, but real users hit this. In case 2 the
+    //      server-side handler completed fine; the user just lost the body.
+    // Distinguish by an explicit flag set in the abort callsites. If the
+    // abort wasn't user-initiated AND we didn't receive a single token,
+    // automatically retry via the non-stream POST /api/lazyclaw/chat
+    // endpoint instead of giving up with "중단됨".
+    const userAbort = window.__lcUserAbort === true;
+    window.__lcUserAbort = false;
+    const noTokensYet = (reply.pending === true);
+    const externalAbort = (e && e.name === 'AbortError') && !userAbort && noTokensYet;
+
+    if ((e && e.name === 'AbortError') && userAbort) {
+      // User explicitly hit Stop / Esc — show the "중단됨" bubble.
       if (reply.pending) { reply.text = ''; reply.pending = false; }
       reply.text = (reply.text || '') + (reply.text ? '\n\n' : '') + '⏹ ' + t('중단됨');
       _lcSaveHistory(sessionId, history); _lcChatRender();
     } else {
+      // Either a real error OR an external abort with nothing received —
+      // fall back to the non-stream endpoint. This recovers transparently
+      // when the browser environment kills SSE connections.
+      if (reply.pending) { reply.text = ''; reply.pending = false; }
       try {
         const r = await api('/api/lazyclaw/chat', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -29168,7 +29194,11 @@ async function _lcChatSend() {
         });
         reply.text = (r && r.ok && r.output) ? r.output : ('⚠ ' + (r.error || t('응답 실패')));
         if (r && r.ok) reply.meta = [r.provider, r.model, r.durationMs ? (r.durationMs/1000).toFixed(1)+'s' : ''].filter(Boolean).join(' · ');
-      } catch (e2) { reply.text = '⚠ ' + (e2 && e2.message || e2); }
+      } catch (e2) {
+        reply.text = externalAbort
+          ? '⚠ ' + t('스트림 연결이 차단되었습니다 — 브라우저 확장 / Service Worker 가 SSE 를 가로막고 있을 수 있어요. 시크릿 창에서 시도해보세요.')
+          : '⚠ ' + (e2 && e2.message || e2);
+      }
       _lcSaveHistory(sessionId, history); _lcChatRender();
     }
   } finally {
