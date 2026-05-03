@@ -10,6 +10,37 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.5] — 2026-05-03
+
+**QQ115** — openclaw-style **settings via the lazyclaw terminal**.
+The user can now tweak preferences without leaving the terminal:
+
+```
+lazyclaude get                         # full CC_PREFS dump
+lazyclaude get ui                      # one section
+lazyclaude get ui.theme                # one key
+lazyclaude set ui theme light          # bool/int/float/string coerced from schema
+lz set ai temperature 1.2              # `lz` shorthand
+```
+
+### Added
+- `dist/app.js` — `_lcTermBuiltin` + `_lcTermHandleBuiltin`
+  intercept get/set commands inside `_lcTermRun` before they
+  reach `/api/lazyclaw/term`. Coerces values per
+  `CC_PREFS_SCHEMA[section][key].type` (bool / int / float /
+  string), then routes through `_qsApplyAndPersist` so the same
+  side-effects (theme switch, lang reload, etc.) fire as if the
+  user used Quick Settings.
+- Autocomplete suggestions for `lazyclaude get/set` and `lz`.
+- `scripts/e2e-terminal-set-prefs.mjs` — Playwright regression:
+  get prints JSON, set ui theme flips body class, set ai
+  temperature 1.2 coerces float, bad section/key warn, built-ins
+  do not hit the shell endpoint, `lz` shorthand works.
+
+### Verified
+- 7/7 Playwright checks green.
+
+---
 ## [2.71.4] — 2026-05-03
 
 **QQ114** — In zh/en mode, the lazyclaw Chat & Terminal nav tiles

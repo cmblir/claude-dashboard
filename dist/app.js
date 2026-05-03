@@ -28459,6 +28459,12 @@ function _lcTermSuggest(prefix) {
     'gemini --version', 'gemini --help',
     'codex --version', 'codex --help',
     'lazyclaude status', 'lazyclaude version', 'lazyclaude --version', 'lazyclaude --help',
+    'lazyclaude get', 'lazyclaude get ui', 'lazyclaude get ai', 'lazyclaude get behavior', 'lazyclaude get workflow',
+    'lazyclaude set ui theme dark', 'lazyclaude set ui theme light', 'lazyclaude set ui lang ko',
+    'lazyclaude set ui lang en', 'lazyclaude set ui lang zh',
+    'lazyclaude set ai temperature ', 'lazyclaude set ai effort ',
+    'lazyclaude set behavior autoResume ',
+    'lz get ', 'lz set ',
     'git status', 'git status -s', 'git status -sb',
     'git log -5', 'git log --oneline -10', 'git log --oneline -20',
     'git remote -v', 'git branch --show-current',
@@ -28560,6 +28566,76 @@ window._lcTermShowHelp = function () {
   `);
 };
 
+// QQ115 (v2.71.5) — openclaw-style settings via terminal. Recognises
+//   lazyclaude get [section[.key]]
+//   lazyclaude set <section> <key> <value>
+// and routes them to the prefs API instead of the shell whitelist.
+// Lets the user tweak theme / lang / behavior without leaving the
+// terminal — same backend as Quick Settings, persisted server-side.
+function _lcTermBuiltin(cmd) {
+  const m = cmd.match(/^(?:lazyclaude|lz)\s+(get|set)\b\s*(.*)$/i);
+  if (!m) return null;
+  const verb = m[1].toLowerCase();
+  const rest = m[2].trim();
+  return { verb, rest };
+}
+async function _lcTermHandleBuiltin(verb, rest, log) {
+  const prefs = window.CC_PREFS;
+  const schema = window.CC_PREFS_SCHEMA;
+  if (!prefs || !schema) {
+    log.push({ kind: 'err', text: '⚠ ' + t('Quick Settings 가 아직 로드되지 않았어요. 잠시 후 다시 시도하세요.'), ts: Date.now() });
+    return;
+  }
+  if (verb === 'get') {
+    if (!rest) {
+      log.push({ kind: 'out', text: JSON.stringify(prefs, null, 2), ts: Date.now() });
+      return;
+    }
+    const [sec, key] = rest.split('.');
+    if (!prefs[sec]) {
+      log.push({ kind: 'err', text: '⚠ ' + t('알 수 없는 섹션') + `: ${sec}`, ts: Date.now() });
+      return;
+    }
+    if (!key) {
+      log.push({ kind: 'out', text: JSON.stringify(prefs[sec], null, 2), ts: Date.now() });
+      return;
+    }
+    if (!(key in prefs[sec])) {
+      log.push({ kind: 'err', text: '⚠ ' + t('알 수 없는 키') + `: ${sec}.${key}`, ts: Date.now() });
+      return;
+    }
+    log.push({ kind: 'out', text: `${sec}.${key} = ${JSON.stringify(prefs[sec][key])}`, ts: Date.now() });
+    return;
+  }
+  // set
+  const parts = rest.split(/\s+/);
+  if (parts.length < 3) {
+    log.push({ kind: 'err', text: '⚠ ' + t('사용법') + ': lazyclaude set <section> <key> <value>', ts: Date.now() });
+    return;
+  }
+  const [sec, key, ...valParts] = parts;
+  let raw = valParts.join(' ');
+  if (!schema[sec] || !schema[sec][key]) {
+    log.push({ kind: 'err', text: '⚠ ' + t('알 수 없는 키') + `: ${sec}.${key}`, ts: Date.now() });
+    return;
+  }
+  // Coerce to schema type
+  const typ = schema[sec][key].type;
+  let value = raw;
+  if (typ === 'bool')   value = /^(true|1|on|yes)$/i.test(raw);
+  else if (typ === 'int')   value = parseInt(raw, 10);
+  else if (typ === 'float') value = parseFloat(raw);
+  if (typeof _qsApplyAndPersist === 'function') {
+    _qsApplyAndPersist(sec, key, value);
+  } else if (typeof setPref === 'function') {
+    setPref(sec, key, value);
+  } else {
+    log.push({ kind: 'err', text: '⚠ ' + t('Pref 저장 함수를 찾을 수 없음'), ts: Date.now() });
+    return;
+  }
+  log.push({ kind: 'out', text: `✓ ${sec}.${key} = ${JSON.stringify(value)}`, ts: Date.now() });
+}
+
 window._lcTermRun = async function () {
   const inp = document.getElementById('lcTermInput');
   if (!inp) return;
@@ -28575,6 +28651,18 @@ window._lcTermRun = async function () {
   const log = _lcTermLoadLog();
   log.push({ kind: 'cmd', text: cmd, ts: Date.now() });
   _lcTermSaveLog(log); _lcTermRender();
+
+  // QQ115 — intercept the built-in `lazyclaude get/set` before the
+  // shell whitelist so settings can be tweaked without leaving the term.
+  const builtin = _lcTermBuiltin(cmd);
+  if (builtin) {
+    try { await _lcTermHandleBuiltin(builtin.verb, builtin.rest, log); }
+    catch (e) { log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() }); }
+    _lcTermSaveLog(log); _lcTermRender();
+    inp.focus();
+    return;
+  }
+
   try {
     const r = await api('/api/lazyclaw/term', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
