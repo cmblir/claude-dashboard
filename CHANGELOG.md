@@ -10,6 +10,64 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.70.0] — 2026-05-03
+
+**Playwright Verification Sprint** — milestone marker for the
+20-iteration Ralph loop with `매 작업 검수는 playwright로 확인 후
+완료시 패스` constraint. Backwards-compatible.
+
+### Verified end-to-end (23 new scripts)
+**Workflow (n8n parity)**
+- `e2e-qq108-pin-badge.mjs` — pin badge keyed-diff render.
+- `e2e-qq108-output-panel.mjs` — inspector node-output preview
+  + 전체 보기 modal.
+- `e2e-pin-data-ctxmenu.mjs` — right-click pin/unpin flow.
+- `e2e-sticky-note.mjs` — sticky note color/size/text mutate.
+- `e2e-align-distribute.mjs` — QQ34 toolbar (left/vcenter/
+  hdist/right) + show-on-2/hide-on-1.
+- `e2e-multi-copy-paste.mjs` — QQ29 lasso → Cmd+C → Cmd+V with
+  internal-edge remapping.
+- `e2e-multi-delete.mjs` — QQ30 silent < 4 / confirm ≥ 4.
+- `e2e-workflow-tags.mjs` — QQ38 + QQ60 chip filter.
+- `e2e-success-badge-sticky-count.mjs` — QQ78 + QQ79.
+- `e2e-mini-gantt.mjs` — QQ46 + QQ73 sort/icons/click-select.
+- `e2e-workflow-export-import.mjs` — full envelope round-trip.
+- `e2e-rubber-band.mjs` — QQ27 Shift+drag selection.
+- `e2e-group-drag.mjs` — QQ28 multi-drag preserves offsets.
+- `e2e-fail-fast-status.mjs` — MM1/NN3/PP1 amber dashed.
+
+**Chat (OpenClaw parity)**
+- `e2e-chat-image-attach.mjs` — paste/picker → counter → clear.
+- `e2e-chat-session-nav.mjs` — Cmd+Shift+[/].
+- `e2e-chat-history-recall.mjs` — Cmd+↑/↓ + QQ85 reset.
+- `e2e-chat-branch.mjs` — branch + parent lineage.
+- `e2e-chat-edit-user-msg.mjs` — ✏️ truncate+prefill.
+- `e2e-chat-search-cost.mjs` — Cmd+K search + cost chain.
+- `e2e-chat-codeblock-collapse.mjs` — 📋 + 더보기.
+
+**Terminal + perf**
+- `e2e-terminal.mjs` — whitelisted run + Tab + Esc.
+- `e2e-lag-budget.mjs` — DCL ≤600ms, 50-node rebuild ≤250ms,
+  RAF coalesce 50→1.
+
+### Bugs found by Playwright (and fixed in same iteration)
+- **QQ109** (v2.69.2) — `_wfShowNodeOutputModal` was module-
+  private; QQ108 inline `onclick` hit ReferenceError. Fixed
+  via `window._wfShowNodeOutputModal = …`.
+- 50-node canvas test caught a viewport-too-small issue in
+  group-drag — bumped Playwright viewport to 1600×1200.
+- Lag-budget test caught a hook misplacement: `window
+  ._wfRenderCanvasNow` is just an alias; the RAF wrapper
+  resolves the closure directly. Fixed by hooking
+  `_wfRenderGroups` instead.
+
+### Status
+- 66/66 tabs smoke pass.
+- 23/23 new e2e scripts pass.
+- 441 pytest pass (2 pre-existing FF1-obsoleted assertions
+  remain deselected).
+
+---
 ## [2.69.20] — 2026-05-03
 
 ### Added (test infra)
