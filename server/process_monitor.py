@@ -341,8 +341,27 @@ def _top_processes(limit: int = 30) -> list[dict]:
     return rows[:limit]
 
 
+_MEMORY_SNAPSHOT_CACHE: dict = {"data": None, "ts": 0.0}
+# QQ143 — memory snapshot bundles _top_processes(30) (ps fan-out) and
+# api_cli_sessions_list (full Claude sessions scan) — together ~360ms
+# per hit. With a 1.5s TTL, the user-facing live ticker still feels
+# real-time but back-to-back tab-switches and concurrent panel
+# refreshes hit the memo. ?nocache=1 forces a re-probe.
+_MEMORY_SNAPSHOT_TTL_S = 1.5
+
+
 def api_memory_snapshot(query: dict | None = None) -> dict:
     """GET /api/memory/snapshot — system memory + top processes."""
+    import time as _time
+    nc = (query or {}).get("nocache")
+    if isinstance(nc, list):
+        nc = nc[0] if nc else None
+    nocache = nc in ("1", "true", "yes", True)
+    if not nocache:
+        cached = _MEMORY_SNAPSHOT_CACHE.get("data")
+        if cached is not None and (_time.time() - _MEMORY_SNAPSHOT_CACHE.get("ts", 0)) < _MEMORY_SNAPSHOT_TTL_S:
+            return cached
+
     page = _macos_page_size()
     counts = _parse_vm_stat()
     free_pages = counts.get("pages free", 0)
@@ -366,7 +385,7 @@ def api_memory_snapshot(query: dict | None = None) -> dict:
     cli = api_cli_sessions_list({})
     idle_count = sum(1 for s in cli.get("sessions", []) if s.get("idle_seconds", 0) > 600)
 
-    return {
+    result_payload = {
         "ok": True,
         "memory": {
             "total_bytes": total_b,
@@ -382,6 +401,9 @@ def api_memory_snapshot(query: dict | None = None) -> dict:
         "topProcesses": top,
         "idleClaudeCodeCount": idle_count,
     }
+    _MEMORY_SNAPSHOT_CACHE["data"] = result_payload
+    _MEMORY_SNAPSHOT_CACHE["ts"] = _time.time()
+    return result_payload
 
 
 # ───────── kill / open-terminal ─────────
