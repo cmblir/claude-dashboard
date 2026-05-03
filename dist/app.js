@@ -29684,7 +29684,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run'];
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel'];
   const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
@@ -29702,7 +29702,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   if (verb === '__unknown__') {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
-    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run'];
+    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel'];
     // QQ162 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     let best = null, bestScore = 99;
     for (const k of candidates) {
@@ -29733,6 +29733,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       'lazyclaude usage [N]                — cost summary across all sessions (default 7d)\n' +
       'lazyclaude workflows [filter]       — list workflows (id/name substring)\n' +
       'lazyclaude run <id|name>            — start a workflow run\n' +
+      'lazyclaude cancel [runId|wf]        — cancel a running workflow\n' +
       'lazyclaude diag                     — re-run CLI health check (claude/ollama/gemini/...)\n' +
       'lazyclaude version                  — dashboard version + build info\n' +
       'lazyclaude reset                    — wipe terminal log\n' +
@@ -29873,6 +29874,83 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
         return `${live}${(w.id || '').padEnd(28)} ${w.nodeCount}n ${w.totalRuns || 0}r${lastChip}  ${w.name || ''}`;
       });
       log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'cancel') {
+    // QQ210 — terminal parity with chat /cancel. Same resolution rules:
+    // exact runId / runId-prefix / wf-id-or-name (when unique-running).
+    let listed = null;
+    try { listed = await (await fetch('/api/workflows/list', { cache:'no-store' })).json(); }
+    catch (e) { log.push({kind:'err',text:'⚠ '+(e&&e.message||e),ts:Date.now()}); return; }
+    const wfs = (listed && listed.workflows) || [];
+    const live = [];
+    for (const w of wfs) {
+      const rid = w.activeRunId
+        || (w.lastRuns && w.lastRuns.find(r => r.status === 'running') && w.lastRuns.find(r => r.status === 'running').runId)
+        || '';
+      if (rid) live.push({ wfId: w.id, wfName: w.name || '', runId: rid, runningCount: w.runningCount || 1 });
+    }
+    if (!rest) {
+      if (!live.length) {
+        log.push({ kind: 'out', text: '(no workflows currently running)', ts: Date.now() });
+        return;
+      }
+      const lines = ['Running runs (' + live.length + '):'];
+      for (const r of live) {
+        lines.push(`  ${r.runId.padEnd(28)} ${(r.wfId||'').padEnd(28)} ${r.wfName||''}`);
+      }
+      lines.push('Cancel: lazyclaude cancel <runId>');
+      log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+      return;
+    }
+    const q = rest.trim().toLowerCase();
+    let target = null;
+    if (/^run-\d{10,14}-[a-z0-9]{4,8}$/i.test(q)) {
+      const fromList = live.find(r => r.runId.toLowerCase() === q);
+      target = fromList || { wfId:'', wfName:'', runId: rest.trim() };
+    }
+    if (!target) {
+      target = live.find(r => r.runId.toLowerCase() === q)
+            || live.find(r => r.runId.toLowerCase().startsWith(q));
+    }
+    if (!target) {
+      const wfMatches = wfs.filter(w =>
+        (w.id || '').toLowerCase() === q ||
+        (w.id || '').toLowerCase().startsWith(q) ||
+        (w.name || '').toLowerCase().includes(q));
+      const wfRunning = wfMatches.filter(w => w.runningCount > 0);
+      if (wfRunning.length === 1) {
+        const w = wfRunning[0];
+        const rid = w.activeRunId
+          || (w.lastRuns && w.lastRuns.find(r => r.status === 'running') && w.lastRuns.find(r => r.status === 'running').runId)
+          || '';
+        if (rid) target = { wfId: w.id, wfName: w.name || '', runId: rid };
+      } else if (wfRunning.length > 1) {
+        log.push({ kind: 'err', text: '⚠ ' + t('여러 개 일치 — runId 로 지정하세요'), ts: Date.now() });
+        return;
+      }
+    }
+    if (!target) {
+      log.push({ kind: 'err', text: '⚠ ' + t('일치하는 실행 없음') + ': ' + rest, ts: Date.now() });
+      return;
+    }
+    try {
+      const r = await fetch('/api/workflows/run-cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ runId: target.runId }),
+      });
+      const j = await r.json();
+      if (!j || !j.ok) {
+        log.push({ kind: 'err', text: '⚠ ' + t('취소 요청 실패') + ': ' + ((j && j.error) || '?'), ts: Date.now() });
+        return;
+      }
+      log.push({ kind: 'out', text:
+        `Cancel requested:\n  run:      ${target.runId}\n  workflow: ${target.wfName || target.wfId || '(unknown)'}\n  (applies at next node boundary)`,
+        ts: Date.now() });
     } catch (e) {
       log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
     }
