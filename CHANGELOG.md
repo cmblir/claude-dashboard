@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.47] — 2026-05-03
+
+**QQ157** — small consistency fix. The QQ147 did-you-mean
+suggestion list inside the terminal handler was missing
+`'go'` (alias of `'open'`) and `'diag'` (added later in QQ150).
+Typing `lazyclaude dia` therefore couldn't suggest `diag`.
+
+The `KNOWN_VERBS` list (which gates the parser) and the
+`candidates` list (which feeds the suggestion heuristic) are
+now in sync. Verified manually: `lazyclaude dia` → "혹시
+lazyclaude diag?".
+
+---
 ## [2.71.46] — 2026-05-03
 
 **QQ156b** — Playwright regression for the QQ156 cache
