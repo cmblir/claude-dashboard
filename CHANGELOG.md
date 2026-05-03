@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.69.5] — 2026-05-03
+
+### Added (test infra)
+- 🎭 **Playwright regression for fail-fast sibling cancel UI**
+  (`scripts/e2e-fail-fast-status.mjs`). Builds a 3-node DAG
+  (start → ok + err + canc), seeds simulated run results with
+  one error and one sibling-cancelled, walks the same DOM-apply
+  pipeline as the SSE poller, and asserts:
+  1. err node carries `data-status="err"`.
+  2. cancelled-by-sibling node is promoted from err to
+     `data-status="cancelled"` (PP1).
+  3. Computed style of the cancelled node's body shows the
+     dashed amber stroke (the `.wf-node[data-status="cancelled"]
+     .wf-node-body` rule). Pins down MM1 / NN3 / PP1 visual
+     contract.
+
+---
 ## [2.69.4] — 2026-05-03
 
 ### Added (test infra)
