@@ -10,6 +10,72 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.92.0] — 2026-05-05
+
+**`withResponseCache`: provider decorator for memoizing identical calls.**
+
+A wrapper, not a per-provider option — same shape as `withRateLimitRetry`
+and `withFallback`. Caching is policy (caller decides how aggressive),
+not transport. The concrete providers stay pure async iterators over a
+single call.
+
+### Use case
+Development workflows: re-running the same prompt during agent design
+shouldn't keep burning tokens. Now:
+
+```js
+import { withResponseCache } from './src/lazyclaw/providers/cache.mjs';
+import { PROVIDERS } from './src/lazyclaw/providers/registry.mjs';
+
+const cached = withResponseCache(PROVIDERS.anthropic, {
+  maxEntries: 256,
+  ttlMs: 60 * 60 * 1000,   // 1 hour
+});
+```
+
+Identical messages + model + cache-relevant opts hit the cache.
+`signal`, `fetch`, `onThinking`, `onToolUse` are deliberately not
+part of the key — they don't change the response.
+
+### Hash stability
+`stableStringify` sorts object keys before serialization so
+`{a:1,b:2}` and `{b:2,a:1}` hash identically. Plain `JSON.stringify`
+respects insertion order which would cause spurious cache misses
+when callers built the opts object differently between calls.
+
+### Eviction
+- **TTL** wins over LRU: an entry past `ttlMs` is dropped before it
+  could be served as a hit.
+- **LRU**: `maxEntries` defaults to 256; on insert, the oldest entry
+  is evicted to make room.
+- **Touch-on-hit** so frequently-asked prompts stay alive.
+
+### Failure isolation
+Mid-stream errors do **not** poison the cache. The buffer lands in
+the cache only when the source iterator completes successfully —
+errors and aborts let the next caller try fresh.
+
+### Inspection
+`cached.cacheStats()` returns `{ hits, misses, size, maxEntries }` —
+useful for benchmarks and dashboards. `cached.cacheClear()` empties
+the cache and resets counters.
+
+### Tests
+6 new phase 6 specs:
+- second identical call replays from memory; underlying `calls = 1`,
+  `hits = 1`, `misses = 1`
+- different message bodies miss separately; key-order independence
+  verified by hashing two different opts orderings and comparing
+- TTL eviction: pre-TTL hit, post-TTL miss (injected `now()`)
+- failed mid-stream call doesn't poison; second call gets a fresh
+  underlying invocation that completes cleanly
+- LRU eviction at `maxEntries=2`: 'a' evicted by 'c', re-asking 'a'
+  misses
+- `hashKey` produces identical hashes across reordered opts properties
+
+Suite: 190/190. tsc clean.
+
+---
 ## [2.91.0] — 2026-05-05
 
 **Daemon: per-IP rate limit (token-bucket, opt-in).**

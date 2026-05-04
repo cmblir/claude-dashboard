@@ -1157,6 +1157,111 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('withResponseCache: identical second call replays from memory (no second underlying call)', async () => {
+    const { withResponseCache } = await import('../src/lazyclaw/providers/cache.mjs' as string);
+    let calls = 0;
+    const inner = {
+      name: 'mock',
+      async *sendMessage() { calls += 1; yield 'hello'; yield ' world'; },
+    };
+    const cached = withResponseCache(inner, { maxEntries: 8 });
+    const out1: string[] = [];
+    for await (const c of cached.sendMessage([{ role: 'user', content: 'q' }], { model: 'm' })) out1.push(c);
+    const out2: string[] = [];
+    for await (const c of cached.sendMessage([{ role: 'user', content: 'q' }], { model: 'm' })) out2.push(c);
+    expect(out1.join('')).toBe('hello world');
+    expect(out2.join('')).toBe('hello world');
+    expect(calls).toBe(1);                                  // second call served from cache
+    const stats = cached.cacheStats();
+    expect(stats.hits).toBe(1);
+    expect(stats.misses).toBe(1);
+  });
+
+  test('withResponseCache: different message arrays miss separately; cache key is stable across key order', async () => {
+    const { withResponseCache } = await import('../src/lazyclaw/providers/cache.mjs' as string);
+    let calls = 0;
+    const inner = {
+      name: 'mock',
+      async *sendMessage(messages: any) { calls += 1; yield `reply:${messages[0].content}`; },
+    };
+    const cached = withResponseCache(inner);
+    const drain = async (msgs: any[], opts: any = {}) => {
+      const out: string[] = [];
+      for await (const c of cached.sendMessage(msgs, opts)) out.push(c);
+      return out.join('');
+    };
+    expect(await drain([{ role: 'user', content: 'a' }])).toBe('reply:a');
+    expect(await drain([{ role: 'user', content: 'b' }])).toBe('reply:b');
+    expect(await drain([{ role: 'user', content: 'a' }])).toBe('reply:a');  // cached
+    expect(calls).toBe(2);                                                   // a + b, not 3
+  });
+
+  test('withResponseCache: TTL eviction drops stale entries', async () => {
+    const { withResponseCache } = await import('../src/lazyclaw/providers/cache.mjs' as string);
+    let calls = 0;
+    let now = 1000;
+    const inner = { name: 'mock', async *sendMessage() { calls += 1; yield 'x'; } };
+    const cached = withResponseCache(inner, { ttlMs: 100, now: () => now });
+    const drain = async () => {
+      for await (const _c of cached.sendMessage([{ role: 'user', content: 'q' }], { model: 'm' })) { /* drain */ }
+    };
+    await drain();                       // miss → calls=1
+    await drain();                       // hit  → calls=1 still
+    expect(calls).toBe(1);
+    now += 200;                          // past TTL
+    await drain();                       // miss again → calls=2
+    expect(calls).toBe(2);
+  });
+
+  test('withResponseCache: failed underlying call does not poison the cache', async () => {
+    const { withResponseCache } = await import('../src/lazyclaw/providers/cache.mjs' as string);
+    let attempt = 0;
+    const inner = {
+      name: 'mock',
+      async *sendMessage() {
+        attempt += 1;
+        yield 'partial';
+        if (attempt === 1) throw new Error('mid-stream');
+        yield ' complete';
+      },
+    };
+    const cached = withResponseCache(inner);
+    let caught: any = null;
+    try {
+      for await (const _c of cached.sendMessage([{ role: 'user', content: 'q' }], {})) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.message).toBe('mid-stream');
+    // Second call should hit the underlying provider (not the half-cached partial)
+    const out: string[] = [];
+    for await (const c of cached.sendMessage([{ role: 'user', content: 'q' }], {})) out.push(c);
+    expect(out.join('')).toBe('partial complete');
+    expect(attempt).toBe(2);
+  });
+
+  test('withResponseCache: maxEntries enforces LRU eviction', async () => {
+    const { withResponseCache } = await import('../src/lazyclaw/providers/cache.mjs' as string);
+    const inner = { name: 'mock', async *sendMessage(m: any) { yield `r:${m[0].content}`; } };
+    const cached = withResponseCache(inner, { maxEntries: 2 });
+    const drain = async (q: string) => {
+      for await (const _c of cached.sendMessage([{ role: 'user', content: q }], {})) { /* drain */ }
+    };
+    await drain('a');  // [a]
+    await drain('b');  // [a, b]
+    await drain('c');  // a evicted → [b, c]
+    expect(cached.cacheStats().size).toBe(2);
+    // Re-asking for 'a' should miss now (was evicted)
+    const before = cached.cacheStats().misses;
+    await drain('a');
+    expect(cached.cacheStats().misses).toBe(before + 1);
+  });
+
+  test('withResponseCache: stableStringify produces identical hashes across object key order', async () => {
+    const { hashKey } = await import('../src/lazyclaw/providers/cache.mjs' as string);
+    const a = hashKey([{ role: 'user', content: 'q' }], 'm', { thinking: { enabled: true, budgetTokens: 100 }, system: 'sys' });
+    const b = hashKey([{ role: 'user', content: 'q' }], 'm', { system: 'sys', thinking: { budgetTokens: 100, enabled: true } });
+    expect(a).toBe(b);
+  });
+
   test('rate limiter: token bucket allows up to capacity then 429s', async () => {
     const mod = await import('../src/lazyclaw/ratelimit.mjs' as string);
     let now = 0;
