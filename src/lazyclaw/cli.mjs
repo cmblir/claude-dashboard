@@ -39,8 +39,25 @@ async function importWorkflow(file) {
 }
 
 async function cmdRun(sessionId, file, opts = {}) {
-  const { runPersistent } = await loadEngine();
   const nodes = await importWorkflow(file);
+  if (opts.parallel) {
+    // --parallel: schedule by `deps`. No state persistence — `runParallel`
+    // is a one-shot DAG run; resume semantics belong to runPersistent.
+    // failedAt + executedNodes are derived from results so the JSON
+    // shape stays compatible with the sequential path.
+    const { runParallel } = await import('./workflow/executor.mjs');
+    const r = await runParallel(nodes);
+    const executedNodes = r.results.filter(x => x.status === 'success').map(x => x.id);
+    console.log(JSON.stringify({
+      success: r.success,
+      executedNodes,
+      failedAt: r.failedAt || null,
+      mode: 'parallel',
+      error: r.error?.message || null,
+    }));
+    process.exit(r.success ? 0 : 1);
+  }
+  const { runPersistent } = await loadEngine();
   const dir = opts.dir || '.workflow-state';
   const r = await runPersistent(nodes, { sessionId, dir, maxRetries: opts.maxRetries ?? 3 });
   console.log(JSON.stringify({ success: r.success, executedNodes: r.executedNodes, failedAt: r.failedAt }));
@@ -428,7 +445,7 @@ const HELP_SUMMARIES = {
 // Detailed usage per subcommand for `lazyclaw help <name>`. Kept as flat
 // strings so the help output is identical in every terminal.
 const HELP_DETAILS = {
-  run: 'Usage: lazyclaw run <session-id> <workflow.mjs>\n  Persists state to .workflow-state/<session-id>.json so the run can be resumed.',
+  run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel]\n  Sequential by default; persists state to .workflow-state/<session-id>.json so the run can be resumed.\n  --parallel runs nodes by topological level via runParallel — nodes must declare deps: string[].\n  --parallel does NOT persist state (not resumable; one-shot DAG).',
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
   config: 'Usage: lazyclaw config <get|set|list|delete> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
@@ -1001,6 +1018,25 @@ function cmdConfigGet(key) {
   else console.log(JSON.stringify(cfg));
 }
 
+// Flags whose presence is the signal — they don't consume the next arg
+// even when one is available. Without this allow-list,
+// `lazyclaw run --parallel demo wf.mjs` would set `flags.parallel='demo'`
+// and silently lose the session id; the user would only see a
+// "missing positional" error after the dispatcher rejected it.
+const BOOLEAN_FLAGS = new Set([
+  'parallel',
+  'once',
+  'non-interactive',
+  'include-secrets',
+  'include-sessions',
+  'overwrite-skills',
+  'no-overwrite-config',
+  'import-sessions',
+  'show-thinking',
+  'help',         // also handled as a subcommand alias
+  'version',
+]);
+
 function parseArgs(argv) {
   const out = { positional: [], flags: {} };
   for (let i = 0; i < argv.length; i++) {
@@ -1010,12 +1046,18 @@ function parseArgs(argv) {
       if (eq >= 0) {
         out.flags[a.slice(2, eq)] = a.slice(eq + 1);
       } else {
+        const name = a.slice(2);
+        if (BOOLEAN_FLAGS.has(name)) {
+          // Known boolean — never consumes the next arg.
+          out.flags[name] = true;
+          continue;
+        }
         const next = argv[i + 1];
         if (next === undefined || next.startsWith('--')) {
-          // bare boolean flag
-          out.flags[a.slice(2)] = true;
+          // Unknown flag at end-of-args or before another --flag: still boolean.
+          out.flags[name] = true;
         } else {
-          out.flags[a.slice(2)] = next;
+          out.flags[name] = next;
           i += 1;
         }
       }
@@ -1031,8 +1073,8 @@ async function main() {
   switch (cmd) {
     case 'run': {
       const [sessionId, file] = rest.positional;
-      if (!sessionId || !file) { console.error('Usage: lazyclaw run <session-id> <workflow.mjs>'); process.exit(2); }
-      await cmdRun(sessionId, file, { dir: rest.flags.dir });
+      if (!sessionId || !file) { console.error('Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel]'); process.exit(2); }
+      await cmdRun(sessionId, file, { dir: rest.flags.dir, parallel: !!rest.flags.parallel });
       break;
     }
     case 'resume': {

@@ -167,6 +167,55 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(systems).toHaveLength(1);
   });
 
+  test('lazyclaw run --parallel executes a DAG by topological level', () => {
+    const dir = tmpConfigDir();
+    // Workflow file with a fan-out / fan-in shape. Sleeps 80ms in each
+    // independent node so a sequential runner would take 240ms+ for the
+    // fan-out level alone; --parallel completes that level in ~80ms.
+    const wfPath = path.join(dir, 'wf.mjs');
+    fs.writeFileSync(wfPath,
+      `const sleep = ms => new Promise(r => setTimeout(r, ms));
+       export const nodes = [
+         { id: 'fetch',    type: 't', deps: [],                        async execute() { return 'csv'; } },
+         { id: 'embed',    type: 't', deps: ['fetch'],                 async execute() { await sleep(80); return 'E'; } },
+         { id: 'classify', type: 't', deps: ['fetch'],                 async execute() { await sleep(80); return 'C'; } },
+         { id: 'tag',      type: 't', deps: ['fetch'],                 async execute() { await sleep(80); return 'T'; } },
+         { id: 'merge',    type: 't', deps: ['embed','classify','tag'], async execute(input) { return Object.keys(input).length; } },
+       ];`,
+    );
+    // Flag BEFORE positionals — historically broken because parseArgs
+    // would steal the next arg as the flag value. The BOOLEAN_FLAGS
+    // allow-list makes --parallel always boolean.
+    const t0 = Date.now();
+    const r = runCli(['run', '--parallel', 'demo', wfPath], dir);
+    const elapsed = Date.now() - t0;
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.mode).toBe('parallel');
+    expect(out.executedNodes).toEqual(expect.arrayContaining(['fetch', 'embed', 'classify', 'tag', 'merge']));
+    // 240ms+ sequential vs ~80ms parallel for the fan-out — generous CI ceiling
+    expect(elapsed).toBeLessThan(500);
+  });
+
+  test('lazyclaw run --parallel surfaces cycle errors with exit 1', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'cyclic.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a', type: 't', deps: ['b'], async execute() { return 1; } },
+         { id: 'b', type: 't', deps: ['a'], async execute() { return 2; } },
+       ];`,
+    );
+    // Flag AFTER positionals also works — parseArgs is order-independent
+    // for known boolean flags.
+    const r = runCli(['run', 'demo', wfPath, '--parallel'], dir);
+    expect(r.status).toBe(1);
+    const out = JSON.parse(r.stdout);
+    expect(out.success).toBe(false);
+    expect(out.error).toMatch(/cycle/);
+    expect(out.executedNodes).toEqual([]);
+  });
+
   test('chat SIGINT mid-stream interrupts the turn but keeps the REPL alive', async () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);

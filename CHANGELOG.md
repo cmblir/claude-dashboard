@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.90.0] — 2026-05-05
+
+**`lazyclaw run --parallel` exposes `runParallel` in the CLI; parser
+gains a boolean-flag allow-list.**
+
+### `lazyclaw run --parallel <session-id> <workflow.mjs>`
+Executes the workflow as a DAG via `runParallel` instead of the
+default sequential path. The workflow file exports `nodes` with
+optional `deps: string[]`; topologically independent nodes run
+concurrently in their level. The parallel mode does **not** persist
+state (`runPersistent` is the resumable path; `--parallel` is a
+one-shot DAG run).
+
+### Boolean-flag allow-list (parser fix)
+Until now `parseArgs` couldn't tell `--parallel` (boolean) from
+`--port` (value-taking) and assumed any non-`--` next arg was the
+flag's value. `lazyclaw run --parallel demo wf.mjs` would set
+`flags.parallel = 'demo'` and silently lose the session id.
+
+Added a `BOOLEAN_FLAGS` set listing every flag that's a presence-only
+signal:
+```
+parallel, once, non-interactive, include-secrets, include-sessions,
+overwrite-skills, no-overwrite-config, import-sessions, show-thinking,
+help, version
+```
+These never consume the next arg even when one's available — both
+`--parallel demo wf.mjs` and `demo wf.mjs --parallel` work now.
+
+### Tests
+2 new phase 6 specs (one each ordering):
+- `run --parallel demo wf.mjs` — flag *before* positionals — DAG
+  executes, fan-out level finishes in <500 ms (sequential floor 240+
+  per node × 3 = 720+ ms)
+- `run demo wf.mjs --parallel` — flag *after* positionals — same DAG
+  fails on a deliberate cycle, exit 1, error mentions cycle
+
+Suite: 180/180. tsc clean.
+
+---
 ## [2.89.0] — 2026-05-05
 
 **Workflow: `runParallel` for DAG-with-deps execution (n8n-style).**
