@@ -22668,7 +22668,12 @@ VIEWS.openPorts = async () => {
 };
 
 VIEWS.cliSessions = async () => {
-  const r = await api('/api/sessions-monitor/list');
+  // QQ221 — fetch live sessions + AR bindings together so each row can
+  // surface its existing AR state and offer one-click toggle.
+  const [r, ar] = await Promise.all([
+    api('/api/sessions-monitor/list'),
+    api('/api/auto_resume/status').catch(() => ({ ok: false, active: [] })),
+  ]);
   if (!r || !r.ok) {
     return `
       ${viewHeader('활성 CLI 세션', 'Claude Code CLI 세션 모니터링', 'cliSessions')}
@@ -22677,6 +22682,11 @@ VIEWS.cliSessions = async () => {
       </div>`;
   }
   const sess = r.sessions || [];
+  const arActive = (ar && ar.active) || [];
+  const arBySid = {};
+  for (const e of arActive) {
+    if (e && e.sessionId) arBySid[e.sessionId] = e;
+  }
   return `
     ${viewHeader('활성 CLI 세션', 'Claude Code CLI 세션 모니터링', 'cliSessions')}
     <div class="card p-5">
@@ -22690,26 +22700,86 @@ VIEWS.cliSessions = async () => {
               <th class="text-right">${t('작업')}</th>
             </tr></thead>
             <tbody>
-              ${sess.map(s => `
+              ${sess.map(s => {
+                const sid = s.sessionId || '';
+                const arEntry = arBySid[sid];
+                const arOn = !!(arEntry && arEntry.enabled);
+                const arState = arEntry ? (arEntry.state || '') : '';
+                const arBtn = arOn
+                  ? `<button class="btn text-xs" style="border-color:var(--ok);color:var(--ok);" onclick="_pmCancelAR('${escapeHtml(sid)}')" title="${t('Auto-Resume 중단')}">🔄 ${t('AR 중단')}${arState ? ' · '+escapeHtml(arState) : ''}</button>`
+                  : `<button class="btn text-xs" onclick="_pmInjectAR('${escapeHtml(sid)}', ${JSON.stringify(s.cwd || '').replace(/"/g, '&quot;')})" title="${t('Auto-Resume 주입')}">🔄 ${t('Auto-Resume 주입')}</button>`;
+                return `
                 <tr>
-                  <td class="mono text-[10px]">${escapeHtml((s.sessionId || '').slice(0, 8))}</td>
+                  <td class="mono text-[10px]">${escapeHtml(sid.slice(0, 8))}</td>
                   <td class="mono text-xs">${s.pid}</td>
                   <td class="mono text-[10px] text-[var(--text-mute)] truncate" style="max-width:280px;">${escapeHtml(s.cwd || '')}</td>
                   <td class="mono text-xs">${_pmFmtBytes(s.rss_bytes)}</td>
                   <td class="text-xs">${_pmFmtIdle(s.idle_seconds)}</td>
                   <td class="text-xs text-[var(--text-mute)]">${escapeHtml(s.terminal_app || '—')}</td>
-                  <td class="text-right">
-                    <button class="btn text-xs" onclick="_pmOpenSessTerm('${escapeHtml(s.sessionId || '')}')">${t('터미널 열기')}</button>
+                  <td class="text-right" style="white-space:nowrap;">
+                    ${arBtn}
+                    <button class="btn text-xs" onclick="_pmOpenSessTerm('${escapeHtml(sid)}')">${t('터미널 열기')}</button>
                     <button class="btn text-xs" onclick="_pmKillPid(${s.pid}, 'SIGTERM')">${t('종료')}</button>
                   </td>
-                </tr>
-              `).join('')}
+                </tr>`;
+              }).join('')}
             </tbody>
           </table>
         </div>
       ` : `<div class="empty text-sm">${t('활성 CLI 세션이 없습니다')}</div>`}
     </div>`;
 };
+
+// QQ221 — one-click Auto-Resume injection from the live CLI sessions list.
+// Uses defaults tuned for token/rate-limit recovery: long poll/idle so the
+// worker waits across the reset window rather than thrashing, then auto-
+// terminates once a clean exit is detected (STATE_DONE handled server-side).
+async function _pmInjectAR(sid, cwd) {
+  if (!sid) { toast(t('세션 ID가 없습니다'), 'err'); return; }
+  try {
+    const r = await api('/api/auto_resume/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        cwd: cwd || '',
+        prompt: '',  // server falls back to DEFAULT_PROMPT
+        pollInterval: 300,
+        idleSeconds: 90,
+        maxAttempts: 24,
+        useContinue: false,
+        installHooks: false,
+        terminalClosedAction: 'wait',
+      }),
+    });
+    if (r && r.ok) {
+      toast(t('Auto-Resume 주입 완료'), 'ok');
+      setTimeout(() => renderView && renderView(), 600);
+    } else {
+      toast((r && r.error) || t('실패'), 'err');
+    }
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function _pmCancelAR(sid) {
+  if (!sid) return;
+  if (!confirm(t('Auto-Resume 워커를 중단할까요?'))) return;
+  try {
+    const r = await api('/api/auto_resume/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid }),
+    });
+    if (r && r.ok) {
+      toast(t('Auto-Resume 중단됨'), 'ok');
+      setTimeout(() => renderView && renderView(), 400);
+    } else {
+      toast((r && r.error) || t('실패'), 'err');
+    }
+  } catch (e) { toast(e.message, 'err'); }
+}
+window._pmInjectAR = _pmInjectAR;
+window._pmCancelAR = _pmCancelAR;
 
 async function _pmOpenSessTerm(sid) {
   try {
