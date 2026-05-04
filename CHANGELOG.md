@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.87.0] — 2026-05-05
+
+**Daemon: `PUT` and `DELETE /skills/<name>` for HTTP skill management.**
+
+The read endpoints (`GET /skills`, `GET /skills/<name>`) shipped in
+2.85.1; this fills out the CRUD surface so a remote tool can write
+and remove skills without shelling into the host.
+
+### `PUT /skills/<name>`
+- Body: raw markdown (Content-Type ignored — we don't dictate)
+- Validates the name **before** reading the body so a bogus path-
+  traversal name fails fast and we don't waste bandwidth
+- 1 MiB body cap; oversize → 400 + connection destroyed
+- Distinct status codes:
+  - `201 Created` on first write
+  - `200 OK` on overwrite (with `replaced: true` in the body)
+  Caller can branch on status if they care about idempotency vs newness.
+
+### `DELETE /skills/<name>`
+- Idempotent: 200 whether the file existed or not
+- Body reports `removed: true|false` so callers that *do* care can branch
+- Same `skillPath` validation as `GET`/`PUT` — dotfiles and traversal
+  names rejected with 400
+
+### Authorization model
+When `--auth-token` is set, both endpoints require Bearer auth (the
+existing gate runs before the route resolver). The Origin gate runs
+even before auth, so a browser CSRF attempt to `PUT` a skill is
+rejected with 403 before any read of the request body.
+
+### Tests
+3 new phase 6 specs:
+- PUT first-write 201, then PUT same name → 200 with `replaced: true`,
+  body content read back to verify overwrite landed
+- PUT `.hidden` → 400 + skills/ directory remains empty (no leaked
+  write under any name)
+- DELETE existing → `removed: true`; DELETE again → `removed: false`,
+  both 200
+
+Suite: 164/164. tsc clean.
+
+---
 ## [2.86.1] — 2026-05-05
 
 **Chat slashes: `/provider` and `/model` for mid-chat switching.**

@@ -728,6 +728,68 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon PUT /skills/<name> creates a skill (201) then overwrites (200)', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const create = await fetch(`${d.url}/skills/reviewer`, {
+        method: 'PUT',
+        headers: { 'content-type': 'text/markdown' },
+        body: '# Reviewer\nbe blunt\n',
+      });
+      expect(create.status).toBe(201);
+      const cj = await create.json();
+      expect(cj.replaced).toBe(false);
+      expect(fs.readFileSync(path.join(dir, 'skills', 'reviewer.md'), 'utf8')).toContain('be blunt');
+
+      // Overwrite — same name, new body
+      const update = await fetch(`${d.url}/skills/reviewer`, {
+        method: 'PUT',
+        headers: { 'content-type': 'text/markdown' },
+        body: '# Reviewer v2\nbe ruthless\n',
+      });
+      expect(update.status).toBe(200);
+      const uj = await update.json();
+      expect(uj.replaced).toBe(true);
+      expect(fs.readFileSync(path.join(dir, 'skills', 'reviewer.md'), 'utf8')).toContain('be ruthless');
+    } finally { await d.kill(); }
+  });
+
+  test('daemon PUT /skills/<name> rejects path-traversal name (400) without writing', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/skills/.hidden`, {
+        method: 'PUT',
+        headers: { 'content-type': 'text/markdown' },
+        body: 'should not land',
+      });
+      expect(r.status).toBe(400);
+      // No file landed under skills/, including no .hidden.md file.
+      const skillsDir = path.join(dir, 'skills');
+      const list = fs.existsSync(skillsDir) ? fs.readdirSync(skillsDir) : [];
+      expect(list).toEqual([]);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon DELETE /skills/<name> is idempotent and reports removed:true|false', async () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'doomed.md'), '# Doomed\n');
+    const d = await startDaemonProc(dir);
+    try {
+      const first = await fetch(`${d.url}/skills/doomed`, { method: 'DELETE' });
+      expect(first.status).toBe(200);
+      expect((await first.json()).removed).toBe(true);
+      expect(fs.existsSync(path.join(dir, 'skills', 'doomed.md'))).toBe(false);
+
+      // Second DELETE on the same name still 200, but removed:false
+      const second = await fetch(`${d.url}/skills/doomed`, { method: 'DELETE' });
+      expect(second.status).toBe(200);
+      expect((await second.json()).removed).toBe(false);
+    } finally { await d.kill(); }
+  });
+
   test('daemon accepts retry body shape and still returns the mock reply', async () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);

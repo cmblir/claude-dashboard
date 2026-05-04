@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import { PROVIDERS, PROVIDER_INFO, maskApiKey } from './providers/registry.mjs';
 import { withRateLimitRetry } from './providers/retry.mjs';
 import { withFallback } from './providers/fallback.mjs';
-import { composeSystemPrompt, listSkills, loadSkill, skillPath } from './skills.mjs';
+import { composeSystemPrompt, listSkills, loadSkill, skillPath, installSkill, removeSkill } from './skills.mjs';
 
 // Resolve the provider for a request. Composes two opt-in wrappers:
 //   - body.fallback: array of provider names to chain after the primary.
@@ -63,6 +63,26 @@ function readJson(req) {
       try { resolve(JSON.parse(buf)); }
       catch (e) { reject(new Error(`invalid JSON body: ${e.message}`)); }
     });
+    req.on('error', reject);
+  });
+}
+
+// Raw body reader — used for `PUT /skills/<name>` where the body is
+// markdown rather than JSON. Same 1 MiB cap as the CLI's `--from-url`
+// path so HTTP can't sneak past the safeguard the CLI enforces.
+const SKILL_MAX_BYTES = 1_048_576;
+function readTextBody(req, maxBytes = SKILL_MAX_BYTES) {
+  return new Promise((resolve, reject) => {
+    let buf = '';
+    req.setEncoding('utf8');
+    req.on('data', d => {
+      buf += d;
+      if (buf.length > maxBytes) {
+        reject(new Error(`body exceeds ${maxBytes} bytes`));
+        req.destroy();
+      }
+    });
+    req.on('end', () => resolve(buf));
     req.on('error', reject);
   });
 }
@@ -272,6 +292,50 @@ export function makeHandler(ctx) {
               'content-length': Buffer.byteLength(body),
             });
             return res.end(body);
+          } catch (err) {
+            return writeJson(res, 400, { error: err?.message || String(err) });
+          }
+        }
+        case req.method === 'PUT' && !!skillMatch: {
+          // PUT /skills/<name>  body = markdown text
+          //   201 on first write, 200 on overwrite (caller can branch on
+          //   the status if they care about idempotency vs newness).
+          //   400 on invalid name (skillPath validation) or oversize body.
+          const name = skillMatch[1];
+          const cfgDir = ctx.sessionsDirGetter();
+          let priorExists = false;
+          try {
+            // Validate name before reading the body so a bogus name fails
+            // fast and we don't waste bandwidth.
+            const file = skillPath(name, cfgDir);
+            priorExists = await fileExists(file);
+          } catch (err) {
+            return writeJson(res, 400, { error: err?.message || String(err) });
+          }
+          let body;
+          try { body = await readTextBody(req); }
+          catch (err) { return writeJson(res, 400, { error: err?.message || String(err) }); }
+          try {
+            const written = installSkill(name, body, cfgDir);
+            return writeJson(res, priorExists ? 200 : 201, {
+              ok: true, name, path: written, bytes: body.length, replaced: priorExists,
+            });
+          } catch (err) {
+            return writeJson(res, 400, { error: err?.message || String(err) });
+          }
+        }
+        case req.method === 'DELETE' && !!skillMatch: {
+          // DELETE /skills/<name>  idempotent: 200 whether the file
+          // existed or not, mirroring DELETE /sessions/<id>. The body
+          // reports `removed: true|false` so callers can branch when
+          // they care.
+          const name = skillMatch[1];
+          const cfgDir = ctx.sessionsDirGetter();
+          try {
+            const file = skillPath(name, cfgDir);
+            const existed = await fileExists(file);
+            removeSkill(name, cfgDir);
+            return writeJson(res, 200, { ok: true, name, removed: existed });
           } catch (err) {
             return writeJson(res, 400, { error: err?.message || String(err) });
           }
