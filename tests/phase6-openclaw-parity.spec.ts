@@ -3249,6 +3249,51 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(() => skillsMod.skillPath('.', '/tmp')).toThrow();
   });
 
+  test('config path prints the resolved config.json location', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['config', 'path'], dir);
+    expect(r.status).toBe(0);
+    // Trailing newline from console.log.
+    expect(r.stdout.trim()).toBe(path.join(dir, 'config.json'));
+  });
+
+  test('config edit invokes $LAZYCLAW_EDITOR on the config file and validates JSON on save', () => {
+    const dir = tmpConfigDir();
+    // Pre-seed a config so the editor opens an existing file.
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ provider: 'mock' }));
+    // Use a noop "editor" — `true` exits 0 without doing anything.
+    // The test asserts: cmdConfigEdit doesn't crash, prints ok, leaves
+    // the JSON parseable.
+    const r = runCli(['config', 'edit'], dir, { LAZYCLAW_EDITOR: 'true' });
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(true);
+    expect(out.path).toBe(path.join(dir, 'config.json'));
+    // File still parseable.
+    expect(JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'))).toEqual({ provider: 'mock' });
+  });
+
+  test('config edit refuses to silently accept an invalid JSON edit', () => {
+    const dir = tmpConfigDir();
+    fs.writeFileSync(path.join(dir, 'config.json'), '{}');
+    // Custom "editor" that corrupts the file.
+    const corruptScript = path.join(dir, 'corrupt.sh');
+    fs.writeFileSync(corruptScript, '#!/bin/sh\necho "this is not json" > "$1"\n');
+    fs.chmodSync(corruptScript, 0o755);
+    const r = runCli(['config', 'edit'], dir, { LAZYCLAW_EDITOR: corruptScript });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/invalid JSON/);
+  });
+
+  test('config edit creates the file when missing rather than failing', () => {
+    const dir = tmpConfigDir();
+    // No config.json yet. Editor exits clean (true → empty edit, file gets {} from us).
+    const r = runCli(['config', 'edit'], dir, { LAZYCLAW_EDITOR: 'true' });
+    expect(r.status).toBe(0);
+    const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'));
+    expect(cfg).toEqual({});
+  });
+
   test('config list returns the full config as JSON', () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);

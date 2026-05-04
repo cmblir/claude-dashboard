@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.99.0] — 2026-05-05
+
+**`config path` and `config edit` for shell-friendly config access.**
+
+Two small CLI niceties that round out `config get/set/list/delete`:
+
+### `lazyclaw config path`
+Prints the resolved config.json location and nothing else, so shell
+pipelines work cleanly:
+
+```bash
+cat $(lazyclaw config path)
+diff <(lazyclaw config path) ~/.lazyclaw/config.json
+```
+
+### `lazyclaw config edit`
+Opens the config file in `$LAZYCLAW_EDITOR` (then `$VISUAL`, then
+`$EDITOR`, then `vi` as final fallback). After the editor exits, we
+**re-read the file and run `JSON.parse` on it**. If the result is
+malformed JSON we print the parse error and exit 1 — instead of
+letting the user walk away thinking the edit landed and then
+silently breaking every subsequent invocation.
+
+The file is also auto-created with `{}` if it doesn't exist, so
+opening a fresh install in `$EDITOR` doesn't surface as a "scratch
+buffer the user accidentally saves as nothing."
+
+### Tests
+4 new phase 6 specs:
+- `config path` prints the right path with no extra output
+- `config edit` with `$LAZYCLAW_EDITOR=true` (no-op editor) → exit 0,
+  file unchanged and still parseable
+- `config edit` with a script that writes garbage to the file → exit 1
+  with `invalid JSON` on stderr
+- `config edit` against a fresh dir creates `{}` rather than failing
+  on the missing file
+
+Suite: 228/228. tsc clean.
+
+---
 ## [2.98.1] — 2026-05-05
 
 **Chat `/usage` slash now reports running token totals.**

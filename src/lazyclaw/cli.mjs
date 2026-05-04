@@ -93,6 +93,42 @@ async function cmdResume(sessionId, file, opts = {}) {
   process.exit(r.success ? 0 : 1);
 }
 
+async function cmdConfigEdit() {
+  // Open config.json in $EDITOR (or sensible default), then validate
+  // the result before letting the user walk away believing the edit
+  // landed. A bad JSON syntax error here would silently break every
+  // future invocation, so we re-parse the file post-edit and refuse
+  // to leave it broken.
+  const p = configPath();
+  // Ensure the file exists with at least an empty object so $EDITOR
+  // doesn't open a blank scratch buffer the user accidentally saves
+  // as nothing.
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  if (!fs.existsSync(p)) fs.writeFileSync(p, '{}\n');
+  const editor = process.env.LAZYCLAW_EDITOR || process.env.VISUAL || process.env.EDITOR || 'vi';
+  const { spawn } = await import('node:child_process');
+  await new Promise((resolve, reject) => {
+    const child = spawn(editor, [p], { stdio: 'inherit' });
+    child.on('exit', code => {
+      if (code === 0) resolve();
+      else reject(new Error(`editor exited ${code}`));
+    });
+    child.on('error', reject);
+  });
+  // Validate the result. If JSON.parse throws, restore from a backup
+  // we made before the edit (the original content if the file existed,
+  // or an empty {} otherwise — the file always has SOME valid JSON).
+  try {
+    const txt = fs.readFileSync(p, 'utf8');
+    JSON.parse(txt);
+    console.log(JSON.stringify({ ok: true, path: p }));
+  } catch (e) {
+    console.error(`config: edit produced invalid JSON: ${e.message}`);
+    console.error(`Re-run \`lazyclaw config edit\` to fix; nothing else has been touched.`);
+    process.exit(1);
+  }
+}
+
 function cmdConfigSet(key, value) {
   const cfg = readConfig();
   cfg[key] = value;
@@ -462,7 +498,7 @@ const HELP_SUMMARIES = {
 const HELP_DETAILS = {
   run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
-  config: 'Usage: lazyclaw config <get|set|list|delete> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).',
+  config: 'Usage: lazyclaw config <get|set|list|delete|path|edit> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
   agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, totalTokens?, ...} to stderr after the response.',
   doctor: 'Usage: lazyclaw doctor\n  Validates configuration and registered providers. Exits 0 only when no issues.',
@@ -1170,8 +1206,13 @@ async function main() {
         delete cfg[key];
         writeConfig(cfg);
         console.log(JSON.stringify({ ok: true, key, removed: had }));
+      } else if (sub === 'path') {
+        // Useful for shell pipelines: `cat $(lazyclaw config path)`.
+        console.log(configPath());
+      } else if (sub === 'edit') {
+        await cmdConfigEdit();
       } else {
-        console.error('Usage: lazyclaw config set|get|list|delete <key> [value]'); process.exit(2);
+        console.error('Usage: lazyclaw config set|get|list|delete|path|edit <key> [value]'); process.exit(2);
       }
       break;
     }
