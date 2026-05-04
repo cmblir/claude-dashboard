@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract annotated tag message
+        id: tag
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
+          BODY=$(git tag -l --format='%(contents)' "$TAG")
+          if [ -z "$BODY" ]; then
+            BODY="Release $TAG"
+          fi
+          {
+            echo "body<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.tag.outputs.name }}" \
+            --title "${{ steps.tag.outputs.name }}" \
+            --notes "${{ steps.tag.outputs.body }}" \
+            --verify-tag
