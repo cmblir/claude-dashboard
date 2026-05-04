@@ -453,6 +453,23 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon statusForProviderError maps error codes to HTTP statuses', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    expect(mod.statusForProviderError({ code: 'INVALID_KEY' })).toEqual({ status: 401 });
+    const rate = mod.statusForProviderError({ code: 'RATE_LIMIT', retryAfterMs: 7000 });
+    expect(rate.status).toBe(429);
+    expect(rate.headers['retry-after']).toBe('7');
+    // Sub-second retry rounds up to 1s — never 0 (we don't want to hammer)
+    const subSecond = mod.statusForProviderError({ code: 'RATE_LIMIT', retryAfterMs: 100 });
+    expect(subSecond.headers['retry-after']).toBe('1');
+    // Pass-through: an arbitrary 4xx/5xx status from the provider keeps
+    // its original status code.
+    expect(mod.statusForProviderError({ status: 503 })).toEqual({ status: 503 });
+    // Default for anything else: 502 Bad Gateway (we acted as the gateway).
+    expect(mod.statusForProviderError({})).toEqual({ status: 502 });
+    expect(mod.statusForProviderError(undefined)).toEqual({ status: 502 });
+  });
+
   test('anthropic 429 → RateLimitError with parsed retry-after seconds', async () => {
     const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
     const fakeFetch = async () => ({

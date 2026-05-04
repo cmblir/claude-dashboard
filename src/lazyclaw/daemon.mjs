@@ -37,13 +37,30 @@ function readJson(req) {
   });
 }
 
-function writeJson(res, status, obj) {
+function writeJson(res, status, obj, extraHeaders = {}) {
   const body = JSON.stringify(obj);
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'content-length': Buffer.byteLength(body),
+    ...extraHeaders,
   });
   res.end(body);
+}
+
+// Map provider error codes to HTTP statuses so clients can branch on
+// res.status instead of parsing error messages. Returns
+// { status, headers? } so 429 can attach a Retry-After.
+//
+// Exported for unit testing without spinning up an actual provider that
+// would only fail under live network conditions.
+export function statusForProviderError(err) {
+  if (err?.code === 'INVALID_KEY') return { status: 401 };
+  if (err?.code === 'RATE_LIMIT') {
+    const retrySeconds = Math.max(1, Math.ceil((err.retryAfterMs || 1000) / 1000));
+    return { status: 429, headers: { 'retry-after': String(retrySeconds) } };
+  }
+  if (err?.status && err.status >= 400 && err.status < 600) return { status: err.status };
+  return { status: 502 };
 }
 
 function writeSseHead(res) {
@@ -181,7 +198,12 @@ export function makeHandler(ctx) {
             for await (const chunk of prov.sendMessage(messages, sendOpts)) acc += chunk;
             return writeJson(res, 200, { reply: acc });
           } catch (err) {
-            return writeJson(res, 502, { error: err?.message || String(err), code: err?.code || null });
+            const m = statusForProviderError(err);
+            return writeJson(res, m.status, {
+              error: err?.message || String(err),
+              code: err?.code || null,
+              ...(err?.retryAfterMs ? { retryAfterMs: err.retryAfterMs } : {}),
+            }, m.headers || {});
           }
         }
         case route === 'POST /agent': {
@@ -262,7 +284,12 @@ export function makeHandler(ctx) {
             if (sid) ctx.sessionsMod.appendTurn(sid, 'assistant', acc, cfgDir);
             return writeJson(res, 200, { reply: acc });
           } catch (err) {
-            return writeJson(res, 502, { error: err?.message || String(err), code: err?.code || null });
+            const m = statusForProviderError(err);
+            return writeJson(res, m.status, {
+              error: err?.message || String(err),
+              code: err?.code || null,
+              ...(err?.retryAfterMs ? { retryAfterMs: err.retryAfterMs } : {}),
+            }, m.headers || {});
           }
         }
         default:

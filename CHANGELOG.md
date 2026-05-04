@@ -10,6 +10,32 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.79.3] — 2026-05-05
+
+**Daemon: provider-error → HTTP status mapping.**
+
+Every error coming out of `POST /agent` and `POST /chat` used to land
+as 502. Now they map by `err.code`:
+
+| code | HTTP | extra |
+|---|---|---|
+| `INVALID_KEY` | 401 | — |
+| `RATE_LIMIT` | 429 | `Retry-After: <seconds>`, `retryAfterMs` in body |
+| `err.status` (4xx/5xx) | passthrough | — |
+| anything else | 502 | — |
+
+Sub-second `retryAfterMs` rounds up to 1s in the header so a
+mis-typed value can never produce `Retry-After: 0` (which would invite
+clients to immediately hammer).
+
+`statusForProviderError(err)` is exported so callers reusing the
+daemon module can apply the same mapping. Direct unit tests cover
+INVALID_KEY/RATE_LIMIT/passthrough/default plus the sub-second rounding
+edge case.
+
+1 new spec, suite 83/83 green, tsc clean.
+
+---
 ## [2.79.2] — 2026-05-05
 
 **`RateLimitError` for HTTP 429 with parsed `Retry-After`.**
