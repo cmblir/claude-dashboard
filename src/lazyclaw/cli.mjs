@@ -772,6 +772,19 @@ async function cmdChat(flags = {}) {
       case '/usage': {
         const out = { messageCount: messages.length, charsSent };
         if (runningUsage) out.tokens = runningUsage;
+        // When cfg.rates has a card for the active provider/model AND
+        // we accumulated real usage, surface the running cost too. The
+        // computation is local (pure arithmetic), no extra network.
+        if (runningUsage && cfg.rates && typeof cfg.rates === 'object') {
+          try {
+            const { costFromUsage } = await import('./providers/rates.mjs');
+            const r = costFromUsage(
+              { provider: activeProvName, model: activeModel, usage: runningUsage },
+              cfg.rates,
+            );
+            if (r) out.cost = r;
+          } catch { /* never let cost-card lookup fail the slash */ }
+        }
         process.stdout.write(JSON.stringify(out) + '\n');
         return true;
       }

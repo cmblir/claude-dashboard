@@ -19,6 +19,7 @@ import { PROVIDERS, PROVIDER_INFO, maskApiKey } from './providers/registry.mjs';
 import { withRateLimitRetry } from './providers/retry.mjs';
 import { withFallback } from './providers/fallback.mjs';
 import { withResponseCache } from './providers/cache.mjs';
+import { costFromUsage } from './providers/rates.mjs';
 import { composeSystemPrompt, listSkills, loadSkill, skillPath, installSkill, removeSkill } from './skills.mjs';
 import { TokenBucketLimiter } from './ratelimit.mjs';
 import { createLogger } from './logger.mjs';
@@ -514,6 +515,21 @@ export function makeHandler(ctx) {
             thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
             onUsage: body.usage ? (u) => { captured = u; } : undefined,
           };
+          // Cost lookup: body.cost:true asks the daemon to attach a cost
+          // block when usage was captured AND cfg.rates has a card for
+          // the active provider/model. Pure arithmetic — no extra wire
+          // calls. Inline rather than helper-extract because the two
+          // response paths (stream / non-stream) need to bind it
+          // differently (SSE event vs JSON field).
+          const computeCost = () => {
+            if (!body.cost || !captured || !cfg.rates) return null;
+            try {
+              return costFromUsage(
+                { provider: provName, model: body.model || cfg.model, usage: captured },
+                cfg.rates,
+              );
+            } catch { return null; }
+          };
           if (body.stream === true) {
             writeSseHead(res);
             try {
@@ -522,6 +538,8 @@ export function makeHandler(ctx) {
                 await new Promise(r => setImmediate(r));
               }
               if (captured) writeSse(res, 'usage', captured);
+              const cost = computeCost();
+              if (cost) writeSse(res, 'cost', cost);
               writeSse(res, 'done', { ok: true });
               return res.end();
             } catch (err) {
@@ -532,7 +550,11 @@ export function makeHandler(ctx) {
           let acc = '';
           try {
             for await (const chunk of prov.sendMessage(messages, sendOpts)) acc += chunk;
-            return writeJson(res, 200, captured ? { reply: acc, usage: captured } : { reply: acc });
+            const cost = computeCost();
+            const out = { reply: acc };
+            if (captured) out.usage = captured;
+            if (cost) out.cost = cost;
+            return writeJson(res, 200, out);
           } catch (err) {
             const m = statusForProviderError(err);
             return writeJson(res, m.status, {
@@ -585,6 +607,15 @@ export function makeHandler(ctx) {
             thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
             onUsage: body.usage ? (u) => { agentCaptured = u; } : undefined,
           };
+          const computeAgentCost = () => {
+            if (!body.cost || !agentCaptured || !cfg.rates) return null;
+            try {
+              return costFromUsage(
+                { provider: provName, model, usage: agentCaptured },
+                cfg.rates,
+              );
+            } catch { return null; }
+          };
 
           if (body.stream === true) {
             writeSseHead(res);
@@ -605,6 +636,8 @@ export function makeHandler(ctx) {
               if (sid && !ac.signal.aborted) ctx.sessionsMod.appendTurn(sid, 'assistant', acc, cfgDir);
               if (!ac.signal.aborted) {
                 if (agentCaptured) writeSse(res, 'usage', agentCaptured);
+                const cost = computeAgentCost();
+                if (cost) writeSse(res, 'cost', cost);
                 writeSse(res, 'done', { ok: true });
               }
               return res.end();
@@ -625,7 +658,11 @@ export function makeHandler(ctx) {
           try {
             for await (const chunk of prov.sendMessage(messages, agentSendOpts)) acc += chunk;
             if (sid) ctx.sessionsMod.appendTurn(sid, 'assistant', acc, cfgDir);
-            return writeJson(res, 200, agentCaptured ? { reply: acc, usage: agentCaptured } : { reply: acc });
+            const cost = computeAgentCost();
+            const out = { reply: acc };
+            if (agentCaptured) out.usage = agentCaptured;
+            if (cost) out.cost = cost;
+            return writeJson(res, 200, out);
           } catch (err) {
             const m = statusForProviderError(err);
             return writeJson(res, m.status, {

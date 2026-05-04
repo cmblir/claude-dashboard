@@ -10,6 +10,55 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.0.1] — 2026-05-05
+
+**Cost wiring: chat `/usage` and daemon `body.cost` surface dollar
+amounts when rates are configured.**
+
+3.0.0 shipped `costFromUsage()` as a pure helper. This iteration
+wires it through the user-facing surfaces so callers don't have to
+hand-roll the lookup.
+
+### Chat
+`/usage` now includes a `cost` block when (a) `runningUsage` has
+accumulated real tokens AND (b) `config.rates` has a card matching
+the *active* provider/model:
+
+```json
+{"messageCount": 4, "charsSent": 87,
+ "tokens": {"inputTokens": 1234, "outputTokens": 567, ...},
+ "cost":   {"cost": 0.063, "currency": "USD",
+            "breakdown": {"input": 0.018, "output": 0.045, ...}}}
+```
+
+The active provider/model can change mid-chat via `/provider` and
+`/model`, so the lookup uses the *current* values, not what was set
+at chat start.
+
+### Daemon
+`POST /agent` and `POST /chat` now accept `body.cost: true`. When set
+alongside `body.usage: true` AND `cfg.rates` has a matching card, the
+response gains a `cost` field (non-stream) or emits an `event: cost`
+SSE frame (stream).
+
+Without `cfg.rates`, `body.cost` is silently a no-op — same posture
+as `body.usage` without `--response-cache`. The schema stays stable;
+optional features just don't populate optional fields.
+
+### Tests
+3 new phase 6 specs:
+- daemon `POST /agent` with `usage:true, cost:true` + injected
+  anthropic stub + `cfg.rates` populated → response carries both
+  `usage` and `cost` blocks; cost arithmetic verified
+  (1000 in × 15/1M + 500 out × 75/1M = $0.0525)
+- daemon `body.cost:true` against mock provider with no rates: response
+  has neither `usage` nor `cost` field; daemon doesn't crash
+- chat `/usage` with `cfg.rates` + injected stub: same verification
+  via the REPL JSON line
+
+Suite: 236/236. tsc clean.
+
+---
 ## [3.0.0] — 2026-05-05
 
 **`costFromUsage()` helper for token → currency conversion. v3 mark.**

@@ -1678,6 +1678,84 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon POST /agent body.cost:true returns cost block when rates configured for active model', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'anthropic'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-ant-x'], dir);
+    runCli(['config', 'set', 'model', 'claude-opus-4-7'], dir);
+    // Inject rates manually into the config file (config set only takes
+    // string values; rates is an object).
+    const cfgPath = path.join(dir, 'config.json');
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    cfg.rates = {
+      'anthropic/claude-opus-4-7': { inputPer1M: 15, outputPer1M: 75, currency: 'USD' },
+    };
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg));
+
+    // Monkey-patch the anthropic provider via spawn preload.
+    const preload = path.join(dir, 'preload.mjs');
+    fs.writeFileSync(preload,
+      `import('${path.resolve('src/lazyclaw/providers/registry.mjs')}').then(reg => {
+        reg.PROVIDERS.anthropic = {
+          name: 'anthropic',
+          async *sendMessage(_msgs, opts) {
+            yield 'r';
+            opts.onUsage?.({ inputTokens: 1000, outputTokens: 500 });
+          },
+        };
+      });`,
+    );
+    const child = spawn(process.execPath, ['--import', preload, CLI, 'daemon', '--port', '0'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const url: string = await new Promise((resolve, reject) => {
+      let buf = '';
+      child.stdout.on('data', d => {
+        buf += d.toString();
+        const nl = buf.indexOf('\n');
+        if (nl < 0) return;
+        try { resolve(JSON.parse(buf.slice(0, nl)).url); } catch (e) { reject(e); }
+      });
+      setTimeout(() => reject(new Error('boot')), 5000);
+    });
+    try {
+      const r = await fetch(`${url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'q', usage: true, cost: true }),
+      });
+      expect(r.status).toBe(200);
+      const j = await r.json();
+      expect(j.usage).toEqual({ inputTokens: 1000, outputTokens: 500 });
+      // 1000/1M × 15 + 500/1M × 75 = 0.015 + 0.0375 = 0.0525
+      expect(j.cost.cost).toBe(0.0525);
+      expect(j.cost.currency).toBe('USD');
+      expect(j.cost.breakdown.input).toBe(0.015);
+      expect(j.cost.breakdown.output).toBe(0.0375);
+    } finally {
+      await new Promise<void>(r => { child.once('close', () => r()); child.kill('SIGTERM'); });
+    }
+  });
+
+  test('daemon body.cost:true is silently a no-op when cfg.rates is missing', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'q', usage: true, cost: true }),
+      });
+      expect(r.status).toBe(200);
+      const j = await r.json();
+      // Mock didn't emit usage, so neither usage nor cost lands. The
+      // critical thing is no crash.
+      expect('cost' in j).toBe(false);
+    } finally { await d.kill(); }
+  });
+
   test('costFromUsage: anthropic with cache fields produces a 4-bucket breakdown', async () => {
     const { costFromUsage } = await import('../src/lazyclaw/providers/rates.mjs' as string);
     const rates = {
@@ -1751,6 +1829,53 @@ test.describe('Phase 6 — OpenClaw parity', () => {
       expect((card as any).inputPer1M).toBe(0);
       expect((card as any).outputPer1M).toBe(0);
     }
+  });
+
+  test('chat /usage adds cost block when cfg.rates is configured for the active model', async () => {
+    const dir = tmpConfigDir();
+    // Set provider/model + rates for the active card.
+    runCli(['config', 'set', 'provider', 'anthropic'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-ant-x'], dir);
+    runCli(['config', 'set', 'model', 'claude-opus-4-7'], dir);
+    const cfgPath = path.join(dir, 'config.json');
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    cfg.rates = {
+      'anthropic/claude-opus-4-7': { inputPer1M: 15, outputPer1M: 75, currency: 'USD' },
+    };
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg));
+
+    const preload = path.join(dir, 'preload.mjs');
+    fs.writeFileSync(preload,
+      `import('${path.resolve('src/lazyclaw/providers/registry.mjs')}').then(reg => {
+        reg.PROVIDERS.anthropic = {
+          name: 'anthropic',
+          async *sendMessage(_msgs, opts) {
+            yield 'r';
+            opts.onUsage?.({ inputTokens: 1000, outputTokens: 500 });
+          },
+        };
+      });`,
+    );
+    const child = spawn(process.execPath, ['--import', preload, CLI, 'chat'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stdin.write('q\n');
+    await new Promise(r => setTimeout(r, 250));
+    child.stdin.write('/usage\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+    const out = chunks.join('');
+    const usageLine = out.split('\n').find(l => l.startsWith('{') && l.includes('cost'));
+    expect(usageLine).toBeDefined();
+    const u = JSON.parse(usageLine!);
+    expect(u.tokens.inputTokens).toBe(1000);
+    expect(u.cost.cost).toBe(0.0525);
+    expect(u.cost.currency).toBe('USD');
   });
 
   test('chat /usage with mock provider reports messageCount + charsSent only (no tokens block)', async () => {
