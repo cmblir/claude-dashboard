@@ -10,6 +10,41 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.88.1] — 2026-05-05
+
+**Chat: Ctrl+C aborts the current turn instead of killing the process.**
+
+Long replies were impossible to interrupt without losing the whole
+chat session — Ctrl+C terminated the CLI. Now SIGINT during a stream
+aborts only that turn; the REPL keeps running so the next prompt
+still works.
+
+### Behavior
+- During a stream: SIGINT calls `AbortController.abort()` on the
+  per-turn signal, the provider stops yielding, the partial reply is
+  discarded (we don't append a half-reply to the message history —
+  the model would see it as a complete reply on the next turn), and
+  the REPL prints `^C interrupted — prompt is back`.
+- Outside a stream (waiting at the prompt): SIGINT still terminates
+  the process (default behavior). The handler is installed only for
+  the duration of the stream and removed on the way out via `finally`.
+
+### Mock provider also honors the signal now
+Symmetry with the other providers — checked at the top of every chunk
+yield. Tests rely on this so the abort case is reproducible offline.
+
+### Tests
+1 new phase 6 spec:
+- 200-char prompt → ~1s mock stream
+- spawn child, write prompt, wait 150 ms, send SIGINT
+- assert: process didn't die (next stdin write still produces output),
+  the interrupted notice landed, the *full* long mock-reply is NOT in
+  output (proving the stream actually aborted), follow-up message gets
+  its own reply, exit code 0 on `/exit`
+
+Suite: 172/172. tsc clean.
+
+---
 ## [2.88.0] — 2026-05-05
 
 **Portable bundles: `lazyclaw export` / `lazyclaw import`.**

@@ -167,6 +167,49 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(systems).toHaveLength(1);
   });
 
+  test('chat SIGINT mid-stream interrupts the turn but keeps the REPL alive', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+
+    // Long prompt → long reply → mockChunks delays 5ms per char.
+    // 200 chars × 5ms = ~1s of streaming. We SIGINT after ~150ms,
+    // expect the stream to abort and the prompt to come back so
+    // the next user line still works.
+    const longPrompt = 'q'.repeat(200);
+    const child = spawn(process.execPath, [CLI, 'chat'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stderr.on('data', d => chunks.push(d.toString()));
+
+    child.stdin.write(longPrompt + '\n');
+    await new Promise(r => setTimeout(r, 150));
+    // Send SIGINT to interrupt the stream
+    child.kill('SIGINT');
+    await new Promise(r => setTimeout(r, 200));
+    // Process should still be alive — send a follow-up
+    child.stdin.write('after-interrupt\n');
+    await new Promise(r => setTimeout(r, 400));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    const exitCode = await new Promise<number | null>(resolve => {
+      child.on('close', code => resolve(code));
+    });
+
+    const out = chunks.join('');
+    // The stream was interrupted: we should see the interruption message
+    // and NOT the full mock-reply for the long prompt.
+    expect(out).toContain('interrupted');
+    expect(out).not.toContain('mock-reply: ' + longPrompt);
+    // After interrupt the REPL kept running — the second message did get
+    // a reply (mock truncates content to last user msg).
+    expect(out).toContain('mock-reply: after-interrupt');
+    // Clean exit, not killed by signal.
+    expect(exitCode).toBe(0);
+  });
+
   test('chat /new clears messages so the next reply does not see prior context', async () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);

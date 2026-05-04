@@ -22,8 +22,13 @@ import { geminiProvider } from './gemini.mjs';
  * @property {(messages: ChatMessage[], opts: { apiKey?: string, model?: string }) => AsyncIterable<string>} sendMessage
  */
 
-async function* mockChunks(text, delayMs = 5) {
+async function* mockChunks(text, delayMs = 5, signal) {
   for (const ch of text) {
+    if (signal?.aborted) {
+      const e = new Error('aborted');
+      e.code = 'ABORT';
+      throw e;
+    }
     await new Promise(r => setTimeout(r, delayMs));
     yield ch;
   }
@@ -32,10 +37,13 @@ async function* mockChunks(text, delayMs = 5) {
 /** @type {Provider} */
 export const mockProvider = {
   name: 'mock',
-  async *sendMessage(messages /*, opts */) {
+  async *sendMessage(messages, opts = {}) {
     const last = messages[messages.length - 1];
     const reply = `mock-reply: ${last?.content ?? ''}`;
-    yield* mockChunks(reply);
+    // Honor opts.signal so the chat REPL's Ctrl+C handler (and any
+    // other caller) can stop the stream mid-flight. The other concrete
+    // providers already do this; the mock should match for symmetry.
+    yield* mockChunks(reply, 5, opts.signal);
   },
 };
 

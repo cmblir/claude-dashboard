@@ -751,8 +751,22 @@ async function cmdChat(flags = {}) {
     charsSent += text.length;
     persistTurn('user', text);
     let acc = '';
+    // Per-turn AbortController. Ctrl+C during a stream aborts THIS turn
+    // and returns to the prompt instead of killing the process. Outside
+    // a stream, Ctrl+C still terminates (we restore the default handler
+    // below, after the try/finally).
+    const turnAc = new AbortController();
+    const onSigint = () => {
+      turnAc.abort();
+      process.stdout.write('\n^C interrupted — prompt is back\n');
+    };
+    process.on('SIGINT', onSigint);
     try {
-      for await (const chunk of prov.sendMessage(messages, { apiKey: cfg['api-key'], model: activeModel })) {
+      for await (const chunk of prov.sendMessage(messages, {
+        apiKey: cfg['api-key'],
+        model: activeModel,
+        signal: turnAc.signal,
+      })) {
         process.stdout.write(chunk);
         acc += chunk;
       }
@@ -760,7 +774,15 @@ async function cmdChat(flags = {}) {
       messages.push({ role: 'assistant', content: acc });
       persistTurn('assistant', acc);
     } catch (err) {
-      process.stdout.write(`error: ${err?.message || String(err)}\n`);
+      // ABORT errors are user-initiated; partial assistant output is
+      // discarded (we don't append a half-reply to the message history
+      // because the next turn would treat it as a complete reply and
+      // give odd context to the model).
+      if (err?.code !== 'ABORT' && !turnAc.signal.aborted) {
+        process.stdout.write(`error: ${err?.message || String(err)}\n`);
+      }
+    } finally {
+      process.off('SIGINT', onSigint);
     }
   }
 }
