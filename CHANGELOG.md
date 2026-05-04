@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.83.1] — 2026-05-05
+
+**LazyClaw: Gemini provider — fourth concrete provider.**
+
+Brings Google's Generative Language API onto the same iterator
+contract as Anthropic, OpenAI, and Ollama. Authentication via
+`?key=` query parameter (Gemini's quirk) is handled inside the
+provider so callers pass `opts.apiKey` the same way as everywhere
+else.
+
+### Wire format
+- `POST .../v1/models/{model}:streamGenerateContent?alt=sse&key=...`
+- Body: `{ contents: [{role:user|model, parts:[{text}]}], systemInstruction?: {parts:[{text}]} }`
+- SSE response: `data: <json>\n\n` per chunk; text path is
+  `candidates[0].content.parts[*].text`
+- No terminator like `[DONE]`; stream simply ends
+
+### Message-shape translation
+Gemini calls assistants `model` and lifts the system prompt out of
+the conversation into its own field. We translate:
+- `role: 'assistant'` → `'model'`
+- `role: 'system'` → `systemInstruction.parts[].text` (the most
+  recent system message wins on conflict, matching how the other
+  providers behave when given multiple)
+- `opts.system` overrides any in-message system if both are present
+
+### Errors
+Mirrors the rest: 401/403 → `INVALID_KEY`, 429 → `RateLimitError`
+with parsed `Retry-After`, other 4xx/5xx → `ApiError`. `AbortSignal`
+honored before request and on every chunk; UTF-8 streaming
+TextDecoder for non-ASCII responses.
+
+### Registry
+`PROVIDER_INFO.gemini` advertises the endpoint shape and suggested
+models (`gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2.0-flash`).
+`lazyclaw doctor` accepts `provider: gemini` with a key.
+
+### Tests
+4 new phase 6 specs:
+- happy path: SSE response → assembled text, URL contains
+  `:streamGenerateContent?alt=sse&key=...`, body shape correct
+- system message lifted to `systemInstruction`; assistant maps to `model`
+- 401 → `INVALID_KEY`, 429 → `RateLimitError` with `retryAfterMs: 5000`
+- registry lists gemini; doctor accepts it
+
+Suite: 122/122. tsc clean.
+
+---
 ## [2.83.0] — 2026-05-05
 
 **Daemon: `Origin` gate for DNS-rebinding / browser-CSRF defense.**

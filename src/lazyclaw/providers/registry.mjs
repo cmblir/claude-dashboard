@@ -10,6 +10,7 @@
 import { anthropicProvider } from './anthropic.mjs';
 import { openaiProvider } from './openai.mjs';
 import { ollamaProvider } from './ollama.mjs';
+import { geminiProvider } from './gemini.mjs';
 
 /**
  * @typedef {{ role: 'user'|'assistant'|'system', content: string }} ChatMessage
@@ -38,13 +39,14 @@ export const mockProvider = {
   },
 };
 
-export { anthropicProvider, openaiProvider, ollamaProvider };
+export { anthropicProvider, openaiProvider, ollamaProvider, geminiProvider };
 
 export const PROVIDERS = {
   mock: mockProvider,
   anthropic: anthropicProvider,
   openai: openaiProvider,
   ollama: ollamaProvider,
+  gemini: geminiProvider,
 };
 
 // Static metadata for `lazyclaw providers list/info`. Kept next to PROVIDERS
@@ -82,6 +84,14 @@ export const PROVIDER_INFO = {
     endpoint: 'http://127.0.0.1:11434/api/chat',
     defaultModel: 'llama3.1',
     suggestedModels: ['llama3.1', 'llama3.2', 'mistral', 'qwen2.5-coder'],
+  },
+  gemini: {
+    name: 'gemini',
+    requiresApiKey: true,
+    docs: 'Google Generative Language API (Gemini). SSE streaming via :streamGenerateContent?alt=sse. Auth via ?key= query param.',
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models/{model}:streamGenerateContent',
+    defaultModel: 'gemini-1.5-pro',
+    suggestedModels: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash'],
   },
 };
 
