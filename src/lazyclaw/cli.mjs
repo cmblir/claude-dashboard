@@ -195,6 +195,99 @@ async function cmdVersion() {
   console.log(JSON.stringify(out));
 }
 
+// Subcommand inventory used by `lazyclaw completion`. Single source of
+// truth so adding a subcommand updates the completion script too. The
+// dispatcher in main() is the runtime authority; this list mirrors it.
+const SUBCOMMANDS = [
+  'run', 'resume',
+  'config', 'chat', 'agent',
+  'doctor', 'status', 'onboard',
+  'sessions', 'skills', 'providers',
+  'daemon', 'version', 'completion',
+];
+
+const SUBCOMMAND_SUBS = {
+  config:    ['get', 'set', 'list', 'delete', 'unset'],
+  sessions:  ['list', 'show', 'clear', 'export'],
+  skills:    ['list', 'show', 'install', 'remove'],
+  providers: ['list', 'info'],
+  completion: ['bash', 'zsh'],
+};
+
+function bashCompletion() {
+  // Standard bash COMPREPLY pattern. We split COMP_WORDS into:
+  //   [0] = lazyclaw, [1] = subcommand, [2+] = subcommand args.
+  // Two-level completion: word index 1 → top subcommands; index 2 → the
+  // sub-subcommand list (if defined for that subcommand). Beyond index 2
+  // we don't try to enumerate dynamic items (session ids etc.) — that
+  // would require running the CLI on every <Tab>, which is too slow.
+  const subs = SUBCOMMANDS.join(' ');
+  const subSubsCases = Object.entries(SUBCOMMAND_SUBS)
+    .map(([name, list]) => `      ${name})\n        COMPREPLY=( $(compgen -W "${list.join(' ')}" -- "$cur") )\n        ;;`)
+    .join('\n');
+  return `# lazyclaw bash completion. Source from your shell:
+#   eval "$(node /path/to/cli.mjs completion bash)"
+_lazyclaw_completion() {
+  local cur prev words cword
+  _init_completion 2>/dev/null || {
+    cur="\${COMP_WORDS[COMP_CWORD]}"
+    prev="\${COMP_WORDS[COMP_CWORD-1]}"
+    cword=$COMP_CWORD
+  }
+  if [ "$cword" -eq 1 ]; then
+    COMPREPLY=( $(compgen -W "${subs}" -- "$cur") )
+    return 0
+  fi
+  if [ "$cword" -eq 2 ]; then
+    case "\${COMP_WORDS[1]}" in
+${subSubsCases}
+    esac
+    return 0
+  fi
+  return 0
+}
+complete -F _lazyclaw_completion lazyclaw
+`;
+}
+
+function zshCompletion() {
+  // _arguments-style. We list subcommands then dispatch on the first
+  // positional via a single `_describe`. Sub-subcommands handled by a
+  // case inside the function. Same coverage rationale as bash.
+  const subs = SUBCOMMANDS.map(s => `    '${s}'`).join('\n');
+  const subSubsCases = Object.entries(SUBCOMMAND_SUBS)
+    .map(([name, list]) => `      (${name}) _values 'sub' ${list.map(v => `'${v}'`).join(' ')} ;;`)
+    .join('\n');
+  return `#compdef lazyclaw
+# lazyclaw zsh completion. Add to fpath, or eval inline:
+#   eval "$(node /path/to/cli.mjs completion zsh)"
+_lazyclaw() {
+  local subs=(
+${subs}
+  )
+  if (( CURRENT == 2 )); then
+    _values 'subcommand' \${subs[@]}
+    return
+  fi
+  if (( CURRENT == 3 )); then
+    case \${words[2]} in
+${subSubsCases}
+    esac
+    return
+  fi
+}
+compdef _lazyclaw lazyclaw
+_lazyclaw "$@"
+`;
+}
+
+async function cmdCompletion(shell) {
+  if (shell === 'bash') { process.stdout.write(bashCompletion()); return; }
+  if (shell === 'zsh')  { process.stdout.write(zshCompletion()); return; }
+  console.error('Usage: lazyclaw completion <bash|zsh>');
+  process.exit(2);
+}
+
 async function cmdAgent(prompt, flags) {
   // OpenClaw-style one-shot: send a single prompt, stream the response,
   // exit. Useful in scripts and pipelines. Honors --provider and --model
@@ -704,8 +797,12 @@ async function main() {
       await cmdVersion();
       break;
     }
+    case 'completion': {
+      await cmdCompletion(rest.positional[0]);
+      break;
+    }
     default:
-      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard|sessions|providers|skills|daemon|version> ...');
+      console.error('Usage: lazyclaw <' + SUBCOMMANDS.join('|') + '> ...');
       process.exit(2);
   }
 }

@@ -10,6 +10,45 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.83.4] — 2026-05-05
+
+**`lazyclaw completion bash|zsh` for shell autocompletion.**
+
+OpenClaw ships completion scripts; LazyClaw didn't. This makes
+`lazyclaw <TAB>` actually do something for users who source the output.
+
+### Usage
+```bash
+# bash
+lazyclaw completion bash >> ~/.bashrc
+# zsh — must live on $fpath; load via compinit
+lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"
+```
+
+The completion scripts know about every top-level subcommand
+(`run|resume|config|chat|agent|doctor|status|onboard|sessions|skills|providers|daemon|version|completion`)
+plus the second-level subcommands for the multi-level ones
+(`config get|set|list|delete`, `sessions list|show|clear|export`,
+`skills list|show|install|remove`, `providers list|info`,
+`completion bash|zsh`).
+
+### Source-of-truth
+`SUBCOMMANDS` and `SUBCOMMAND_SUBS` live next to the runtime dispatcher
+in `cli.mjs`. Tests assert the completion scripts contain every
+subcommand the dispatcher knows about, so adding a subcommand can't
+silently fall out of completion coverage.
+
+### Tests
+4 new phase 6 specs:
+- `completion bash` emits `_lazyclaw_completion` function +
+  `complete -F` line; every top-level subcommand appears in the body
+- `completion zsh` emits a `#compdef` script with the same subcommands
+- `completion` with no shell argument → exit 2 + usage on stderr
+- the bash output is syntactically valid (`bash -n` parse check)
+
+Suite: 139/139. tsc clean.
+
+---
 ## [2.83.3] — 2026-05-05
 
 **Provider auto-fallback: `withFallback` for chained provider failover.**
