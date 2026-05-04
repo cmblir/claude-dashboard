@@ -448,11 +448,50 @@ async function cmdSkills(sub, positional, flags = {}) {
       return;
     }
     case 'install': {
-      // Two forms: --from <path>, or read content from stdin.
+      // Three forms: --from <path>, --from-url <https://...>, or stdin.
       const name = positional[0];
-      if (!name) { console.error('Usage: lazyclaw skills install <name> [--from <path>]'); process.exit(2); }
+      if (!name) { console.error('Usage: lazyclaw skills install <name> [--from <path> | --from-url <https://...>]'); process.exit(2); }
       let content;
-      if (flags.from) {
+      if (flags['from-url']) {
+        const url = String(flags['from-url']);
+        // Refuse http/file/data — only https. The skill content goes
+        // straight into the system prompt, so source authenticity matters.
+        if (!url.startsWith('https://')) {
+          console.error('skills install --from-url requires an https:// URL');
+          process.exit(2);
+        }
+        const fetchFn = globalThis.fetch;
+        if (!fetchFn) { console.error('fetch is not available in this Node runtime'); process.exit(1); }
+        // Configurable max size — protect against pathological responses
+        // that would balloon the prompt and the disk file. 1 MiB cap.
+        const MAX_BYTES = 1_048_576;
+        try {
+          const res = await fetchFn(url, { redirect: 'follow' });
+          if (!res.ok) { console.error(`fetch ${url} → ${res.status}`); process.exit(1); }
+          // Stream the body so we can stop at the cap rather than loading
+          // an arbitrarily large response into memory.
+          const reader = res.body?.getReader?.();
+          if (!reader) { content = await res.text(); }
+          else {
+            const chunks = [];
+            let total = 0;
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              total += value.length;
+              if (total > MAX_BYTES) {
+                console.error(`skills install: response exceeds ${MAX_BYTES} bytes; refusing`);
+                process.exit(1);
+              }
+              chunks.push(value);
+            }
+            content = new TextDecoder('utf-8', { fatal: false }).decode(Buffer.concat(chunks.map(c => Buffer.from(c))));
+          }
+        } catch (e) {
+          console.error(`skills install fetch failed: ${e?.message || e}`);
+          process.exit(1);
+        }
+      } else if (flags.from) {
         content = fs.readFileSync(flags.from, 'utf8');
       } else {
         content = await new Promise(resolve => {

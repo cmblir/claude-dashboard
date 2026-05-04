@@ -10,6 +10,44 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.83.2] — 2026-05-05
+
+**`skills install --from-url <https://...>` for remote skill fetch.**
+
+OpenClaw has a "ClawHub" registry concept for sharing skills; LazyClaw
+doesn't run a registry but adds the simpler primitive — fetch from any
+HTTPS URL. A skill written by someone else is just a markdown file at
+a URL.
+
+### CLI
+- `lazyclaw skills install <name> --from-url <https://...>` fetches the
+  body and writes `<configDir>/skills/<name>.md`
+- Existing `--from <path>` and stdin forms continue to work
+
+### Safety guardrails
+- **HTTPS only**: `http://`, `file://`, `data:` etc. are rejected with
+  exit 2. The skill content goes straight into the system prompt, so
+  source authenticity matters.
+- **1 MiB body cap**: streaming read aborts at the cap. Pathological
+  responses can't balloon the prompt or fill the disk.
+- **Non-2xx → exit 1** with the status code in the error message
+- **No file write on failure** — the cap test asserts `<name>.md` is
+  not created when the response is rejected
+
+### Tests
+4 new phase 6 specs:
+- non-https URLs (`http://`, `file://`) → exit 2 with usage hint
+- happy path: stub-fetched body lands at the right path
+- size cap: 2 MiB body → exit 1 + `<name>.md` not written
+- 404 → exit 1 with status in stderr
+
+The stub fetch is injected via Node's `--import` flag so the test
+process replaces `globalThis.fetch` before the CLI loads — no TLS cert,
+no network round-trip, fast and offline.
+
+Suite: 126/126. tsc clean.
+
+---
 ## [2.83.1] — 2026-05-05
 
 **LazyClaw: Gemini provider — fourth concrete provider.**

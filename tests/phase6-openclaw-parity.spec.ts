@@ -1000,6 +1000,194 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(mod.clampBackoff(Number.NaN, 30_000)).toBe(30_000);
   });
 
+  test('withFallback: primary throws RATE_LIMIT pre-yield → next provider yields successfully', async () => {
+    const mod = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    const calls: string[] = [];
+    const primary = {
+      name: 'primary',
+      async *sendMessage() {
+        calls.push('primary');
+        const e: any = new Error('rl');
+        e.code = 'RATE_LIMIT';
+        e.retryAfterMs = 1;
+        throw e;
+      },
+    };
+    const fallback = {
+      name: 'fallback',
+      async *sendMessage() {
+        calls.push('fallback');
+        yield 'rescued';
+      },
+    };
+    const chain = mod.withFallback([primary, fallback]);
+    const out: string[] = [];
+    for await (const c of chain.sendMessage([{ role: 'user', content: 'q' }], {})) out.push(c);
+    expect(out.join('')).toBe('rescued');
+    expect(calls).toEqual(['primary', 'fallback']);
+    expect(chain.name).toBe('fallback(primary→fallback)');
+  });
+
+  test('withFallback: INVALID_KEY does NOT trigger fallback (auth errors are structural)', async () => {
+    const mod = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    let fallbackCalled = false;
+    const primary = {
+      name: 'primary',
+      async *sendMessage() {
+        const e: any = new Error('auth');
+        e.code = 'INVALID_KEY';
+        throw e;
+      },
+    };
+    const secondary = {
+      name: 'secondary',
+      async *sendMessage() { fallbackCalled = true; yield 'x'; },
+    };
+    const chain = mod.withFallback([primary, secondary]);
+    let caught: any = null;
+    try {
+      for await (const _c of chain.sendMessage([{ role: 'user', content: 'q' }], {})) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('INVALID_KEY');
+    expect(fallbackCalled).toBe(false);
+  });
+
+  test('withFallback: ABORT does NOT trigger fallback (user cancellation should stop, not retry)', async () => {
+    const mod = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    let fallbackCalled = false;
+    const primary = {
+      name: 'primary',
+      async *sendMessage() {
+        const e: any = new Error('abort');
+        e.code = 'ABORT';
+        throw e;
+      },
+    };
+    const secondary = {
+      name: 'secondary',
+      async *sendMessage() { fallbackCalled = true; yield 'x'; },
+    };
+    const chain = mod.withFallback([primary, secondary]);
+    let caught: any = null;
+    try {
+      for await (const _c of chain.sendMessage([{ role: 'user', content: 'q' }], {})) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('ABORT');
+    expect(fallbackCalled).toBe(false);
+  });
+
+  test('withFallback: mid-stream error does NOT trigger fallback (would duplicate text)', async () => {
+    const mod = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    let fallbackCalled = false;
+    const primary = {
+      name: 'primary',
+      async *sendMessage() {
+        yield 'partial';
+        const e: any = new Error('rl');
+        e.code = 'RATE_LIMIT';
+        throw e;
+      },
+    };
+    const secondary = {
+      name: 'secondary',
+      async *sendMessage() { fallbackCalled = true; yield 'x'; },
+    };
+    const chain = mod.withFallback([primary, secondary]);
+    const out: string[] = [];
+    let caught: any = null;
+    try {
+      for await (const c of chain.sendMessage([{ role: 'user', content: 'q' }], {})) out.push(c);
+    } catch (e) { caught = e; }
+    expect(out).toEqual(['partial']);
+    expect(caught?.code).toBe('RATE_LIMIT');
+    expect(fallbackCalled).toBe(false);
+  });
+
+  test('withFallback: 5xx upstream falls back; onFallback callback observes the transition', async () => {
+    const mod = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    const log: any[] = [];
+    const primary = {
+      name: 'primary',
+      async *sendMessage() {
+        const e: any = new Error('upstream down');
+        e.status = 502;
+        throw e;
+      },
+    };
+    const secondary = {
+      name: 'secondary',
+      async *sendMessage() { yield 'b'; },
+    };
+    const chain = mod.withFallback([primary, secondary], {
+      onFallback: (info: any) => log.push({ from: info.from, to: info.to, code: info.err?.code, status: info.err?.status }),
+    });
+    const out: string[] = [];
+    for await (const c of chain.sendMessage([{ role: 'user', content: 'q' }], {})) out.push(c);
+    expect(out.join('')).toBe('b');
+    expect(log).toEqual([{ from: 'primary', to: 'secondary', code: undefined, status: 502 }]);
+  });
+
+  test('withFallback: all providers fail → rethrows the LAST error', async () => {
+    const mod = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    const make = (name: string, code: string) => ({
+      name,
+      async *sendMessage() {
+        const e: any = new Error(`${name} down`);
+        e.code = code;
+        throw e;
+      },
+    });
+    const chain = mod.withFallback([make('a', 'RATE_LIMIT'), make('b', 'RATE_LIMIT'), make('c', 'CONNECTION_REFUSED')]);
+    let caught: any = null;
+    try {
+      for await (const _c of chain.sendMessage([{ role: 'user', content: 'q' }], {})) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('CONNECTION_REFUSED');
+    expect(String(caught?.message)).toContain('c down');
+  });
+
+  test('withFallback: shouldFallback predicate overrides defaults', async () => {
+    const mod = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    let called = false;
+    const primary = {
+      name: 'primary',
+      async *sendMessage() {
+        const e: any = new Error('xx');
+        e.code = 'INVALID_KEY';
+        throw e;
+      },
+    };
+    const secondary = {
+      name: 'secondary',
+      async *sendMessage() { called = true; yield 'y'; },
+    };
+    // Custom predicate: fall back on auth errors too. Useful when the
+    // primary key has expired and the fallback is keyed differently.
+    const chain = mod.withFallback([primary, secondary], { shouldFallback: () => true });
+    const out: string[] = [];
+    for await (const c of chain.sendMessage([{ role: 'user', content: 'q' }], {})) out.push(c);
+    expect(out.join('')).toBe('y');
+    expect(called).toBe(true);
+  });
+
+  test('withFallback: single-provider chain still works (degenerate case)', async () => {
+    const mod = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    const only = {
+      name: 'only',
+      async *sendMessage() { yield 'solo'; },
+    };
+    const chain = mod.withFallback([only]);
+    const out: string[] = [];
+    for await (const c of chain.sendMessage([{ role: 'user', content: 'q' }], {})) out.push(c);
+    expect(out.join('')).toBe('solo');
+    expect(chain.name).toBe('fallback(only)');
+  });
+
+  test('withFallback: empty chain throws', async () => {
+    const mod = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    expect(() => mod.withFallback([])).toThrow();
+  });
+
   test('gemini provider hits :streamGenerateContent?alt=sse with key in query and parses parts[].text', async () => {
     const mod = await import('../src/lazyclaw/providers/gemini.mjs' as string);
     let url = '';
@@ -1452,6 +1640,92 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     const r4 = runCli(['skills', 'remove', 'commit-style'], dir);
     expect(r4.status).toBe(0);
     expect(JSON.parse(runCli(['skills', 'list'], dir).stdout)).toEqual([]);
+  });
+
+  test('skills install --from-url rejects non-https schemes', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['skills', 'install', 'evil', '--from-url', 'http://example.com/x.md'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/requires an https:\/\/ URL/);
+    const r2 = runCli(['skills', 'install', 'evil', '--from-url', 'file:///etc/passwd'], dir);
+    expect(r2.status).toBe(2);
+    expect(r2.stderr).toMatch(/requires an https:\/\/ URL/);
+  });
+
+  test('skills install --from-url fetches successfully via stub fetch', () => {
+    // We can't ship a TLS cert just to test this path. Instead we use
+    // Node's --import flag to inject a fetch override into the child
+    // process *before* the CLI loads, so the https:// scheme check
+    // passes but the actual request never goes over the network.
+    const dir = tmpConfigDir();
+    const preload = path.join(dir, 'preload.mjs');
+    fs.writeFileSync(preload,
+      `globalThis.fetch = async () => {
+        const body = new TextEncoder().encode('# Stubbed Skill\\n\\nbe witty\\n');
+        return {
+          ok: true,
+          status: 200,
+          body: new ReadableStream({
+            start(c) { c.enqueue(body); c.close(); },
+          }),
+        };
+      };`,
+    );
+    const r = spawnSync(process.execPath, [
+      '--import', preload,
+      CLI, 'skills', 'install', 'witty', '--from-url', 'https://example.test/x.md',
+    ], {
+      encoding: 'utf8',
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+    });
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.name).toBe('witty');
+    expect(fs.readFileSync(path.join(dir, 'skills', 'witty.md'), 'utf8')).toContain('be witty');
+  });
+
+  test('skills install --from-url rejects responses that exceed the size cap', () => {
+    const dir = tmpConfigDir();
+    const preload = path.join(dir, 'preload.mjs');
+    fs.writeFileSync(preload,
+      `globalThis.fetch = async () => {
+        const big = new Uint8Array(2 * 1024 * 1024);  // 2 MiB > 1 MiB cap
+        return {
+          ok: true,
+          status: 200,
+          body: new ReadableStream({
+            start(c) { c.enqueue(big); c.close(); },
+          }),
+        };
+      };`,
+    );
+    const r = spawnSync(process.execPath, [
+      '--import', preload,
+      CLI, 'skills', 'install', 'big', '--from-url', 'https://example.test/x.md',
+    ], {
+      encoding: 'utf8',
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+    });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/exceeds .* bytes; refusing/);
+    expect(fs.existsSync(path.join(dir, 'skills', 'big.md'))).toBe(false);
+  });
+
+  test('skills install --from-url surfaces non-2xx responses as exit 1', () => {
+    const dir = tmpConfigDir();
+    const preload = path.join(dir, 'preload.mjs');
+    fs.writeFileSync(preload,
+      `globalThis.fetch = async () => ({ ok: false, status: 404, body: null });`,
+    );
+    const r = spawnSync(process.execPath, [
+      '--import', preload,
+      CLI, 'skills', 'install', 'missing', '--from-url', 'https://example.test/x.md',
+    ], {
+      encoding: 'utf8',
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+    });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/→ 404/);
   });
 
   test('skills install reads stdin when --from is not given', async () => {
