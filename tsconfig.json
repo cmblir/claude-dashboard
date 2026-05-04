@@ -8,7 +8,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "allowJs": false,
+    "allowJs": true,
+    "checkJs": false,
     "resolveJsonModule": true,
     "lib": ["ES2022", "DOM"],
     "types": ["node"]

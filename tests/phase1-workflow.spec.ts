@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { runSequential } from '../src/lazyclaw/workflow/executor.js';
-import type { WorkflowNode } from '../src/lazyclaw/workflow/types.js';
+import { runSequential } from '../src/lazyclaw/workflow/executor.mjs';
+
+interface WorkflowNode {
+  id: string;
+  type: string;
+  execute(input: unknown): Promise<unknown>;
+  cleanup?: () => void | Promise<void>;
+}
 
 function makeNodes(count: number, failAt?: number): { nodes: WorkflowNode[]; order: string[]; cleaned: string[] } {
   const order: string[] = [];
