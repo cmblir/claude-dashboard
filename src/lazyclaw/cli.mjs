@@ -201,10 +201,21 @@ async function cmdAgent(prompt, flags) {
   // flags as overrides over config.json. Reads stdin when prompt is "-"
   // so callers can pipe input.
   await ensureRegistry();
+  const skillsMod = await import('./skills.mjs');
   const cfg = readConfig();
   const provName = flags.provider || cfg.provider || 'mock';
   const prov = _registryMod.PROVIDERS[provName];
   if (!prov) { console.error(`unknown provider: ${provName}`); process.exit(2); }
+
+  // --skill resolves a comma-separated list to a composed system prompt.
+  // Defaults from config.skills (same shape) if --skill not passed.
+  const skillNames = (flags.skill ? String(flags.skill) : (Array.isArray(cfg.skills) ? cfg.skills.join(',') : ''))
+    .split(',').map(s => s.trim()).filter(Boolean);
+  let systemPrompt = null;
+  if (skillNames.length > 0) {
+    try { systemPrompt = skillsMod.composeSystemPrompt(skillNames, path.dirname(configPath())); }
+    catch (e) { console.error(`skill error: ${e.message}`); process.exit(2); }
+  }
 
   let text = prompt;
   if (text === '-' || text === undefined) {
@@ -218,7 +229,9 @@ async function cmdAgent(prompt, flags) {
   if (!text || !String(text).trim()) {
     console.error('agent: empty prompt'); process.exit(2);
   }
-  const messages = [{ role: 'user', content: String(text) }];
+  const messages = [];
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+  messages.push({ role: 'user', content: String(text) });
   // --thinking <budgetTokens> enables Anthropic extended thinking. Other
   // providers ignore the flag silently because their opts shape doesn't
   // carry it.
@@ -367,6 +380,55 @@ async function cmdDaemon(flags) {
   }
 }
 
+async function cmdSkills(sub, positional, flags = {}) {
+  const skillsMod = await import('./skills.mjs');
+  const cfgDir = path.dirname(configPath());
+  switch (sub) {
+    case undefined:
+    case 'list': {
+      const items = skillsMod.listSkills(cfgDir);
+      console.log(JSON.stringify(items.map(s => ({ name: s.name, bytes: s.bytes, summary: s.summary })), null, 2));
+      return;
+    }
+    case 'show': {
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw skills show <name>'); process.exit(2); }
+      try { process.stdout.write(skillsMod.loadSkill(name, cfgDir)); }
+      catch (e) { console.error(e.message); process.exit(1); }
+      return;
+    }
+    case 'install': {
+      // Two forms: --from <path>, or read content from stdin.
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw skills install <name> [--from <path>]'); process.exit(2); }
+      let content;
+      if (flags.from) {
+        content = fs.readFileSync(flags.from, 'utf8');
+      } else {
+        content = await new Promise(resolve => {
+          let buf = '';
+          process.stdin.setEncoding('utf8');
+          process.stdin.on('data', d => { buf += d; });
+          process.stdin.on('end', () => resolve(buf));
+        });
+      }
+      const written = skillsMod.installSkill(name, content, cfgDir);
+      console.log(JSON.stringify({ ok: true, name, path: written, bytes: content.length }));
+      return;
+    }
+    case 'remove': {
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw skills remove <name>'); process.exit(2); }
+      skillsMod.removeSkill(name, cfgDir);
+      console.log(JSON.stringify({ ok: true, removed: name }));
+      return;
+    }
+    default:
+      console.error('Usage: lazyclaw skills <list|show <name>|install <name> [--from path]|remove <name>>');
+      process.exit(2);
+  }
+}
+
 async function cmdProviders(sub, positional) {
   await ensureRegistry();
   switch (sub) {
@@ -485,8 +547,18 @@ async function main() {
         cmdConfigSet(key, valueParts.join(' '));
       } else if (sub === 'get') {
         cmdConfigGet(rest.positional[1]);
+      } else if (sub === 'list') {
+        cmdConfigGet(undefined);
+      } else if (sub === 'delete' || sub === 'unset') {
+        const key = rest.positional[1];
+        if (!key) { console.error('Usage: lazyclaw config delete <key>'); process.exit(2); }
+        const cfg = readConfig();
+        const had = Object.prototype.hasOwnProperty.call(cfg, key);
+        delete cfg[key];
+        writeConfig(cfg);
+        console.log(JSON.stringify({ ok: true, key, removed: had }));
       } else {
-        console.error('Usage: lazyclaw config set|get <key> [value]'); process.exit(2);
+        console.error('Usage: lazyclaw config set|get|list|delete <key> [value]'); process.exit(2);
       }
       break;
     }
@@ -502,6 +574,11 @@ async function main() {
     case 'providers': {
       const sub = rest.positional[0];
       await cmdProviders(sub, rest.positional.slice(1));
+      break;
+    }
+    case 'skills': {
+      const sub = rest.positional[0];
+      await cmdSkills(sub, rest.positional.slice(1), rest.flags);
       break;
     }
     case 'daemon': {
@@ -532,7 +609,7 @@ async function main() {
       break;
     }
     default:
-      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard|sessions|providers|daemon|version> ...');
+      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard|sessions|providers|skills|daemon|version> ...');
       process.exit(2);
   }
 }

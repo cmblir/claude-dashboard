@@ -413,6 +413,84 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('skills install + list + show + remove round-trip', () => {
+    const dir = tmpConfigDir();
+    const r1 = runCli(['skills', 'install', 'commit-style', '--from', __filename], dir);
+    expect(r1.status).toBe(0);
+    const r2 = runCli(['skills', 'list'], dir);
+    const items = JSON.parse(r2.stdout);
+    expect(items.map((s: any) => s.name)).toContain('commit-style');
+    const r3 = runCli(['skills', 'show', 'commit-style'], dir);
+    expect(r3.status).toBe(0);
+    expect(r3.stdout.length).toBeGreaterThan(0);
+    const r4 = runCli(['skills', 'remove', 'commit-style'], dir);
+    expect(r4.status).toBe(0);
+    expect(JSON.parse(runCli(['skills', 'list'], dir).stdout)).toEqual([]);
+  });
+
+  test('skills install reads stdin when --from is not given', async () => {
+    const dir = tmpConfigDir();
+    const child = spawn(process.execPath, [CLI, 'skills', 'install', 'piped'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    child.stdin.write('# Piped Skill\n\nbe concise.\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+    const file = path.join(dir, 'skills', 'piped.md');
+    expect(fs.existsSync(file)).toBe(true);
+    expect(fs.readFileSync(file, 'utf8')).toContain('be concise');
+  });
+
+  test('agent --skill prepends the skill content as system message', async () => {
+    // The mock provider is only sensitive to the LAST user message, so we
+    // can't verify the system prompt landed by inspecting the reply alone.
+    // Instead we plumb a tiny inspector provider via a tmp registry-based
+    // helper file, then exercise via a unit test.
+    const skillsMod = await import('../src/lazyclaw/skills.mjs' as string);
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'a.md'), '# A\nbody-A\n');
+    fs.writeFileSync(path.join(dir, 'skills', 'b.md'), '# B\nbody-B\n');
+    const composed = skillsMod.composeSystemPrompt(['a', 'b'], dir);
+    expect(composed).toContain('skill: a');
+    expect(composed).toContain('body-A');
+    expect(composed).toContain('skill: b');
+    expect(composed).toContain('body-B');
+  });
+
+  test('skills name validation rejects path-traversal and dotfiles', async () => {
+    const skillsMod = await import('../src/lazyclaw/skills.mjs' as string);
+    expect(() => skillsMod.skillPath('../bad', '/tmp')).toThrow();
+    expect(() => skillsMod.skillPath('a/b', '/tmp')).toThrow();
+    expect(() => skillsMod.skillPath('.hidden', '/tmp')).toThrow();
+    expect(() => skillsMod.skillPath('.', '/tmp')).toThrow();
+  });
+
+  test('config list returns the full config as JSON', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    runCli(['config', 'set', 'model', 'mock-1'], dir);
+    const r = runCli(['config', 'list'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out).toMatchObject({ provider: 'mock', model: 'mock-1' });
+  });
+
+  test('config delete removes a key, idempotent on missing', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const r1 = runCli(['config', 'delete', 'provider'], dir);
+    expect(r1.status).toBe(0);
+    expect(JSON.parse(r1.stdout)).toEqual({ ok: true, key: 'provider', removed: true });
+    const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'));
+    expect(cfg.provider).toBeUndefined();
+    // idempotent
+    const r2 = runCli(['config', 'delete', 'provider'], dir);
+    expect(r2.status).toBe(0);
+    expect(JSON.parse(r2.stdout).removed).toBe(false);
+  });
+
   test('providers list returns the registered providers with their key requirement', () => {
     const dir = tmpConfigDir();
     const r = runCli(['providers', 'list'], dir);

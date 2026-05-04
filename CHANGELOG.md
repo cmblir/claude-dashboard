@@ -10,6 +10,47 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.77.0] — 2026-05-05
+
+**LazyClaw: skills (markdown system prompts) + `config list/delete`.**
+
+OpenClaw's "skill" concept reduced to its load-bearing core: reusable
+instruction bundles, named, locally stored, no remote registry needed.
+A skill is just a markdown file at `<configDir>/skills/<name>.md`.
+
+### CLI
+- `lazyclaw skills list` — names + first-line summaries
+- `lazyclaw skills show <name>` — print full markdown
+- `lazyclaw skills install <name> --from <path>` — copy a file
+- `lazyclaw skills install <name>` (no --from) — read content from stdin
+- `lazyclaw skills remove <name>`
+- `lazyclaw agent --skill review,style "review my diff"` — comma-separated
+  list of skills to compose into the system prompt for this run
+- Defaults: when `config.skills` is set to an array of skill names,
+  `agent` (and chat through it) auto-applies them unless `--skill` is
+  explicitly passed
+
+### Skill composition
+Each skill is wrapped with a `<!-- skill: name -->` marker and joined
+with a `---` separator so the model can see boundaries between distinct
+guidance. Empty / missing skills throw a clear error before the
+provider call.
+
+### Security
+`skillPath()` rejects names containing `/`, `\\`, `..`, `.`, or names
+starting with `.` (no dotfiles). Tested.
+
+### `config list/delete`
+Filling the obvious gaps in `config get/set`. `delete` is idempotent
+and reports `removed: true|false` so callers know whether anything
+changed.
+
+### Tests
+6 new phase 6 specs (round-trip skills CRUD, stdin install, skill
+composition into system prompt, name validation, config list, config
+delete idempotency). Suite: 70/70. tsc clean.
+
+---
 ## [2.76.1] — 2026-05-05
 
 **Daemon: more endpoints — `GET /doctor`, `POST /chat`, `GET/DELETE /sessions/<id>`.**
