@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.77.2] — 2026-05-05
+
+**Docs: README documents the LazyClaw CLI surface.**
+
+The CLI grew from `chat + config` (phase 4) to 12 subcommands across
+this Ralph cycle without README catching up. §4.5 says "if a feature
+that users can run is added, the README must be updated." Filling
+that obligation:
+
+- `README.md` (canonical, English): new `🐚 LazyClaw CLI (standalone)`
+  section between "Install as an app" and "Features". Documents
+  onboard / doctor / chat / agent / sessions / skills / providers /
+  daemon / config and the loopback HTTP gateway.
+- `README.ko.md`, `README.zh.md`: condensed mirror sections that link
+  back to the canonical English reference for the full table.
+
+No code changes. Suite still 72/72 (re-verified). Dashboard QA still 0/66.
+
+---
 ## [2.77.1] — 2026-05-05
 
 **Daemon: skill composition for `POST /agent`.**

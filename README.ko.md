@@ -219,6 +219,48 @@ API 키는 `🧠 AI 프로바이더` 탭에서 저장해도 됩니다 — `~/.cl
 
 ---
 
+## 🐚 LazyClaw CLI (독립 실행)
+
+`src/lazyclaw/cli.mjs` 의 Node 동반자. 대시보드 없이도 동작하며 프로바이더 통신,
+영속 채팅 세션, 로컬 HTTP 게이트웨이, 마크다운 스킬을 모두 지원합니다.
+설정은 `~/.lazyclaw/config.json`.
+
+```bash
+node src/lazyclaw/cli.mjs <command>
+```
+
+### 한 번에 셋업
+
+```bash
+node src/lazyclaw/cli.mjs onboard --non-interactive \
+    --model anthropic/claude-opus-4-7 --api-key $ANTHROPIC_API_KEY
+node src/lazyclaw/cli.mjs doctor
+```
+
+`provider/model` 통합 문자열이 자동 분해됩니다. `doctor` 가 누락된 항목이 있으면
+non-zero 로 종료합니다.
+
+### 주요 명령
+
+- **대화**: `chat` (REPL), `chat --session <id>` (영속), `agent "프롬프트"` (one-shot)
+- **스킬**: `skills list/show/install/remove`, `agent --skill review,style "..."` 으로 시스템 프롬프트 합성
+- **확장 사고**: `agent --thinking 5000 "..."` (Anthropic), `--show-thinking` 으로 사고 내용을 stderr 분리
+- **검사**: `version`, `status` (키 마스킹), `providers list/info`, `sessions list/show/clear`
+- **설정**: `config get/set/list/delete <key>`
+
+### HTTP 데몬
+
+```bash
+node src/lazyclaw/cli.mjs daemon --port 0    # 127.0.0.1 바인딩, URL 출력
+```
+
+루프백 전용. 엔드포인트: `GET /version|/providers|/status|/doctor|/sessions|/sessions/<id>`,
+`DELETE /sessions/<id>`, `POST /agent`, `POST /chat`. `stream:true` 로 SSE 스트리밍.
+
+전체 명령 레퍼런스는 [영문 README](./README.md#-lazyclaw-cli-standalone) 참고.
+
+---
+
 ## ✨ 주요 기능
 
 ### 🎯 런 센터 — ECC / OMC / OMX 를 대시보드에서 직접 실행 (v2.36)

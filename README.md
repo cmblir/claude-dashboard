@@ -194,6 +194,76 @@ Uninstall with `make uninstall-mac`.
 
 ---
 
+## 🐚 LazyClaw CLI (standalone)
+
+LazyClaw is the Node-side companion that lives at `src/lazyclaw/cli.mjs`.
+It runs without the dashboard and ships everything you need to talk to a
+provider, persist chat sessions, expose a local HTTP gateway, and bundle
+reusable instructions ("skills"). Config lives at `~/.lazyclaw/config.json`.
+
+```bash
+node src/lazyclaw/cli.mjs <command>      # while developing locally
+# or in tests / scripts:
+LAZYCLAW_CONFIG_DIR=/tmp/lc node src/lazyclaw/cli.mjs status
+```
+
+### One-shot setup
+
+```bash
+node src/lazyclaw/cli.mjs onboard --non-interactive \
+    --model anthropic/claude-opus-4-7 --api-key $ANTHROPIC_API_KEY
+node src/lazyclaw/cli.mjs doctor
+```
+
+The unified `provider/model` string is split automatically. `doctor`
+exits non-zero when anything is missing.
+
+### Conversation
+
+| Command | What it does |
+|---|---|
+| `chat` | Interactive REPL. `/help`, `/status`, `/new`, `/usage`, `/exit`. |
+| `chat --session <id>` | Persistent — turns append to `~/.lazyclaw/sessions/<id>.jsonl` and resume on next invocation. |
+| `agent "prompt"` | One-shot. Streams the reply, exits. Pipe input with `agent -`. |
+| `agent --skill review,style "..."` | Compose markdown skills as the system prompt for this run. |
+| `agent --thinking 5000 "complex problem"` | Anthropic extended thinking with a 5000-token budget. Add `--show-thinking` to route reasoning text to stderr. |
+
+### Inspection
+
+| Command | Output |
+|---|---|
+| `version` (also `--version`, `-v`) | `{version, nodeVersion, platform}` JSON. |
+| `status` | Provider, model, masked API key. Never prints the raw key. |
+| `providers list` | Each provider with key requirement + suggested models. |
+| `providers info <name>` | Endpoint URL + docs blurb + default model. |
+| `sessions list` / `show <id>` / `clear <id>` | Persistent chat session ops. |
+| `skills list` / `show <name>` / `install <name> [--from path]` / `remove <name>` | Markdown skill CRUD. |
+| `config get <k>` / `set <k> <v>` / `list` / `delete <k>` | Local key-value config. |
+
+### HTTP daemon
+
+```bash
+node src/lazyclaw/cli.mjs daemon --port 0    # binds 127.0.0.1, prints url
+```
+
+Loopback-only (no auth — assumes one local user). Endpoints:
+
+- `GET /version`, `/providers`, `/status`, `/doctor`, `/sessions`
+- `GET /sessions/<id>` → `{id, turns}` (404 when missing)
+- `DELETE /sessions/<id>` (idempotent)
+- `POST /agent` `{prompt, provider?, model?, skills?, thinkingBudget?, sessionId?, stream?}`
+- `POST /chat` `{messages: [...], provider?, model?, stream?}`
+
+`stream:true` returns `text/event-stream` with `event: token`,
+`event: done`, `event: error` frames.
+
+### Providers
+
+Built-in: `mock` (offline echo, used by tests), `anthropic` (Messages API
++ extended thinking), `openai` (Chat Completions, `[DONE]`-terminated SSE).
+
+---
+
 ## ✨ Features
 
 ### 🎯 Run Center — execute ECC / OMC / OMX from the dashboard (v2.36)

@@ -206,6 +206,47 @@ API 密钥也可以在 `🧠 AI 供应商` 标签页中保存 — 存储于 `~/.
 
 ---
 
+## 🐚 LazyClaw CLI（独立运行）
+
+`src/lazyclaw/cli.mjs` 是独立的 Node 端配套工具，不依赖仪表盘即可使用 —
+连接供应商、持久化聊天会话、本地 HTTP 网关、可复用的 markdown 技能（skills）。
+配置位于 `~/.lazyclaw/config.json`。
+
+```bash
+node src/lazyclaw/cli.mjs <command>
+```
+
+### 一键设置
+
+```bash
+node src/lazyclaw/cli.mjs onboard --non-interactive \
+    --model anthropic/claude-opus-4-7 --api-key $ANTHROPIC_API_KEY
+node src/lazyclaw/cli.mjs doctor
+```
+
+`provider/model` 统一字符串会自动拆分。任何缺失项 `doctor` 都会非零退出。
+
+### 主要命令
+
+- **对话**：`chat`（REPL）、`chat --session <id>`（持久化）、`agent "提示"`（一次性）
+- **技能**：`skills list/show/install/remove`，`agent --skill review,style "..."` 合成系统提示
+- **扩展思考**：`agent --thinking 5000 "..."`（仅 Anthropic），`--show-thinking` 将思考输出到 stderr
+- **检查**：`version`、`status`（密钥脱敏）、`providers list/info`、`sessions list/show/clear`
+- **配置**：`config get/set/list/delete <key>`
+
+### HTTP 守护进程
+
+```bash
+node src/lazyclaw/cli.mjs daemon --port 0    # 绑定 127.0.0.1，打印 URL
+```
+
+仅环回访问。端点：`GET /version|/providers|/status|/doctor|/sessions|/sessions/<id>`、
+`DELETE /sessions/<id>`、`POST /agent`、`POST /chat`。`stream:true` 启用 SSE 流式输出。
+
+完整命令参考见 [英文 README](./README.md#-lazyclaw-cli-standalone)。
+
+---
+
 ## ✨ 核心功能
 
 ### 🔀 工作流引擎（n8n 风格 DAG）
