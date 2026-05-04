@@ -1,12 +1,3 @@
----
-active: true
-iteration: 1
-session_id: 
-max_iterations: 0
-completion_promise: "<promise>DONE</promise>"
-started_at: "2026-05-04T01:28:12Z"
----
-
 # Ralph Loop Task
 
 Build features INCREMENTALLY. Complete and verify ONE phase fully before moving to the next. Do NOT skip ahead.
