@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>LazyClaw Chat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 16px; max-width: 720px; }
+  fieldset { margin-bottom: 12px; }
+  #messages { border: 1px solid #ddd; padding: 8px; min-height: 240px; margin-bottom: 8px; }
+  .msg { padding: 6px 8px; margin: 4px 0; border-radius: 6px; }
+  .msg.user { background: #eef; }
+  .msg.bot { background: #efe; white-space: pre-wrap; }
+  #error { color: #b00; min-height: 1.2em; }
+  #input { width: 70%; }
+</style>
+</head>
+<body>
+<fieldset>
+  <legend>Settings</legend>
+  <label>Provider <select id="provider"><option value="mock">mock</option><option value="anthropic">anthropic</option></select></label>
+  <label>API Key <input id="apiKey" type="text" placeholder="sk-..." /></label>
+  <label>Model <input id="model" type="text" value="claude-haiku-4-5-20251001" /></label>
+  <button id="saveSettings" type="button">Save</button>
+</fieldset>
+<div id="messages" data-testid="messages"></div>
+<input id="input" type="text" placeholder="Type a message..." />
+<button id="send" type="button">Send</button>
+<div id="error" data-testid="error"></div>
+<script type="module" src="./app.mjs"></script>
+</body>
+</html>
