@@ -30,6 +30,17 @@ class AbortError extends Error {
   }
 }
 
+class RateLimitError extends Error {
+  constructor(retryAfterMs, body = '') {
+    super(`openai api 429: rate limited (retry-after ${retryAfterMs}ms)`);
+    this.name = 'RateLimitError';
+    this.code = 'RATE_LIMIT';
+    this.status = 429;
+    this.retryAfterMs = retryAfterMs;
+    this.body = body;
+  }
+}
+
 class ApiError extends Error {
   constructor(status, body) {
     super(`openai api ${status}: ${String(body).slice(0, 200)}`);
@@ -37,6 +48,18 @@ class ApiError extends Error {
     this.status = status;
     this.body = body;
   }
+}
+
+function parseRetryAfterMs(headers) {
+  let raw = null;
+  if (headers && typeof headers.get === 'function') raw = headers.get('retry-after') || headers.get('Retry-After');
+  else if (headers) raw = headers['retry-after'] || headers['Retry-After'];
+  if (!raw) return 1000;
+  const asInt = parseInt(String(raw), 10);
+  if (!Number.isNaN(asInt)) return Math.max(0, asInt * 1000);
+  const date = Date.parse(String(raw));
+  if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+  return 1000;
 }
 
 async function* iterateBody(body) {
@@ -122,6 +145,7 @@ export const openaiProvider = {
     if (!res.ok) {
       const text = typeof res.text === 'function' ? await res.text() : '';
       if (res.status === 401 || res.status === 403) throw new InvalidApiKeyError(text || 'unauthorized');
+      if (res.status === 429) throw new RateLimitError(parseRetryAfterMs(res.headers), text || '');
       throw new ApiError(res.status, text || '');
     }
 
@@ -190,4 +214,4 @@ export const openaiProvider = {
   },
 };
 
-export { InvalidApiKeyError, ApiError, AbortError };
+export { InvalidApiKeyError, ApiError, AbortError, RateLimitError };

@@ -10,6 +10,33 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.79.2] — 2026-05-05
+
+**`RateLimitError` for HTTP 429 with parsed `Retry-After`.**
+
+Both providers used to lump 429 in with the catch-all `ApiError`,
+so callers had to substring-match `body` to even know it was a rate
+limit. Lifted it to a dedicated class:
+
+```js
+catch (e) {
+  if (e.code === 'RATE_LIMIT') sleep(e.retryAfterMs);
+  else throw e;
+}
+```
+
+`Retry-After` parsing handles the two RFC-compliant forms:
+- integer seconds (`"7"`) → 7000 ms
+- HTTP-date (`"Wed, 21 Oct 2026 07:28:00 GMT"`) → ms until that wall-clock
+- missing or unparseable → 1000 ms default (rather than retry instantly)
+
+Works with both a `Headers` instance and a plain object so injected
+test fetches can use either shape.
+
+3 new phase 6 specs (anthropic seconds form, openai missing-header
+default, HTTP-date form). Suite: 82/82. tsc clean.
+
+---
 ## [2.79.1] — 2026-05-05
 
 **OpenAI tool calling for symmetry with Anthropic.**

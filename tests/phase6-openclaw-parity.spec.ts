@@ -453,6 +453,64 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('anthropic 429 → RateLimitError with parsed retry-after seconds', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    const fakeFetch = async () => ({
+      ok: false, status: 429,
+      headers: new Headers({ 'retry-after': '7' }),
+      text: async () => '{"error":{"message":"rate limited"}}',
+    });
+    let caught: any = null;
+    try {
+      for await (const _c of mod.anthropicProvider.sendMessage(
+        [{ role: 'user', content: 'hi' }],
+        { apiKey: 'sk-ant-x', model: 'claude-opus-4-7', fetch: fakeFetch as any },
+      )) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('RATE_LIMIT');
+    expect(caught?.status).toBe(429);
+    expect(caught?.retryAfterMs).toBe(7000);
+  });
+
+  test('openai 429 → RateLimitError; missing retry-after defaults to 1000ms', async () => {
+    const mod = await import('../src/lazyclaw/providers/openai.mjs' as string);
+    const fakeFetch = async () => ({
+      ok: false, status: 429,
+      headers: new Headers({}),
+      text: async () => '{"error":{"message":"rate limited"}}',
+    });
+    let caught: any = null;
+    try {
+      for await (const _c of mod.openaiProvider.sendMessage(
+        [{ role: 'user', content: 'hi' }],
+        { apiKey: 'sk-x', model: 'gpt-4.1', fetch: fakeFetch as any },
+      )) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('RATE_LIMIT');
+    expect(caught?.retryAfterMs).toBe(1000);
+  });
+
+  test('rate-limit retry-after also parses an HTTP-date', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    const future = new Date(Date.now() + 5000).toUTCString();
+    const fakeFetch = async () => ({
+      ok: false, status: 429,
+      headers: { 'retry-after': future },
+      text: async () => '',
+    });
+    let caught: any = null;
+    try {
+      for await (const _c of mod.anthropicProvider.sendMessage(
+        [{ role: 'user', content: 'hi' }],
+        { apiKey: 'sk-ant-x', model: 'claude-opus-4-7', fetch: fakeFetch as any },
+      )) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('RATE_LIMIT');
+    // Allow ±2s of slack so the test isn't flaky on slow CI
+    expect(caught?.retryAfterMs).toBeGreaterThan(2000);
+    expect(caught?.retryAfterMs).toBeLessThan(8000);
+  });
+
   test('openai provider passes through tools and surfaces assembled tool_calls via onToolUse', async () => {
     const mod = await import('../src/lazyclaw/providers/openai.mjs' as string);
     const calls: any[] = [];
