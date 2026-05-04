@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.97.1] — 2026-05-05
+
+**OpenAI: usage capture via `opts.onUsage` (parity with anthropic).**
+
+2.97.0 deferred OpenAI usage as out-of-scope; this iteration delivers
+it. The Chat Completions API only emits usage on the stream when
+`stream_options: { include_usage: true }` is set in the request body,
+so the provider now adds that field **only when the caller provides
+an `onUsage` callback** — preserving the wire shape for every
+existing caller.
+
+### Output shape
+Normalized to mirror anthropic's `onUsage` payload but with the
+fields OpenAI actually returns:
+
+```js
+{ inputTokens: 12, outputTokens: 3, totalTokens: 15 }
+```
+
+(Anthropic adds `cacheCreationInputTokens` / `cacheReadInputTokens`;
+OpenAI doesn't expose cache fields in the same way, so we report
+`totalTokens` instead.)
+
+### Wire-shape guarantee
+- Without `onUsage` → request body has no `stream_options` field at
+  all (verified by a spec). Existing callers see no behavior change.
+- With `onUsage` → `stream_options: {include_usage: true}` is added.
+
+### Tests
+2 new phase 6 specs:
+- happy path: SSE includes a usage frame; callback fires with normalized
+  shape; request body contains `stream_options.include_usage: true`
+- opt-in guarantee: no `onUsage` → no `stream_options` on the wire
+
+Suite: 217/217. tsc clean.
+
+Now both real-network providers expose normalized usage, closing the
+parity gap §1.1 flagged in 2.97.0.
+
+---
 ## [2.97.0] — 2026-05-05
 
 **Anthropic: usage totals surfaced via `opts.onUsage` callback.**

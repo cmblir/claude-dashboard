@@ -1724,6 +1724,61 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(out.join('')).toBe('x');
   });
 
+  test('openai provider surfaces usage via opts.onUsage (with stream_options.include_usage)', async () => {
+    const mod = await import('../src/lazyclaw/providers/openai.mjs' as string);
+    let sentBody: any = null;
+    const sse =
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' +
+      'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n' +
+      'data: {"choices":[],"usage":{"prompt_tokens":12,"completion_tokens":3,"total_tokens":15}}\n\n' +
+      'data: [DONE]\n\n';
+    const fakeFetch = async (_url: string, init: any) => {
+      sentBody = JSON.parse(init.body);
+      return {
+        ok: true, status: 200,
+        body: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(sse)); c.close(); } }),
+      };
+    };
+    let captured: any = null;
+    const out: string[] = [];
+    for await (const c of mod.openaiProvider.sendMessage(
+      [{ role: 'user', content: 'q' }],
+      { apiKey: 'sk-x', model: 'gpt-4.1', fetch: fakeFetch as any, onUsage: (u: any) => { captured = u; } },
+    )) out.push(c);
+    expect(out.join('')).toBe('hi');
+    // Provider must have set stream_options on the wire request.
+    expect(sentBody.stream_options).toEqual({ include_usage: true });
+    expect(captured).toEqual({ inputTokens: 12, outputTokens: 3, totalTokens: 15 });
+  });
+
+  test('openai onUsage opt-in: missing callback omits stream_options entirely', async () => {
+    const mod = await import('../src/lazyclaw/providers/openai.mjs' as string);
+    let sentBody: any = null;
+    const fakeFetch = async (_url: string, init: any) => {
+      sentBody = JSON.parse(init.body);
+      return {
+        ok: true, status: 200,
+        body: new ReadableStream({
+          start(c) {
+            c.enqueue(new TextEncoder().encode(
+              'data: {"choices":[{"delta":{"content":"x"}}]}\n\ndata: [DONE]\n\n',
+            ));
+            c.close();
+          },
+        }),
+      };
+    };
+    const out: string[] = [];
+    for await (const c of mod.openaiProvider.sendMessage(
+      [{ role: 'user', content: 'q' }],
+      { apiKey: 'sk-x', model: 'gpt-4.1', fetch: fakeFetch as any },
+    )) out.push(c);
+    expect(out.join('')).toBe('x');
+    // Without onUsage we must NOT request usage — keeps the wire shape
+    // identical to pre-2.97.0 callers.
+    expect(sentBody.stream_options).toBeUndefined();
+  });
+
   test('cache wrapper: onHit/onMiss callbacks fire once per call with the right shape', async () => {
     const { withResponseCache } = await import('../src/lazyclaw/providers/cache.mjs' as string);
     const events: any[] = [];

@@ -130,6 +130,14 @@ export const openaiProvider = {
       body.tools = opts.tools;
       if (opts.toolChoice) body.tool_choice = opts.toolChoice;
     }
+    // Usage capture is opt-in via stream_options. We only request it when
+    // the caller provided an onUsage callback — otherwise we'd be paying
+    // for an extra response field we'd just throw away. The shape comes
+    // back as a top-level `usage` field on a final chunk that has empty
+    // choices, right before `[DONE]`.
+    if (typeof opts.onUsage === 'function') {
+      body.stream_options = { include_usage: true };
+    }
 
     if (opts.signal?.aborted) throw new AbortError('aborted before request');
     const res = await fetchFn('https://api.openai.com/v1/chat/completions', {
@@ -151,6 +159,12 @@ export const openaiProvider = {
 
     const decoder = new TextDecoder('utf-8', { fatal: false });
     let buffer = '';
+    // Usage accumulator. With stream_options.include_usage, the final
+    // pre-[DONE] chunk carries `usage` at top level: {prompt_tokens,
+    // completion_tokens, total_tokens}. We collect into a normalized
+    // shape that mirrors the anthropic provider's onUsage payload so
+    // callers don't have to special-case per provider.
+    let usage = null;
     // OpenAI streams tool_calls as deltas with an `index` we use as the
     // accumulation key. Each delta may carry a partial id, name, and/or
     // arguments string. We assemble until the stream signals
@@ -183,10 +197,22 @@ export const openaiProvider = {
         if (frame.data === '[DONE]') {
           // Drain any tool calls that haven't been flushed by finish_reason.
           for (const idx of Array.from(toolCallsByIndex.keys())) flushToolCall(idx);
+          if (usage && typeof opts.onUsage === 'function') {
+            try { opts.onUsage(usage); } catch { /* never let a callback abort */ }
+          }
           return;
         }
         try {
           const obj = JSON.parse(frame.data);
+          // Usage frame: top-level `usage` (no choices content). Capture
+          // and continue — the final stream terminator [DONE] still emits.
+          if (obj?.usage && typeof obj.usage === 'object') {
+            usage = {
+              inputTokens: obj.usage.prompt_tokens ?? null,
+              outputTokens: obj.usage.completion_tokens ?? null,
+              totalTokens: obj.usage.total_tokens ?? null,
+            };
+          }
           const choice = obj?.choices?.[0];
           const delta = choice?.delta || {};
           if (delta.content) yield delta.content;
