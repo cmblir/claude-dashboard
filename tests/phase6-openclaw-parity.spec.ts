@@ -1678,6 +1678,81 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon: forbidden-Origin requests do NOT cost a rate-limit token (Origin runs first)', async () => {
+    // Symmetric to the auth-before-rate-limit test: a malicious browser
+    // page hitting 127.0.0.1 with a foreign Origin must not be able to
+    // exhaust the bucket either. Origin gate runs first so those
+    // requests get 403 before reaching the limiter.
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      rateLimit: { capacity: 2, refillPerSec: 0.001 },
+      // No allowedOrigins — every Origin-bearing request is forbidden
+    });
+    const drive = async (origin?: string) => {
+      let status = 0;
+      const headers: any = origin ? { origin } : {};
+      const req: any = { method: 'GET', url: '/version', headers, socket: { remoteAddress: '127.0.0.1' } };
+      const res: any = { writeHead(s: number) { status = s; }, end() {}, once: () => {} };
+      await handler(req, res);
+      return status;
+    };
+    // 10 evil-origin requests — all 403, none cost a token
+    for (let i = 0; i < 10; i++) {
+      expect(await drive('https://evil.example')).toBe(403);
+    }
+    // No-origin (CLI/script) requests still get the full bucket
+    expect(await drive()).toBe(200);
+    expect(await drive()).toBe(200);
+    expect(await drive()).toBe(429);
+  });
+
+  test('daemon: unauthenticated requests do NOT cost a rate-limit token (auth runs first)', async () => {
+    // Production scenario: a public-facing daemon with --auth-token AND
+    // --rate-limit. If rate limit ran before auth, an attacker could
+    // exhaust the legitimate user's budget with junk requests. Auth
+    // first means anonymous traffic gets 401'd before touching the
+    // bucket — verified here by exhausting attempts with bad-auth then
+    // sending a good-auth request that still goes through.
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      authToken: 'good',
+      rateLimit: { capacity: 2, refillPerSec: 0.001 },  // glacial refill
+    });
+    const drive = async (token: string | null) => {
+      let status = 0;
+      const headers: any = {};
+      if (token !== null) headers.authorization = `Bearer ${token}`;
+      const req: any = { method: 'GET', url: '/version', headers, socket: { remoteAddress: '127.0.0.1' } };
+      const res: any = { writeHead(s: number) { status = s; }, end() {}, once: () => {} };
+      await handler(req, res);
+      return status;
+    };
+    // 5 unauthenticated requests — all 401, none should cost a token
+    for (let i = 0; i < 5; i++) {
+      expect(await drive('wrong-token')).toBe(401);
+    }
+    // 5 missing-auth requests — also 401, also free
+    for (let i = 0; i < 5; i++) {
+      expect(await drive(null)).toBe(401);
+    }
+    // Now an authenticated request — bucket should be intact (cap 2)
+    expect(await drive('good')).toBe(200);
+    expect(await drive('good')).toBe(200);
+    // Third authenticated request 429s — budget actually applies once
+    // we cross the auth gate.
+    expect(await drive('good')).toBe(429);
+  });
+
   test('daemon CLI --rate-limit caps a remote and surfaces in the bound-URL JSON', async () => {
     const dir = tmpConfigDir();
     const d = await startDaemonProc(dir, ['--rate-limit', '2']);

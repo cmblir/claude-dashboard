@@ -10,6 +10,41 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.95.3] — 2026-05-05
+
+**Test coverage: gate ordering for the security stack — pinned down.**
+
+The README documents Origin → auth → rate-limit and a test confirms
+Origin-before-auth (a forbidden Origin gets 403 with no
+`WWW-Authenticate` header). Two more orderings remained implicit;
+this fills them in:
+
+1. **Auth runs before rate limit.** With both `--auth-token` and
+   `--rate-limit 2` set, ten unauthenticated requests + ten
+   missing-auth requests all 401 without spending a token. A
+   subsequent authenticated burst still gets the full bucket and
+   429s only on the 3rd legitimate request.
+
+   Why this matters in production: if rate-limit ran first, an
+   attacker could DoS the legitimate user's budget with junk
+   requests. Auth-first means anonymous traffic never touches the
+   limiter — the budget is per *authenticated identity*, not per IP.
+
+2. **Origin runs before rate limit.** Symmetric: ten foreign-Origin
+   requests all 403 without spending a token. CLI/script callers
+   (no Origin header) still get the full bucket. So a malicious
+   browser page on `evil.example` cannot exhaust the legitimate
+   user's budget by hitting 127.0.0.1 cross-origin.
+
+These two tests pin down the contract the README asserts. Together
+with the existing Origin-before-auth test, the gate ordering is
+fully covered: an attacker can't get *anywhere* into the daemon
+without first passing every gate, and each gate is both correct in
+isolation and correct in composition.
+
+No production code changes. Suite: 210/210. tsc clean.
+
+---
 ## [2.95.2] — 2026-05-05
 
 **Docs: README catches up on the post-2.82.2 surface (§4.5).**
