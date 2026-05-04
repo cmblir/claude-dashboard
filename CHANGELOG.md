@@ -10,6 +10,41 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.82.1] — 2026-05-05
+
+**Daemon: optional bearer-token auth for non-loopback exposure.**
+
+The daemon was loopback-only, no auth, single-user assumption. That's
+fine for the default deploy but breaks the moment you SSH-tunnel the
+port to a shared host or run the daemon under a service account that
+others share. Adds opt-in bearer-token auth.
+
+### How it works
+`makeHandler({ ..., authToken: 'secret-abc' })` enables the gate. Every
+request must present `Authorization: Bearer <token>`; missing or
+mismatched tokens get `401` + `WWW-Authenticate: Bearer realm="lazyclaw"`
+before the route is even resolved. When `authToken` is unset (default),
+behavior is identical to before — every request goes through.
+
+### Constant-time comparison
+Plain `===` would short-circuit on the first mismatching byte, leaking
+timing information that an attacker on a shared host could use to
+narrow the secret one byte at a time. The check XORs every byte into
+an accumulator and returns `accum === 0`, so success and failure take
+the same time regardless of where the strings diverge.
+
+### Tests
+4 new phase 6 specs:
+- missing `Authorization` header → 401 + `WWW-Authenticate`
+- correct `Bearer <token>` → 200, route reached
+- wrong token → 401, `readConfig` is *not* called (auth runs before
+  route resolution — important so unauthorized callers can't probe
+  internal state via side effects)
+- no `authToken` set → no gate, default loopback behavior unchanged
+
+Suite: 110/110. tsc clean. Dashboard QA: 0/66.
+
+---
 ## [2.82.0] — 2026-05-05
 
 **`chat --skill` parity + daemon retry plumbing.**

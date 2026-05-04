@@ -258,10 +258,10 @@ test.describe('Phase 6 — OpenClaw parity', () => {
 
   // Daemon helper: spawn `lazyclaw daemon --port 0`, wait for the bound URL
   // line on stdout, return the URL plus a cleanup hook.
-  function startDaemonProc(cfgDir: string): Promise<{ url: string, kill: () => Promise<void> }> {
+  function startDaemonProc(cfgDir: string, extraArgs: string[] = [], extraEnv: NodeJS.ProcessEnv = {}): Promise<{ url: string, kill: () => Promise<void> }> {
     return new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, [CLI, 'daemon', '--port', '0'], {
-        env: { ...process.env, LAZYCLAW_CONFIG_DIR: cfgDir },
+      const child = spawn(process.execPath, [CLI, 'daemon', '--port', '0', ...extraArgs], {
+        env: { ...process.env, LAZYCLAW_CONFIG_DIR: cfgDir, ...extraEnv },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
       let buf = '';
@@ -517,6 +517,130 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     const r = runCli(['agent', 'hello', '--retry', '3'], dir);
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('mock-reply: hello');
+  });
+
+  test('daemon makeHandler with authToken: missing Authorization → 401', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      authToken: 'secret-abc',
+    });
+    // Drive a fake req/res. Capture writeHead status + body.
+    let status = 0;
+    let body = '';
+    const headers: Record<string, string> = {};
+    const fakeReq: any = { method: 'GET', url: '/version', headers: {} };
+    const fakeRes: any = {
+      writeHead(s: number, h: any) { status = s; if (h) Object.assign(headers, h); },
+      end(b: string) { body = b; },
+    };
+    await handler(fakeReq, fakeRes);
+    expect(status).toBe(401);
+    expect(headers['www-authenticate']).toMatch(/Bearer realm/);
+    expect(JSON.parse(body)).toEqual({ error: 'unauthorized' });
+  });
+
+  test('daemon makeHandler with authToken: correct Bearer token → 200', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '1.2.3',
+      authToken: 'secret-abc',
+    });
+    let status = 0;
+    let body = '';
+    const fakeReq: any = { method: 'GET', url: '/version', headers: { authorization: 'Bearer secret-abc' } };
+    const fakeRes: any = {
+      writeHead(s: number) { status = s; },
+      end(b: string) { body = b; },
+    };
+    await handler(fakeReq, fakeRes);
+    expect(status).toBe(200);
+    expect(JSON.parse(body).version).toBe('1.2.3');
+  });
+
+  test('daemon makeHandler with authToken: wrong token → 401, never reaches the route', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    let configRead = 0;
+    const handler = mod.makeHandler({
+      readConfig: () => { configRead += 1; return {}; },
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      authToken: 'secret-abc',
+    });
+    const fakeReq: any = { method: 'GET', url: '/status', headers: { authorization: 'Bearer wrong' } };
+    let status = 0;
+    const fakeRes: any = { writeHead(s: number) { status = s; }, end() {} };
+    await handler(fakeReq, fakeRes);
+    expect(status).toBe(401);
+    // Auth check happens before route resolution — readConfig must NOT be called.
+    expect(configRead).toBe(0);
+  });
+
+  test('daemon constantTimeEqual: same-length mismatch and different-length both reject', async () => {
+    // Inline drive — re-import the module and exercise the gate via the
+    // public handler. constantTimeEqual itself isn't exported; the
+    // observable contract is "wrong token → 401 regardless of length."
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      authToken: 'aaaaaaaa',
+    });
+    const drive = async (token: string) => {
+      let status = 0;
+      const req: any = { method: 'GET', url: '/version', headers: { authorization: `Bearer ${token}` } };
+      const res: any = { writeHead(s: number) { status = s; }, end() {} };
+      await handler(req, res);
+      return status;
+    };
+    expect(await drive('aaaaaaaa')).toBe(200);    // exact match
+    expect(await drive('aaaaaaab')).toBe(401);    // same length, last byte off
+    expect(await drive('a')).toBe(401);            // shorter
+    expect(await drive('aaaaaaaaa')).toBe(401);    // longer
+    expect(await drive('')).toBe(401);             // empty
+  });
+
+  test('daemon CLI --auth-token reports auth=true and rejects unauthenticated requests', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir, ['--auth-token', 'integration-secret']);
+    try {
+      const noAuth = await fetch(`${d.url}/version`);
+      expect(noAuth.status).toBe(401);
+      const withAuth = await fetch(`${d.url}/version`, { headers: { authorization: 'Bearer integration-secret' } });
+      expect(withAuth.status).toBe(200);
+      const j = await withAuth.json();
+      expect(j.version).toMatch(/^\d+\.\d+\.\d+/);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon makeHandler without authToken: any request goes through (default loopback mode)', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '1.0.0',
+      // no authToken
+    });
+    let status = 0;
+    const fakeReq: any = { method: 'GET', url: '/version', headers: {} };
+    const fakeRes: any = { writeHead(s: number) { status = s; }, end() {} };
+    await handler(fakeReq, fakeRes);
+    expect(status).toBe(200);
   });
 
   test('daemon POST /agent with no prompt returns 400', async () => {

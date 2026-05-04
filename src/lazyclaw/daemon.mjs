@@ -93,16 +93,53 @@ function writeSse(res, event, data) {
 }
 
 /**
+ * Constant-time string equality. Plain `===` would short-circuit on the
+ * first mismatching byte, leaking timing info that lets an attacker on
+ * a shared host narrow the secret one byte at a time. We compare every
+ * byte with XOR + accumulator.
+ */
+function constantTimeEqual(a, b) {
+  const aStr = String(a ?? '');
+  const bStr = String(b ?? '');
+  if (aStr.length !== bStr.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aStr.length; i++) {
+    diff |= aStr.charCodeAt(i) ^ bStr.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+function isAuthorized(req, expectedToken) {
+  if (!expectedToken) return true;  // auth disabled
+  const header = req.headers['authorization'] || '';
+  const m = /^Bearer\s+(.+)$/i.exec(header);
+  if (!m) return false;
+  return constantTimeEqual(m[1].trim(), expectedToken);
+}
+
+/**
  * @param {{
  *   readConfig: () => Record<string, unknown>,
  *   sessionsDirGetter: () => string,
  *   sessionsMod: typeof import('./sessions.mjs'),
  *   version: () => string,
+ *   authToken?: string,
  * }} ctx
  */
 export function makeHandler(ctx) {
+  const authToken = ctx.authToken || null;
   return async function handler(req, res) {
     try {
+      // Authentication gate — when authToken is set, every request must
+      // present `Authorization: Bearer <token>`. This is opt-in because
+      // the default deployment is loopback-only single-user; the token
+      // is for shared-host scenarios or when you want to expose the
+      // daemon over an SSH tunnel and lock down the open port.
+      if (authToken && !isAuthorized(req, authToken)) {
+        return writeJson(res, 401, { error: 'unauthorized' }, {
+          'www-authenticate': 'Bearer realm="lazyclaw"',
+        });
+      }
       const url = new URL(req.url || '/', 'http://localhost');
       const route = `${req.method} ${url.pathname}`;
       const sessionMatch = url.pathname.match(/^\/sessions\/([^/]+)$/);
@@ -326,6 +363,7 @@ export function makeHandler(ctx) {
  *   sessionsDirGetter: () => string,
  *   sessionsMod: typeof import('./sessions.mjs'),
  *   version: () => string,
+ *   authToken?: string,
  * }} opts
  * @returns {Promise<{ port: number, server: http.Server, close: () => Promise<void> }>}
  */
