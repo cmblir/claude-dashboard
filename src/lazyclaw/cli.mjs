@@ -338,6 +338,42 @@ async function cmdChat(flags = {}) {
   }
 }
 
+async function cmdProviders(sub, positional) {
+  await ensureRegistry();
+  switch (sub) {
+    case undefined:
+    case 'list': {
+      // Defensive: if metadata is missing for a registered provider, fall back
+      // to a minimal shape so this never crashes the CLI even mid-refactor.
+      const out = Object.keys(_registryMod.PROVIDERS).map(name => {
+        const meta = _registryMod.PROVIDER_INFO[name] || { name, requiresApiKey: false, docs: '' };
+        return {
+          name,
+          requiresApiKey: !!meta.requiresApiKey,
+          defaultModel: meta.defaultModel || null,
+          suggestedModels: meta.suggestedModels || [],
+        };
+      });
+      console.log(JSON.stringify(out, null, 2));
+      return;
+    }
+    case 'info': {
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw providers info <name>'); process.exit(2); }
+      const meta = _registryMod.PROVIDER_INFO[name];
+      if (!meta) {
+        console.error(`unknown provider: ${name} (registered: ${Object.keys(_registryMod.PROVIDERS).join(', ')})`);
+        process.exit(2);
+      }
+      console.log(JSON.stringify(meta, null, 2));
+      return;
+    }
+    default:
+      console.error('Usage: lazyclaw providers <list|info <name>>');
+      process.exit(2);
+  }
+}
+
 async function cmdSessions(sub, positional) {
   const sessionsMod = await import('./sessions.mjs');
   const cfgDir = path.dirname(configPath());
@@ -434,6 +470,11 @@ async function main() {
       await cmdSessions(sub, rest.positional.slice(1));
       break;
     }
+    case 'providers': {
+      const sub = rest.positional[0];
+      await cmdProviders(sub, rest.positional.slice(1));
+      break;
+    }
     case 'agent': {
       const prompt = rest.positional[0];
       await cmdAgent(prompt, rest.flags);
@@ -458,7 +499,7 @@ async function main() {
       break;
     }
     default:
-      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard|sessions|version> ...');
+      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard|sessions|providers|version> ...');
       process.exit(2);
   }
 }

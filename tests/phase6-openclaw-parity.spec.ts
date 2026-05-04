@@ -197,6 +197,38 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(calls[0].headers['anthropic-version']).toBeTruthy();
   });
 
+  test('providers list returns the registered providers with their key requirement', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['providers', 'list'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    const names = out.map((p: any) => p.name);
+    expect(names).toEqual(expect.arrayContaining(['mock', 'anthropic', 'openai']));
+    const mock = out.find((p: any) => p.name === 'mock');
+    expect(mock.requiresApiKey).toBe(false);
+    const anthropic = out.find((p: any) => p.name === 'anthropic');
+    expect(anthropic.requiresApiKey).toBe(true);
+    expect(anthropic.suggestedModels).toEqual(expect.arrayContaining(['claude-opus-4-7']));
+  });
+
+  test('providers info <name> returns the static metadata', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['providers', 'info', 'anthropic'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.name).toBe('anthropic');
+    expect(out.endpoint).toContain('anthropic.com');
+    expect(out.defaultModel).toBe('claude-opus-4-7');
+  });
+
+  test('providers info on unknown provider exits 2 with a registered-list hint', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['providers', 'info', 'nonsense'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/unknown provider/);
+    expect(r.stderr).toMatch(/mock/);
+  });
+
   test('chat --session persists turns to <configDir>/sessions/<id>.jsonl', async () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);

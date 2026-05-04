@@ -10,6 +10,24 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.75.1] — 2026-05-05
+
+**LazyClaw: `providers list/info` for discoverability.**
+
+`lazyclaw providers list` returns every registered provider with its
+key requirement, default model, and suggested models — so a fresh
+install can answer "what can I run?" without reading source.
+
+`lazyclaw providers info <name>` returns the full static metadata
+(endpoint URL, key prefix, docs blurb). Unknown name exits 2 and
+hints the registered list.
+
+Provider info lives in `PROVIDER_INFO` next to `PROVIDERS` so adding
+a provider in one place can't drift from what users see.
+
+3 new phase 6 specs; suite 53/53 green.
+
+---
 ## [2.75.0] — 2026-05-05
 
 **LazyClaw: persistent chat sessions.**

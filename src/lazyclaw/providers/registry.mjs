@@ -45,6 +45,36 @@ export const PROVIDERS = {
   openai: openaiProvider,
 };
 
+// Static metadata for `lazyclaw providers list/info`. Kept next to PROVIDERS
+// so adding a provider in one place can't drift from the list shown to users.
+export const PROVIDER_INFO = {
+  mock: {
+    name: 'mock',
+    requiresApiKey: false,
+    docs: 'In-process echo provider. Replies "mock-reply: <last user message>". Used for offline tests and demos.',
+    defaultModel: null,
+    suggestedModels: [],
+  },
+  anthropic: {
+    name: 'anthropic',
+    requiresApiKey: true,
+    keyPrefix: 'sk-ant-',
+    docs: 'Anthropic Messages API. Supports streaming + extended thinking.',
+    endpoint: 'https://api.anthropic.com/v1/messages',
+    defaultModel: 'claude-opus-4-7',
+    suggestedModels: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
+  },
+  openai: {
+    name: 'openai',
+    requiresApiKey: true,
+    keyPrefix: 'sk-',
+    docs: 'OpenAI Chat Completions API. Streaming via SSE with [DONE] terminator.',
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    defaultModel: 'gpt-4.1',
+    suggestedModels: ['gpt-4.1', 'gpt-4o', 'gpt-4o-mini'],
+  },
+};
+
 /**
  * Split a unified "provider/model" string (OpenClaw style:
  * "anthropic/claude-opus-4-7"). Also accepts a bare model id and returns
