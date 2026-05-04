@@ -994,6 +994,39 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(fs.existsSync(path.join(dir, 'sessions', 'doomed.jsonl'))).toBe(false);
   });
 
+  test('sessions export prints a Markdown dump with H1 + per-turn sections', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'demo.jsonl'),
+      JSON.stringify({ role: 'user', content: 'how do I sort an array?', ts: Date.now() }) + '\n' +
+      JSON.stringify({ role: 'assistant', content: 'use Array.prototype.sort', ts: Date.now() }) + '\n');
+    const r = runCli(['sessions', 'export', 'demo'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('# Session: demo');
+    expect(r.stdout).toContain('## User');
+    expect(r.stdout).toContain('## Assistant');
+    expect(r.stdout).toContain('how do I sort an array?');
+    expect(r.stdout).toContain('use Array.prototype.sort');
+    expect(r.stdout).toContain('Turns: 2');
+  });
+
+  test('sessions export on empty session prints "(empty)" body', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'blank.jsonl'), '');
+    const r = runCli(['sessions', 'export', 'blank'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('# Session: blank');
+    expect(r.stdout).toContain('_(empty)_');
+  });
+
+  test('sessions export with no id exits 2 with usage', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['sessions', 'export'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/Usage: lazyclaw sessions export/);
+  });
+
   test('sessionPath rejects path-traversal ids', async () => {
     const sm = await import('../src/lazyclaw/sessions.mjs' as string);
     expect(() => sm.sessionPath('../etc/passwd', '/tmp/whatever')).toThrow();
