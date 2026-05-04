@@ -262,6 +262,54 @@ Loopback-only (no auth — assumes one local user). Endpoints:
 Built-in: `mock` (offline echo, used by tests), `anthropic` (Messages API
 + extended thinking), `openai` (Chat Completions, `[DONE]`-terminated SSE).
 
+### Programmatic API
+
+The provider interface is `AsyncIterable<string>`-shaped — call
+`prov.sendMessage(messages, opts)` and `for await` the text chunks.
+
+```js
+import { PROVIDERS } from './src/lazyclaw/providers/registry.mjs';
+
+const ac = new AbortController();
+setTimeout(() => ac.abort(), 30_000);   // hard 30s ceiling
+
+try {
+  for await (const chunk of PROVIDERS.anthropic.sendMessage(
+    [{ role: 'user', content: 'explain X' }],
+    {
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      model: 'claude-opus-4-7',
+      thinking: { enabled: true, budgetTokens: 5000 },
+      onThinking: t => process.stderr.write(t),
+      tools: [/* OpenAI-style or Anthropic-style tool defs */],
+      onToolUse: ({ id, name, input }) => runMyTool(id, name, input),
+      signal: ac.signal,
+    },
+  )) {
+    process.stdout.write(chunk);
+  }
+} catch (err) {
+  switch (err.code) {
+    case 'INVALID_KEY':  /* 401-equivalent */; break;
+    case 'RATE_LIMIT':   await sleep(err.retryAfterMs); /* retry */; break;
+    case 'ABORT':        /* user cancelled — ok */; break;
+    default:             throw err;
+  }
+}
+```
+
+`onThinking` and `onToolUse` are passthrough callbacks — the iterator
+keeps yielding only assistant *text*, so existing string-stream
+callers see no change. `tool_use` blocks reassemble from the streamed
+`input_json_delta` partials and surface only when complete; tool
+*execution* is the caller's responsibility (no shell/filesystem
+side-effects from this library).
+
+Error classes: `InvalidApiKeyError` (`code: 'INVALID_KEY'`),
+`RateLimitError` (`code: 'RATE_LIMIT'`, with `retryAfterMs`),
+`AbortError` (`code: 'ABORT'`), `ApiError` (other 4xx/5xx). All
+exported from each provider module.
+
 ---
 
 ## ✨ Features

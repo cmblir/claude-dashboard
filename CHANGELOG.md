@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.79.4] — 2026-05-05
+
+**Docs: README documents the programmatic provider API.**
+
+The CLI/daemon surface was already in the README; the underlying
+`prov.sendMessage(messages, opts)` interface was not. After 16+
+iterations of building it out (`opts.signal`, `opts.thinking`,
+`opts.onThinking`, `opts.tools`, `opts.toolChoice`, `opts.onToolUse`,
+`opts.fetch` test seam, plus the `INVALID_KEY` / `RATE_LIMIT` / `ABORT`
+error codes), the surface deserves a real example.
+
+New "Programmatic API" subsection under "🐚 LazyClaw CLI (standalone)".
+Single annotated `for await` block exercises the full opts shape and
+shows the catch-by-`err.code` dispatch readers should write. No code
+changes.
+
+---
 ## [2.79.3] — 2026-05-05
 
 **Daemon: provider-error → HTTP status mapping.**
