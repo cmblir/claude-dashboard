@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.86.1] — 2026-05-05
+
+**Chat slashes: `/provider` and `/model` for mid-chat switching.**
+
+The conversation history sticks; the next user message goes to the
+new provider/model with the existing context. No restart needed.
+
+### Behavior
+- `/provider <name>` — switch the active provider. Unknown name →
+  error in stdout, prior provider kept.
+- `/provider` (no arg) — print the current provider name.
+- `/model <name>` — update the active model.
+- `/model anthropic/claude-opus-4-7` — unified form switches both
+  provider and model in one shot.
+- `/model` (no arg) — print the current model.
+- `/status` now reflects the *active* (mutable) provider/model rather
+  than the on-disk config — accurate after any switch.
+
+### Why mid-chat switching matters
+Common workflow: start with a cheap fast model for ideation, switch
+to the heavyweight model once you've nailed down what you want.
+Previously you'd `/exit`, edit config, and `chat` again — losing the
+context. Now the conversation history rides with you.
+
+### Note
+The on-disk `config.json` is **not** updated by the slashes — switches
+are session-scoped. To persist, run `lazyclaw config set provider X`.
+
+### Tests
+4 new phase 6 specs:
+- `/provider <known>` switches; verified by triggering INVALID_KEY
+  on a switch to anthropic-without-key (proves mock no longer active)
+- `/provider` (bare) prints current name
+- `/provider <unknown>` errors and keeps prior provider (subsequent
+  message still gets a mock-reply)
+- `/model some-model` and `/model openai/gpt-4.1` — both update
+  active state, the second also flips provider — verified via
+  `/status` JSON snapshots before and after
+
+Suite: 161/161. tsc clean.
+
+---
 ## [2.86.0] — 2026-05-05
 
 **Chat slash: `/skill` for switching skills mid-conversation.**

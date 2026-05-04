@@ -216,6 +216,101 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     }
   });
 
+  test('chat /provider switches the active provider for subsequent turns', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+
+    const child = spawn(process.execPath, [CLI, 'chat'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stdin.write('hello\n');
+    await new Promise(r => setTimeout(r, 300));
+    // Switch to anthropic — has no key, so the next user message will
+    // trigger an INVALID_KEY error. That's the cheap way to prove the
+    // switch took effect (mock would happily reply otherwise).
+    child.stdin.write('/provider anthropic\n');
+    await new Promise(r => setTimeout(r, 100));
+    child.stdin.write('test after switch\n');
+    await new Promise(r => setTimeout(r, 400));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+    const out = chunks.join('');
+    expect(out).toContain('mock-reply: hello');         // first turn used mock
+    expect(out).toContain('provider → anthropic');      // switch acked
+    expect(out).toMatch(/missing api key|invalid|INVALID_KEY|error/i);  // anthropic without key
+  });
+
+  test('chat /provider with no args prints the current provider', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const child = spawn(process.execPath, [CLI, 'chat'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stdin.write('/provider\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+    expect(chunks.join('')).toContain('provider: mock');
+  });
+
+  test('chat /provider with unknown name keeps prior provider', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const child = spawn(process.execPath, [CLI, 'chat'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stdin.write('/provider nonexistent\n');
+    await new Promise(r => setTimeout(r, 100));
+    child.stdin.write('hello\n');
+    await new Promise(r => setTimeout(r, 400));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+    const out = chunks.join('');
+    expect(out).toContain('unknown provider: nonexistent');
+    expect(out).toContain('mock-reply: hello');  // mock provider still active
+  });
+
+  test('chat /model updates the active model and accepts unified provider/model', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const child = spawn(process.execPath, [CLI, 'chat'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stdin.write('/model some-model\n');
+    await new Promise(r => setTimeout(r, 100));
+    child.stdin.write('/status\n');
+    await new Promise(r => setTimeout(r, 100));
+    // Unified form switches both
+    child.stdin.write('/model openai/gpt-4.1\n');
+    await new Promise(r => setTimeout(r, 100));
+    child.stdin.write('/status\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+    const out = chunks.join('');
+    expect(out).toContain('model → some-model');
+    expect(out).toMatch(/"model":\s*"some-model"/);
+    expect(out).toContain('model → gpt-4.1');
+    expect(out).toContain('provider → openai');
+    expect(out).toMatch(/"provider":\s*"openai".*"model":\s*"gpt-4.1"/s);
+  });
+
   test('chat /skill switches the active system message and persists to session', async () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);
