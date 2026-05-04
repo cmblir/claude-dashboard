@@ -1678,6 +1678,81 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('costFromUsage: anthropic with cache fields produces a 4-bucket breakdown', async () => {
+    const { costFromUsage } = await import('../src/lazyclaw/providers/rates.mjs' as string);
+    const rates = {
+      'anthropic/claude-opus-4-7': {
+        inputPer1M: 15, outputPer1M: 75,
+        cacheReadPer1M: 1.5, cacheCreatePer1M: 18.75,
+        currency: 'USD',
+      },
+    };
+    const r = costFromUsage({
+      provider: 'anthropic',
+      model: 'claude-opus-4-7',
+      usage: {
+        inputTokens: 1000, outputTokens: 500,
+        cacheCreationInputTokens: 2000, cacheReadInputTokens: 4000,
+      },
+    }, rates);
+    // 1000/1M × 15 = 0.015
+    // 500/1M × 75 = 0.0375
+    // 4000/1M × 1.5 = 0.006
+    // 2000/1M × 18.75 = 0.0375
+    expect(r!.breakdown).toEqual({
+      input: 0.015,
+      output: 0.0375,
+      cacheRead: 0.006,
+      cacheCreate: 0.0375,
+    });
+    expect(r!.cost).toBe(0.096);
+    expect(r!.currency).toBe('USD');
+  });
+
+  test('costFromUsage: openai shape (no cache fields) ignores absent rate keys', async () => {
+    const { costFromUsage } = await import('../src/lazyclaw/providers/rates.mjs' as string);
+    const rates = { 'openai/gpt-4.1': { inputPer1M: 2, outputPer1M: 8 } };
+    const r = costFromUsage({
+      provider: 'openai',
+      model: 'gpt-4.1',
+      usage: { inputTokens: 1000, outputTokens: 500, totalTokens: 1500 },
+    }, rates);
+    expect(r!.breakdown.input).toBe(0.002);
+    expect(r!.breakdown.output).toBe(0.004);
+    expect(r!.breakdown.cacheRead).toBe(0);
+    expect(r!.breakdown.cacheCreate).toBe(0);
+    expect(r!.cost).toBe(0.006);
+    expect(r!.currency).toBe('USD');
+  });
+
+  test('costFromUsage: unknown provider/model returns null (don\'t silently bill at zero)', async () => {
+    const { costFromUsage } = await import('../src/lazyclaw/providers/rates.mjs' as string);
+    const rates = { 'openai/gpt-4.1': { inputPer1M: 2, outputPer1M: 8 } };
+    expect(costFromUsage({
+      provider: 'anthropic',
+      model: 'claude-opus-4-7',
+      usage: { inputTokens: 1000, outputTokens: 500 },
+    }, rates)).toBeNull();
+  });
+
+  test('costFromUsage: missing inputs return null rather than throwing', async () => {
+    const { costFromUsage } = await import('../src/lazyclaw/providers/rates.mjs' as string);
+    expect(costFromUsage(null as any, { x: { inputPer1M: 1, outputPer1M: 1 } })).toBeNull();
+    expect(costFromUsage({ provider: 'x', model: 'y', usage: {} } as any, null as any)).toBeNull();
+  });
+
+  test('RATE_CARD_SHAPE ships zero placeholders (no silent default prices)', async () => {
+    const mod = await import('../src/lazyclaw/providers/rates.mjs' as string);
+    const shape = mod.RATE_CARD_SHAPE;
+    expect(Object.keys(shape).length).toBeGreaterThan(0);
+    for (const [key, card] of Object.entries(shape)) {
+      // Every numeric rate field is exactly 0 — callers MUST fill in
+      // real numbers or get null back from costFromUsage.
+      expect((card as any).inputPer1M).toBe(0);
+      expect((card as any).outputPer1M).toBe(0);
+    }
+  });
+
   test('chat /usage with mock provider reports messageCount + charsSent only (no tokens block)', async () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);

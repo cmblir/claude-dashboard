@@ -10,6 +10,91 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.0.0] — 2026-05-05
+
+**`costFromUsage()` helper for token → currency conversion. v3 mark.**
+
+The 28-iteration cycle (v2.71.116 → v2.99.0) is closing out. v3.0.0
+caps the run with the missing piece that completes the cost-tracking
+story: a small helper that turns the normalized usage objects from
+2.97.0/2.97.1 into actual money.
+
+### `src/lazyclaw/providers/rates.mjs`
+```js
+import { costFromUsage } from './src/lazyclaw/providers/rates.mjs';
+
+const rates = {
+  'anthropic/claude-opus-4-7': {
+    inputPer1M: 15.00, outputPer1M: 75.00,
+    cacheReadPer1M: 1.50, cacheCreatePer1M: 18.75,
+    currency: 'USD',
+  },
+};
+
+const cost = costFromUsage(
+  { provider: 'anthropic', model: 'claude-opus-4-7', usage: capturedUsage },
+  rates,
+);
+// → { cost: 0.012345, currency: 'USD', breakdown: { input, output, cacheRead, cacheCreate } }
+```
+
+### Why no shipped rate card
+Hardcoding prices sets up the library to silently lie the moment
+provider pricing moves. Different teams negotiate different deals
+(volume contracts, regional pricing, provider-managed proxies).
+A single global default would be wrong for most users.
+
+So:
+- The library is **shape-only**: `costFromUsage(call, rates)` is pure
+  arithmetic.
+- `RATE_CARD_SHAPE` ships a zero-filled template with the right keys
+  for the 5 supported providers — copy-paste, fill in your current
+  prices, ship.
+- Unknown `provider/model` keys return `null` (not zero) so callers
+  can spot "we never registered a rate for this" and decide what to
+  do — billing at $0 by default is dishonest.
+
+### Six-decimal rounding
+Token rates land in fractions of a cent at sub-USD prices (10000
+tokens × $1/M = $0.01). We round to six decimals to (a) keep IEEE-754
+noise out of test assertions and (b) preserve 1/100¢ precision for
+batch-aggregation use cases.
+
+### Tests
+5 new phase 6 specs:
+- anthropic 4-bucket breakdown: input + output + cacheRead + cacheCreate
+  with exact rounded numbers
+- openai shape (no cache fields): cache rates absent → cache buckets
+  return 0, not undefined
+- unknown provider/model: returns `null` not `{cost: 0}` (anti-silent-zero)
+- bad inputs (`null`, missing rates): returns `null` rather than throwing
+- `RATE_CARD_SHAPE` audit: every numeric field is exactly 0 — guarantees
+  no shipped rate is "almost right" and easy to miss
+
+Suite: 233/233. tsc clean.
+
+### v3 closing note
+This Ralph run delivered roughly 28 versions across:
+- 5 concrete providers (mock, anthropic, openai, ollama, gemini)
+- 3 composable provider decorators (retry, fallback, cache) with
+  end-to-end ordering tests for their composition
+- 3 workflow execution modes (sequential / parallel / persistent DAG)
+- A daemon with three-layer security (Origin → auth → rate limit)
+  proven correct in pairwise composition
+- Structured logging, runtime metrics, full usage-token capture,
+  cost calculation, portable export/import bundles
+- Shell completion (bash + zsh), tab-friendly help, slash commands
+  for mid-conversation skill/provider/model switching
+- 233 tests, dashboard QA 0/66, all gates green
+
+Out of scope (per §1.1): multi-channel inbox (WhatsApp / Signal /
+iMessage / Telegram), voice / wake-word, mobile companion apps,
+Live Canvas A2UI, Docker/SSH/OpenShell sandbox backends, daemon
+graceful-shutdown timeout. These need real platform credentials,
+mobile builds, or daemon-installation steps that don't fit the
+autonomous-mode contract.
+
+---
 ## [2.99.0] — 2026-05-05
 
 **`config path` and `config edit` for shell-friendly config access.**
