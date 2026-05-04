@@ -50,6 +50,10 @@ test:  ## Run pytest unit tests (auto_resume coverage)
 	@which pytest >/dev/null 2>&1 || { echo "pytest not installed — pip install pytest"; exit 1; }
 	pytest tests/ -v
 
-test:  ## Run pytest unit tests (auto_resume coverage)
-	@which pytest >/dev/null 2>&1 || { echo "pytest not installed — pip install pytest"; exit 1; }
-	pytest tests/ -v
+bench-providers:  ## Throughput benchmark for the SSE parsers (anthropic + openai)
+	@echo "▶ anthropic"
+	@node scripts/bench-providers.mjs
+	@echo "▶ openai"
+	@PROVIDER=openai node scripts/bench-providers.mjs
+	@echo "▶ anthropic 50k tokens"
+	@N=50000 node scripts/bench-providers.mjs

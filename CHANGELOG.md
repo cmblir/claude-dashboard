@@ -10,6 +10,42 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.81.0] — 2026-05-05
+
+**Provider throughput benchmark (`make bench-providers`).**
+
+§9.2 of the engineering directives: don't optimize without measurement.
+This is the measurement. Future SSE-parser changes should re-run this
+and post the before/after numbers in their commit message rather than
+guessing.
+
+### `scripts/bench-providers.mjs`
+Feeds each provider a worst-case-shape stream — every token is its own
+`event: content_block_delta` (anthropic) or `data:` frame (openai), so
+maximum number of `\\n\\n` boundary searches and `JSON.parse` calls.
+Reports `tokensPerSec`, `mbPerSec`, `heapDeltaMB`.
+
+Configurable via env vars:
+- `N=50000` token count (default 20000)
+- `PROVIDER=openai` switches to OpenAI Chat Completions (default anthropic)
+
+### Baseline numbers (this machine, today)
+- anthropic, 20k tokens: **~790k tok/s**, ~80 MB/s, +5.8 MB heap
+- anthropic, 50k tokens: **~927k tok/s**, ~94 MB/s, +6.6 MB heap
+- openai,    20k tokens: **~750k tok/s**, ~33 MB/s, +2.6 MB heap
+
+Linear scaling between 20k and 50k tokens — no quadratic regression
+in the buffer slicing path. Bounded heap delta confirms the streaming
+`TextDecoder` and per-frame consumption don't accumulate.
+
+### `make bench-providers`
+Runs all three configurations sequentially with a banner per run.
+Output is JSON-per-run so it's easy to diff against a prior run.
+
+No production code changes. Suite still 92/92 (or whatever the head
+is after 2.80.2 — re-verify with `npx playwright test`).
+
+---
 ## [2.80.2] — 2026-05-05
 
 **Test coverage: `sessions export` CLI behavior.**
