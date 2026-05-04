@@ -13,8 +13,14 @@
 
 import http from 'node:http';
 import path from 'node:path';
+import fs from 'node:fs';
 
 import { PROVIDERS, PROVIDER_INFO, maskApiKey } from './providers/registry.mjs';
+
+async function fileExists(p) {
+  try { await fs.promises.access(p); return true; }
+  catch { return false; }
+}
 
 function readJson(req) {
   return new Promise((resolve, reject) => {
@@ -65,15 +71,16 @@ export function makeHandler(ctx) {
     try {
       const url = new URL(req.url || '/', 'http://localhost');
       const route = `${req.method} ${url.pathname}`;
-      switch (route) {
-        case 'GET /version':
+      const sessionMatch = url.pathname.match(/^\/sessions\/([^/]+)$/);
+      switch (true) {
+        case route === 'GET /version':
           return writeJson(res, 200, { version: ctx.version(), nodeVersion: process.version, platform: `${process.platform}-${process.arch}` });
-        case 'GET /providers':
+        case route === 'GET /providers':
           return writeJson(res, 200, Object.keys(PROVIDERS).map(name => {
             const meta = PROVIDER_INFO[name] || { name };
             return { name, requiresApiKey: !!meta.requiresApiKey, defaultModel: meta.defaultModel || null, suggestedModels: meta.suggestedModels || [] };
           }));
-        case 'GET /status': {
+        case route === 'GET /status': {
           const cfg = ctx.readConfig();
           return writeJson(res, 200, {
             provider: cfg.provider || null,
@@ -81,11 +88,102 @@ export function makeHandler(ctx) {
             keyMasked: maskApiKey(cfg['api-key']),
           });
         }
-        case 'GET /sessions': {
+        case route === 'GET /doctor': {
+          // Mirror the CLI doctor output — same field set so any tool that
+          // already knows how to read CLI doctor JSON can hit this endpoint.
+          const cfg = ctx.readConfig();
+          const issues = [];
+          if (!cfg.provider) issues.push('config.provider is missing');
+          if (cfg.provider && cfg.provider !== 'mock' && !cfg['api-key']) {
+            issues.push(`config['api-key'] is missing for provider "${cfg.provider}"`);
+          }
+          if (cfg.provider && !Object.prototype.hasOwnProperty.call(PROVIDERS, cfg.provider)) {
+            issues.push(`unknown provider "${cfg.provider}"`);
+          }
+          const ok = issues.length === 0;
+          return writeJson(res, ok ? 200 : 503, {
+            ok,
+            provider: cfg.provider || null,
+            model: cfg.model || null,
+            hasApiKey: !!cfg['api-key'],
+            nodeVersion: process.version,
+            platform: `${process.platform}-${process.arch}`,
+            issues,
+            knownProviders: Object.keys(PROVIDERS),
+            timestamp: new Date().toISOString(),
+          });
+        }
+        case route === 'GET /sessions': {
           const list = ctx.sessionsMod.listSessions(ctx.sessionsDirGetter());
           return writeJson(res, 200, list.map(s => ({ id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString() })));
         }
-        case 'POST /agent': {
+        case req.method === 'GET' && !!sessionMatch: {
+          // GET /sessions/<id> — full turn log. Returns 404 when missing
+          // rather than an empty array so the caller can distinguish
+          // "session does not exist" from "session is empty".
+          const id = sessionMatch[1];
+          try {
+            const cfgDir = ctx.sessionsDirGetter();
+            const file = ctx.sessionsMod.sessionPath(id, cfgDir);
+            if (!(await fileExists(file))) return writeJson(res, 404, { error: 'session not found', id });
+            const turns = ctx.sessionsMod.loadTurns(id, cfgDir);
+            return writeJson(res, 200, { id, turns });
+          } catch (err) {
+            return writeJson(res, 400, { error: err?.message || String(err) });
+          }
+        }
+        case req.method === 'DELETE' && !!sessionMatch: {
+          // DELETE /sessions/<id> — idempotent. 200 on both "deleted" and
+          // "didn't exist" so callers can use it as a reset without checking
+          // first.
+          const id = sessionMatch[1];
+          try {
+            ctx.sessionsMod.clearSession(id, ctx.sessionsDirGetter());
+            return writeJson(res, 200, { ok: true, id });
+          } catch (err) {
+            return writeJson(res, 400, { error: err?.message || String(err) });
+          }
+        }
+        case route === 'POST /chat': {
+          // Full message-array input, single response (or stream). Useful when
+          // the caller already has a message history and doesn't want to use
+          // the disk-persisted session model.
+          const body = await readJson(req);
+          const cfg = ctx.readConfig();
+          const provName = body.provider || cfg.provider || 'mock';
+          const prov = PROVIDERS[provName];
+          if (!prov) return writeJson(res, 400, { error: `unknown provider: ${provName}` });
+          const messages = Array.isArray(body.messages) ? body.messages.filter(m => m && typeof m.role === 'string' && typeof m.content === 'string') : null;
+          if (!messages || messages.length === 0) return writeJson(res, 400, { error: 'messages array required' });
+          const thinkingBudget = Number(body.thinkingBudget) || 0;
+          const sendOpts = {
+            apiKey: cfg['api-key'],
+            model: body.model || cfg.model,
+            thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
+          };
+          if (body.stream === true) {
+            writeSseHead(res);
+            try {
+              for await (const chunk of prov.sendMessage(messages, sendOpts)) {
+                writeSse(res, 'token', { text: chunk });
+                await new Promise(r => setImmediate(r));
+              }
+              writeSse(res, 'done', { ok: true });
+              return res.end();
+            } catch (err) {
+              writeSse(res, 'error', { message: err?.message || String(err) });
+              return res.end();
+            }
+          }
+          let acc = '';
+          try {
+            for await (const chunk of prov.sendMessage(messages, sendOpts)) acc += chunk;
+            return writeJson(res, 200, { reply: acc });
+          } catch (err) {
+            return writeJson(res, 502, { error: err?.message || String(err), code: err?.code || null });
+          }
+        }
+        case route === 'POST /agent': {
           const body = await readJson(req);
           const cfg = ctx.readConfig();
           const provName = body.provider || cfg.provider || 'mock';
@@ -142,7 +240,7 @@ export function makeHandler(ctx) {
         }
         default:
           return writeJson(res, 404, { error: 'not found', route });
-      }
+      } /* eslint-disable-line no-fallthrough */
     } catch (err) {
       return writeJson(res, 500, { error: err?.message || String(err) });
     }

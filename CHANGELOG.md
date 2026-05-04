@@ -10,6 +10,29 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.76.1] — 2026-05-05
+
+**Daemon: more endpoints — `GET /doctor`, `POST /chat`, `GET/DELETE /sessions/<id>`.**
+
+Daemon was MVP'd in 2.76.0 with version/providers/status/sessions/agent.
+This fills in the remaining surface so a remote tool can run a complete
+LazyClaw workflow without ever shelling out to the CLI.
+
+- `GET /doctor` — mirrors `lazyclaw doctor`. Returns 503 when the
+  diagnostic finds issues so health-check probes can short-circuit
+  on a single status code; otherwise 200 with the same JSON shape.
+- `POST /chat` — body `{messages: [{role, content}, ...], provider?, model?, stream?, thinkingBudget?}`.
+  Useful when the caller already has a message history and isn't using
+  the disk-persisted session model. `stream:true` returns the same
+  SSE shape as `POST /agent`.
+- `GET /sessions/<id>` — `{id, turns}`. Returns 404 when the file is
+  missing so the caller can distinguish "doesn't exist" from "empty".
+- `DELETE /sessions/<id>` — idempotent. Always 200 on missing or
+  present, so callers can use it as a reset without checking first.
+
+5 new phase 6 specs (11 daemon specs total). Suite 64/64. tsc clean.
+
+---
 ## [2.76.0] — 2026-05-05
 
 **LazyClaw: local HTTP daemon (`lazyclaw daemon`).**

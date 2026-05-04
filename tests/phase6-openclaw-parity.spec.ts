@@ -312,6 +312,92 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /doctor mirrors CLI doctor and 503s when config invalid', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/doctor`);
+      // No config → ok=false → 503
+      expect(r.status).toBe(503);
+      const j = await r.json();
+      expect(j.ok).toBe(false);
+      expect(j.issues.length).toBeGreaterThan(0);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /doctor returns 200 once config is valid', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/doctor`);
+      expect(r.status).toBe(200);
+      const j = await r.json();
+      expect(j.ok).toBe(true);
+      expect(j.knownProviders).toEqual(expect.arrayContaining(['mock']));
+    } finally { await d.kill(); }
+  });
+
+  test('daemon POST /chat takes a full message array and returns the reply', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/chat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ messages: [
+          { role: 'user', content: 'first' },
+          { role: 'assistant', content: 'first reply' },
+          { role: 'user', content: 'follow up' },
+        ]}),
+      });
+      expect(r.status).toBe(200);
+      const j = await r.json();
+      expect(j.reply).toContain('mock-reply: follow up');
+    } finally { await d.kill(); }
+  });
+
+  test('daemon POST /chat 400 when messages is missing or empty', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r1 = await fetch(`${d.url}/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) });
+      expect(r1.status).toBe(400);
+      const r2 = await fetch(`${d.url}/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: [] }) });
+      expect(r2.status).toBe(400);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /sessions/<id> returns turns; DELETE clears the file', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'apple.jsonl'),
+      JSON.stringify({ role: 'user', content: 'hi', ts: 1 }) + '\n' +
+      JSON.stringify({ role: 'assistant', content: 'hello', ts: 2 }) + '\n');
+    const d = await startDaemonProc(dir);
+    try {
+      const get = await fetch(`${d.url}/sessions/apple`);
+      expect(get.status).toBe(200);
+      const got = await get.json();
+      expect(got.id).toBe('apple');
+      expect(got.turns.length).toBe(2);
+
+      const del = await fetch(`${d.url}/sessions/apple`, { method: 'DELETE' });
+      expect(del.status).toBe(200);
+      expect(fs.existsSync(path.join(dir, 'sessions', 'apple.jsonl'))).toBe(false);
+
+      // Idempotent: deleting again still 200s.
+      const del2 = await fetch(`${d.url}/sessions/apple`, { method: 'DELETE' });
+      expect(del2.status).toBe(200);
+
+      // GET on a missing session is 404 (distinct from "session is empty").
+      const getMissing = await fetch(`${d.url}/sessions/apple`);
+      expect(getMissing.status).toBe(404);
+    } finally { await d.kill(); }
+  });
+
   test('daemon POST /agent with no prompt returns 400', async () => {
     const dir = tmpConfigDir();
     const d = await startDaemonProc(dir);
