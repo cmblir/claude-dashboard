@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.80.1] — 2026-05-05
+
+**`lazyclaw sessions export <id>` — print a session as Markdown.**
+
+`sessions.exportMarkdown(id)` already shipped in 2.80.0 (the user/linter
+added the helper) but the CLI binding for `sessions export <id>` was
+not wired through, so the only way to call it was from JS. Wires the
+case into the `sessions` subcommand.
+
+```bash
+lazyclaw sessions export feat-x > feat-x.md
+```
+
+Errors (missing id, invalid id) follow the same pattern as the rest of
+the `sessions` subcommand (exit 2 for usage, exit 1 for runtime).
+
+---
 ## [2.80.0] — 2026-05-05
 
 **LazyClaw: Ollama provider for local-model parity.**

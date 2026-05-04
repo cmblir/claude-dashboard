@@ -488,8 +488,15 @@ async function cmdSessions(sub, positional) {
       console.log(JSON.stringify({ ok: true, cleared: id }));
       return;
     }
+    case 'export': {
+      const id = positional[0];
+      if (!id) { console.error('Usage: lazyclaw sessions export <id>'); process.exit(2); }
+      try { process.stdout.write(sessionsMod.exportMarkdown(id, cfgDir)); }
+      catch (e) { console.error(e.message); process.exit(1); }
+      return;
+    }
     default:
-      console.error('Usage: lazyclaw sessions <list|show <id>|clear <id>>');
+      console.error('Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>>');
       process.exit(2);
   }
 }
