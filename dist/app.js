@@ -23476,27 +23476,54 @@ window._armApplyAdvice = async (payloadJson) => {
 };
 
 window._armOpenAddDialog = async () => {
-  // Pull live CLI sessions so the user can pick one rather than guess UUIDs.
-  let live = [];
-  try {
-    const r = await api('/api/sessions-monitor/list').catch(() => null);
-    live = (r && r.sessions) || [];
-  } catch (_) {}
-  const liveOptions = live.length
-    ? live.map(s => `<option value="${escapeHtml(s.sessionId || s.session_id || '')}">${escapeHtml((s.sessionId || s.session_id || '').slice(0, 8))} · ${escapeHtml(s.cwd || '')}</option>`).join('')
-    : '';
+  // Pull both live CLI sessions and indexed (historical) sessions so the
+  // user can always pick one — even when no Claude CLI is currently running.
+  const [liveR, idxR] = await Promise.all([
+    api('/api/sessions-monitor/list').catch(() => null),
+    api('/api/sessions/list?limit=200&sort=recent').catch(() => null),
+  ]);
+  const live = (liveR && liveR.sessions) || [];
+  const indexed = (idxR && idxR.sessions) || [];
+  const liveIds = new Set(live.map(s => s.sessionId || s.session_id).filter(Boolean));
+  const norm = [
+    ...live.map(s => ({
+      sessionId: s.sessionId || s.session_id || '',
+      cwd: s.cwd || '',
+      project: s.cwd ? s.cwd.split('/').pop() : '',
+      kind: 'live',
+    })),
+    ...indexed
+      .filter(s => s.session_id && !liveIds.has(s.session_id))
+      .map(s => ({
+        sessionId: s.session_id,
+        cwd: s.cwd || s.projectPath || '',
+        project: s.project || '',
+        kind: 'indexed',
+      })),
+  ].filter(s => s.sessionId);
+  window.__armSessions = norm;
+  const liveOpts = norm.filter(s => s.kind === 'live').map((s, i) => {
+    const idx = norm.indexOf(s);
+    return `<option value="${idx}">${escapeHtml(s.sessionId.slice(0, 8))} · ${escapeHtml(s.cwd || s.project || '')}</option>`;
+  }).join('');
+  const idxOpts = norm.filter(s => s.kind === 'indexed').map(s => {
+    const idx = norm.indexOf(s);
+    return `<option value="${idx}">${escapeHtml(s.sessionId.slice(0, 8))} · ${escapeHtml(s.project || s.cwd || '')}</option>`;
+  }).join('');
+  const hasAny = norm.length > 0;
   showModal(`
     <div class="text-sm font-semibold mb-2">+ ${t('새 Auto-Resume 바인딩')}</div>
     <div class="text-[11px] mb-3" style="color:var(--text-dim)">
       ${t('대상 Claude 세션을 골라서 Auto-Resume 워커를 붙입니다. 토큰/레이트 한도 발생 시 자동으로 claude --resume 으로 재시도합니다.')}
     </div>
-    ${live.length ? `
-      <label class="text-[11px] block mb-1">${t('실행 중인 세션 선택')}</label>
-      <select id="armSidPick" class="input w-full mb-3" onchange="document.getElementById('armSid').value=this.value;document.getElementById('armCwd').value=(${JSON.stringify(live)}.find(s=>(s.sessionId||s.session_id)===this.value)||{}).cwd||''">
+    ${hasAny ? `
+      <label class="text-[11px] block mb-1">${t('세션 선택')}</label>
+      <select id="armSidPick" class="input w-full mb-3" onchange="_armPickSession(this.value)">
         <option value="">— ${t('직접 입력')} —</option>
-        ${liveOptions}
+        ${liveOpts ? `<optgroup label="${t('실행 중')}">${liveOpts}</optgroup>` : ''}
+        ${idxOpts ? `<optgroup label="${t('최근 세션')}">${idxOpts}</optgroup>` : ''}
       </select>
-    ` : `<div class="text-[11px] mb-3" style="color:var(--text-dim)">${t('실행 중인 Claude CLI 세션이 감지되지 않습니다. session UUID 와 cwd 를 직접 입력하세요.')}</div>`}
+    ` : `<div class="text-[11px] mb-3" style="color:var(--text-dim)">${t('알려진 Claude 세션이 없습니다. session UUID 와 cwd 를 직접 입력하세요.')}</div>`}
     <label class="text-[11px] block mb-1">${t('Session UUID')}</label>
     <input id="armSid" class="input w-full mb-2 mono" placeholder="abc12345-..."
       oninput="(()=>{const r=_armRecallCwd(this.value);if(r&&!document.getElementById('armCwd').value)document.getElementById('armCwd').value=r;})()">
@@ -23533,6 +23560,20 @@ window._armOpenAddDialog = async () => {
       <button class="btn text-xs" onclick="_armSubmitAddDialog()">${t('바인딩 추가')}</button>
     </div>
   `, { title: '' });
+};
+
+window._armPickSession = (idx) => {
+  const arr = window.__armSessions || [];
+  const s = arr[parseInt(idx, 10)];
+  const sidEl = document.getElementById('armSid');
+  const cwdEl = document.getElementById('armCwd');
+  if (!s) {
+    if (sidEl) sidEl.value = '';
+    if (cwdEl) cwdEl.value = '';
+    return;
+  }
+  if (sidEl) sidEl.value = s.sessionId || '';
+  if (cwdEl) cwdEl.value = s.cwd || _armRecallCwd(s.sessionId) || '';
 };
 
 // K3 (v2.63.0) — per-UUID-prefix cwd memory so repeat-binders don't retype.
