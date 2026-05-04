@@ -10,6 +10,42 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.86.0] — 2026-05-05
+
+**Chat slash: `/skill` for switching skills mid-conversation.**
+
+`chat --skill review,style` set the system prompt at start; once the
+chat was running there was no way to change it without restarting.
+`/skill` fixes that.
+
+### Behavior
+- `/skill review,style` — replace the active system message with a
+  composition of the named skills. If a system message already exists
+  it's overwritten; never stacked.
+- `/skill` (no args) — drop the active system message entirely.
+- Persistence: when `--session <id>` is set, the JSONL file is
+  rewritten so the dropped/overwritten system turn doesn't linger as
+  a stale entry.
+- Unknown skill name → `skill error: skill not found: <name>` and
+  prior state preserved (no partial damage).
+
+### Why rewrite the JSONL on `/skill`
+The session log is append-only. To overwrite the system prompt without
+introducing a "system replaces system" semantic in the storage format,
+we truncate and re-append the in-memory message array. This keeps the
+storage primitive simple — every line is a turn, no special cases for
+mutating prior turns.
+
+### Tests
+3 new phase 6 specs:
+- `/skill a` then `/skill b` leaves exactly one system message (the
+  most recent) — verified by reading the JSONL after `/exit`
+- `/skill` (no arg) drops the system message — verified the same way
+- unknown skill name → error in stdout, prior state preserved
+
+Suite: 157/157. tsc clean.
+
+---
 ## [2.85.1] — 2026-05-05
 
 **Daemon: `GET /skills` + `GET /skills/<name>` for HTTP skill discovery.**

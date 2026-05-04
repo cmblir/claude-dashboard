@@ -167,6 +167,7 @@ const SLASH_COMMANDS = [
   { cmd: '/new',    help: 'clear conversation and start over' },
   { cmd: '/reset',  help: 'alias for /new' },
   { cmd: '/usage',  help: 'show message count + chars sent so far' },
+  { cmd: '/skill',  help: 'switch active skills: /skill review,style (no arg → clear)' },
   { cmd: '/exit',   help: 'leave the chat' },
 ];
 
@@ -512,6 +513,51 @@ async function cmdChat(flags = {}) {
       }
       case '/usage': {
         process.stdout.write(JSON.stringify({ messageCount: messages.length, charsSent }) + '\n');
+        return true;
+      }
+      case '/skill': {
+        // `/skill name1,name2` — replace the active system message with a
+        // composition of the named skills. `/skill` (no arg) clears the
+        // system message. The replacement happens in-place on the
+        // messages array; the prior system turn (if any) is dropped so
+        // we don't end up with two stacked system messages talking past
+        // each other. When --session is set we persist the new system
+        // message so the next invocation resumes with the same context.
+        const arg = line.slice('/skill'.length).trim();
+        const names = arg.split(',').map(s => s.trim()).filter(Boolean);
+        const sysIdx = messages.findIndex(m => m.role === 'system');
+        if (names.length === 0) {
+          if (sysIdx >= 0) messages.splice(sysIdx, 1);
+          if (sessionId) {
+            // Persistent session: rewrite the file from scratch so the
+            // dropped system turn doesn't linger as a stale entry.
+            const sm = await import('./sessions.mjs');
+            sm.resetSession(sessionId, cfgDir);
+            for (const m of messages) sm.appendTurn(sessionId, m.role, m.content, cfgDir);
+          }
+          process.stdout.write('cleared system prompt (no active skills)\n');
+          return true;
+        }
+        try {
+          const sys = await (async () => {
+            const mod = await import('./skills.mjs');
+            return mod.composeSystemPrompt(names, cfgDir);
+          })();
+          if (!sys) {
+            process.stdout.write('no skill content composed (empty input?)\n');
+            return true;
+          }
+          if (sysIdx >= 0) messages[sysIdx] = { role: 'system', content: sys };
+          else messages.unshift({ role: 'system', content: sys });
+          if (sessionId) {
+            const sm = await import('./sessions.mjs');
+            sm.resetSession(sessionId, cfgDir);
+            for (const m of messages) sm.appendTurn(sessionId, m.role, m.content, cfgDir);
+          }
+          process.stdout.write(`active skills: ${names.join(', ')}\n`);
+        } catch (e) {
+          process.stdout.write(`skill error: ${e?.message || e}\n`);
+        }
         return true;
       }
       case '/exit': {
