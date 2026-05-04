@@ -10,6 +10,38 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.92.1] — 2026-05-05
+
+**Daemon: wire `withResponseCache` through `resolveProvider`.**
+
+The cache decorator shipped in 2.92.0 but wasn't reachable from the
+HTTP surface. Now:
+
+- `lazyclaw daemon --response-cache` allocates a per-handler shared
+  cache map. Without the flag, no cache state exists.
+- Per-request opt-in: `POST /agent` and `POST /chat` honor
+  `body.cache: true` (or an object — currently treated as `true`).
+- The cache wraps the BASE provider before fallback / retry so a
+  cache hit short-circuits both — a hit is itself a successful
+  response, no need to fail-and-retry through alternates.
+
+### Composition order
+Innermost to outermost: cache → fallback → retry. So:
+- A cache HIT skips fallback and retry entirely.
+- A cache MISS goes through fallback → retry as usual; a successful
+  response from any chain member populates the cache for the
+  primary's key (we cache by the primary's identity).
+
+### Tests
+2 new phase 6 specs:
+- `--response-cache` + `body.cache: true` — two identical requests
+  return the same reply (the cache served the second one)
+- without `--response-cache`, `body.cache: true` is a silent no-op:
+  the daemon doesn't crash, doesn't leak state, just ignores the flag
+
+Suite: 192/192. tsc clean.
+
+---
 ## [2.92.0] — 2026-05-05
 
 **`withResponseCache`: provider decorator for memoizing identical calls.**

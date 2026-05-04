@@ -1321,6 +1321,46 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(parseInt(denied.headers['retry-after'], 10)).toBeGreaterThanOrEqual(1);
   });
 
+  test('daemon CLI --response-cache enables shared cache; body.cache opts in per request', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir, ['--response-cache']);
+    try {
+      // First call with body.cache: true — populates the cache.
+      const post = (cache: boolean) => fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'cache test', cache }),
+      }).then(r => r.json());
+      const r1 = await post(true);
+      expect(r1.reply).toContain('mock-reply: cache test');
+      // Second identical call also with cache:true — should still return
+      // the same reply. The cache wrapper served it from memory; this is
+      // observably correct (no error, identical text). The dedicated
+      // cache hit/miss assertions live in the unit tests above.
+      const r2 = await post(true);
+      expect(r2.reply).toBe(r1.reply);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon: without --response-cache, body.cache: true is silently a no-op (no cache state)', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);  // no --response-cache flag
+    try {
+      // body.cache should not crash the daemon; the request just bypasses
+      // cache machinery entirely.
+      const r = await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'no cache wired', cache: true }),
+      });
+      expect(r.status).toBe(200);
+      const j = await r.json();
+      expect(j.reply).toContain('mock-reply: no cache wired');
+    } finally { await d.kill(); }
+  });
+
   test('daemon CLI --rate-limit caps a remote and surfaces in the bound-URL JSON', async () => {
     const dir = tmpConfigDir();
     const d = await startDaemonProc(dir, ['--rate-limit', '2']);

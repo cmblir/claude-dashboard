@@ -18,24 +18,46 @@ import fs from 'node:fs';
 import { PROVIDERS, PROVIDER_INFO, maskApiKey } from './providers/registry.mjs';
 import { withRateLimitRetry } from './providers/retry.mjs';
 import { withFallback } from './providers/fallback.mjs';
+import { withResponseCache } from './providers/cache.mjs';
 import { composeSystemPrompt, listSkills, loadSkill, skillPath, installSkill, removeSkill } from './skills.mjs';
 import { TokenBucketLimiter } from './ratelimit.mjs';
 
-// Resolve the provider for a request. Composes two opt-in wrappers:
-//   - body.fallback: array of provider names to chain after the primary.
-//     Pre-yield recoverable errors fall through; mid-stream errors bubble.
-//   - body.retry: { attempts?, maxBackoffMs? } — applied AFTER fallback so
-//     each retry covers the full chain (retry exhausts → 429 to client).
+// Resolve the provider for a request. Composes opt-in wrappers in this
+// order (innermost first):
+//   1. cache  — wraps the base provider so cache hits never trigger
+//               fallback or retry (a hit is a successful response).
+//   2. fallback — chain of alternates; pre-yield recoverable errors fall
+//                 through; mid-stream errors bubble.
+//   3. retry  — outermost so each retry covers the full chain (retry
+//               exhausts → 429 to client).
+// `cachedByName` is a per-handler Map shared across requests so the
+// cache state actually persists between calls. Without that the cache
+// would be empty on every request.
+//
 // Returns { provider } on success or { error } when the primary or any
 // listed fallback name is unknown.
-function resolveProvider(body, providerName) {
+function resolveProvider(body, providerName, cachedByName) {
   if (!PROVIDERS[providerName]) return { error: `unknown provider: ${providerName}` };
-  let prov = PROVIDERS[providerName];
+  const wrapWithCache = (name) => {
+    if (!cachedByName) return PROVIDERS[name];
+    if (!cachedByName.has(name)) {
+      cachedByName.set(name, withResponseCache(PROVIDERS[name], {
+        maxEntries: cachedByName._opts?.maxEntries,
+        ttlMs: cachedByName._opts?.ttlMs,
+      }));
+    }
+    return cachedByName.get(name);
+  };
+  // Cache only when the request explicitly opts in. The handler-level
+  // Map is shared so two requests with body.cache=true to the same base
+  // provider hit the same cache.
+  const useCache = !!body?.cache;
+  let prov = useCache ? wrapWithCache(providerName) : PROVIDERS[providerName];
   if (Array.isArray(body?.fallback) && body.fallback.length > 0) {
     const chain = [prov];
     for (const name of body.fallback) {
       if (!PROVIDERS[name]) return { error: `unknown fallback provider: ${name}` };
-      chain.push(PROVIDERS[name]);
+      chain.push(useCache ? wrapWithCache(name) : PROVIDERS[name]);
     }
     prov = withFallback(chain);
   }
@@ -183,6 +205,7 @@ function isOriginAllowed(req, allowedOrigins) {
  *   authToken?: string,
  *   allowedOrigins?: string[],
  *   rateLimit?: { capacity?: number, refillPerSec?: number } | null,
+ *   responseCache?: { maxEntries?: number, ttlMs?: number } | true | null,
  * }} ctx
  */
 export function makeHandler(ctx) {
@@ -196,6 +219,11 @@ export function makeHandler(ctx) {
         refillPerSec: ctx.rateLimit.refillPerSec,
       })
     : null;
+  // Per-handler cache map — populated lazily as requests opt in via
+  // body.cache. Shared across requests so the second identical call
+  // actually hits. We attach the configured opts so the lazy init
+  // gets the right TTL/maxEntries.
+  const cachedByName = ctx.responseCache ? Object.assign(new Map(), { _opts: ctx.responseCache === true ? {} : ctx.responseCache }) : null;
   return async function handler(req, res) {
     try {
       // Origin gate runs *before* auth so a browser-originated request
@@ -386,7 +414,7 @@ export function makeHandler(ctx) {
           const body = await readJson(req);
           const cfg = ctx.readConfig();
           const provName = body.provider || cfg.provider || 'mock';
-          const resolved = resolveProvider(body, provName);
+          const resolved = resolveProvider(body, provName, cachedByName);
           if (resolved.error) return writeJson(res, 400, { error: resolved.error });
           const prov = resolved.provider;
           const messages = Array.isArray(body.messages) ? body.messages.filter(m => m && typeof m.role === 'string' && typeof m.content === 'string') : null;
@@ -428,7 +456,7 @@ export function makeHandler(ctx) {
           const body = await readJson(req);
           const cfg = ctx.readConfig();
           const provName = body.provider || cfg.provider || 'mock';
-          const resolved = resolveProvider(body, provName);
+          const resolved = resolveProvider(body, provName, cachedByName);
           if (resolved.error) return writeJson(res, 400, { error: resolved.error });
           const prov = resolved.provider;
           const prompt = String(body.prompt ?? '').trim();
@@ -532,6 +560,7 @@ export function makeHandler(ctx) {
  *   authToken?: string,
  *   allowedOrigins?: string[],
  *   rateLimit?: { capacity?: number, refillPerSec?: number } | null,
+ *   responseCache?: { maxEntries?: number, ttlMs?: number } | true | null,
  * }} opts
  * @returns {Promise<{ port: number, server: http.Server, close: () => Promise<void> }>}
  */

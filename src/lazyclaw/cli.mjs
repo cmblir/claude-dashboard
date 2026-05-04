@@ -456,7 +456,7 @@ const HELP_DETAILS = {
   sessions: 'Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>>\n  list — recent sessions by mtime; export — render as Markdown for sharing.',
   skills: 'Usage: lazyclaw skills <list|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>>\n  --from-url fetches over HTTPS only; 1 MiB body cap.',
   providers: 'Usage: lazyclaw providers <list|info <name>>\n  Static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.',
-  daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s (token-bucket; smooths bursts).',
+  daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.',
   version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
   export: 'Usage: lazyclaw export [--include-secrets] [--include-sessions] > bundle.json\n  --include-secrets keeps the raw api-key in the bundle (default redacts it).\n  --include-sessions adds full turn content (default keeps metadata only).',
@@ -829,6 +829,10 @@ async function cmdDaemon(flags) {
   const rateLimit = (Number.isFinite(rlCap) && rlCap > 0)
     ? { capacity: rlCap, refillPerSec: rlCap / 60 }
     : null;
+  // --response-cache flips the daemon-scope cache on (no value form ⇒ true).
+  // Per-request opt-in still happens via body.cache; this just allocates
+  // the shared map so the cache state actually persists.
+  const responseCache = flags['response-cache'] ? true : null;
   const cfgDir = path.dirname(configPath());
   const d = await startDaemon({
     port: Number.isFinite(port) ? port : 0,
@@ -840,6 +844,7 @@ async function cmdDaemon(flags) {
     authToken: authToken || undefined,
     allowedOrigins,
     rateLimit,
+    responseCache,
   });
   // Print the bound port immediately so test/script callers can pick it up
   // even when we asked for port 0. Indicate auth presence (not the token)
@@ -850,6 +855,7 @@ async function cmdDaemon(flags) {
     auth: !!authToken,
     allowedOriginCount: allowedOrigins.length,
     rateLimit: rateLimit ? { capacity: rateLimit.capacity, refillPerSec: rateLimit.refillPerSec } : null,
+    responseCache: !!responseCache,
   }) + '\n');
   if (!once) {
     // Forward SIGINT/SIGTERM to a clean shutdown.
@@ -1043,6 +1049,7 @@ const BOOLEAN_FLAGS = new Set([
   'no-overwrite-config',
   'import-sessions',
   'show-thinking',
+  'response-cache',
   'help',         // also handled as a subcommand alias
   'version',
 ]);
