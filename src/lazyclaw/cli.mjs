@@ -10,7 +10,9 @@ async function loadEngine() {
 }
 
 function configPath() {
-  return path.join(os.homedir(), '.lazyclaw', 'config.json');
+  const override = process.env.LAZYCLAW_CONFIG_DIR;
+  const dir = override ? override : path.join(os.homedir(), '.lazyclaw');
+  return path.join(dir, 'config.json');
 }
 
 function readConfig() {
@@ -66,6 +68,34 @@ function cmdConfigSet(key, value) {
   console.log(JSON.stringify({ ok: true, key, value }));
 }
 
+async function cmdChat() {
+  const cfg = readConfig();
+  const provName = cfg.provider || 'mock';
+  const { PROVIDERS } = await import('./providers/registry.mjs');
+  const prov = PROVIDERS[provName];
+  if (!prov) { console.error(`unknown provider: ${provName}`); process.exit(2); }
+
+  const readline = await import('node:readline');
+  const rl = readline.createInterface({ input: process.stdin, terminal: false });
+  const messages = [];
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    if (line.trim() === '/exit') break;
+    messages.push({ role: 'user', content: line });
+    let acc = '';
+    try {
+      for await (const chunk of prov.sendMessage(messages, { apiKey: cfg['api-key'], model: cfg.model })) {
+        process.stdout.write(chunk);
+        acc += chunk;
+      }
+      process.stdout.write('\n');
+      messages.push({ role: 'assistant', content: acc });
+    } catch (err) {
+      process.stdout.write(`error: ${err?.message || String(err)}\n`);
+    }
+  }
+}
+
 function cmdConfigGet(key) {
   const cfg = readConfig();
   if (key) console.log(JSON.stringify({ key, value: cfg[key] ?? null }));
@@ -115,10 +145,7 @@ async function main() {
       break;
     }
     case 'chat': {
-      // Phase 4 surface — interactive chat. Implemented in phase 3+4.
-      const { startChatRepl } = await import('./chat/repl.js')
-        .catch(async () => import('./chat/repl.mjs'));
-      await startChatRepl();
+      await cmdChat();
       break;
     }
     default:
