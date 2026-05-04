@@ -9,6 +9,7 @@
 
 import { anthropicProvider } from './anthropic.mjs';
 import { openaiProvider } from './openai.mjs';
+import { ollamaProvider } from './ollama.mjs';
 
 /**
  * @typedef {{ role: 'user'|'assistant'|'system', content: string }} ChatMessage
@@ -37,12 +38,13 @@ export const mockProvider = {
   },
 };
 
-export { anthropicProvider, openaiProvider };
+export { anthropicProvider, openaiProvider, ollamaProvider };
 
 export const PROVIDERS = {
   mock: mockProvider,
   anthropic: anthropicProvider,
   openai: openaiProvider,
+  ollama: ollamaProvider,
 };
 
 // Static metadata for `lazyclaw providers list/info`. Kept next to PROVIDERS
@@ -72,6 +74,14 @@ export const PROVIDER_INFO = {
     endpoint: 'https://api.openai.com/v1/chat/completions',
     defaultModel: 'gpt-4.1',
     suggestedModels: ['gpt-4.1', 'gpt-4o', 'gpt-4o-mini'],
+  },
+  ollama: {
+    name: 'ollama',
+    requiresApiKey: false,
+    docs: 'Local Ollama daemon. Streams newline-delimited JSON from /api/chat. No auth — defaults to 127.0.0.1:11434, override via OLLAMA_HOST or opts.baseUrl.',
+    endpoint: 'http://127.0.0.1:11434/api/chat',
+    defaultModel: 'llama3.1',
+    suggestedModels: ['llama3.1', 'llama3.2', 'mistral', 'qwen2.5-coder'],
   },
 };
 

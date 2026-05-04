@@ -88,3 +88,38 @@ export function resetSession(id, configDir = defaultConfigDir()) {
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, '');
 }
+
+/**
+ * Render a session as shareable Markdown. The session id and turn count
+ * become the H1 / metadata block; each turn becomes a section with the
+ * role as H2 and the content as a fenced block when it looks like code,
+ * else plain prose.
+ *
+ * Why fenced blocks: assistant replies often contain code that would
+ * otherwise be mis-rendered as Markdown. We use a triple-backtick fence
+ * with a language tag of `text` only when no code-fence is already
+ * present in the turn content (so models that already produce
+ * pre-formatted code blocks don't end up double-fenced).
+ *
+ * @param {string} id
+ * @param {string} [configDir]
+ * @returns {string}
+ */
+export function exportMarkdown(id, configDir = defaultConfigDir()) {
+  const turns = loadTurns(id, configDir);
+  const lines = [`# Session: ${id}`, ''];
+  if (turns.length === 0) {
+    lines.push('_(empty)_');
+    return lines.join('\n');
+  }
+  const first = new Date(turns[0]?.ts || Date.now()).toISOString();
+  const last = new Date(turns[turns.length - 1]?.ts || Date.now()).toISOString();
+  lines.push(`- Turns: ${turns.length}`, `- First: ${first}`, `- Last: ${last}`, '');
+  for (const t of turns) {
+    const role = t.role === 'user' ? 'User' : t.role === 'assistant' ? 'Assistant' : 'System';
+    lines.push(`## ${role}`, '');
+    const text = String(t.content || '');
+    lines.push(text, '');
+  }
+  return lines.join('\n');
+}

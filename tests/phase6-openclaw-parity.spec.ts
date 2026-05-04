@@ -528,6 +528,82 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(caught?.retryAfterMs).toBeLessThan(8000);
   });
 
+  test('ollama provider streams newline-delimited JSON chunks and stops on done:true', async () => {
+    const mod = await import('../src/lazyclaw/providers/ollama.mjs' as string);
+    const ndjson =
+      '{"message":{"role":"assistant","content":"Hello"},"done":false}\n' +
+      '{"message":{"role":"assistant","content":" world"},"done":false}\n' +
+      '{"done":true,"prompt_eval_count":4,"eval_count":2}\n';
+    let url = '';
+    let sentBody: any = null;
+    const fakeFetch = async (u: string, init: any) => {
+      url = u;
+      sentBody = JSON.parse(init.body);
+      return {
+        ok: true, status: 200,
+        body: new ReadableStream({
+          start(c) { c.enqueue(new TextEncoder().encode(ndjson)); c.close(); },
+        }),
+      };
+    };
+    const out: string[] = [];
+    for await (const chunk of mod.ollamaProvider.sendMessage(
+      [{ role: 'user', content: 'hi' }],
+      { model: 'llama3.1', fetch: fakeFetch as any },
+    )) out.push(chunk);
+    expect(out.join('')).toBe('Hello world');
+    expect(url).toBe('http://127.0.0.1:11434/api/chat');
+    expect(sentBody.stream).toBe(true);
+    expect(sentBody.model).toBe('llama3.1');
+  });
+
+  test('ollama provider honors opts.baseUrl override', async () => {
+    const mod = await import('../src/lazyclaw/providers/ollama.mjs' as string);
+    let url = '';
+    const fakeFetch = async (u: string) => {
+      url = u;
+      return {
+        ok: true, status: 200,
+        body: new ReadableStream({
+          start(c) { c.enqueue(new TextEncoder().encode('{"message":{"content":"x"},"done":true}\n')); c.close(); },
+        }),
+      };
+    };
+    for await (const _c of mod.ollamaProvider.sendMessage(
+      [{ role: 'user', content: 'hi' }],
+      { fetch: fakeFetch as any, baseUrl: 'http://10.0.0.5:9999/' },
+    )) { /* drain */ }
+    expect(url).toBe('http://10.0.0.5:9999/api/chat');
+  });
+
+  test('ollama provider surfaces ECONNREFUSED as ConnectionError code CONNECTION_REFUSED', async () => {
+    const mod = await import('../src/lazyclaw/providers/ollama.mjs' as string);
+    const fakeFetch = async () => {
+      const e: any = new Error('fetch failed');
+      e.cause = { code: 'ECONNREFUSED' };
+      throw e;
+    };
+    let caught: any = null;
+    try {
+      for await (const _c of mod.ollamaProvider.sendMessage(
+        [{ role: 'user', content: 'hi' }],
+        { fetch: fakeFetch as any },
+      )) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('CONNECTION_REFUSED');
+    expect(String(caught?.message)).toMatch(/cannot reach/);
+  });
+
+  test('ollama provider in registry — providers list includes it with requiresApiKey:false', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['providers', 'list'], dir);
+    const out = JSON.parse(r.stdout);
+    const ollama = out.find((p: any) => p.name === 'ollama');
+    expect(ollama).toBeTruthy();
+    expect(ollama.requiresApiKey).toBe(false);
+    expect(ollama.suggestedModels).toEqual(expect.arrayContaining(['llama3.1']));
+  });
+
   test('openai provider passes through tools and surfaces assembled tool_calls via onToolUse', async () => {
     const mod = await import('../src/lazyclaw/providers/openai.mjs' as string);
     const calls: any[] = [];
@@ -877,6 +953,36 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r.status).toBe(0);
     const out = JSON.parse(r.stdout);
     expect(out.map((s: any) => s.id)).toEqual(['newer', 'older']);
+  });
+
+  test('sessions export renders the conversation as shareable Markdown', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    const t1 = Date.now() - 60_000;
+    const t2 = Date.now();
+    fs.writeFileSync(path.join(dir, 'sessions', 'demo.jsonl'),
+      JSON.stringify({ role: 'user', content: 'hi there', ts: t1 }) + '\n' +
+      JSON.stringify({ role: 'assistant', content: 'hello!\n\n```js\nconsole.log(1);\n```', ts: t2 }) + '\n');
+    const r = runCli(['sessions', 'export', 'demo'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/^# Session: demo/);
+    expect(r.stdout).toContain('## User');
+    expect(r.stdout).toContain('hi there');
+    expect(r.stdout).toContain('## Assistant');
+    expect(r.stdout).toContain('hello!');
+    expect(r.stdout).toContain('console.log(1);');
+    // Metadata block — turns count + first/last timestamps
+    expect(r.stdout).toMatch(/Turns: 2/);
+  });
+
+  test('sessions export on empty session prints a placeholder', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'empty.jsonl'), '');
+    const r = runCli(['sessions', 'export', 'empty'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/Session: empty/);
+    expect(r.stdout).toContain('_(empty)_');
   });
 
   test('sessions clear removes the file', () => {

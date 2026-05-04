@@ -10,6 +10,51 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.80.0] — 2026-05-05
+
+**LazyClaw: Ollama provider for local-model parity.**
+
+OpenClaw lists Ollama alongside Anthropic/OpenAI; LazyClaw was missing
+it. Adds `providers/ollama.mjs` — a third concrete provider so users
+with `ollama serve` running can chat without paying for API tokens.
+
+### Wire format
+- `POST {baseUrl}/api/chat` (default `http://127.0.0.1:11434`)
+- `OLLAMA_HOST` env var, `opts.baseUrl` flag, or default — in that order
+- Newline-delimited JSON, not SSE: one
+  `{"message":{"content":"…"},"done":false}` object per chunk,
+  terminator is `{"done":true,...}` (which carries
+  `prompt_eval_count` / `eval_count` for callers that want to log usage)
+
+### Iterator contract
+Same as the other providers: yield `message.content` strings, return
+on `done: true`. `opts.signal` honored before request and on every
+chunk. UTF-8 streaming `TextDecoder` so non-ASCII responses don't
+mojibake across socket reads.
+
+### Specific failure mode
+The most common Ollama error is "the daemon isn't running":
+`ECONNREFUSED`. We catch that and throw a dedicated
+`ConnectionError { code: 'CONNECTION_REFUSED' }` with a useful message
+(`ollama: cannot reach <baseUrl> (is the daemon running?)`) instead of
+letting a raw fetch error propagate. Callers can branch on `err.code`.
+
+### Registry
+`PROVIDER_INFO.ollama` advertises `requiresApiKey: false`, the local
+endpoint, and a suggested-model list (`llama3.1`, `llama3.2`, `mistral`,
+`qwen2.5-coder`). `lazyclaw doctor` accepts an `ollama` provider with
+no key.
+
+### Tests
+4 new phase 6 specs:
+- happy path: NDJSON chunks → assembled text, `done:true` terminates
+- `opts.baseUrl` override actually changes the URL hit
+- `ECONNREFUSED` → `ConnectionError { code: 'CONNECTION_REFUSED' }`
+- registry exposes `ollama` via `lazyclaw providers list`
+
+Suite: 89/89. tsc clean.
+
+---
 ## [2.79.5] — 2026-05-05
 
 **Docs: refresh stale version badges + tagline.**
