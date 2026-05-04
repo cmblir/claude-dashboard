@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.79.5] — 2026-05-05
+
+**Docs: refresh stale version badges + tagline.**
+
+The version badge in `README.md` and `README.ko.md` was stuck at
+`v2.36.3`; `README.zh.md` was at `v2.33.2`. The "Latest line is v2.55"
+tagline was 24 versions behind. Bumped all three to `v2.79.4` and
+rewrote the tagline to reflect the LazyClaw CLI parity arc that
+landed across this cycle (anthropic + openai streaming, extended
+thinking, tool-use passthrough, persistent sessions, skills, daemon,
+AbortSignal, error classes).
+
+Docs only.
+
+---
 ## [2.79.4] — 2026-05-05
 
 **Docs: README documents the programmatic provider API.**

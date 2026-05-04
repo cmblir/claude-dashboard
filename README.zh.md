@@ -12,7 +12,7 @@ _别死记 50+ CLI 命令，点一下就行。_
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.33.2-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.79.4-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-架构)
 
 </div>

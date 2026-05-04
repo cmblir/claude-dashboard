@@ -12,7 +12,7 @@ _Don't memorize 50+ CLI commands. Just click._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.36.3-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.79.4-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-architecture)
 
 </div>
@@ -24,8 +24,10 @@ LazyClaude is a **local-first command center** that manages your entire `~/.clau
 <sub>Inspired by `lazygit` / `lazydocker` — but for your Claude stack.</sub>
 
 **Recent versions** — see [CHANGELOG.md](./CHANGELOG.md) for the full per-release log.
-Latest line is **v2.55** — channel orchestrator (Slack/Telegram), terminal TUI, agent bus,
-and the cycle-3 optimization wave (HTTPS keep-alive, plan LRU, reply debouncer, topic index).
+Latest line is **v2.79** — LazyClaw CLI parity arc: real Anthropic + OpenAI streaming
+(extended thinking, tool-use passthrough), persistent chat sessions, markdown skills,
+local HTTP daemon (`lazyclaw daemon`), `AbortSignal` end-to-end, and dedicated error
+classes (`INVALID_KEY` / `RATE_LIMIT` / `ABORT`).
 
 
 ## 🎬 What it looks like
