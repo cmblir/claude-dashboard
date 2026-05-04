@@ -77,3 +77,125 @@ export async function runSequential(nodes, initialInput = null) {
   }
   return { success: true, results, session };
 }
+
+/**
+ * Compute topological levels (Kahn's algorithm). Returns an array of
+ * level groups; nodes within a group have no dependencies on each
+ * other and can run concurrently. Cycles produce an empty trailing
+ * remainder, which the caller turns into an error.
+ *
+ * @param {Array<{id: string, deps?: string[]}>} nodes
+ * @returns {{ levels: string[][], leftover: string[] }}
+ */
+export function topologicalLevels(nodes) {
+  const idToNode = new Map(nodes.map(n => [n.id, n]));
+  const indegree = new Map();
+  const reverse = new Map(); // id → [dependents]
+  for (const n of nodes) {
+    indegree.set(n.id, 0);
+    reverse.set(n.id, []);
+  }
+  for (const n of nodes) {
+    for (const d of n.deps || []) {
+      // Unknown dep — treated as a satisfied edge (don't lock the node out).
+      // Caller can validate up front if they want strict mode.
+      if (!idToNode.has(d)) continue;
+      indegree.set(n.id, (indegree.get(n.id) || 0) + 1);
+      reverse.get(d).push(n.id);
+    }
+  }
+  const levels = [];
+  let frontier = nodes.filter(n => (indegree.get(n.id) || 0) === 0).map(n => n.id);
+  const visited = new Set();
+  while (frontier.length) {
+    levels.push(frontier);
+    for (const id of frontier) visited.add(id);
+    const next = [];
+    for (const id of frontier) {
+      for (const dep of reverse.get(id) || []) {
+        const left = (indegree.get(dep) || 0) - 1;
+        indegree.set(dep, left);
+        if (left === 0) next.push(dep);
+      }
+    }
+    frontier = next;
+  }
+  const leftover = nodes.map(n => n.id).filter(id => !visited.has(id));
+  return { levels, leftover };
+}
+
+/**
+ * Run a DAG of nodes by topological level — within a level, every node
+ * runs concurrently via `Promise.all`. Each node receives a map of its
+ * declared deps' outputs as input (`{ depId: depOutput }`), so a fan-in
+ * node can see all its inputs at once.
+ *
+ * On any failure: stop scheduling further levels, run cleanup on every
+ * node that started (in any level), clear the session, return failure.
+ * Cleanups run via `Promise.allSettled` so a flaky cleanup can't mask
+ * the original error.
+ *
+ * @param {Array<{
+ *   id: string,
+ *   type: string,
+ *   deps?: string[],
+ *   execute: (input: Record<string, unknown> | unknown) => Promise<unknown>,
+ *   cleanup?: (() => (Promise<void>|void)),
+ * }>} nodes
+ * @param {{ initialInput?: unknown }} [opts]
+ * @returns {Promise<RunResult>}
+ */
+export async function runParallel(nodes, opts = {}) {
+  const session = {};
+  const started = [];
+  const results = [];
+  const idToNode = new Map(nodes.map(n => [n.id, n]));
+  const { levels, leftover } = topologicalLevels(nodes);
+  if (leftover.length > 0) {
+    const error = new Error(`workflow has a cycle or unreachable nodes: ${leftover.join(', ')}`);
+    return { success: false, results, error, failedAt: leftover[0], session };
+  }
+  for (const level of levels) {
+    // Build the input record for each node in the level: each node sees
+    // a `{ depId: depOutput }` map, or `initialInput` when it has no deps.
+    const settled = await Promise.allSettled(level.map(async (id) => {
+      const node = idToNode.get(id);
+      started.push(node);
+      const deps = node.deps || [];
+      const input = deps.length === 0
+        ? (opts.initialInput ?? null)
+        : Object.fromEntries(deps.map(d => [d, session[d]]));
+      const t0 = performance.now();
+      try {
+        const output = await node.execute(input);
+        const duration = performance.now() - t0;
+        return { ok: true, record: { id, duration, output, status: /** @type {'success'} */('success') } };
+      } catch (err) {
+        const duration = performance.now() - t0;
+        return { ok: false, record: { id, duration, output: undefined, status: /** @type {'failed'} */('failed') }, err };
+      }
+    }));
+    let firstFailure = null;
+    for (const s of settled) {
+      // Promise.allSettled never rejects; the inner async function caught.
+      const v = s.status === 'fulfilled' ? s.value : { ok: false, record: { id: 'unknown', duration: 0, output: undefined, status: 'failed' }, err: s.reason };
+      results.push(v.record);
+      if (v.ok) {
+        session[v.record.id] = v.record.output;
+      } else if (!firstFailure) {
+        firstFailure = v;
+      }
+    }
+    if (firstFailure) {
+      const error = firstFailure.err instanceof Error ? firstFailure.err : new Error(String(firstFailure.err));
+      await Promise.allSettled(started.map(n => {
+        if (typeof n.cleanup !== 'function') return null;
+        try { return Promise.resolve(n.cleanup()); }
+        catch { return Promise.resolve(); }
+      }));
+      for (const k of Object.keys(session)) delete session[k];
+      return { success: false, results, error, failedAt: firstFailure.record.id, session };
+    }
+  }
+  return { success: true, results, session };
+}

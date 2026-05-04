@@ -10,6 +10,65 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.89.0] — 2026-05-05
+
+**Workflow: `runParallel` for DAG-with-deps execution (n8n-style).**
+
+Until now the executor was strictly sequential. New `runParallel`
+takes nodes that declare `deps: string[]` and runs each topological
+level concurrently — a fan-out / fan-in graph completes in the time
+of its longest path, not the sum of all nodes.
+
+### API
+```js
+import { runParallel } from './src/lazyclaw/workflow/executor.mjs';
+
+const r = await runParallel([
+  { id: 'fetch',   deps: [],            async execute() { return await loadCsv(); } },
+  { id: 'classify',deps: ['fetch'],     async execute(input) { /* input = {fetch: rows} */ } },
+  { id: 'embed',   deps: ['fetch'],     async execute(input) { /* same input shape */ } },
+  { id: 'merge',   deps: ['classify','embed'], async execute(input) {
+      // input = { classify: ..., embed: ... }
+  } },
+]);
+```
+
+A fan-in node sees `{ depId: depOutput }` so it can branch on every
+predecessor's result without rebuilding the lookup itself.
+
+### Topological grouping
+`topologicalLevels(nodes)` is exported separately for callers who
+just want the schedule (e.g., to render a workflow visualization).
+Returns `{ levels, leftover }` — a non-empty `leftover` indicates a
+cycle or unreachable nodes.
+
+### Failure semantics
+- One node failing in level N stops scheduling level N+1.
+- Cleanup runs on every node that *started* (any prior level), via
+  `Promise.allSettled` — same isolation as `runSequential`.
+- Session is cleared, `failedAt` reports the first failure within
+  the failing level (deterministic but `Promise.all` order, not
+  declaration order).
+
+### Cycle detection
+Built into Kahn's algorithm: any node never enters the frontier when
+a cycle traps it. `runParallel` refuses to run the graph and returns
+`{success: false, error: 'workflow has a cycle or unreachable nodes: ...'}`.
+
+### Tests
+6 new phase 1 specs:
+- `topologicalLevels` produces `[[a], [b,c], [d]]` for a diamond
+- `topologicalLevels` reports `leftover` for a cycle
+- `runParallel`: 3 independent 100 ms nodes finish in <220 ms wall
+  (sequential floor is 300+)
+- `runParallel`: fan-in receives `{a: 'fromA', b: 'fromB'}`
+- `runParallel`: failure in level 0 stops level 1; cleanup ran for
+  every started node, none for the never-scheduled ones
+- `runParallel`: cycle detected, refuses to run, error mentions cycle
+
+Suite: 178/178. tsc clean.
+
+---
 ## [2.88.1] — 2026-05-05
 
 **Chat: Ctrl+C aborts the current turn instead of killing the process.**
