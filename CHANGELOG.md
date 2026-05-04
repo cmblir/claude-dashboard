@@ -10,6 +10,57 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.91.0] — 2026-05-05
+
+**Daemon: per-IP rate limit (token-bucket, opt-in).**
+
+Defense-in-depth alongside the auth-token gate (2.82.1) and Origin
+allowlist (2.83.0). When the daemon is exposed beyond loopback —
+or when an authenticated client misbehaves — a token-bucket cap
+keeps any single remote from monopolizing the host.
+
+### CLI
+- `lazyclaw daemon --rate-limit 60` → 60 requests / 60 s sustained,
+  burst-tolerant via the bucket
+- Default off (no flag → unlimited, the historical loopback default)
+- Bound-URL JSON includes `rateLimit: {capacity, refillPerSec}` so
+  test/script callers can see the active policy without inspecting
+  the daemon process
+
+### Why token bucket and not fixed-window
+A fixed window of N requests/minute allows a 2N burst at the boundary
+(last second of window K + first second of window K+1). Token-bucket
+math (refill on access + deduct one) smooths bursts without that edge.
+Two arithmetic ops per request, no per-request log entries to truncate.
+
+### Ordering
+Origin → auth → rate limit. The bucket runs *after* auth so the
+budget is per authenticated identity rather than per IP-pretending-
+to-be-someone-else; an unauthenticated request never costs a token.
+Forbidden Origins also never cost a token — short-circuited at the
+front gate.
+
+### Memory bound
+Stale buckets are evicted on access (a bucket abandoned past its
+refill-to-capacity time would have refilled to capacity anyway). No
+background sweep needed. Per-key state is `{tokens, last}` — 16
+bytes plus the key.
+
+### Tests
+4 new phase 6 specs:
+- token bucket: capacity exhaustion → `allowed:false` with
+  `retryAfterMs > 0`; advance time → bucket refills; verified with
+  injectable `now()` so the test runs offline
+- separate keys have independent buckets (alice exhausted, bob still OK)
+- daemon `makeHandler` with `rateLimit` returns 429 + `Retry-After`
+  header after capacity exhaustion (handler-level test, no real
+  network)
+- CLI `--rate-limit 2` integration: third request 429s, header set,
+  bound-URL JSON exposes the policy
+
+Suite: 184/184. tsc clean.
+
+---
 ## [2.90.0] — 2026-05-05
 
 **`lazyclaw run --parallel` exposes `runParallel` in the CLI; parser

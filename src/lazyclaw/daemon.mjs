@@ -19,6 +19,7 @@ import { PROVIDERS, PROVIDER_INFO, maskApiKey } from './providers/registry.mjs';
 import { withRateLimitRetry } from './providers/retry.mjs';
 import { withFallback } from './providers/fallback.mjs';
 import { composeSystemPrompt, listSkills, loadSkill, skillPath, installSkill, removeSkill } from './skills.mjs';
+import { TokenBucketLimiter } from './ratelimit.mjs';
 
 // Resolve the provider for a request. Composes two opt-in wrappers:
 //   - body.fallback: array of provider names to chain after the primary.
@@ -181,11 +182,20 @@ function isOriginAllowed(req, allowedOrigins) {
  *   version: () => string,
  *   authToken?: string,
  *   allowedOrigins?: string[],
+ *   rateLimit?: { capacity?: number, refillPerSec?: number } | null,
  * }} ctx
  */
 export function makeHandler(ctx) {
   const authToken = ctx.authToken || null;
   const allowedOrigins = Array.isArray(ctx.allowedOrigins) ? ctx.allowedOrigins : [];
+  // Rate limiter is opt-in; passing nothing → unlimited (the historical
+  // single-user-loopback default). When enabled, scope is per remote IP.
+  const limiter = ctx.rateLimit
+    ? new TokenBucketLimiter({
+        capacity: ctx.rateLimit.capacity,
+        refillPerSec: ctx.rateLimit.refillPerSec,
+      })
+    : null;
   return async function handler(req, res) {
     try {
       // Origin gate runs *before* auth so a browser-originated request
@@ -202,6 +212,23 @@ export function makeHandler(ctx) {
         return writeJson(res, 401, { error: 'unauthorized' }, {
           'www-authenticate': 'Bearer realm="lazyclaw"',
         });
+      }
+      // Rate limit gate — *after* auth so the budget is per authenticated
+      // identity rather than per IP-pretending-to-be-someone-else. Authed
+      // means the remote actually proved they have the shared secret.
+      if (limiter) {
+        // The remote-IP key falls back to a fixed string for tests that
+        // drive the handler directly without a socket. socket.remoteAddress
+        // is "127.0.0.1" for loopback; that's fine for our scope.
+        const key = req.socket?.remoteAddress || 'no-socket';
+        const verdict = limiter.consume(key);
+        if (!verdict.allowed) {
+          const retrySeconds = Math.max(1, Math.ceil(verdict.retryAfterMs / 1000));
+          return writeJson(res, 429, {
+            error: 'rate limit exceeded',
+            retryAfterMs: verdict.retryAfterMs,
+          }, { 'retry-after': String(retrySeconds) });
+        }
       }
       const url = new URL(req.url || '/', 'http://localhost');
       const route = `${req.method} ${url.pathname}`;
@@ -504,6 +531,7 @@ export function makeHandler(ctx) {
  *   version: () => string,
  *   authToken?: string,
  *   allowedOrigins?: string[],
+ *   rateLimit?: { capacity?: number, refillPerSec?: number } | null,
  * }} opts
  * @returns {Promise<{ port: number, server: http.Server, close: () => Promise<void> }>}
  */

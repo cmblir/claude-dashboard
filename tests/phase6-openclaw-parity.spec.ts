@@ -1157,6 +1157,79 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('rate limiter: token bucket allows up to capacity then 429s', async () => {
+    const mod = await import('../src/lazyclaw/ratelimit.mjs' as string);
+    let now = 0;
+    const lim = new mod.TokenBucketLimiter({
+      capacity: 3,
+      refillPerSec: 1,
+      now: () => now,
+    });
+    expect(lim.consume('k').allowed).toBe(true);    // 3 → 2
+    expect(lim.consume('k').allowed).toBe(true);    // 2 → 1
+    expect(lim.consume('k').allowed).toBe(true);    // 1 → 0
+    const denied = lim.consume('k');
+    expect(denied.allowed).toBe(false);
+    expect(denied.retryAfterMs).toBeGreaterThan(0);
+    // Advance 1.1s — one token should have refilled, allowing 1 more.
+    now += 1100;
+    expect(lim.consume('k').allowed).toBe(true);
+    expect(lim.consume('k').allowed).toBe(false);
+  });
+
+  test('rate limiter: separate keys have independent buckets', async () => {
+    const mod = await import('../src/lazyclaw/ratelimit.mjs' as string);
+    const lim = new mod.TokenBucketLimiter({ capacity: 1, refillPerSec: 1, now: () => 0 });
+    expect(lim.consume('alice').allowed).toBe(true);
+    expect(lim.consume('alice').allowed).toBe(false);
+    // Bob has his own bucket.
+    expect(lim.consume('bob').allowed).toBe(true);
+  });
+
+  test('daemon makeHandler with rateLimit: requests over capacity get 429 + Retry-After', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    // Tiny capacity so we can exhaust it inside the test.
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      rateLimit: { capacity: 2, refillPerSec: 0.001 },  // glacial refill
+    });
+    const drive = async () => {
+      let status = 0;
+      let headers: Record<string, string> = {};
+      const req: any = { method: 'GET', url: '/version', headers: {}, socket: { remoteAddress: '127.0.0.1' } };
+      const res: any = {
+        writeHead(s: number, h: any) { status = s; if (h) Object.assign(headers, h); },
+        end() {},
+      };
+      await handler(req, res);
+      return { status, headers };
+    };
+    expect((await drive()).status).toBe(200);
+    expect((await drive()).status).toBe(200);
+    const denied = await drive();
+    expect(denied.status).toBe(429);
+    expect(denied.headers['retry-after']).toBeDefined();
+    expect(parseInt(denied.headers['retry-after'], 10)).toBeGreaterThanOrEqual(1);
+  });
+
+  test('daemon CLI --rate-limit caps a remote and surfaces in the bound-URL JSON', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir, ['--rate-limit', '2']);
+    try {
+      // First two requests OK.
+      expect((await fetch(`${d.url}/version`)).status).toBe(200);
+      expect((await fetch(`${d.url}/version`)).status).toBe(200);
+      // Third should 429 (token bucket cap of 2, glacial 2/60s refill).
+      const denied = await fetch(`${d.url}/version`);
+      expect(denied.status).toBe(429);
+      expect(denied.headers.get('retry-after')).toBeDefined();
+    } finally { await d.kill(); }
+  });
+
   test('daemon CLI --auth-token reports auth=true and rejects unauthenticated requests', async () => {
     const dir = tmpConfigDir();
     const d = await startDaemonProc(dir, ['--auth-token', 'integration-secret']);

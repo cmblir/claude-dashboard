@@ -456,7 +456,7 @@ const HELP_DETAILS = {
   sessions: 'Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>>\n  list — recent sessions by mtime; export — render as Markdown for sharing.',
   skills: 'Usage: lazyclaw skills <list|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>>\n  --from-url fetches over HTTPS only; 1 MiB body cap.',
   providers: 'Usage: lazyclaw providers <list|info <name>>\n  Static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.',
-  daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.',
+  daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s (token-bucket; smooths bursts).',
   version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
   export: 'Usage: lazyclaw export [--include-secrets] [--include-sessions] > bundle.json\n  --include-secrets keeps the raw api-key in the bundle (default redacts it).\n  --include-sessions adds full turn content (default keeps metadata only).',
@@ -821,6 +821,14 @@ async function cmdDaemon(flags) {
   // they're unaffected.
   const originSrc = flags['allow-origin'] || process.env.LAZYCLAW_ALLOW_ORIGINS || '';
   const allowedOrigins = String(originSrc).split(',').map(s => s.trim()).filter(Boolean);
+  // --rate-limit <capacity> sets a token-bucket cap per remote IP.
+  // refillPerSec defaults to capacity/60 so the bucket sustains the
+  // same long-run rate (a bucket of 60 / 1 per second == 60 req/min).
+  // Pass 0 (or omit) to leave the daemon unlimited.
+  const rlCap = flags['rate-limit'] ? parseInt(flags['rate-limit'], 10) : 0;
+  const rateLimit = (Number.isFinite(rlCap) && rlCap > 0)
+    ? { capacity: rlCap, refillPerSec: rlCap / 60 }
+    : null;
   const cfgDir = path.dirname(configPath());
   const d = await startDaemon({
     port: Number.isFinite(port) ? port : 0,
@@ -831,6 +839,7 @@ async function cmdDaemon(flags) {
     version: () => readVersionFromRepo(),
     authToken: authToken || undefined,
     allowedOrigins,
+    rateLimit,
   });
   // Print the bound port immediately so test/script callers can pick it up
   // even when we asked for port 0. Indicate auth presence (not the token)
@@ -840,6 +849,7 @@ async function cmdDaemon(flags) {
     ok: true, url: `http://127.0.0.1:${d.port}`, port: d.port, once,
     auth: !!authToken,
     allowedOriginCount: allowedOrigins.length,
+    rateLimit: rateLimit ? { capacity: rateLimit.capacity, refillPerSec: rateLimit.refillPerSec } : null,
   }) + '\n');
   if (!once) {
     // Forward SIGINT/SIGTERM to a clean shutdown.
