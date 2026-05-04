@@ -16,6 +16,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 import { PROVIDERS, PROVIDER_INFO, maskApiKey } from './providers/registry.mjs';
+import { composeSystemPrompt } from './skills.mjs';
 
 async function fileExists(p) {
   try { await fs.promises.access(p); return true; }
@@ -198,6 +199,21 @@ export function makeHandler(ctx) {
           const sid = body.sessionId || null;
           const cfgDir = ctx.sessionsDirGetter();
           let messages = sid ? ctx.sessionsMod.loadTurns(sid, cfgDir).map(t => ({ role: t.role, content: t.content })) : [];
+          // Skill composition: body.skills can be a comma-separated string
+          // ("a,b") or an array (["a","b"]). Compose only when no system
+          // message already exists in the message array (so re-runs of
+          // the same session don't double-prepend).
+          const skillNames = Array.isArray(body.skills)
+            ? body.skills
+            : (typeof body.skills === 'string' ? body.skills.split(',').map(s => s.trim()).filter(Boolean) : []);
+          if (skillNames.length > 0 && !messages.some(m => m.role === 'system')) {
+            try {
+              const sys = composeSystemPrompt(skillNames, cfgDir);
+              if (sys) messages.unshift({ role: 'system', content: sys });
+            } catch (err) {
+              return writeJson(res, 400, { error: `skill error: ${err?.message || String(err)}` });
+            }
+          }
           messages.push({ role: 'user', content: prompt });
           if (sid) ctx.sessionsMod.appendTurn(sid, 'user', prompt, cfgDir);
 

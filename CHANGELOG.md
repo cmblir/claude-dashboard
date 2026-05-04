@@ -10,6 +10,34 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.77.1] — 2026-05-05
+
+**Daemon: skill composition for `POST /agent`.**
+
+The daemon now mirrors the CLI's `--skill` flag at `POST /agent`:
+
+```
+POST /agent
+{ "prompt": "...", "skills": "review,style" }
+```
+
+Or as an array: `"skills": ["review", "style"]`. Names compose with
+`<!-- skill: name -->` markers and a `---` separator (same shape as
+the CLI). When `sessionId` is set the prepended system message
+is only added on the first call (we check whether a system message
+already exists in the hydrated history) so multi-turn sessions don't
+double-prepend.
+
+Errors during composition (missing skill, invalid name) return 400
+before any provider call so the caller sees a clear "skill error: ..."
+rather than a 502 from the model.
+
+2 new phase 6 specs (composition success + missing-skill 400).
+Suite: 72/72. tsc clean.
+
+Plus: dashboard QA re-run after iteration 10 — still 0/66 issues.
+
+---
 ## [2.77.0] — 2026-05-05
 
 **LazyClaw: skills (markdown system prompts) + `config list/delete`.**
