@@ -10,6 +10,36 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.95.1] — 2026-05-05
+
+**`lazyclaw run --parallel-persistent` exposes `runPersistentDag`.**
+
+The engine landed in 2.95.0; now the CLI flag wires it up. Three
+explicit modes:
+
+| Flag | Engine | Resumable | Concurrent |
+|---|---|---|---|
+| (none) | `runPersistent` | yes | no — sequential |
+| `--parallel` | `runParallel` | no — in-memory | yes — by topo level |
+| `--parallel-persistent` | `runPersistentDag` | yes | yes — by topo level |
+
+State files live at `<--dir>/<session-id>.json` for both resumable
+modes; running `lazyclaw resume <id> <wf>` continues from the last
+checkpoint regardless of which mode wrote it.
+
+### Tests
+2 new phase 6 specs:
+- `--parallel-persistent` runs a 4-node diamond, exits 0, JSON output
+  has `mode: 'parallel-persistent'`, state file landed at the
+  configured `--dir`, `merge.output` reflects fan-in inputs
+- end-to-end resume: workflow file flips behavior on a sentinel-file
+  attempt counter — first invocation fails at b (exit 1), second
+  invocation skips a, retries b (succeeds), runs c. `executedNodes` on
+  the second call is `['b', 'c']`.
+
+Suite: 208/208. tsc clean.
+
+---
 ## [2.95.0] — 2026-05-05
 
 **Workflow: `runPersistentDag` — DAG with checkpoint-and-resume.**

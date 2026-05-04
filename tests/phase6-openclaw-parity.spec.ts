@@ -197,6 +197,62 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(elapsed).toBeLessThan(500);
   });
 
+  test('lazyclaw run --parallel-persistent runs a DAG with state persistence', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'pdag.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a',     deps: [],         async execute() { return 'A'; } },
+         { id: 'b',     deps: ['a'],      async execute(input) { return 'B:' + input.a; } },
+         { id: 'c',     deps: ['a'],      async execute(input) { return 'C:' + input.a; } },
+         { id: 'merge', deps: ['b','c'],  async execute(input) { return Object.values(input).join('+'); } },
+       ];`,
+    );
+    const stateDir = path.join(dir, 'wfstate');
+    const r = runCli(['run', 'pdag-test', wfPath, '--parallel-persistent', '--dir', stateDir], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.mode).toBe('parallel-persistent');
+    expect(out.success).toBe(true);
+    expect(out.executedNodes.sort()).toEqual(['a', 'b', 'c', 'merge']);
+    // State file landed at the requested location.
+    const stateFile = path.join(stateDir, 'pdag-test.json');
+    expect(fs.existsSync(stateFile)).toBe(true);
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    expect(state.nodes.merge.output).toBe('B:A+C:A');
+  });
+
+  test('lazyclaw run --parallel-persistent resumes after a flaky failure', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'flaky.mjs');
+    // Sentinel-file approach so the second invocation can flip behavior.
+    const sentinel = path.join(dir, 'attempt');
+    fs.writeFileSync(wfPath,
+      `import fs from 'node:fs';
+       export const nodes = [
+         { id: 'a', deps: [],    async execute() { return 'A'; } },
+         { id: 'b', deps: ['a'], async execute(input) {
+             const n = (() => { try { return parseInt(fs.readFileSync(${JSON.stringify(sentinel)}, 'utf8'), 10) || 0; } catch { return 0; } })();
+             fs.writeFileSync(${JSON.stringify(sentinel)}, String(n + 1));
+             if (n === 0) throw new Error('flaky-first-attempt');
+             return 'B:' + input.a;
+         } },
+         { id: 'c', deps: ['b'], async execute(input) { return 'C:' + input.b; } },
+       ];`,
+    );
+    const stateDir = path.join(dir, 'st');
+    const r1 = runCli(['run', 'flaky', wfPath, '--parallel-persistent', '--dir', stateDir], dir);
+    expect(r1.status).toBe(1);
+    const o1 = JSON.parse(r1.stdout);
+    expect(o1.failedAt).toBe('b');
+    // Second invocation: a is success (skipped), b retries (passes), c runs.
+    const r2 = runCli(['run', 'flaky', wfPath, '--parallel-persistent', '--dir', stateDir], dir);
+    expect(r2.status).toBe(0);
+    const o2 = JSON.parse(r2.stdout);
+    expect(o2.success).toBe(true);
+    expect(o2.executedNodes.sort()).toEqual(['b', 'c']);
+  });
+
   test('lazyclaw run --parallel surfaces cycle errors with exit 1', () => {
     const dir = tmpConfigDir();
     const wfPath = path.join(dir, 'cyclic.mjs');
