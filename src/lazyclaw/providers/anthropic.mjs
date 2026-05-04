@@ -131,6 +131,15 @@ export const anthropicProvider = {
         budget_tokens: opts.thinking.budgetTokens || 1024,
       };
     }
+    // Tool-use is passthrough only: opts.tools forwards to the request
+    // body, but execution is the caller's responsibility. We surface
+    // assembled tool_use blocks via opts.onToolUse — the iterator itself
+    // continues to yield only text deltas so existing callers don't
+    // break.
+    if (Array.isArray(opts.tools) && opts.tools.length > 0) {
+      body.tools = opts.tools;
+      if (opts.toolChoice) body.tool_choice = opts.toolChoice;
+    }
 
     // Honor opts.signal (AbortSignal) so callers can cancel mid-stream.
     // Both the fetch itself and the body iterator check the signal — fetch
@@ -160,30 +169,60 @@ export const anthropicProvider = {
     // codepoint that lands across two reads would surface as U+FFFD.
     const decoder = new TextDecoder('utf-8', { fatal: false });
     let buffer = '';
+    // Tool-use blocks are emitted via content_block_start (with the name
+    // + tool_use_id) followed by N content_block_delta frames carrying
+    // input_json_delta partials. We accumulate per index; at content_block_stop
+    // we hand the assembled object to opts.onToolUse.
+    const openToolBlocks = new Map();
     for await (const chunk of iterateBody(res.body)) {
       if (opts.signal?.aborted) throw new AbortError('aborted mid-stream');
       buffer += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
       let consumed = 0;
       for (const frame of parseSseFrames(buffer)) {
         consumed = frame.nextCursor;
-        if (frame.event === 'content_block_delta' && frame.data) {
+        if (frame.event === 'content_block_start' && frame.data) {
+          try {
+            const obj = JSON.parse(frame.data);
+            if (obj?.content_block?.type === 'tool_use') {
+              openToolBlocks.set(obj.index, {
+                id: obj.content_block.id,
+                name: obj.content_block.name,
+                inputJson: '',
+              });
+            }
+          } catch { /* skip malformed */ }
+        } else if (frame.event === 'content_block_delta' && frame.data) {
           try {
             const obj = JSON.parse(frame.data);
             const delta = obj?.delta || {};
-            // text_delta → yield as a normal token chunk
-            // thinking_delta → route to opts.onThinking when provided; default is to drop
-            //                  (keeping the public iterator a stream of *response* text).
             if (delta.type === 'text_delta' && delta.text) {
               yield delta.text;
             } else if (delta.type === 'thinking_delta' && delta.thinking && typeof opts.onThinking === 'function') {
               try { opts.onThinking(delta.thinking); } catch { /* never let a callback abort the stream */ }
+            } else if (delta.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+              const t = openToolBlocks.get(obj.index);
+              if (t) t.inputJson += delta.partial_json;
             } else if (delta.text) {
-              // Backwards-compat: older deltas without a type field still carried a `text`.
               yield delta.text;
             }
           } catch {
             // Ignore malformed frame; the buffer may still contain valid frames.
           }
+        } else if (frame.event === 'content_block_stop' && frame.data) {
+          try {
+            const obj = JSON.parse(frame.data);
+            const t = openToolBlocks.get(obj.index);
+            if (t) {
+              openToolBlocks.delete(obj.index);
+              if (typeof opts.onToolUse === 'function') {
+                let input = {};
+                try { input = t.inputJson ? JSON.parse(t.inputJson) : {}; }
+                catch { /* malformed input → pass empty + raw for caller to inspect */ }
+                try { opts.onToolUse({ id: t.id, name: t.name, input, raw: t.inputJson }); }
+                catch { /* never let a callback abort the stream */ }
+              }
+            }
+          } catch { /* skip malformed */ }
         } else if (frame.event === 'message_stop') {
           return;
         } else if (frame.event === 'error' && frame.data) {

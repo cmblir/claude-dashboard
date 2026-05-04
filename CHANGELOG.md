@@ -10,6 +10,50 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.79.0] — 2026-05-05
+
+**Anthropic tool-use passthrough.**
+
+The provider now forwards `opts.tools` to the Messages API and assembles
+streamed `tool_use` blocks for the caller via `opts.onToolUse`.
+
+### What this is — and what this is NOT
+This is a *passthrough*, deliberately. The provider:
+- Sends your `tools` definitions in the request body
+- Optionally honors `opts.toolChoice` (e.g., `{type: 'auto'}` /
+  `{type: 'tool', name: 'X'}`)
+- Reassembles each streamed `tool_use` block from
+  `content_block_start` (id + name) + N `input_json_delta` partials +
+  `content_block_stop`
+- Calls `opts.onToolUse({id, name, input, raw})` once the block is complete
+
+It does **not** execute tools. Execution is the caller's responsibility:
+the caller decides what to run, runs it locally with whatever sandbox
+they want, and sends the result back as a `tool_result` content block
+on the next `messages` array. This keeps the provider library
+unprivileged — no shell access, no filesystem write, no surprise
+side-effects from the model.
+
+### Iterator contract
+`text_delta` continues to yield through the for-await loop as before;
+`thinking_delta` continues to route to `onThinking`; `input_json_delta`
+accumulates into the open tool block and surfaces only on
+`content_block_stop`. Existing callers see no behavior change.
+
+### Robustness
+A malformed `partial_json` (e.g., the model sent something we couldn't
+JSON-parse) still calls `onToolUse` with `input: {}` and `raw: <whatever>`
+so the caller can either retry, log, or recover.
+
+### Tests
+2 new phase 6 specs:
+- happy path: tool definitions in request body, assembled tool_use call
+  with id + name + parsed input from chunked partial_json
+- malformed partial_json → empty `input`, raw text preserved
+
+Suite: 77/77. tsc clean.
+
+---
 ## [2.78.0] — 2026-05-05
 
 **Cancellable streams: `AbortSignal` end-to-end.**

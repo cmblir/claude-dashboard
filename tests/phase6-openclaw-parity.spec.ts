@@ -453,6 +453,70 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('anthropic provider passes through tool definitions and surfaces tool_use via callback', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    const calls: any[] = [];
+    const sse =
+      'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n' +
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Looking up..."}}\n\n' +
+      'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n' +
+      'event: content_block_start\ndata: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_01","name":"get_weather","input":{}}}\n\n' +
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"city\\":"}}\n\n' +
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\\"Seoul\\"}"}}\n\n' +
+      'event: content_block_stop\ndata: {"type":"content_block_stop","index":1}\n\n' +
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n';
+    const tools = [{ name: 'get_weather', description: 'Get weather', input_schema: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] } }];
+    let sentBody: any = null;
+    const fakeFetch = async (_url: string, init: any) => {
+      sentBody = JSON.parse(init.body);
+      return {
+        ok: true, status: 200,
+        body: new ReadableStream({
+          start(c) { c.enqueue(new TextEncoder().encode(sse)); c.close(); },
+        }),
+      };
+    };
+    const text: string[] = [];
+    for await (const chunk of mod.anthropicProvider.sendMessage(
+      [{ role: 'user', content: "what's the weather in Seoul?" }],
+      {
+        apiKey: 'sk-ant-x', model: 'claude-opus-4-7',
+        fetch: fakeFetch as any,
+        tools,
+        toolChoice: { type: 'auto' },
+        onToolUse: (call: any) => calls.push(call),
+      },
+    )) text.push(chunk);
+    expect(text.join('')).toBe('Looking up...');
+    expect(sentBody.tools).toEqual(tools);
+    expect(sentBody.tool_choice).toEqual({ type: 'auto' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].name).toBe('get_weather');
+    expect(calls[0].id).toBe('toolu_01');
+    expect(calls[0].input).toEqual({ city: 'Seoul' });
+  });
+
+  test('anthropic tool_use with malformed partial_json still calls onToolUse with raw + empty input', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    const calls: any[] = [];
+    const sse =
+      'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"x","name":"t","input":{}}}\n\n' +
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"not-json"}}\n\n' +
+      'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n' +
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n';
+    const fakeFetch = async () => ({
+      ok: true, status: 200,
+      body: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(sse)); c.close(); } }),
+    });
+    for await (const _c of mod.anthropicProvider.sendMessage(
+      [{ role: 'user', content: 'q' }],
+      { apiKey: 'sk-ant-x', model: 'claude-opus-4-7', fetch: fakeFetch as any, onToolUse: (c: any) => calls.push(c) },
+    )) { /* drain */ }
+    expect(calls).toHaveLength(1);
+    expect(calls[0].input).toEqual({});
+    expect(calls[0].raw).toBe('not-json');
+  });
+
   test('anthropic provider honors AbortSignal — pre-request abort throws AbortError', async () => {
     const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
     const ac = new AbortController();
