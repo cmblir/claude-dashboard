@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 
 import {
   runPersistent,
+  runPersistentDag,
   loadState,
   statePath,
 } from '../src/lazyclaw/workflow/persistent.mjs';
@@ -179,5 +180,104 @@ test.describe('Phase 2 — Auto-resume', () => {
     for (const id of ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8']) {
       expect(s2.nodes[id].status).toBe('success');
     }
+  });
+
+  test('runPersistentDag: 4-node diamond runs to completion and persists state per node', async () => {
+    const dir = tmpDir('pdag');
+    const sid = 'diamond-1';
+    const nodes = [
+      { id: 'a',     deps: [],            async execute() { return 'A'; } },
+      { id: 'b',     deps: ['a'],         async execute(input: any) { return `B:${input.a}`; } },
+      { id: 'c',     deps: ['a'],         async execute(input: any) { return `C:${input.a}`; } },
+      { id: 'merge', deps: ['b', 'c'],    async execute(input: any) { return `M:${input.b}+${input.c}`; } },
+    ];
+    const r = await runPersistentDag(nodes, { sessionId: sid, dir });
+    expect(r.success).toBe(true);
+    expect(r.executedNodes.sort()).toEqual(['a', 'b', 'c', 'merge']);
+    const s = loadState(sid, dir)!;
+    expect(s.nodes.merge.output).toBe('M:B:A+C:A');
+    for (const id of ['a', 'b', 'c', 'merge']) {
+      expect(s.nodes[id].status).toBe('success');
+    }
+  });
+
+  test('runPersistentDag: resume after a failed node skips success nodes and retries the failed one', async () => {
+    const dir = tmpDir('pdag-resume');
+    const sid = 'flaky-1';
+    let attempt = 0;
+    const nodes = [
+      { id: 'a',     deps: [],         async execute() { return 'A'; } },
+      // b fails on the first attempt, succeeds the second.
+      {
+        id: 'b',
+        deps: ['a'],
+        async execute(input: any) {
+          attempt += 1;
+          if (attempt === 1) throw new Error('flaky');
+          return `B:${input.a}`;
+        },
+      },
+      { id: 'c',     deps: ['a', 'b'], async execute(input: any) { return `C:${input.a}/${input.b}`; } },
+    ];
+    const first = await runPersistentDag(nodes, { sessionId: sid, dir });
+    expect(first.success).toBe(false);
+    expect(first.failedAt).toBe('b');
+    const s1 = loadState(sid, dir)!;
+    expect(s1.nodes.a.status).toBe('success');
+    expect(s1.nodes.b.status).toBe('failed');
+    expect(s1.nodes.c?.status ?? 'pending').toBe('pending');  // never started
+
+    // Resume — same nodes array; b will pass on the second attempt.
+    const second = await runPersistentDag(nodes, { sessionId: sid, dir });
+    expect(second.success).toBe(true);
+    expect(second.executedNodes.sort()).toEqual(['b', 'c']);  // a skipped
+    const s2 = loadState(sid, dir)!;
+    expect(s2.nodes.a.status).toBe('success');
+    expect(s2.nodes.b.status).toBe('success');
+    expect(s2.nodes.c.status).toBe('success');
+    expect(s2.nodes.c.output).toBe('C:A/B:A');
+  });
+
+  test('runPersistentDag: cycle is detected before any node runs', async () => {
+    const dir = tmpDir('pdag-cycle');
+    const sid = 'cyc-1';
+    let executed = false;
+    const nodes = [
+      { id: 'a', deps: ['b'], async execute() { executed = true; return 1; } },
+      { id: 'b', deps: ['a'], async execute() { executed = true; return 2; } },
+    ];
+    const r = await runPersistentDag(nodes, { sessionId: sid, dir });
+    expect(r.success).toBe(false);
+    expect(r.error).toMatch(/cycle/);
+    expect(executed).toBe(false);  // refused before scheduling
+  });
+
+  test('runPersistentDag: state file demotes "running" → "pending" on resume so an interrupted level retries', async () => {
+    const dir = tmpDir('pdag-interrupted');
+    const sid = 'crash-1';
+    // Hand-craft a state file that mimics a process killed mid-level:
+    // a is success, b is running (was alive when SIGKILL hit).
+    const dirPath = path.join(dir);
+    fs.mkdirSync(dirPath, { recursive: true });
+    const state = {
+      sessionId: sid,
+      order: ['a', 'b'],
+      nodes: {
+        a: { status: 'success', output: 'A', attempts: 1, durationMs: 1 },
+        b: { status: 'running', attempts: 1 },
+      },
+      startedAt: 1, updatedAt: 1,
+    };
+    fs.writeFileSync(path.join(dirPath, `${sid}.json`), JSON.stringify(state));
+
+    const nodes = [
+      { id: 'a', deps: [],    async execute() { throw new Error('a should be skipped'); } },
+      { id: 'b', deps: ['a'], async execute(input: any) { return `B:${input.a}`; } },
+    ];
+    const r = await runPersistentDag(nodes, { sessionId: sid, dir });
+    expect(r.success).toBe(true);
+    expect(r.executedNodes).toEqual(['b']);   // a skipped, b retried
+    const s = loadState(sid, dir)!;
+    expect(s.nodes.b.output).toBe('B:A');
   });
 });

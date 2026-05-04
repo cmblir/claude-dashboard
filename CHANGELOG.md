@@ -10,6 +10,72 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.95.0] — 2026-05-05
+
+**Workflow: `runPersistentDag` — DAG with checkpoint-and-resume.**
+
+Until now LazyClaw had two non-overlapping workflow engines:
+- `runPersistent` (phase 2): sequential, persists state to JSON, resumable.
+- `runParallel` (phase 5): topological levels, in-memory only.
+
+Real n8n-style workflows want both: parallel level execution AND
+resume after a process kill. `runPersistentDag` is that union.
+
+### API
+```js
+import { runPersistentDag } from './src/lazyclaw/workflow/persistent.mjs';
+
+const r = await runPersistentDag([
+  { id: 'a',     deps: [],            execute() {...} },
+  { id: 'b',     deps: ['a'],         execute(input) {...} },
+  { id: 'c',     deps: ['a'],         execute(input) {...} },
+  { id: 'merge', deps: ['b','c'],     execute(input) {...} },
+], { sessionId: 'demo', dir: '.workflow-state' });
+```
+
+### Resume semantics
+- `success` nodes: skipped on resume; their outputs feed into fan-in
+  nodes that depend on them.
+- `running` nodes (= a process killed mid-level): demoted to `pending`
+  on the next start; the level retries.
+- `failed` nodes: re-attempted on the next run. Idempotency is the
+  caller's responsibility (same as `runPersistent`).
+- `pending` nodes never started; they run normally.
+
+### Cycle detection
+Inherited from `topologicalLevels` (Kahn's algorithm). Cycle → exit
+before any node executes; the state file is never written.
+
+### Failure semantics
+First failure in level N stops scheduling N+1. Successful nodes within
+the failing level still get their state persisted before the function
+returns — so a partial recovery on resume sees everything that
+actually succeeded.
+
+### Subtle test-runner bug found and fixed
+`runPersistentDag` originally used `await import('./executor.mjs')` so
+the executor wouldn't load when only the sequential path was used.
+Under `@playwright/test`, that tripped tsx's CJS conversion path
+when phase 1 had already loaded executor.mjs statically — the dynamic
+re-import surfaced as `exports is not defined in ES module scope`.
+Switched to a top-level static import. Cost is one extra import on
+boot for callers who never use the DAG path; benefit is a stable
+loader contract.
+
+### Tests
+4 new phase 2 specs:
+- 4-node diamond runs to completion; merge sees `{b, c}` outputs;
+  state file has all four `success` records
+- resume after a flaky failure: first run fails at b, state shows
+  `b: failed`, c untouched. Second run skips a, retries b (succeeds
+  this time), executes c. `executedNodes` is `['b', 'c']`.
+- cycle detected before any node runs (no state file written)
+- hand-crafted state with `b: running` (mimicking a SIGKILL): on
+  resume, b is demoted to pending and retries; a (success) is skipped
+
+Suite: 206/206. tsc clean.
+
+---
 ## [2.94.0] — 2026-05-05
 
 **Daemon: `GET /metrics` for runtime observability.**
