@@ -10,6 +10,47 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.74.0] — 2026-05-05
+
+**LazyClaw: extended thinking + `version` subcommand.**
+
+### Extended thinking (Anthropic)
+The Anthropic provider now plumbs through the Messages-API extended
+thinking parameter and surfaces `thinking_delta` events.
+
+API shape on `sendMessage`:
+- `opts.thinking = { enabled: true, budgetTokens: 5000 }` — enables the
+  extended-thinking budget. `budgetTokens` defaults to 1024 when only
+  `enabled` is set. The provider always sends `{ type: "enabled", budget_tokens: N }`
+  in the request body.
+- `opts.onThinking?: (chunk: string) => void` — optional callback that
+  receives every `thinking_delta` text chunk as it streams. The main
+  iterator continues to yield only `text_delta` content, keeping the
+  default consumer contract identical to before.
+
+CLI:
+- `lazyclaw agent --thinking 5000 "..."` — enables extended thinking
+  with a 5000-token budget. Works for the anthropic provider; other
+  providers ignore the flag silently.
+- `lazyclaw agent --thinking 5000 --show-thinking "..."` — additionally
+  routes thinking text to stderr while normal response text continues
+  to stdout. This way `lazyclaw agent ... | tee response.txt` only ever
+  pipes the answer.
+
+### `lazyclaw version`
+Prints `{ version, nodeVersion, platform }` as JSON. Aliases: `--version`, `-v`.
+
+### Tests
+3 new phase 6 specs:
+- `version` subcommand returns the expected shape
+- thinking config goes out in the request body and `thinking_delta`
+  routes to the `onThinking` callback while text stays on the iterator
+- back-compat: when no `onThinking` is provided, thinking deltas are
+  dropped so existing callers continue to see the same stream
+
+Full suite: 45/45.
+
+---
 ## [2.73.0] — 2026-05-05
 
 **LazyClaw parity continued: OpenAI provider + `agent` one-shot.**

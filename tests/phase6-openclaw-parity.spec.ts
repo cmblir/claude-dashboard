@@ -197,6 +197,69 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(calls[0].headers['anthropic-version']).toBeTruthy();
   });
 
+  test('version subcommand prints VERSION + node + platform as JSON', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['version'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.version).toMatch(/^\d+\.\d+\.\d+/);
+    expect(out.nodeVersion).toMatch(/^v\d+\./);
+    expect(out.platform).toMatch(/-/);
+  });
+
+  test('anthropic provider sends thinking config when budget is set, and routes thinking_delta to onThinking callback', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    const calls: any[] = [];
+    const sse =
+      'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"weighing"}}\n\n' +
+      'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":" options"}}\n\n' +
+      'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"answer"}}\n\n' +
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n';
+    const fakeFetch = async (url: string, init: any) => {
+      calls.push({ url, body: JSON.parse(init.body) });
+      return {
+        ok: true, status: 200,
+        body: new ReadableStream({
+          start(controller) { controller.enqueue(new TextEncoder().encode(sse)); controller.close(); },
+        }),
+      };
+    };
+    const thinkingChunks: string[] = [];
+    const textChunks: string[] = [];
+    for await (const chunk of mod.anthropicProvider.sendMessage(
+      [{ role: 'user', content: 'hard problem' }],
+      {
+        apiKey: 'sk-ant-x', model: 'claude-opus-4-7',
+        fetch: fakeFetch as any,
+        thinking: { enabled: true, budgetTokens: 5000 },
+        onThinking: (t: string) => thinkingChunks.push(t),
+      },
+    )) textChunks.push(chunk);
+    expect(textChunks.join('')).toBe('answer');
+    expect(thinkingChunks.join('')).toBe('weighing options');
+    expect(calls[0].body.thinking).toEqual({ type: 'enabled', budget_tokens: 5000 });
+  });
+
+  test('anthropic provider drops thinking_delta when no callback is provided (back-compat)', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    const sse =
+      'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"silent"}}\n\n' +
+      'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hi"}}\n\n' +
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n';
+    const fakeFetch = async () => ({
+      ok: true, status: 200,
+      body: new ReadableStream({
+        start(c) { c.enqueue(new TextEncoder().encode(sse)); c.close(); },
+      }),
+    });
+    const out: string[] = [];
+    for await (const c of mod.anthropicProvider.sendMessage(
+      [{ role: 'user', content: 'q' }],
+      { apiKey: 'sk-ant-x', model: 'claude-opus-4-7', fetch: fakeFetch as any },
+    )) out.push(c);
+    expect(out.join('')).toBe('hi');
+  });
+
   test('agent one-shot streams reply for a positional prompt and exits 0', () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);

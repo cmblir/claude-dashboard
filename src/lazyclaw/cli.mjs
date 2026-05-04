@@ -170,6 +170,31 @@ const SLASH_COMMANDS = [
   { cmd: '/exit',   help: 'leave the chat' },
 ];
 
+function readVersionFromRepo() {
+  // VERSION lives at the repo root. From <repo>/src/lazyclaw/cli.mjs that is two levels up.
+  const here = path.dirname(new URL(import.meta.url).pathname);
+  const candidates = [
+    path.resolve(here, '../../VERSION'),
+    path.resolve(here, '../../../VERSION'),
+  ];
+  for (const c of candidates) {
+    try {
+      const v = fs.readFileSync(c, 'utf8').trim();
+      if (v) return v;
+    } catch { /* keep trying */ }
+  }
+  return '0.0.0';
+}
+
+async function cmdVersion() {
+  const out = {
+    version: readVersionFromRepo(),
+    nodeVersion: process.version,
+    platform: `${process.platform}-${process.arch}`,
+  };
+  console.log(JSON.stringify(out));
+}
+
 async function cmdAgent(prompt, flags) {
   // OpenClaw-style one-shot: send a single prompt, stream the response,
   // exit. Useful in scripts and pipelines. Honors --provider and --model
@@ -194,10 +219,19 @@ async function cmdAgent(prompt, flags) {
     console.error('agent: empty prompt'); process.exit(2);
   }
   const messages = [{ role: 'user', content: String(text) }];
+  // --thinking <budgetTokens> enables Anthropic extended thinking. Other
+  // providers ignore the flag silently because their opts shape doesn't
+  // carry it.
+  const thinkingBudget = flags.thinking ? parseInt(flags.thinking, 10) : 0;
+  // --show-thinking prints thinking deltas to stderr while text deltas
+  // continue to stream to stdout. This keeps stdout clean for piping.
+  const showThinking = flags['show-thinking'];
   try {
     for await (const chunk of prov.sendMessage(messages, {
       apiKey: cfg['api-key'],
       model: flags.model || cfg.model,
+      thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
+      onThinking: showThinking ? t => process.stderr.write(t) : undefined,
     })) {
       process.stdout.write(chunk);
     }
@@ -361,8 +395,14 @@ async function main() {
       await cmdOnboard(rest.flags);
       break;
     }
+    case 'version':
+    case '--version':
+    case '-v': {
+      await cmdVersion();
+      break;
+    }
     default:
-      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard> ...');
+      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard|version> ...');
       process.exit(2);
   }
 }

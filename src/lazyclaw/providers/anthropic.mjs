@@ -114,6 +114,15 @@ export const anthropicProvider = {
     };
     const sys = opts.system || messages.find(m => m.role === 'system')?.content;
     if (sys) body.system = sys;
+    // Extended thinking. opts.thinking: { enabled?: boolean, budgetTokens?: number }.
+    // The thinking field is opt-in; when budget is set we always treat it as enabled
+    // because the API rejects budget without a corresponding type.
+    if (opts.thinking && (opts.thinking.enabled || opts.thinking.budgetTokens)) {
+      body.thinking = {
+        type: 'enabled',
+        budget_tokens: opts.thinking.budgetTokens || 1024,
+      };
+    }
 
     const res = await fetchFn('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -144,8 +153,18 @@ export const anthropicProvider = {
         if (frame.event === 'content_block_delta' && frame.data) {
           try {
             const obj = JSON.parse(frame.data);
-            const text = obj?.delta?.text;
-            if (text) yield text;
+            const delta = obj?.delta || {};
+            // text_delta → yield as a normal token chunk
+            // thinking_delta → route to opts.onThinking when provided; default is to drop
+            //                  (keeping the public iterator a stream of *response* text).
+            if (delta.type === 'text_delta' && delta.text) {
+              yield delta.text;
+            } else if (delta.type === 'thinking_delta' && delta.thinking && typeof opts.onThinking === 'function') {
+              try { opts.onThinking(delta.thinking); } catch { /* never let a callback abort the stream */ }
+            } else if (delta.text) {
+              // Backwards-compat: older deltas without a type field still carried a `text`.
+              yield delta.text;
+            }
           } catch {
             // Ignore malformed frame; the buffer may still contain valid frames.
           }
