@@ -170,6 +170,44 @@ const SLASH_COMMANDS = [
   { cmd: '/exit',   help: 'leave the chat' },
 ];
 
+async function cmdAgent(prompt, flags) {
+  // OpenClaw-style one-shot: send a single prompt, stream the response,
+  // exit. Useful in scripts and pipelines. Honors --provider and --model
+  // flags as overrides over config.json. Reads stdin when prompt is "-"
+  // so callers can pipe input.
+  await ensureRegistry();
+  const cfg = readConfig();
+  const provName = flags.provider || cfg.provider || 'mock';
+  const prov = _registryMod.PROVIDERS[provName];
+  if (!prov) { console.error(`unknown provider: ${provName}`); process.exit(2); }
+
+  let text = prompt;
+  if (text === '-' || text === undefined) {
+    text = await new Promise(resolve => {
+      let buf = '';
+      process.stdin.setEncoding('utf8');
+      process.stdin.on('data', d => { buf += d; });
+      process.stdin.on('end', () => resolve(buf));
+    });
+  }
+  if (!text || !String(text).trim()) {
+    console.error('agent: empty prompt'); process.exit(2);
+  }
+  const messages = [{ role: 'user', content: String(text) }];
+  try {
+    for await (const chunk of prov.sendMessage(messages, {
+      apiKey: cfg['api-key'],
+      model: flags.model || cfg.model,
+    })) {
+      process.stdout.write(chunk);
+    }
+    process.stdout.write('\n');
+  } catch (err) {
+    process.stderr.write(`error: ${err?.message || String(err)}\n`);
+    process.exit(1);
+  }
+}
+
 async function cmdChat() {
   await ensureRegistry();
   const cfg = readConfig();
@@ -306,6 +344,11 @@ async function main() {
       await cmdChat();
       break;
     }
+    case 'agent': {
+      const prompt = rest.positional[0];
+      await cmdAgent(prompt, rest.flags);
+      break;
+    }
     case 'doctor': {
       await cmdDoctor();
       break;
@@ -319,7 +362,7 @@ async function main() {
       break;
     }
     default:
-      console.error('Usage: lazyclaw <run|resume|config|chat|doctor|status|onboard> ...');
+      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard> ...');
       process.exit(2);
   }
 }

@@ -10,6 +10,47 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.73.0] — 2026-05-05
+
+**LazyClaw parity continued: OpenAI provider + `agent` one-shot.**
+
+OpenClaw lists OpenAI alongside Anthropic; LazyClaw now matches.
+
+### `lazyclaw agent <prompt>`
+One-shot, non-interactive execution. Sends a single user message,
+streams the response to stdout, exits.
+- `lazyclaw agent "rewrite this commit message: ..."`
+- `cat file.txt | lazyclaw agent -` reads the prompt from stdin
+- `--provider <name>` and `--model <id>` override config for this call
+
+Designed for shell pipelines and CI scripts. Honors INVALID_KEY at exit
+code 1; clean replies exit 0.
+
+### `providers/openai.mjs`
+- POST `https://api.openai.com/v1/chat/completions` with `stream: true`,
+  `Authorization: Bearer …`
+- SSE: parses `data: {…}\n\n` frames, yields `choices[0].delta.content`,
+  terminates on the literal `data: [DONE]\n\n`
+- 401 / 403 → `InvalidApiKeyError { code: 'INVALID_KEY' }`
+- Streaming `TextDecoder({ stream: true })` so non-ASCII responses (CJK,
+  emoji, etc.) decode correctly across chunk boundaries
+- Test seam: `opts.fetch` injection mirrors the Anthropic provider
+
+### `doctor` updates
+The diagnostic now lists `openai` under `knownProviders`. Setting
+`provider: openai` + `api-key` + `model` passes the diagnostic.
+
+### Tests
+6 new phase 6 specs (now 17 in the file, 42 total in the suite):
+- agent one-shot positional prompt → mock-reply
+- agent stdin prompt
+- agent `--provider` override actually switches providers (proven by
+  triggering INVALID_KEY when the override has no key)
+- openai SSE happy path with `[DONE]` termination
+- openai 401 → INVALID_KEY
+- doctor reports openai
+
+---
 ## [2.72.1] — 2026-05-05
 
 **Anthropic SSE: streaming UTF-8 decoder.**

@@ -8,6 +8,7 @@
 // know about PROVIDERS.
 
 import { anthropicProvider } from './anthropic.mjs';
+import { openaiProvider } from './openai.mjs';
 
 /**
  * @typedef {{ role: 'user'|'assistant'|'system', content: string }} ChatMessage
@@ -36,11 +37,12 @@ export const mockProvider = {
   },
 };
 
-export { anthropicProvider };
+export { anthropicProvider, openaiProvider };
 
 export const PROVIDERS = {
   mock: mockProvider,
   anthropic: anthropicProvider,
+  openai: openaiProvider,
 };
 
 /**

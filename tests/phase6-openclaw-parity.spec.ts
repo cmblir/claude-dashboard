@@ -197,6 +197,100 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(calls[0].headers['anthropic-version']).toBeTruthy();
   });
 
+  test('agent one-shot streams reply for a positional prompt and exits 0', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const r = runCli(['agent', 'hello world'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('mock-reply: hello world');
+  });
+
+  test('agent reads stdin when prompt is "-"', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const child = spawn(process.execPath, [CLI, 'agent', '-'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    child.stdin.write('piped prompt\n');
+    child.stdin.end();
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+    expect(chunks.join('')).toContain('mock-reply: piped prompt');
+  });
+
+  test('agent --provider flag overrides config provider', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    // Override to anthropic without an api-key so we expect the provider
+    // to throw INVALID_KEY — this proves the flag actually switched
+    // providers (otherwise the mock would happily reply).
+    const r = runCli(['agent', 'hi', '--provider', 'anthropic'], dir);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/missing api key|invalid|INVALID_KEY/i);
+  });
+
+  test('openai provider hits chat/completions with stream=true and parses [DONE]', async () => {
+    const mod = await import('../src/lazyclaw/providers/openai.mjs' as string);
+    const calls: any[] = [];
+    const fakeFetch = async (url: string, init: any) => {
+      calls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+      const sse =
+        'data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n' +
+        'data: {"choices":[{"delta":{"content":" there"}}]}\n\n' +
+        'data: [DONE]\n\n';
+      return {
+        ok: true,
+        status: 200,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(sse));
+            controller.close();
+          },
+        }),
+      };
+    };
+    const out: string[] = [];
+    for await (const chunk of mod.openaiProvider.sendMessage(
+      [{ role: 'user', content: 'hello' }],
+      { apiKey: 'sk-x', model: 'gpt-4.1', fetch: fakeFetch as any },
+    )) out.push(chunk);
+    expect(out.join('')).toBe('Hi there');
+    expect(calls[0].url).toContain('/v1/chat/completions');
+    expect(calls[0].headers.authorization).toBe('Bearer sk-x');
+    expect(calls[0].body.stream).toBe(true);
+    expect(calls[0].body.model).toBe('gpt-4.1');
+  });
+
+  test('openai provider 401 → INVALID_KEY', async () => {
+    const mod = await import('../src/lazyclaw/providers/openai.mjs' as string);
+    const fakeFetch = async () => ({
+      ok: false, status: 401,
+      text: async () => '{"error":{"message":"invalid"}}',
+    });
+    let caught: any = null;
+    try {
+      for await (const _c of mod.openaiProvider.sendMessage(
+        [{ role: 'user', content: 'hi' }],
+        { apiKey: 'sk-bad', model: 'gpt-4.1', fetch: fakeFetch as any },
+      )) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught).toBeTruthy();
+    expect(String(caught?.code || caught?.message)).toMatch(/INVALID_KEY|invalid/i);
+  });
+
+  test('doctor knows about the openai provider too', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'openai'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-x'], dir);
+    runCli(['config', 'set', 'model', 'gpt-4.1'], dir);
+    const r = runCli(['doctor'], dir);
+    const out = JSON.parse(r.stdout);
+    expect(out.knownProviders).toEqual(expect.arrayContaining(['mock', 'anthropic', 'openai']));
+    expect(out.ok).toBe(true);
+  });
+
   test('anthropic provider preserves UTF-8 codepoints split across chunk boundaries', async () => {
     // Korean "안녕" = E384 ABC8 EB85 95 (6 bytes). We split mid-codepoint so
     // a non-streaming decoder would produce U+FFFD. The streaming TextDecoder
