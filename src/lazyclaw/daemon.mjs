@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import { PROVIDERS, PROVIDER_INFO, maskApiKey } from './providers/registry.mjs';
 import { withRateLimitRetry } from './providers/retry.mjs';
 import { withFallback } from './providers/fallback.mjs';
-import { composeSystemPrompt } from './skills.mjs';
+import { composeSystemPrompt, listSkills, loadSkill, skillPath } from './skills.mjs';
 
 // Resolve the provider for a request. Composes two opt-in wrappers:
 //   - body.fallback: array of provider names to chain after the primary.
@@ -186,6 +186,7 @@ export function makeHandler(ctx) {
       const url = new URL(req.url || '/', 'http://localhost');
       const route = `${req.method} ${url.pathname}`;
       const sessionMatch = url.pathname.match(/^\/sessions\/([^/]+)$/);
+      const skillMatch = url.pathname.match(/^\/skills\/([^/]+)$/);
       switch (true) {
         case route === 'GET /version':
           return writeJson(res, 200, { version: ctx.version(), nodeVersion: process.version, platform: `${process.platform}-${process.arch}` });
@@ -242,6 +243,35 @@ export function makeHandler(ctx) {
             if (!(await fileExists(file))) return writeJson(res, 404, { error: 'session not found', id });
             const turns = ctx.sessionsMod.loadTurns(id, cfgDir);
             return writeJson(res, 200, { id, turns });
+          } catch (err) {
+            return writeJson(res, 400, { error: err?.message || String(err) });
+          }
+        }
+        case route === 'GET /skills': {
+          // List installed skills with their first-line summary so a UI
+          // can render them without a follow-up read for each one.
+          const cfgDir = ctx.sessionsDirGetter();
+          const items = listSkills(cfgDir).map(s => ({
+            name: s.name, bytes: s.bytes, summary: s.summary,
+          }));
+          return writeJson(res, 200, items);
+        }
+        case req.method === 'GET' && !!skillMatch: {
+          // GET /skills/<name> — full markdown body as text/markdown.
+          // 404 when the file is missing so the caller can branch.
+          // 400 when the name fails skillPath validation (path traversal,
+          // dotfile, etc.) — same protections as the CLI.
+          const name = skillMatch[1];
+          try {
+            const cfgDir = ctx.sessionsDirGetter();
+            const file = skillPath(name, cfgDir);
+            if (!(await fileExists(file))) return writeJson(res, 404, { error: 'skill not found', name });
+            const body = loadSkill(name, cfgDir);
+            res.writeHead(200, {
+              'content-type': 'text/markdown; charset=utf-8',
+              'content-length': Buffer.byteLength(body),
+            });
+            return res.end(body);
           } catch (err) {
             return writeJson(res, 400, { error: err?.message || String(err) });
           }

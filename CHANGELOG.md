@@ -10,6 +10,44 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.85.1] — 2026-05-05
+
+**Daemon: `GET /skills` + `GET /skills/<name>` for HTTP skill discovery.**
+
+Skills were creatable / loadable via the CLI and the daemon's
+`POST /agent` already accepted them in `body.skills`, but a remote tool
+had no way to *browse* what skills exist on a host. Adds the two read
+endpoints.
+
+### `GET /skills`
+```json
+[
+  { "name": "reviewer", "bytes": 187, "summary": "Reviewer" },
+  { "name": "concise",  "bytes":  43, "summary": "Concise" }
+]
+```
+Mirrors `lazyclaw skills list`. Summary is the first markdown line with
+the leading `#` stripped. Sorted alphabetically.
+
+### `GET /skills/<name>`
+- 200: `text/markdown` body (no JSON envelope — pipe straight into a
+  renderer or compose into a prompt)
+- 404: `{ error: "skill not found", name }` so callers branch cleanly
+- 400: invalid name (path-traversal, dotfile) — `skillPath()` validation
+  reused so HTTP gets the same protections as the CLI
+
+### Tests
+4 new phase 6 specs:
+- `GET /skills` returns the list shape with first-line summaries
+- `GET /skills/<name>` returns `text/markdown` body
+- `GET /skills/missing` → 404 with the missing name in the body
+- `GET /skills/.hidden` → 400 (dotfile rejected by `skillPath`, second-
+  layer protection beyond the URL `[^/]+` regex)
+
+Suite: 154/154 (the count includes the 2 phase 1 tests added by 2.85.0).
+tsc clean.
+
+---
 ## [2.85.0] — 2026-05-05
 
 **Workflow executor: parallel cleanup hooks (measured 5× speedup).**

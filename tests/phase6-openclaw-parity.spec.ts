@@ -211,9 +211,86 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     await new Promise<void>(resolve => child.on('close', () => resolve()));
 
     const out = chunks.join('');
-    for (const cmd of ['/status', '/new', '/usage', '/help', '/exit']) {
+    for (const cmd of ['/status', '/new', '/usage', '/skill', '/help', '/exit']) {
       expect(out).toContain(cmd);
     }
+  });
+
+  test('chat /skill switches the active system message and persists to session', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'a.md'), '# A\nbody-A\n');
+    fs.writeFileSync(path.join(dir, 'skills', 'b.md'), '# B\nbody-B\n');
+
+    const child = spawn(process.execPath, [CLI, 'chat', '--session', 'sw'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    child.stdin.write('first\n');
+    await new Promise(r => setTimeout(r, 300));
+    child.stdin.write('/skill a\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('/skill b\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+
+    const turns = fs.readFileSync(path.join(dir, 'sessions', 'sw.jsonl'), 'utf8')
+      .split('\n').filter(Boolean).map(l => JSON.parse(l));
+    // Exactly one system message (skill b, since a was replaced)
+    const systems = turns.filter(t => t.role === 'system');
+    expect(systems).toHaveLength(1);
+    expect(systems[0].content).toContain('skill: b');
+    expect(systems[0].content).toContain('body-B');
+    // The first user/assistant pair survives the skill switch
+    expect(turns.some(t => t.role === 'user' && t.content === 'first')).toBe(true);
+  });
+
+  test('chat /skill with no args clears the active system message', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'concise.md'), '# Concise\nbe brief\n');
+
+    const child = spawn(process.execPath, [CLI, 'chat', '--skill', 'concise', '--session', 'cl'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    child.stdin.write('hello\n');
+    await new Promise(r => setTimeout(r, 300));
+    child.stdin.write('/skill\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+
+    const turns = fs.readFileSync(path.join(dir, 'sessions', 'cl.jsonl'), 'utf8')
+      .split('\n').filter(Boolean).map(l => JSON.parse(l));
+    // No system messages after /skill cleared it.
+    expect(turns.filter(t => t.role === 'system')).toHaveLength(0);
+    // hello + assistant reply still present
+    expect(turns.some(t => t.role === 'user' && t.content === 'hello')).toBe(true);
+  });
+
+  test('chat /skill with unknown skill prints an error and keeps prior state', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+
+    const child = spawn(process.execPath, [CLI, 'chat'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stdin.write('/skill nonexistent\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+    const out = chunks.join('');
+    expect(out).toMatch(/skill error|not found/i);
   });
 
   test('anthropic provider hits messages endpoint with stream=true via injected fetch', async () => {
@@ -494,6 +571,65 @@ test.describe('Phase 6 — OpenClaw parity', () => {
       // GET on a missing session is 404 (distinct from "session is empty").
       const getMissing = await fetch(`${d.url}/sessions/apple`);
       expect(getMissing.status).toBe(404);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /skills lists installed skills with summaries', async () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'reviewer.md'),
+      '# Reviewer\nbe thorough but kind\n');
+    fs.writeFileSync(path.join(dir, 'skills', 'concise.md'),
+      '# Concise\nfewer words\n');
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/skills`).then(x => x.json());
+      const names = r.map((s: any) => s.name).sort();
+      expect(names).toEqual(['concise', 'reviewer']);
+      const reviewer = r.find((s: any) => s.name === 'reviewer');
+      expect(reviewer.summary).toBe('Reviewer');
+      expect(reviewer.bytes).toBeGreaterThan(0);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /skills/<name> returns the markdown body as text/markdown', async () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'tldr.md'),
+      '# TL;DR\nsummarize ruthlessly\n');
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/skills/tldr`);
+      expect(r.status).toBe(200);
+      expect(r.headers.get('content-type')).toContain('text/markdown');
+      const body = await r.text();
+      expect(body).toContain('# TL;DR');
+      expect(body).toContain('summarize ruthlessly');
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /skills/<name> on missing skill returns 404', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/skills/does-not-exist`);
+      expect(r.status).toBe(404);
+      const j = await r.json();
+      expect(j.error).toMatch(/skill not found/);
+      expect(j.name).toBe('does-not-exist');
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /skills/<name> rejects path-traversal names with 400', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      // The router regex `[^/]+` already blocks bare `..`-with-slashes
+      // attacks. This tests the OTHER protection — skillPath rejects
+      // dotfile names like ".secret" so they can't read hidden files
+      // under <configDir>/skills/ either.
+      const r = await fetch(`${d.url}/skills/.hidden`);
+      expect(r.status).toBe(400);
     } finally { await d.kill(); }
   });
 
