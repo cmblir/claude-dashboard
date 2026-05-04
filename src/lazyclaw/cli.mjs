@@ -338,6 +338,35 @@ async function cmdChat(flags = {}) {
   }
 }
 
+async function cmdDaemon(flags) {
+  await ensureRegistry();
+  const sessionsMod = await import('./sessions.mjs');
+  const { startDaemon } = await import('./daemon.mjs');
+  const port = flags.port !== undefined ? parseInt(flags.port, 10) : 0;
+  const once = !!flags.once;
+  const cfgDir = path.dirname(configPath());
+  const d = await startDaemon({
+    port: Number.isFinite(port) ? port : 0,
+    once,
+    readConfig,
+    sessionsDirGetter: () => cfgDir,
+    sessionsMod,
+    version: () => readVersionFromRepo(),
+  });
+  // Print the bound port immediately so test/script callers can pick it up
+  // even when we asked for port 0.
+  process.stdout.write(JSON.stringify({ ok: true, url: `http://127.0.0.1:${d.port}`, port: d.port, once }) + '\n');
+  if (!once) {
+    // Forward SIGINT/SIGTERM to a clean shutdown.
+    const shutdown = async () => { try { await d.close(); } catch {} process.exit(0); };
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+  } else {
+    // In once mode, exit naturally after the server closes.
+    d.server.on('close', () => process.exit(0));
+  }
+}
+
 async function cmdProviders(sub, positional) {
   await ensureRegistry();
   switch (sub) {
@@ -475,6 +504,10 @@ async function main() {
       await cmdProviders(sub, rest.positional.slice(1));
       break;
     }
+    case 'daemon': {
+      await cmdDaemon(rest.flags);
+      break;
+    }
     case 'agent': {
       const prompt = rest.positional[0];
       await cmdAgent(prompt, rest.flags);
@@ -499,7 +532,7 @@ async function main() {
       break;
     }
     default:
-      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard|sessions|providers|version> ...');
+      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard|sessions|providers|daemon|version> ...');
       process.exit(2);
   }
 }

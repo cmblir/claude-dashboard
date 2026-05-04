@@ -197,6 +197,136 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(calls[0].headers['anthropic-version']).toBeTruthy();
   });
 
+  // Daemon helper: spawn `lazyclaw daemon --port 0`, wait for the bound URL
+  // line on stdout, return the URL plus a cleanup hook.
+  function startDaemonProc(cfgDir: string): Promise<{ url: string, kill: () => Promise<void> }> {
+    return new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [CLI, 'daemon', '--port', '0'], {
+        env: { ...process.env, LAZYCLAW_CONFIG_DIR: cfgDir },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let buf = '';
+      const onData = (d: Buffer) => {
+        buf += d.toString();
+        const nl = buf.indexOf('\n');
+        if (nl < 0) return;
+        const line = buf.slice(0, nl);
+        try {
+          const obj = JSON.parse(line);
+          if (obj.url) {
+            child.stdout.off('data', onData);
+            resolve({
+              url: obj.url,
+              kill: () => new Promise(r => { child.once('close', () => r()); child.kill('SIGTERM'); }),
+            });
+          }
+        } catch { /* keep buffering */ }
+      };
+      child.stdout.on('data', onData);
+      child.stderr.on('data', d => { /* drain */ d; });
+      child.on('error', reject);
+      setTimeout(() => reject(new Error('daemon did not boot in 5s')), 5000);
+    });
+  }
+
+  test('daemon GET /version returns the version JSON', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/version`).then(x => x.json());
+      expect(r.version).toMatch(/^\d+\.\d+\.\d+/);
+      expect(r.nodeVersion).toMatch(/^v\d+\./);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /providers matches the providers list CLI subcommand', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/providers`).then(x => x.json());
+      const names = r.map((p: any) => p.name);
+      expect(names).toEqual(expect.arrayContaining(['mock', 'anthropic', 'openai']));
+    } finally { await d.kill(); }
+  });
+
+  test('daemon POST /agent returns a non-streaming reply for the mock provider', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'hello daemon' }),
+      }).then(x => x.json());
+      expect(r.reply).toContain('mock-reply: hello daemon');
+    } finally { await d.kill(); }
+  });
+
+  test('daemon POST /agent appends turns to a session when sessionId is set', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const reply = await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'remember me', sessionId: 'daemon-test' }),
+      }).then(x => x.json());
+      expect(reply.reply).toContain('mock-reply: remember me');
+      const log = path.join(dir, 'sessions', 'daemon-test.jsonl');
+      expect(fs.existsSync(log)).toBe(true);
+      const turns = fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+      expect(turns.map(t => t.role)).toEqual(['user', 'assistant']);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon POST /agent with stream=true streams tokens via SSE', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const res = await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'stream me', stream: true }),
+      });
+      expect(res.headers.get('content-type')).toContain('text/event-stream');
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let acc = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value);
+      }
+      expect(acc).toMatch(/event: token/);
+      expect(acc).toMatch(/event: done/);
+      // Reassemble the streamed text from the token frames.
+      const tokens: string[] = [];
+      for (const frame of acc.split('\n\n')) {
+        const m = frame.match(/^event: token\s*\ndata: (.+)$/m);
+        if (m) try { tokens.push(JSON.parse(m[1]).text); } catch { /* skip */ }
+      }
+      expect(tokens.join('')).toContain('mock-reply: stream me');
+    } finally { await d.kill(); }
+  });
+
+  test('daemon POST /agent with no prompt returns 400', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const res = await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+      const j = await res.json();
+      expect(j.error).toMatch(/prompt required/);
+    } finally { await d.kill(); }
+  });
+
   test('providers list returns the registered providers with their key requirement', () => {
     const dir = tmpConfigDir();
     const r = runCli(['providers', 'list'], dir);

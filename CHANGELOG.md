@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.76.0] — 2026-05-05
+
+**LazyClaw: local HTTP daemon (`lazyclaw daemon`).**
+
+OpenClaw exposes a local "gateway" so other tools talk to it over HTTP.
+LazyClaw now does the same — scoped to what the CLI offers and locked
+to loopback only.
+
+### Endpoints (always 127.0.0.1)
+- `GET /version` — VERSION + node + platform
+- `GET /providers` — registered providers with key requirement +
+  default/suggested models (mirrors `lazyclaw providers list`)
+- `GET /status` — current config (provider, model, masked key)
+- `GET /sessions` — recent persisted sessions, mtime descending
+- `POST /agent` — body `{prompt, provider?, model?, thinkingBudget?, sessionId?, stream?}`
+  - `stream:false` (default) collects the full reply and returns
+    `{reply}` once
+  - `stream:true` returns `text/event-stream`: `event: token\ndata: {"text":"…"}`
+    per chunk, `event: done` at end, `event: error` on failure
+  - `sessionId` makes both turns (user + assistant) append to
+    `<configDir>/sessions/<id>.jsonl` — same shape as the CLI
+
+### Safety
+- Always binds 127.0.0.1; never 0.0.0.0
+- Body cap: 5 MB, otherwise the request is destroyed before parse
+- Unknown route → 400 with `{error, route}`
+- No auth — assumes the only client is the local user. Don't expose
+  this beyond loopback without adding one.
+
+### CLI shape
+- `lazyclaw daemon --port 0` binds a random port and prints
+  `{ok, url, port, once}` to stdout — easy for tests to discover.
+- `lazyclaw daemon --once` exits after the first request closes.
+  Used by the test harness so it never has to send SIGTERM and chase
+  zombie servers.
+
+### Tests
+6 new phase 6 specs:
+- `GET /version` returns the right shape
+- `GET /providers` enumerates the registered set
+- `POST /agent` non-streaming reply
+- `POST /agent` with `sessionId` writes the JSONL
+- `POST /agent` with `stream:true` emits `event: token` and `event: done`
+- `POST /agent` with no prompt → 400
+
+Suite: 59/59. tsc clean.
+
+---
 ## [2.75.1] — 2026-05-05
 
 **LazyClaw: `providers list/info` for discoverability.**
