@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.75.0] — 2026-05-05
+
+**LazyClaw: persistent chat sessions.**
+
+Chat used to live in process memory only — close the terminal, lose
+the thread. Now opt in with `--session <id>` and the conversation
+persists across invocations.
+
+### Storage
+`<configDir>/sessions/<id>.jsonl`. Append-only JSONL: one
+`{role, content, ts}` line per turn. Append-per-turn means:
+- Atomic writes (no read-modify-write race when two terminals share an id)
+- O(1) write per turn regardless of conversation length
+- Last-turn time is the file mtime, so `sessions list` sorts without
+  reading any file body
+
+### CLI
+- `lazyclaw chat --session <id>` — load prior turns, then append every
+  user/assistant pair as it streams. On resume, prints
+  `resumed session <id> with N prior turn(s)` so the user knows which
+  thread they're picking up.
+- `lazyclaw sessions list` — recent first, by mtime
+- `lazyclaw sessions show <id>` — dump full turn log as JSON
+- `lazyclaw sessions clear <id>` — remove the file
+- `/new` slash inside a `--session` chat truncates the file (mtime stays
+  fresh so the session keeps its position in the list)
+
+### Security
+`sessionPath()` rejects ids containing `/`, `\`, or `..`/`.` so the
+session id can never escape `<configDir>/sessions/`. Tested.
+
+### Tests
+5 new phase 6 specs:
+- chat `--session` writes the expected JSONL on send
+- second invocation announces it resumed the prior turns
+- `sessions list` returns mtime-descending order
+- `sessions clear` removes the file
+- `sessionPath` rejects path-traversal ids
+
+Full suite: 50/50. tsc clean.
+
+---
 ## [2.74.0] — 2026-05-05
 
 **LazyClaw: extended thinking + `version` subcommand.**

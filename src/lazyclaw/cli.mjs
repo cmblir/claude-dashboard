@@ -242,8 +242,9 @@ async function cmdAgent(prompt, flags) {
   }
 }
 
-async function cmdChat() {
+async function cmdChat(flags = {}) {
   await ensureRegistry();
+  const sessionsMod = await import('./sessions.mjs');
   const cfg = readConfig();
   const provName = cfg.provider || 'mock';
   const prov = _registryMod.PROVIDERS[provName];
@@ -251,8 +252,23 @@ async function cmdChat() {
 
   const readline = await import('node:readline');
   const rl = readline.createInterface({ input: process.stdin, terminal: false });
-  let messages = [];
-  let charsSent = 0;
+
+  // Persistent session ID. When --session is set we hydrate prior turns from
+  // <configDir>/sessions/<id>.jsonl and append every new turn back to it.
+  // Without --session, chat is in-memory only (matches phase 4 behavior).
+  const sessionId = flags.session || null;
+  const cfgDir = path.dirname(configPath());
+  let messages = sessionId
+    ? sessionsMod.loadTurns(sessionId, cfgDir).map(t => ({ role: t.role, content: t.content }))
+    : [];
+  let charsSent = messages.reduce((n, m) => n + (m.role === 'user' ? String(m.content || '').length : 0), 0);
+  if (sessionId && messages.length > 0) {
+    process.stdout.write(`resumed session ${sessionId} with ${messages.length} prior turn(s)\n`);
+  }
+  const persistTurn = (role, content) => {
+    if (!sessionId) return;
+    sessionsMod.appendTurn(sessionId, role, content, cfgDir);
+  };
 
   const handleSlash = async (line) => {
     const cmd = line.split(/\s+/)[0];
@@ -276,6 +292,10 @@ async function cmdChat() {
       case '/reset': {
         messages = [];
         charsSent = 0;
+        if (sessionId) {
+          const sm = await import('./sessions.mjs');
+          sm.resetSession(sessionId, cfgDir);
+        }
         process.stdout.write('cleared — new conversation\n');
         return true;
       }
@@ -302,6 +322,7 @@ async function cmdChat() {
     }
     messages.push({ role: 'user', content: text });
     charsSent += text.length;
+    persistTurn('user', text);
     let acc = '';
     try {
       for await (const chunk of prov.sendMessage(messages, { apiKey: cfg['api-key'], model: cfg.model })) {
@@ -310,9 +331,39 @@ async function cmdChat() {
       }
       process.stdout.write('\n');
       messages.push({ role: 'assistant', content: acc });
+      persistTurn('assistant', acc);
     } catch (err) {
       process.stdout.write(`error: ${err?.message || String(err)}\n`);
     }
+  }
+}
+
+async function cmdSessions(sub, positional) {
+  const sessionsMod = await import('./sessions.mjs');
+  const cfgDir = path.dirname(configPath());
+  switch (sub) {
+    case 'list': {
+      const items = sessionsMod.listSessions(cfgDir);
+      console.log(JSON.stringify(items.map(s => ({ id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString() })), null, 2));
+      return;
+    }
+    case 'show': {
+      const id = positional[0];
+      if (!id) { console.error('Usage: lazyclaw sessions show <id>'); process.exit(2); }
+      const turns = sessionsMod.loadTurns(id, cfgDir);
+      console.log(JSON.stringify(turns, null, 2));
+      return;
+    }
+    case 'clear': {
+      const id = positional[0];
+      if (!id) { console.error('Usage: lazyclaw sessions clear <id>'); process.exit(2); }
+      sessionsMod.clearSession(id, cfgDir);
+      console.log(JSON.stringify({ ok: true, cleared: id }));
+      return;
+    }
+    default:
+      console.error('Usage: lazyclaw sessions <list|show <id>|clear <id>>');
+      process.exit(2);
   }
 }
 
@@ -375,7 +426,12 @@ async function main() {
       break;
     }
     case 'chat': {
-      await cmdChat();
+      await cmdChat(rest.flags);
+      break;
+    }
+    case 'sessions': {
+      const sub = rest.positional[0];
+      await cmdSessions(sub, rest.positional.slice(1));
       break;
     }
     case 'agent': {
@@ -402,7 +458,7 @@ async function main() {
       break;
     }
     default:
-      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard|version> ...');
+      console.error('Usage: lazyclaw <run|resume|config|chat|agent|doctor|status|onboard|sessions|version> ...');
       process.exit(2);
   }
 }

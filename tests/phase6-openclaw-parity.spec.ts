@@ -197,6 +197,83 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(calls[0].headers['anthropic-version']).toBeTruthy();
   });
 
+  test('chat --session persists turns to <configDir>/sessions/<id>.jsonl', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const child = spawn(process.execPath, [CLI, 'chat', '--session', 'feat-x'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stdin.write('first message\n');
+    await new Promise(r => setTimeout(r, 600));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+
+    const file = path.join(dir, 'sessions', 'feat-x.jsonl');
+    expect(fs.existsSync(file)).toBe(true);
+    const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+    expect(lines.length).toBeGreaterThanOrEqual(2);
+    expect(lines[0]).toMatchObject({ role: 'user', content: 'first message' });
+    expect(lines[1]).toMatchObject({ role: 'assistant', content: expect.stringContaining('mock-reply: first message') });
+  });
+
+  test('chat --session resumes prior turns on next invocation', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const turn = (input: string) => new Promise<string>((resolve) => {
+      const child = spawn(process.execPath, [CLI, 'chat', '--session', 'sticky'], {
+        env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const chunks: string[] = [];
+      child.stdout.on('data', d => chunks.push(d.toString()));
+      child.stdin.write(input + '\n');
+      setTimeout(() => { child.stdin.write('/exit\n'); child.stdin.end(); }, 500);
+      child.on('close', () => resolve(chunks.join('')));
+    });
+    await turn('first');
+    const second = await turn('second');
+    // Second invocation should announce that it resumed prior turns.
+    expect(second).toMatch(/resumed session sticky with 2 prior turn\(s\)/);
+  });
+
+  test('sessions list returns recent sessions sorted by mtime descending', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    // Record two sessions; the second one is newer.
+    const dirSessions = path.join(dir, 'sessions');
+    fs.mkdirSync(dirSessions, { recursive: true });
+    fs.writeFileSync(path.join(dirSessions, 'older.jsonl'), JSON.stringify({ role: 'user', content: 'a', ts: 1 }) + '\n');
+    fs.writeFileSync(path.join(dirSessions, 'newer.jsonl'), JSON.stringify({ role: 'user', content: 'b', ts: 2 }) + '\n');
+    // Touch newer to ensure mtime ordering.
+    const now = Date.now();
+    fs.utimesSync(path.join(dirSessions, 'older.jsonl'), now / 1000 - 60, now / 1000 - 60);
+    fs.utimesSync(path.join(dirSessions, 'newer.jsonl'), now / 1000, now / 1000);
+    const r = runCli(['sessions', 'list'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.map((s: any) => s.id)).toEqual(['newer', 'older']);
+  });
+
+  test('sessions clear removes the file', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'doomed.jsonl'), JSON.stringify({ role: 'user', content: 'x', ts: 1 }) + '\n');
+    const r = runCli(['sessions', 'clear', 'doomed'], dir);
+    expect(r.status).toBe(0);
+    expect(fs.existsSync(path.join(dir, 'sessions', 'doomed.jsonl'))).toBe(false);
+  });
+
+  test('sessionPath rejects path-traversal ids', async () => {
+    const sm = await import('../src/lazyclaw/sessions.mjs' as string);
+    expect(() => sm.sessionPath('../etc/passwd', '/tmp/whatever')).toThrow();
+    expect(() => sm.sessionPath('a/b', '/tmp')).toThrow();
+    expect(() => sm.sessionPath('.', '/tmp')).toThrow();
+  });
+
   test('version subcommand prints VERSION + node + platform as JSON', () => {
     const dir = tmpConfigDir();
     const r = runCli(['version'], dir);
