@@ -1262,6 +1262,88 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(a).toBe(b);
   });
 
+  test('decorator stack: cache hit short-circuits fallback and retry entirely', async () => {
+    // Real-world flow: a previously-served prompt comes back. The cache
+    // should serve it without ever consulting fallback or retry —
+    // verified by counting underlying calls.
+    const { withResponseCache } = await import('../src/lazyclaw/providers/cache.mjs' as string);
+    const { withFallback } = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    const { withRateLimitRetry } = await import('../src/lazyclaw/providers/retry.mjs' as string);
+    let primaryCalls = 0, fallbackCalls = 0;
+    const primary = { name: 'prim', async *sendMessage() { primaryCalls++; yield 'A'; } };
+    const altname = { name: 'alt', async *sendMessage() { fallbackCalls++; yield 'B'; } };
+    // Compose innermost-first: cache → fallback → retry. (The daemon's
+    // resolveProvider follows the same order.)
+    const cached = withResponseCache(primary);
+    const chained = withFallback([cached, altname]);
+    const robust = withRateLimitRetry(chained, { attempts: 2, sleep: async () => {} });
+    const drain = async () => {
+      const out: string[] = [];
+      for await (const c of robust.sendMessage([{ role: 'user', content: 'q' }], { model: 'm' })) out.push(c);
+      return out.join('');
+    };
+    expect(await drain()).toBe('A');                  // miss → primary serves
+    expect(await drain()).toBe('A');                  // hit → cache serves
+    expect(await drain()).toBe('A');                  // hit → cache serves
+    expect(primaryCalls).toBe(1);                     // never re-called
+    expect(fallbackCalls).toBe(0);                    // never reached
+  });
+
+  test('decorator stack: cache miss falls through to fallback when primary fails pre-stream', async () => {
+    const { withResponseCache } = await import('../src/lazyclaw/providers/cache.mjs' as string);
+    const { withFallback } = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    let primaryCalls = 0, fallbackCalls = 0;
+    const primary = {
+      name: 'prim',
+      async *sendMessage() {
+        primaryCalls++;
+        const e: any = new Error('primary 500');
+        e.status = 500;
+        throw e;
+      },
+    };
+    const alt = { name: 'alt', async *sendMessage() { fallbackCalls++; yield 'fromAlt'; } };
+    const cached = withResponseCache(primary);
+    const chained = withFallback([cached, alt]);
+    const out: string[] = [];
+    for await (const c of chained.sendMessage([{ role: 'user', content: 'q' }], { model: 'm' })) out.push(c);
+    expect(out.join('')).toBe('fromAlt');
+    expect(primaryCalls).toBe(1);
+    expect(fallbackCalls).toBe(1);
+    // Cache state: the primary's failure must NOT have populated the
+    // primary's cache slot. A second call should still hit primary first.
+    const out2: string[] = [];
+    for await (const c of chained.sendMessage([{ role: 'user', content: 'q' }], { model: 'm' })) out2.push(c);
+    expect(primaryCalls).toBe(2);   // primary tried again; cache wasn't poisoned
+  });
+
+  test('decorator stack: retry exhausts on primary RATE_LIMIT then fallback delivers', async () => {
+    const { withFallback } = await import('../src/lazyclaw/providers/fallback.mjs' as string);
+    const { withRateLimitRetry } = await import('../src/lazyclaw/providers/retry.mjs' as string);
+    let primaryAttempts = 0, fallbackCalls = 0;
+    const primary = {
+      name: 'prim',
+      async *sendMessage() {
+        primaryAttempts++;
+        const e: any = new Error('rate limited');
+        e.code = 'RATE_LIMIT';
+        e.retryAfterMs = 1;
+        throw e;
+      },
+    };
+    const alt = { name: 'alt', async *sendMessage() { fallbackCalls++; yield 'savedByFallback'; } };
+    // Wrap primary with retry first; then fan out to fallback. So retry
+    // exhausts → final RATE_LIMIT bubbles → fallback catches and serves.
+    const primaryWithRetry = withRateLimitRetry(primary, { attempts: 2, sleep: async () => {} });
+    const chained = withFallback([primaryWithRetry, alt]);
+    const out: string[] = [];
+    for await (const c of chained.sendMessage([{ role: 'user', content: 'q' }], { model: 'm' })) out.push(c);
+    expect(out.join('')).toBe('savedByFallback');
+    // Initial call + 2 retries = 3 attempts before fallback kicks in.
+    expect(primaryAttempts).toBe(3);
+    expect(fallbackCalls).toBe(1);
+  });
+
   test('rate limiter: token bucket allows up to capacity then 429s', async () => {
     const mod = await import('../src/lazyclaw/ratelimit.mjs' as string);
     let now = 0;

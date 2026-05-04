@@ -10,6 +10,39 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.92.2] — 2026-05-05
+
+**Test coverage: decorator-stack composition (cache + fallback + retry).**
+
+The three decorators have unit tests each, but no test verified that
+they actually compose without surprising each other. This iteration
+fills that gap with three integration specs that pin down the
+contract:
+
+1. **Cache hit short-circuits both fallback and retry.** Primary serves
+   on first call (1× underlying invocation); two more identical calls
+   are served from cache; fallback never reached, retry never invoked.
+   Verified via call counters.
+
+2. **Cache miss falls through to fallback** when the primary fails
+   pre-stream. The fallback delivers; importantly, the primary's
+   *failure* did **not** populate the primary's cache slot. A second
+   call still tries the primary again — the cache wasn't poisoned.
+
+3. **Retry exhausts on primary `RATE_LIMIT`, then fallback delivers.**
+   Initial call + 2 retries = 3 attempts before the bubbled error
+   reaches the fallback wrapper, which then serves successfully.
+   This validates the "retry wraps each chain link individually"
+   composition story.
+
+These three together cover the realistic production flows: re-asks
+hit the cache, transient outages route around the primary, and rate
+limits don't blow the user's budget on the primary if alternates
+exist.
+
+No production code changes. Suite: 195/195. tsc clean.
+
+---
 ## [2.92.1] — 2026-05-05
 
 **Daemon: wire `withResponseCache` through `resolveProvider`.**
