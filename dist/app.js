@@ -23479,7 +23479,7 @@ window._armOpenAddDialog = async () => {
   // Pull live CLI sessions so the user can pick one rather than guess UUIDs.
   let live = [];
   try {
-    const r = await api('/api/cli-sessions/list').catch(() => null);
+    const r = await api('/api/sessions-monitor/list').catch(() => null);
     live = (r && r.sessions) || [];
   } catch (_) {}
   const liveOptions = live.length
