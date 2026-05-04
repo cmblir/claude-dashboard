@@ -168,6 +168,8 @@ const SLASH_COMMANDS = [
   { cmd: '/reset',  help: 'alias for /new' },
   { cmd: '/usage',  help: 'show message count + chars sent so far' },
   { cmd: '/skill',  help: 'switch active skills: /skill review,style (no arg → clear)' },
+  { cmd: '/provider', help: 'switch provider: /provider openai (no arg → print current)' },
+  { cmd: '/model',  help: 'switch model: /model gpt-4.1 or anthropic/claude-opus-4-7' },
   { cmd: '/exit',   help: 'leave the chat' },
 ];
 
@@ -437,9 +439,15 @@ async function cmdChat(flags = {}) {
   const sessionsMod = await import('./sessions.mjs');
   const skillsMod = await import('./skills.mjs');
   const cfg = readConfig();
-  const provName = cfg.provider || 'mock';
-  const prov = _registryMod.PROVIDERS[provName];
-  if (!prov) { console.error(`unknown provider: ${provName}`); process.exit(2); }
+  // Mutable in-REPL state: /provider and /model edit these without
+  // touching config.json on disk. The CLI flag form (`chat --provider X`)
+  // would normally seed these via cfg, but we leave that to a future
+  // iteration; today the slash commands work against the on-disk default.
+  let activeProvName = cfg.provider || 'mock';
+  let activeModel = cfg.model || null;
+  const lookupProv = (name) => _registryMod.PROVIDERS[name];
+  let prov = lookupProv(activeProvName);
+  if (!prov) { console.error(`unknown provider: ${activeProvName}`); process.exit(2); }
 
   const readline = await import('node:readline');
   const rl = readline.createInterface({ input: process.stdin, terminal: false });
@@ -492,12 +500,57 @@ async function cmdChat(flags = {}) {
       }
       case '/status': {
         const out = {
-          provider: cfg.provider || null,
-          model: cfg.model || null,
+          provider: activeProvName,
+          model: activeModel,
           keyMasked: _registryMod.maskApiKey(cfg['api-key']),
           messageCount: messages.length,
         };
         process.stdout.write(JSON.stringify(out) + '\n');
+        return true;
+      }
+      case '/provider': {
+        // `/provider <name>` switches the active provider for subsequent
+        // turns. The conversation history stays put — the next user
+        // message goes to the new provider with the existing context.
+        // `/provider` (no arg) prints the current name.
+        const arg = line.slice('/provider'.length).trim();
+        if (!arg) {
+          process.stdout.write(`provider: ${activeProvName}\n`);
+          return true;
+        }
+        const next = lookupProv(arg);
+        if (!next) {
+          process.stdout.write(`unknown provider: ${arg} (known: ${Object.keys(_registryMod.PROVIDERS).join(', ')})\n`);
+          return true;
+        }
+        activeProvName = arg;
+        prov = next;
+        process.stdout.write(`provider → ${arg}\n`);
+        return true;
+      }
+      case '/model': {
+        // `/model <name>` updates the active model without touching the
+        // provider. `/model` (no arg) prints the current value.
+        const arg = line.slice('/model'.length).trim();
+        if (!arg) {
+          process.stdout.write(`model: ${activeModel || '(default)'}\n`);
+          return true;
+        }
+        // Honor unified provider/model: `/model anthropic/claude-opus-4-7`
+        // splits and switches both.
+        const { parseProviderModel } = _registryMod;
+        const parsed = parseProviderModel(arg);
+        if (parsed.provider) {
+          const next = lookupProv(parsed.provider);
+          if (!next) {
+            process.stdout.write(`unknown provider: ${parsed.provider}\n`);
+            return true;
+          }
+          activeProvName = parsed.provider;
+          prov = next;
+        }
+        activeModel = parsed.model || arg;
+        process.stdout.write(`model → ${activeModel}${parsed.provider ? ` (provider → ${parsed.provider})` : ''}\n`);
         return true;
       }
       case '/new':
@@ -582,7 +635,7 @@ async function cmdChat(flags = {}) {
     persistTurn('user', text);
     let acc = '';
     try {
-      for await (const chunk of prov.sendMessage(messages, { apiKey: cfg['api-key'], model: cfg.model })) {
+      for await (const chunk of prov.sendMessage(messages, { apiKey: cfg['api-key'], model: activeModel })) {
         process.stdout.write(chunk);
         acc += chunk;
       }
