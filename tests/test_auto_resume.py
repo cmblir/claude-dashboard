@@ -267,6 +267,22 @@ class TestProcessOneLifecycle:
         assert e["nextAttemptAt"] > 0
         assert e["attempts"] == 1
 
+    def test_max_attempts_exhausts(self, tmp_path, monkeypatch):
+        ar, sid = self._setup(
+            tmp_path, monkeypatch, claude_exit=1,
+            claude_stderr="HTTP 429 Too Many Requests",
+        )
+        # Pre-bump attempts to one below cap; one more pass should exhaust.
+        store = ar._load_all()
+        store[sid]["attempts"] = store[sid]["maxAttempts"]
+        ar._dump_all(store)
+
+        ar._process_one(sid)
+        e = ar._load_all()[sid]
+        assert e["state"] == "exhausted"
+        assert e["enabled"] is False
+        assert "max attempts" in (e.get("stopReason") or "").lower()
+
     def test_auth_expired_disables_permanently(self, tmp_path, monkeypatch):
         ar, sid = self._setup(
             tmp_path, monkeypatch, claude_exit=1,
