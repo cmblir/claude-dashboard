@@ -175,3 +175,110 @@ class TestJsonlHelpers:
     def test_looks_rate_limited_missing_file(self, tmp_path):
         f = tmp_path / "missing.jsonl"
         assert _looks_rate_limited(f) is False
+
+
+# ───────── _process_one full lifecycle (integration) ─────────
+
+class TestProcessOneLifecycle:
+    """End-to-end: idle+rate-limited jsonl -> spawn fake claude -> STATE_DONE -> auto-disable."""
+
+    def _setup(self, tmp_path, monkeypatch, claude_exit: int, claude_stderr: str = ""):
+        import os
+        import server.auto_resume as ar
+
+        # Redirect on-disk state to tmp
+        state_path = tmp_path / "auto-resume.json"
+        monkeypatch.setattr(ar, "AUTO_RESUME_PATH", state_path)
+
+        # Build a fake jsonl with rate-limit signature, mtime old enough
+        # to trip idleSeconds gate
+        cwd = tmp_path / "session-cwd"
+        cwd.mkdir()
+        jsonl = tmp_path / "session.jsonl"
+        jsonl.write_text(
+            '{"role":"assistant","content":"5-hour limit reached, try again later"}\n'
+        )
+        old_mtime = time.time() - 600  # 10 min ago
+        os.utime(jsonl, (old_mtime, old_mtime))
+
+        # Stub out terminal liveness check (otherwise dead-tick logic kicks in)
+        monkeypatch.setattr(ar, "_live_cli_sessions", lambda: {"sess-int-1": {}})
+
+        # Fake `claude` binary as a shell script
+        fake_bin = tmp_path / "bin"
+        fake_bin.mkdir()
+        fake_claude = fake_bin / "claude"
+        if claude_exit == 0:
+            fake_claude.write_text("#!/bin/sh\necho resumed-ok\nexit 0\n")
+        else:
+            fake_claude.write_text(
+                f"#!/bin/sh\nprintf '%s' {claude_stderr!r} 1>&2\nexit {claude_exit}\n"
+            )
+        fake_claude.chmod(0o755)
+        monkeypatch.setattr(ar, "_claude_bin", lambda: str(fake_claude))
+
+        # Seed an enabled binding
+        sid = "sess-int-1"
+        store = {
+            sid: {
+                "sessionId": sid,
+                "enabled": True,
+                "cwd": str(cwd),
+                "jsonlPath": str(jsonl),
+                "prompt": "continue",
+                "pollInterval": 60,
+                "idleSeconds": 30,
+                "maxAttempts": 5,
+                "useContinue": False,
+                "extraArgs": [],
+                "installHooks": False,
+                "createdAt": int(time.time() * 1000),
+                "attempts": 0,
+                "lastAttemptAt": 0,
+                "nextAttemptAt": 0,
+                "state": "watching",
+                "snapshotHashes": [],
+            }
+        }
+        ar._dump_all(store)
+        return ar, sid
+
+    def test_clean_exit_marks_done_and_disables(self, tmp_path, monkeypatch):
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        ar._process_one(sid)
+        store = ar._load_all()
+        e = store[sid]
+        assert e["state"] == "done", f"expected STATE_DONE, got {e['state']} err={e.get('lastError')}"
+        assert e["lastExitCode"] == 0
+        assert e["lastExitReason"] == "clean"
+        assert e["attempts"] == 1
+        assert e["nextAttemptAt"] == 0
+
+    def test_rate_limit_exit_schedules_retry_keeps_enabled(self, tmp_path, monkeypatch):
+        ar, sid = self._setup(
+            tmp_path, monkeypatch, claude_exit=1,
+            claude_stderr="HTTP 429 Too Many Requests",
+        )
+        ar._process_one(sid)
+        store = ar._load_all()
+        e = store[sid]
+        assert e["lastExitReason"] == "rate_limit"
+        assert e["enabled"] is True
+        assert e["nextAttemptAt"] > 0
+        assert e["attempts"] == 1
+
+    def test_auth_expired_disables_permanently(self, tmp_path, monkeypatch):
+        ar, sid = self._setup(
+            tmp_path, monkeypatch, claude_exit=1,
+            claude_stderr="Unauthorized: please run /login",
+        )
+        ar._process_one(sid)
+        store = ar._load_all()
+        e = store[sid]
+        assert e["state"] == "failed"
+        assert e["lastExitReason"] == "auth_expired"
+        assert e["enabled"] is False
+
+
+# Needed for the integration tests above
+import time  # noqa: E402
