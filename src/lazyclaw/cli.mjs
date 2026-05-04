@@ -392,6 +392,13 @@ async function cmdDaemon(flags) {
   // When neither is set, the daemon runs unauthenticated (the historical
   // single-user-loopback default).
   const authToken = flags['auth-token'] || process.env.LAZYCLAW_AUTH_TOKEN || null;
+  // --allow-origin accepts a comma-separated list (also reads
+  // LAZYCLAW_ALLOW_ORIGINS env). When neither is set, any request that
+  // carries an `Origin` header is rejected with 403 — the browser-CSRF
+  // / DNS-rebinding default. CLI/script callers don't send Origin so
+  // they're unaffected.
+  const originSrc = flags['allow-origin'] || process.env.LAZYCLAW_ALLOW_ORIGINS || '';
+  const allowedOrigins = String(originSrc).split(',').map(s => s.trim()).filter(Boolean);
   const cfgDir = path.dirname(configPath());
   const d = await startDaemon({
     port: Number.isFinite(port) ? port : 0,
@@ -401,11 +408,16 @@ async function cmdDaemon(flags) {
     sessionsMod,
     version: () => readVersionFromRepo(),
     authToken: authToken || undefined,
+    allowedOrigins,
   });
   // Print the bound port immediately so test/script callers can pick it up
-  // even when we asked for port 0. Indicate auth presence (not the token).
+  // even when we asked for port 0. Indicate auth presence (not the token)
+  // and the allowed-origin count (not the values, just whether browser
+  // access has been opened).
   process.stdout.write(JSON.stringify({
-    ok: true, url: `http://127.0.0.1:${d.port}`, port: d.port, once, auth: !!authToken,
+    ok: true, url: `http://127.0.0.1:${d.port}`, port: d.port, once,
+    auth: !!authToken,
+    allowedOriginCount: allowedOrigins.length,
   }) + '\n');
   if (!once) {
     // Forward SIGINT/SIGTERM to a clean shutdown.

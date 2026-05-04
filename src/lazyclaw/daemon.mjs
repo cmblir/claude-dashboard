@@ -118,18 +118,47 @@ function isAuthorized(req, expectedToken) {
 }
 
 /**
+ * Origin gate — protect against DNS-rebinding / CSRF where a page in
+ * the user's browser posts to 127.0.0.1:<our port>. Browsers always
+ * attach `Origin` for cross-origin POSTs (and increasingly for GETs);
+ * CLI tools (curl, fetch from a script) usually don't.
+ *
+ * Policy:
+ *   - No `Origin` header → assume non-browser caller, allow.
+ *   - `Origin` set → must be in `allowedOrigins`. Empty allowlist
+ *     means "reject all browser-originated requests" — the default,
+ *     because the daemon is designed for CLI/script callers.
+ *
+ * Returns true when the request should proceed, false when it should
+ * be rejected with 403.
+ */
+function isOriginAllowed(req, allowedOrigins) {
+  const origin = req.headers['origin'];
+  if (!origin) return true;
+  if (!allowedOrigins || allowedOrigins.length === 0) return false;
+  return allowedOrigins.includes(origin);
+}
+
+/**
  * @param {{
  *   readConfig: () => Record<string, unknown>,
  *   sessionsDirGetter: () => string,
  *   sessionsMod: typeof import('./sessions.mjs'),
  *   version: () => string,
  *   authToken?: string,
+ *   allowedOrigins?: string[],
  * }} ctx
  */
 export function makeHandler(ctx) {
   const authToken = ctx.authToken || null;
+  const allowedOrigins = Array.isArray(ctx.allowedOrigins) ? ctx.allowedOrigins : [];
   return async function handler(req, res) {
     try {
+      // Origin gate runs *before* auth so a browser-originated request
+      // can't even probe whether a token is required.
+      if (!isOriginAllowed(req, allowedOrigins)) {
+        return writeJson(res, 403, { error: 'forbidden origin' });
+      }
       // Authentication gate — when authToken is set, every request must
       // present `Authorization: Bearer <token>`. This is opt-in because
       // the default deployment is loopback-only single-user; the token
@@ -364,6 +393,7 @@ export function makeHandler(ctx) {
  *   sessionsMod: typeof import('./sessions.mjs'),
  *   version: () => string,
  *   authToken?: string,
+ *   allowedOrigins?: string[],
  * }} opts
  * @returns {Promise<{ port: number, server: http.Server, close: () => Promise<void> }>}
  */

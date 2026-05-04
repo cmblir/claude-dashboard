@@ -10,6 +10,42 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.83.0] — 2026-05-05
+
+**Daemon: `Origin` gate for DNS-rebinding / browser-CSRF defense.**
+
+The daemon binds 127.0.0.1, but a malicious page in the user's browser
+can still issue cross-origin POSTs to `http://127.0.0.1:<our port>` —
+that's exactly the DNS-rebinding attack class. The auth-token gate
+helps when set, but the default deploy is unauthenticated.
+
+Fix: every request that carries an `Origin` header must be on the
+allowlist; missing `Origin` (the CLI/script case) passes through.
+The check runs **before** the auth gate so a forbidden origin
+cannot even probe whether a token is required (no `WWW-Authenticate`
+on a 403, the browser doesn't pop a credential prompt).
+
+### CLI
+- `lazyclaw daemon --allow-origin "http://localhost:3000"` opens a
+  specific browser origin
+- comma-separated for multiple: `--allow-origin "http://localhost:3000,http://127.0.0.1:8080"`
+- env var: `LAZYCLAW_ALLOW_ORIGINS=...` (flag wins when both set)
+- bound-URL JSON now reports `allowedOriginCount: <N>` so callers can
+  see whether browser access has been opened (count, not values)
+
+### Tests
+5 new phase 6 specs:
+- no Origin header → allow (CLI/script default)
+- foreign Origin → 403 with `{error: 'forbidden origin'}`
+- allowlisted Origin → 200 (and missing Origin still allowed)
+- ordering: Origin gate runs before auth — forbidden Origin gets 403
+  with no `WWW-Authenticate` (browser cannot probe auth state)
+- CLI integration: `--allow-origin` survives spawn, allowlisted Origin
+  → 200, foreign Origin → 403, no Origin → 200
+
+Suite: 118/118. tsc clean. Dashboard QA: 0/66.
+
+---
 ## [2.82.2] — 2026-05-05
 
 **Docs: README documents the daemon `--auth-token` and `retry` body field.**

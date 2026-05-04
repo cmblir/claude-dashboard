@@ -613,6 +613,101 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(await drive('')).toBe(401);             // empty
   });
 
+  test('daemon Origin gate: no Origin header → allow (CLI/script default)', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+    });
+    let status = 0;
+    const req: any = { method: 'GET', url: '/version', headers: {} };
+    const res: any = { writeHead(s: number) { status = s; }, end() {} };
+    await handler(req, res);
+    expect(status).toBe(200);
+  });
+
+  test('daemon Origin gate: foreign Origin → 403 (browser CSRF / DNS-rebinding defense)', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+    });
+    let status = 0;
+    let body = '';
+    const req: any = { method: 'GET', url: '/version', headers: { origin: 'https://attacker.example' } };
+    const res: any = { writeHead(s: number) { status = s; }, end(b: string) { body = b; } };
+    await handler(req, res);
+    expect(status).toBe(403);
+    expect(JSON.parse(body)).toEqual({ error: 'forbidden origin' });
+  });
+
+  test('daemon Origin gate: allowlisted Origin → allow', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      allowedOrigins: ['http://localhost:3000', 'http://127.0.0.1:8080'],
+    });
+    const drive = async (origin: string | undefined) => {
+      let status = 0;
+      const req: any = { method: 'GET', url: '/version', headers: origin ? { origin } : {} };
+      const res: any = { writeHead(s: number) { status = s; }, end() {} };
+      await handler(req, res);
+      return status;
+    };
+    expect(await drive('http://localhost:3000')).toBe(200);
+    expect(await drive('http://127.0.0.1:8080')).toBe(200);
+    expect(await drive('https://evil.example')).toBe(403);
+    expect(await drive(undefined)).toBe(200);
+  });
+
+  test('daemon Origin gate runs BEFORE auth so a foreign origin cannot probe auth state', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      authToken: 'secret',
+    });
+    let status = 0;
+    const headers: Record<string, string> = {};
+    // Foreign origin + a (valid) auth token. The Origin gate must
+    // reject *before* auth even runs, so we never emit WWW-Authenticate
+    // (which would tell the browser to open the auth dialog).
+    const req: any = { method: 'GET', url: '/version', headers: { origin: 'https://evil.example', authorization: 'Bearer secret' } };
+    const res: any = {
+      writeHead(s: number, h: any) { status = s; if (h) Object.assign(headers, h); },
+      end() {},
+    };
+    await handler(req, res);
+    expect(status).toBe(403);
+    expect(headers['www-authenticate']).toBeUndefined();
+  });
+
+  test('daemon CLI --allow-origin allows that origin and rejects others', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir, ['--allow-origin', 'http://localhost:3000']);
+    try {
+      const ok = await fetch(`${d.url}/version`, { headers: { origin: 'http://localhost:3000' } });
+      expect(ok.status).toBe(200);
+      const bad = await fetch(`${d.url}/version`, { headers: { origin: 'https://evil.example' } });
+      expect(bad.status).toBe(403);
+      const noOrigin = await fetch(`${d.url}/version`);
+      expect(noOrigin.status).toBe(200);
+    } finally { await d.kill(); }
+  });
+
   test('daemon CLI --auth-token reports auth=true and rejects unauthenticated requests', async () => {
     const dir = tmpConfigDir();
     const d = await startDaemonProc(dir, ['--auth-token', 'integration-secret']);
@@ -903,6 +998,110 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     // Negative or non-finite → ceiling
     expect(mod.clampBackoff(-1, 30_000)).toBe(30_000);
     expect(mod.clampBackoff(Number.NaN, 30_000)).toBe(30_000);
+  });
+
+  test('gemini provider hits :streamGenerateContent?alt=sse with key in query and parses parts[].text', async () => {
+    const mod = await import('../src/lazyclaw/providers/gemini.mjs' as string);
+    let url = '';
+    let sentBody: any = null;
+    const sse =
+      'data: {"candidates":[{"content":{"role":"model","parts":[{"text":"Hello"}]}}]}\n\n' +
+      'data: {"candidates":[{"content":{"role":"model","parts":[{"text":" Gemini"}]}}]}\n\n';
+    const fakeFetch = async (u: string, init: any) => {
+      url = u;
+      sentBody = JSON.parse(init.body);
+      return {
+        ok: true, status: 200,
+        body: new ReadableStream({
+          start(c) { c.enqueue(new TextEncoder().encode(sse)); c.close(); },
+        }),
+      };
+    };
+    const out: string[] = [];
+    for await (const chunk of mod.geminiProvider.sendMessage(
+      [{ role: 'user', content: 'hi' }],
+      { apiKey: 'AIza-secret', model: 'gemini-1.5-pro', fetch: fakeFetch as any },
+    )) out.push(chunk);
+    expect(out.join('')).toBe('Hello Gemini');
+    expect(url).toContain('/models/gemini-1.5-pro:streamGenerateContent?alt=sse&key=AIza-secret');
+    expect(sentBody.contents).toEqual([
+      { role: 'user', parts: [{ text: 'hi' }] },
+    ]);
+  });
+
+  test('gemini provider lifts a system message into systemInstruction and maps assistant→model role', async () => {
+    const mod = await import('../src/lazyclaw/providers/gemini.mjs' as string);
+    let sentBody: any = null;
+    const fakeFetch = async (_u: string, init: any) => {
+      sentBody = JSON.parse(init.body);
+      return {
+        ok: true, status: 200,
+        body: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('')); c.close(); } }),
+      };
+    };
+    for await (const _c of mod.geminiProvider.sendMessage(
+      [
+        { role: 'system', content: 'be terse' },
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: 'first reply' },
+        { role: 'user', content: 'follow up' },
+      ],
+      { apiKey: 'k', fetch: fakeFetch as any },
+    )) { /* drain */ }
+    expect(sentBody.systemInstruction).toEqual({ parts: [{ text: 'be terse' }] });
+    expect(sentBody.contents).toEqual([
+      { role: 'user', parts: [{ text: 'first' }] },
+      { role: 'model', parts: [{ text: 'first reply' }] },
+      { role: 'user', parts: [{ text: 'follow up' }] },
+    ]);
+  });
+
+  test('gemini provider 401 → INVALID_KEY; 429 → RateLimitError', async () => {
+    const mod = await import('../src/lazyclaw/providers/gemini.mjs' as string);
+    const make401 = async () => ({
+      ok: false, status: 401,
+      headers: new Headers({}),
+      text: async () => '{"error":{"message":"unauthorized"}}',
+    });
+    let caught: any = null;
+    try {
+      for await (const _c of mod.geminiProvider.sendMessage(
+        [{ role: 'user', content: 'hi' }],
+        { apiKey: 'bad', fetch: make401 as any },
+      )) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('INVALID_KEY');
+
+    const make429 = async () => ({
+      ok: false, status: 429,
+      headers: new Headers({ 'retry-after': '5' }),
+      text: async () => '{"error":{"message":"slow down"}}',
+    });
+    caught = null;
+    try {
+      for await (const _c of mod.geminiProvider.sendMessage(
+        [{ role: 'user', content: 'hi' }],
+        { apiKey: 'k', fetch: make429 as any },
+      )) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('RATE_LIMIT');
+    expect(caught?.retryAfterMs).toBe(5000);
+  });
+
+  test('gemini in registry: providers list includes it; doctor accepts it with a key', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['providers', 'list'], dir);
+    const out = JSON.parse(r.stdout);
+    expect(out.find((p: any) => p.name === 'gemini')).toBeTruthy();
+
+    runCli(['config', 'set', 'provider', 'gemini'], dir);
+    runCli(['config', 'set', 'api-key', 'AIza-test'], dir);
+    runCli(['config', 'set', 'model', 'gemini-1.5-pro'], dir);
+    const doctor = runCli(['doctor'], dir);
+    expect(doctor.status).toBe(0);
+    const dout = JSON.parse(doctor.stdout);
+    expect(dout.knownProviders).toEqual(expect.arrayContaining(['gemini']));
+    expect(dout.ok).toBe(true);
   });
 
   test('ollama provider streams newline-delimited JSON chunks and stops on done:true', async () => {
