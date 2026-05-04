@@ -197,6 +197,47 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(calls[0].headers['anthropic-version']).toBeTruthy();
   });
 
+  test('anthropic provider preserves UTF-8 codepoints split across chunk boundaries', async () => {
+    // Korean "안녕" = E384 ABC8 EB85 95 (6 bytes). We split mid-codepoint so
+    // a non-streaming decoder would produce U+FFFD. The streaming TextDecoder
+    // inside the provider must hold the partial bytes until the next chunk.
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    const fullSse =
+      'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"안녕"}}\n\n' +
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n';
+    const fullBytes = new TextEncoder().encode(fullSse);
+    // Split right inside the first multi-byte codepoint of "안" so the first
+    // chunk ends mid-character.
+    const splitAt = fullSse.indexOf('안') + 1;  // string-index, not byte-index
+    // Convert to byte-aware split by finding the byte offset of the string-index.
+    const before = fullSse.slice(0, splitAt);
+    const beforeBytes = new TextEncoder().encode(before);
+    // Drop one trailing byte from beforeBytes so the codepoint is split.
+    const cutByte = beforeBytes.length - 1;
+    const part1 = fullBytes.slice(0, cutByte);
+    const part2 = fullBytes.slice(cutByte);
+
+    const fakeFetch = async () => ({
+      ok: true,
+      status: 200,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(part1);
+          controller.enqueue(part2);
+          controller.close();
+        },
+      }),
+    });
+    const out: string[] = [];
+    for await (const chunk of mod.anthropicProvider.sendMessage(
+      [{ role: 'user', content: 'hi' }],
+      { apiKey: 'sk-ant-x', model: 'claude-opus-4-7', fetch: fakeFetch as any },
+    )) {
+      out.push(chunk);
+    }
+    expect(out.join('')).toBe('안녕');
+  });
+
   test('anthropic provider surfaces 401 as INVALID_KEY error', async () => {
     const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
     const fakeFetch = async () => ({

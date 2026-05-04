@@ -131,9 +131,13 @@ export const anthropicProvider = {
       throw new ApiError(res.status, text || '');
     }
 
+    // Stream-mode TextDecoder so UTF-8 sequences split across network
+    // chunk boundaries decode correctly. Without {stream:true} a multi-byte
+    // codepoint that lands across two reads would surface as U+FFFD.
+    const decoder = new TextDecoder('utf-8', { fatal: false });
     let buffer = '';
     for await (const chunk of iterateBody(res.body)) {
-      buffer += typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
+      buffer += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
       let consumed = 0;
       for (const frame of parseSseFrames(buffer)) {
         consumed = frame.nextCursor;
@@ -156,6 +160,9 @@ export const anthropicProvider = {
       }
       if (consumed > 0) buffer = buffer.slice(consumed);
     }
+    // Flush any pending bytes the streaming decoder was still holding.
+    const tail = decoder.decode();
+    if (tail) buffer += tail;
   },
 };
 

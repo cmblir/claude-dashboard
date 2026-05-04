@@ -10,6 +10,29 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.72.1] — 2026-05-05
+
+**Anthropic SSE: streaming UTF-8 decoder.**
+
+The provider used `new TextDecoder().decode(chunk)` per chunk — fresh
+decoder each time, no `{ stream: true }`. A multi-byte codepoint that
+landed across two HTTP read boundaries (common with non-ASCII streams,
+i.e. anything that isn't English) would surface as U+FFFD because the
+trailing partial byte was discarded before the continuation arrived.
+
+Reuse a single decoder for the lifetime of the request and pass
+`{ stream: true }` so partial bytes are held until the next chunk.
+Final pending bytes flushed via a no-arg `decoder.decode()` after
+the body iterator drains.
+
+### Tests
+New phase 6 spec: split a Korean text frame mid-codepoint across two
+ReadableStream chunks; assert the joined output equals "안녕" exactly.
+Without the fix, the joined string contains a replacement character.
+
+Full suite: 36/36.
+
+---
 ## [2.72.0] — 2026-05-05
 
 **LazyClaw OpenClaw-parity: phase 6** — `doctor`, `onboard`, `status`,
