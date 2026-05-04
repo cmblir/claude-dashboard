@@ -10,6 +10,53 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.81.2] — 2026-05-05
+
+**Provider retry wrapper: `withRateLimitRetry` for `RATE_LIMIT` backoff.**
+
+A wrapper, not a per-provider option, because retry policy is a caller
+concern (CLI script wants 3 retries, daemon wants 10 with a max wall
+clock). Wrapping keeps the providers simple — each remains a pure
+async iterator over a single attempt.
+
+```js
+import { withRateLimitRetry } from './src/lazyclaw/providers/retry.mjs';
+import { anthropicProvider } from './src/lazyclaw/providers/registry.mjs';
+
+const safe = withRateLimitRetry(anthropicProvider, {
+  attempts: 3,
+  maxBackoffMs: 60_000,
+  onRetry: ({ attempt, retryAfterMs }) => log.warn(`429 retry ${attempt} in ${retryAfterMs}ms`),
+});
+
+for await (const chunk of safe.sendMessage(messages, { apiKey, model, signal })) {
+  process.stdout.write(chunk);
+}
+```
+
+### Strategy
+1. Only `RATE_LIMIT` errors that surface *before any chunk has been yielded*
+   are retried. Mid-stream `RATE_LIMIT` is re-thrown unchanged because
+   retrying would produce duplicate text downstream.
+2. Sleep is `min(retryAfterMs, maxBackoffMs)` with a hard 5-minute
+   absolute ceiling — a misbehaving provider can't pin us for an hour.
+3. `attempts` is exclusive of the initial call: `attempts: 3` means up to
+   four total tries.
+4. `opts.signal` is honored *inside* the sleep so a cancel during backoff
+   stops immediately rather than waiting for wake-up.
+
+### Tests
+6 new phase 6 specs:
+- happy-path retry: yields the second attempt
+- exhausted attempts → rethrow last `RATE_LIMIT`
+- mid-stream `RATE_LIMIT` is NOT retried (duplicate-output guard)
+- non-`RATE_LIMIT` errors pass through immediately
+- `onRetry` callback receives `{attempt, retryAfterMs}`
+- `clampBackoff` clamps to `maxBackoffMs` and the 5-minute ceiling
+
+Suite: 106/106. tsc clean.
+
+---
 ## [2.81.1] — 2026-05-05
 
 **Anthropic prompt caching: `opts.cache: true`.**

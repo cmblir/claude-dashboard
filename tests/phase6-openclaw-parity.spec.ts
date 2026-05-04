@@ -794,6 +794,54 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(calls[0].input).toEqual({ x: 1 });
   });
 
+  test('withRateLimitRetry passes through on first-attempt success (no retry needed)', async () => {
+    const { withRateLimitRetry } = await import('../src/lazyclaw/providers/retry.mjs' as string);
+    let calls = 0;
+    const inner = {
+      name: 'fake',
+      async *sendMessage() { calls++; yield 'A'; yield 'B'; },
+    };
+    const wrapped = withRateLimitRetry(inner, { attempts: 3 });
+    const out: string[] = [];
+    for await (const c of wrapped.sendMessage([], {})) out.push(c);
+    expect(out.join('')).toBe('AB');
+    expect(calls).toBe(1);
+  });
+
+  test('withRateLimitRetry aborts during backoff sleep when AbortSignal fires', async () => {
+    const { withRateLimitRetry } = await import('../src/lazyclaw/providers/retry.mjs' as string);
+    let calls = 0;
+    const inner = {
+      name: 'fake',
+      async *sendMessage() {
+        calls++;
+        const e: any = new Error('rate limited');
+        e.code = 'RATE_LIMIT';
+        e.retryAfterMs = 10_000;   // would normally sleep 10s
+        throw e;
+      },
+    };
+    const ac = new AbortController();
+    // Custom sleep that respects the signal so the test runs fast.
+    const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve, reject) => {
+      const t = setTimeout(resolve, ms);
+      signal?.addEventListener('abort', () => {
+        clearTimeout(t);
+        const e: any = new Error('aborted during retry backoff');
+        e.code = 'ABORT';
+        reject(e);
+      }, { once: true });
+    });
+    const wrapped = withRateLimitRetry(inner, { attempts: 3, sleep });
+    setTimeout(() => ac.abort(), 30);  // abort while sleeping
+    let caught: any = null;
+    try {
+      for await (const _c of wrapped.sendMessage([], { signal: ac.signal })) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('ABORT');
+    expect(calls).toBe(1);   // never reached the second attempt
+  });
+
   test('anthropic provider sends system as a plain string by default', async () => {
     const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
     let body: any = null;
