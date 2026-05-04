@@ -22,6 +22,14 @@ class InvalidApiKeyError extends Error {
   }
 }
 
+class AbortError extends Error {
+  constructor(message = 'aborted') {
+    super(message);
+    this.name = 'AbortError';
+    this.code = 'ABORT';
+  }
+}
+
 class ApiError extends Error {
   constructor(status, body) {
     super(`openai api ${status}: ${String(body).slice(0, 200)}`);
@@ -94,6 +102,7 @@ export const openaiProvider = {
       messages: apiMessages,
     };
 
+    if (opts.signal?.aborted) throw new AbortError('aborted before request');
     const res = await fetchFn('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -101,6 +110,7 @@ export const openaiProvider = {
         'authorization': `Bearer ${opts.apiKey}`,
       },
       body: JSON.stringify(body),
+      signal: opts.signal,
     });
 
     if (!res.ok) {
@@ -112,6 +122,7 @@ export const openaiProvider = {
     const decoder = new TextDecoder('utf-8', { fatal: false });
     let buffer = '';
     for await (const chunk of iterateBody(res.body)) {
+      if (opts.signal?.aborted) throw new AbortError('aborted mid-stream');
       buffer += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
       let consumed = 0;
       for (const frame of parseSseFrames(buffer)) {
@@ -133,4 +144,4 @@ export const openaiProvider = {
   },
 };
 
-export { InvalidApiKeyError, ApiError };
+export { InvalidApiKeyError, ApiError, AbortError };

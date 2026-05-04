@@ -10,6 +10,38 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.78.0] — 2026-05-05
+
+**Cancellable streams: `AbortSignal` end-to-end.**
+
+Both providers and the daemon now honor `opts.signal` so callers can
+cancel an in-flight inference and stop burning tokens.
+
+### Providers
+- `anthropicProvider.sendMessage(..., { signal })` — checks the signal
+  before the request, before each chunk read, and propagates it to
+  `fetch` so the underlying socket closes on abort. Aborted streams
+  throw `AbortError { code: 'ABORT' }`.
+- `openaiProvider.sendMessage` mirrors the same shape.
+
+### Daemon
+The streaming `POST /agent` endpoint creates a per-request
+`AbortController` and forwards `req.aborted` / `res.close` events to
+the provider. When the client disconnects mid-stream:
+- The provider stops issuing tokens.
+- The session JSONL is **not** appended (the assistant turn was
+  partial).
+- The daemon ends the SSE response without writing `event: error`.
+
+### Tests
+3 new phase 6 specs:
+- pre-request abort throws `AbortError` (anthropic)
+- mid-stream abort stops yielding after the first chunk (anthropic)
+- openai mirrors the same shape
+
+Suite: 75/75. tsc clean.
+
+---
 ## [2.77.2] — 2026-05-05
 
 **Docs: README documents the LazyClaw CLI surface.**

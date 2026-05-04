@@ -219,22 +219,33 @@ export function makeHandler(ctx) {
 
           if (body.stream === true) {
             writeSseHead(res);
+            // Forward client disconnect to the provider so we don't keep
+            // burning tokens after the consumer has gone away.
+            const ac = new AbortController();
+            req.on('aborted', () => ac.abort());
+            res.on('close', () => { if (!res.writableEnded) ac.abort(); });
             let acc = '';
             try {
               for await (const chunk of prov.sendMessage(messages, {
                 apiKey: cfg['api-key'],
                 model,
                 thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
+                signal: ac.signal,
               })) {
+                if (ac.signal.aborted) break;
                 acc += chunk;
                 writeSse(res, 'token', { text: chunk });
                 // Backpressure: yield so the caller can read each frame.
                 await new Promise(r => setImmediate(r));
               }
-              if (sid) ctx.sessionsMod.appendTurn(sid, 'assistant', acc, cfgDir);
-              writeSse(res, 'done', { ok: true });
+              if (sid && !ac.signal.aborted) ctx.sessionsMod.appendTurn(sid, 'assistant', acc, cfgDir);
+              if (!ac.signal.aborted) writeSse(res, 'done', { ok: true });
               return res.end();
             } catch (err) {
+              if (err?.code === 'ABORT' || ac.signal.aborted) {
+                // Client gave up — partial assistant turn is discarded.
+                return res.end();
+              }
               writeSse(res, 'error', { message: err?.message || String(err) });
               return res.end();
             }

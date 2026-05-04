@@ -28,6 +28,14 @@ class InvalidApiKeyError extends Error {
   }
 }
 
+class AbortError extends Error {
+  constructor(message = 'aborted') {
+    super(message);
+    this.name = 'AbortError';
+    this.code = 'ABORT';
+  }
+}
+
 class ApiError extends Error {
   constructor(status, body) {
     super(`anthropic api ${status}: ${body.slice(0, 200)}`);
@@ -124,6 +132,12 @@ export const anthropicProvider = {
       };
     }
 
+    // Honor opts.signal (AbortSignal) so callers can cancel mid-stream.
+    // Both the fetch itself and the body iterator check the signal — fetch
+    // for in-flight aborts, the iterator so a cancel between bytes also
+    // surfaces immediately rather than waiting for the next chunk.
+    if (opts.signal?.aborted) throw new AbortError('aborted before request');
+
     const res = await fetchFn('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -132,6 +146,7 @@ export const anthropicProvider = {
         'anthropic-version': ANTHROPIC_VERSION,
       },
       body: JSON.stringify(body),
+      signal: opts.signal,
     });
 
     if (!res.ok) {
@@ -146,6 +161,7 @@ export const anthropicProvider = {
     const decoder = new TextDecoder('utf-8', { fatal: false });
     let buffer = '';
     for await (const chunk of iterateBody(res.body)) {
+      if (opts.signal?.aborted) throw new AbortError('aborted mid-stream');
       buffer += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
       let consumed = 0;
       for (const frame of parseSseFrames(buffer)) {
@@ -185,4 +201,4 @@ export const anthropicProvider = {
   },
 };
 
-export { InvalidApiKeyError, ApiError };
+export { InvalidApiKeyError, ApiError, AbortError };

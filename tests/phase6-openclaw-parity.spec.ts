@@ -453,6 +453,70 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('anthropic provider honors AbortSignal — pre-request abort throws AbortError', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    const ac = new AbortController();
+    ac.abort();
+    let caught: any = null;
+    try {
+      for await (const _c of mod.anthropicProvider.sendMessage(
+        [{ role: 'user', content: 'hi' }],
+        { apiKey: 'sk-ant-x', model: 'claude-opus-4-7', fetch: (async () => ({ ok: true, body: null })) as any, signal: ac.signal },
+      )) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('ABORT');
+  });
+
+  test('anthropic provider honors AbortSignal — mid-stream abort stops yielding', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    const ac = new AbortController();
+    // Stream that emits one frame, then waits, then emits another. We
+    // abort right after the first chunk arrives.
+    const fakeFetch = async () => ({
+      ok: true,
+      status: 200,
+      body: new ReadableStream({
+        async start(controller) {
+          controller.enqueue(new TextEncoder().encode(
+            'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"first"}}\n\n'
+          ));
+          await new Promise(r => setTimeout(r, 30));
+          controller.enqueue(new TextEncoder().encode(
+            'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"second"}}\n\n'
+          ));
+          controller.close();
+        },
+      }),
+    });
+    const got: string[] = [];
+    let caught: any = null;
+    try {
+      for await (const c of mod.anthropicProvider.sendMessage(
+        [{ role: 'user', content: 'hi' }],
+        { apiKey: 'sk-ant-x', model: 'claude-opus-4-7', fetch: fakeFetch as any, signal: ac.signal },
+      )) {
+        got.push(c);
+        ac.abort();  // abort after the very first chunk
+      }
+    } catch (e) { caught = e; }
+    expect(got).toEqual(['first']);
+    expect(caught?.code).toBe('ABORT');
+  });
+
+  test('openai provider honors AbortSignal symmetrically', async () => {
+    const mod = await import('../src/lazyclaw/providers/openai.mjs' as string);
+    const ac = new AbortController();
+    ac.abort();
+    let caught: any = null;
+    try {
+      for await (const _c of mod.openaiProvider.sendMessage(
+        [{ role: 'user', content: 'hi' }],
+        { apiKey: 'sk-x', model: 'gpt-4.1', fetch: (async () => ({ ok: true, body: null })) as any, signal: ac.signal },
+      )) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('ABORT');
+  });
+
   test('skills install + list + show + remove round-trip', () => {
     const dir = tmpConfigDir();
     const r1 = runCli(['skills', 'install', 'commit-style', '--from', __filename], dir);
