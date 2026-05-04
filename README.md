@@ -12,7 +12,7 @@ _Don't memorize 50+ CLI commands. Just click._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v2.79.4-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.95.1-green.svg)](./CHANGELOG.md)
 [![Zero Dependencies](https://img.shields.io/badge/deps-stdlib_only-brightgreen.svg)](#-architecture)
 
 </div>
@@ -224,11 +224,14 @@ exits non-zero when anything is missing.
 
 | Command | What it does |
 |---|---|
-| `chat` | Interactive REPL. `/help`, `/status`, `/new`, `/usage`, `/exit`. |
+| `chat` | Interactive REPL. Slashes: `/help`, `/status`, `/new`, `/reset`, `/usage`, `/skill <names>`, `/provider <name>`, `/model <name>`, `/exit`. Ctrl+C aborts the current turn without killing the REPL. |
 | `chat --session <id>` | Persistent — turns append to `~/.lazyclaw/sessions/<id>.jsonl` and resume on next invocation. |
+| `chat --skill review,style` | Compose markdown skills as the system prompt at start; `/skill` switches mid-conversation without losing context. |
 | `agent "prompt"` | One-shot. Streams the reply, exits. Pipe input with `agent -`. |
 | `agent --skill review,style "..."` | Compose markdown skills as the system prompt for this run. |
 | `agent --thinking 5000 "complex problem"` | Anthropic extended thinking with a 5000-token budget. Add `--show-thinking` to route reasoning text to stderr. |
+| `agent --provider <name> --model <id> "..."` | Override config for this run. Unified `--model anthropic/claude-opus-4-7` form splits both. |
+| `agent --fallback openai,ollama "..."` | Try providers in order on pre-stream failure. |
 
 ### Inspection
 
@@ -238,44 +241,81 @@ exits non-zero when anything is missing.
 | `status` | Provider, model, masked API key. Never prints the raw key. |
 | `providers list` | Each provider with key requirement + suggested models. |
 | `providers info <name>` | Endpoint URL + docs blurb + default model. |
-| `sessions list` / `show <id>` / `clear <id>` | Persistent chat session ops. |
-| `skills list` / `show <name>` / `install <name> [--from path]` / `remove <name>` | Markdown skill CRUD. |
+| `sessions list` / `show <id>` / `clear <id>` / `export <id>` | Persistent chat session ops. `export` renders the session as Markdown for sharing. |
+| `skills list` / `show <name>` / `install <name> [--from path \| --from-url <https://...>]` / `remove <name>` | Markdown skill CRUD. `--from-url` fetches HTTPS-only with a 1 MiB body cap. |
 | `config get <k>` / `set <k> <v>` / `list` / `delete <k>` | Local key-value config. |
+| `export [--include-secrets] [--include-sessions] > bundle.json` | Portable bundle of config + skills (+ optional sessions). Default redacts api-key. |
+| `import [--from path] [--overwrite-skills]` | Apply a bundle from stdin or `--from`. Sessions are never overwritten. |
+| `help [<subcommand>]` | One-line summaries with `help` alone; detailed usage with a name. Aliases `--help` / `-h`. |
+| `completion bash\|zsh` | Emit shell-completion script. |
+| `run <session-id> <wf.mjs> [--parallel \| --parallel-persistent]` | Run a workflow. Default sequential + resumable; `--parallel` is in-memory DAG; `--parallel-persistent` is DAG + checkpoint + resume. |
 
 ### HTTP daemon
 
 ```bash
-node src/lazyclaw/cli.mjs daemon --port 0    # binds 127.0.0.1, prints url
-node src/lazyclaw/cli.mjs daemon --port 8081 --auth-token "$(openssl rand -hex 32)"
-LAZYCLAW_AUTH_TOKEN=mysecret node src/lazyclaw/cli.mjs daemon --port 8081
+# Loopback, no auth (default — single local user)
+lazyclaw daemon --port 0
+
+# Hardened: bearer token + browser allowlist + 60 req/min/IP cap + JSON access log
+lazyclaw daemon --port 8081 \
+  --auth-token "$(openssl rand -hex 32)" \
+  --allow-origin "http://localhost:3000" \
+  --rate-limit 60 \
+  --log info
+
+# Add response caching (per-request opt-in via body.cache)
+lazyclaw daemon --port 8081 --response-cache
 ```
 
-Always binds 127.0.0.1. Default mode is no auth — assumes one local
-user, the historical loopback default. Pass `--auth-token <token>`
-(or set `LAZYCLAW_AUTH_TOKEN`) to require `Authorization: Bearer <token>`
-on every request — useful when SSH-tunneling the port to a shared host
-or running the daemon under a service account others share. The token
-comparison is constant-time. The bound-URL JSON includes `auth: true|false`.
+Always binds 127.0.0.1. The bound-URL JSON includes `auth`,
+`allowedOriginCount`, `rateLimit`, `responseCache`, and `log` so test
+scripts can verify the running policy without inspecting the process.
 
-Endpoints:
+**Security gates** run in this order, each short-circuiting before the next:
+1. **Origin allowlist** (`--allow-origin`, also `LAZYCLAW_ALLOW_ORIGINS`) — DNS-rebinding / browser CSRF defense. No `Origin` header → CLI/script caller, allowed. With `Origin` → must match the allowlist; default empty rejects all browser-originated requests.
+2. **Bearer-token auth** (`--auth-token`, also `LAZYCLAW_AUTH_TOKEN`) — constant-time comparison; missing or wrong token → 401 + `WWW-Authenticate: Bearer`.
+3. **Per-IP rate limit** (`--rate-limit N`) — token bucket, N requests / 60 s sustained, burst-tolerant. Denied requests get 429 + `Retry-After`.
 
-- `GET /version`, `/providers`, `/status`, `/doctor`, `/sessions`
+**Endpoints**:
+
+- `GET /version`, `/providers`, `/status`, `/doctor`, `/sessions`, `/skills`, `/metrics`
 - `GET /sessions/<id>` → `{id, turns}` (404 when missing)
-- `DELETE /sessions/<id>` (idempotent)
-- `POST /agent` `{prompt, provider?, model?, skills?, thinkingBudget?, sessionId?, retry?, stream?}`
-- `POST /chat` `{messages: [...], provider?, model?, retry?, stream?}`
+- `DELETE /sessions/<id>` — idempotent
+- `GET /skills/<name>` → `text/markdown` body
+- `PUT /skills/<name>` body=markdown → 201 created / 200 overwrite
+- `DELETE /skills/<name>` — idempotent, body reports `removed:true|false`
+- `POST /agent` `{prompt, provider?, model?, skills?, thinkingBudget?, sessionId?, retry?, fallback?, cache?, stream?}`
+- `POST /chat` `{messages: [...], provider?, model?, retry?, fallback?, cache?, stream?}`
 
-`stream:true` returns `text/event-stream` with `event: token`,
-`event: done`, `event: error` frames.
+`stream:true` → `text/event-stream` with `event: token`, `event: done`,
+`event: error` frames.
 
-`retry: { attempts, maxBackoffMs }` wraps the provider with
-`withRateLimitRetry` so HTTP callers get the same backoff behavior
-the CLI gets.
+**Provider-decorator body fields** (each opt-in, compose cleanly):
+- `retry: { attempts, maxBackoffMs }` — `withRateLimitRetry`; retries `RATE_LIMIT` only, never mid-stream.
+- `fallback: ["openai", "ollama"]` — `withFallback`; pre-stream failures route to the next entry.
+- `cache: true` — `withResponseCache` (process-scoped, requires `--response-cache` to be on).
+
+**Observability** (`--log info`): each request emits one JSON-line on stderr —
+`{ts, level, msg:"access", method, path, status, durationMs, remote}`.
+`GET /metrics` returns cumulative counters: `{uptimeMs, requestsTotal,
+requestsByStatus, rateLimitDenied, cache: {hits, misses, size} | null}`.
 
 ### Providers
 
-Built-in: `mock` (offline echo, used by tests), `anthropic` (Messages API
-+ extended thinking), `openai` (Chat Completions, `[DONE]`-terminated SSE).
+Built-in (all expose the same `AsyncIterable<string>` shape, all honor
+`opts.signal` for abort, all surface `INVALID_KEY` / `RATE_LIMIT`):
+
+- **`mock`** — offline echo, used by tests
+- **`anthropic`** — Messages API; extended thinking, prompt caching (`opts.cache: true`), tool-use passthrough via `opts.onToolUse`
+- **`openai`** — Chat Completions; `[DONE]`-terminated SSE; tool-use passthrough symmetrically
+- **`ollama`** — local models via `/api/chat`, NDJSON streaming, `opts.baseUrl` override, `CONNECTION_REFUSED` when daemon is down
+- **`gemini`** — Google Generative Language API; `?key=` auth handled internally so callers pass `opts.apiKey` like everywhere else
+
+**Composable wrappers** (decorators, `withX(provider, opts)` shape):
+
+- **`withRateLimitRetry(p, {attempts, maxBackoffMs})`** — retry on `RATE_LIMIT`; pre-stream only (mid-stream retries would duplicate text); honors `opts.signal` during backoff sleep
+- **`withFallback([p1, p2, ...])`** — try in order on pre-stream failure; mid-stream failures bubble unchanged
+- **`withResponseCache(p, {maxEntries, ttlMs})`** — memoize identical messages+model+opts; LRU + TTL; mid-stream errors don't poison the cache
 
 ### Programmatic API
 

@@ -10,6 +10,43 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.95.2] — 2026-05-05
+
+**Docs: README catches up on the post-2.82.2 surface (§4.5).**
+
+A lot landed without README updates between 2.82.2 and now:
+
+- chat slashes: `/skill`, `/provider`, `/model`; SIGINT-aborts-turn behavior
+- agent flags: `--provider`, `--model`, `--fallback`
+- daemon: `--allow-origin`, `--rate-limit`, `--response-cache`, `--log`
+- daemon endpoints: `/metrics`, `GET/PUT/DELETE /skills/<name>`,
+  `body.cache`, `body.fallback`
+- `lazyclaw` subcommands: `export`, `import`, `help`, `completion`,
+  `sessions export`, `skills install --from-url`
+- providers: `ollama`, `gemini` (now 5 total)
+- workflow: `runParallel`, `runPersistentDag`, `run --parallel`,
+  `run --parallel-persistent`
+- composable decorators: `withRateLimitRetry`, `withFallback`,
+  `withResponseCache`
+
+The "🐚 LazyClaw CLI" section now reflects all of this:
+
+- Conversation table mentions `/skill`, `/provider`, `/model`,
+  Ctrl+C-aborts-turn, `--fallback` flag, `--provider`/`--model` overrides
+- Inspection table adds `sessions export`, `--from-url` for skills,
+  `export`/`import`, `help`/`completion`, `run --parallel-persistent`
+- HTTP daemon section: full security gate ordering (Origin → auth →
+  rate limit), every endpoint listed including `/metrics` and the
+  skill CRUD endpoints, body fields for `retry`/`fallback`/`cache`,
+  observability via `--log` and `/metrics`
+- Providers section: 5 concrete providers with capability summaries,
+  the three `withX` decorator wrappers with their composition semantics
+
+Version badges (en/ko/zh) bumped from v2.79.4 to v2.95.1.
+
+No code changes. Suite still 208/208.
+
+---
 ## [2.95.1] — 2026-05-05
 
 **`lazyclaw run --parallel-persistent` exposes `runPersistentDag`.**
