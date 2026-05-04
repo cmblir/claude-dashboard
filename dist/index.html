@@ -649,7 +649,13 @@ window._loadVendor = (() => {
   /* V3 (v2.66.8) — input polish: softer bg, smooth focus ring matching the
      screenshot reference. Box-shadow ring instead of outline so the radius
      stays clean. */
-  .input { width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.88rem; -webkit-appearance: none; transition: border-color 0.15s, box-shadow 0.15s, background 0.15s; }
+  /* :where() keeps the default width at 0-specificity so any Tailwind width
+     utility (w-24, w-20, w-full, max-w-*, flex-1 with min-width:0, etc.)
+     wins automatically. Without this, `.input` (specificity 0,1,0) tied
+     with `w-24` and source order made the default win — squashing
+     <select class="input flex-1"> into ~24px next to <input class="input w-24">. */
+  :where(.input) { width: 100%; }
+  .input { padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.88rem; -webkit-appearance: none; transition: border-color 0.15s, box-shadow 0.15s, background 0.15s; }
   .input:hover { background: rgba(255,255,255,0.06); }
   .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,119,87,0.18); background: rgba(255,255,255,0.07); }
   .input::placeholder { color: var(--text-dim); opacity: 0.7; }

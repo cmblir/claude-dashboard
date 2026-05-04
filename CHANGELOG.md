@@ -10,6 +10,35 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.71.116] — 2026-05-05
+
+**Dashboard QA pass (LCO1)** — squashed `<select>` + new QA harness.
+
+- **Squashed select fix**: every flex row pairing `<select class="input flex-1">`
+  with siblings using width utilities (`<input class="input w-24">`, etc.)
+  was rendering the select at ~24 px because `.input { width: 100% }`
+  (specificity 0,1,0) tied with Tailwind's `w-*` utilities and source order
+  let the default win. Lowered the width default to zero specificity via
+  `:where(.input) { width: 100% }` so any explicit width utility wins
+  automatically — no `!important`, no per-element override. Affected views
+  include `promptCache`, `batchJobs`, `thinkingLab`, `toolUseLab`,
+  `citationsLab`, plus the workflow node multi-assignee row.
+- **Auto-Resume binding picker (LCO0)** — bonus from earlier today:
+  the modal pulls live CLI sessions from `/api/sessions-monitor/list` and
+  picking one auto-fills both Session UUID and cwd. The previous endpoint
+  string `/api/cli-sessions/list` was a typo and never returned data.
+- **New harness `scripts/e2e-dashboard-qa.mjs`**: deeper than the smoke
+  test — captures console errors, page errors, failed network requests,
+  and detects actual horizontal overflow while skipping intentional
+  `text-overflow: ellipsis` truncations. Final pass: 66/66 tabs clean,
+  0 errors, 0 overflow violations.
+
+### Verified
+- `npx playwright test` → 25 passed.
+- `node scripts/e2e-dashboard-qa.mjs` → 0/66 issues.
+- `npm run test:e2e:smoke` → 66/66 tabs.
+
+---
 ## [2.71.115] — 2026-05-04
 
 **QQ220 — CRITICAL** — auto-fallback for external SSE aborts.
