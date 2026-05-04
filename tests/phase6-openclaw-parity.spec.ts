@@ -1963,6 +1963,53 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(() => sm.sessionPath('.', '/tmp')).toThrow();
   });
 
+  test('completion bash prints a compgen-based script with all subcommands', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['completion', 'bash'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('_lazyclaw_completion');
+    expect(r.stdout).toContain('complete -F _lazyclaw_completion lazyclaw');
+    for (const sub of ['run', 'resume', 'config', 'chat', 'agent', 'doctor', 'status', 'onboard', 'sessions', 'skills', 'providers', 'daemon', 'version', 'completion']) {
+      expect(r.stdout).toContain(sub);
+    }
+    expect(r.stdout).toContain('get set list delete unset');
+    expect(r.stdout).toContain('list show clear export');
+  });
+
+  test('completion zsh prints a #compdef script with all subcommands', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['completion', 'zsh'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('#compdef lazyclaw');
+    expect(r.stdout).toContain('compdef _lazyclaw lazyclaw');
+    for (const sub of ['run', 'resume', 'config', 'chat', 'agent', 'doctor', 'status', 'onboard', 'sessions', 'skills', 'providers', 'daemon', 'version']) {
+      expect(r.stdout).toContain(`'${sub}'`);
+    }
+    expect(r.stdout).toContain("'list' 'show' 'install' 'remove'");
+  });
+
+  test('completion with no shell exits 2 with a usage hint', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['completion'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/Usage: lazyclaw completion/);
+    const r2 = runCli(['completion', 'fish'], dir);
+    expect(r2.status).toBe(2);
+  });
+
+  test('completion bash output is syntactically valid bash', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['completion', 'bash'], dir);
+    // bash -n parses only, doesn't execute, so we can validate the
+    // generated script is at least syntactically well-formed.
+    const check = spawnSync('bash', ['-n'], {
+      input: r.stdout,
+      encoding: 'utf8',
+    });
+    expect(check.status).toBe(0);
+    expect(check.stderr).toBe('');
+  });
+
   test('version subcommand prints VERSION + node + platform as JSON', () => {
     const dir = tmpConfigDir();
     const r = runCli(['version'], dir);

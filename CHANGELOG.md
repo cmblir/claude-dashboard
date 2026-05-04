@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.83.3] — 2026-05-05
+
+**Provider auto-fallback: `withFallback` for chained provider failover.**
+
+Mirrors the dashboard's "fallback chain" config in the CLI/daemon
+provider layer. Pass an ordered list of providers; the first one that
+yields any chunk wins, and any *pre-yield* recoverable error trips a
+fall-through to the next provider.
+
+```js
+import { withFallback } from './src/lazyclaw/providers/fallback.mjs';
+import { PROVIDERS } from './src/lazyclaw/providers/registry.mjs';
+
+const safe = withFallback([PROVIDERS.anthropic, PROVIDERS.openai, PROVIDERS.ollama], {
+  onFallback: ({ from, to, err }) => log.warn(`${from} → ${to} (${err.code || err.status})`),
+});
+for await (const chunk of safe.sendMessage(messages, opts)) write(chunk);
+```
+
+### Default `shouldFallback` predicate
+Accepts: `RATE_LIMIT`, `CONNECTION_REFUSED`, 5xx upstream, bare network
+errors. Rejects: `INVALID_KEY` (auth is structural — falling back masks
+the real problem), `ABORT` (user cancellation should stop, not retry),
+4xx that aren't 429. Override via `opts.shouldFallback`.
+
+### Mid-stream guarantee
+Once a provider has yielded any chunk it "owns" the response. A
+subsequent error bubbles unchanged — same invariant as
+`withRateLimitRetry`.
+
+### Tests
+9 new phase 6 specs cover: pre-yield `RATE_LIMIT` → fallback,
+`INVALID_KEY` no fallback, `ABORT` no fallback, mid-stream error
+bubble, 5xx fallback + `onFallback` callback, all providers fail →
+rethrow last error, `shouldFallback` predicate override, single-provider
+degenerate case, empty chain throws at construction.
+
+Suite: 135/135. tsc clean.
+
+---
 ## [2.83.2] — 2026-05-05
 
 **`skills install --from-url <https://...>` for remote skill fetch.**
