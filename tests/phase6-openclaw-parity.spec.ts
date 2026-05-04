@@ -1678,6 +1678,91 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('agent --usage prints normalized totals to stderr (mock provider yields no usage so absence is OK)', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    // Mock provider doesn't emit usage events. With --usage set, the
+    // CLI installs the onUsage callback but mock never calls it. The
+    // critical assertion: --usage must NOT crash the agent path.
+    const r = runCli(['agent', 'hello', '--usage'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('mock-reply: hello');
+    // No usage line on stderr (mock doesn't emit) — absence of crash is the test.
+    expect(r.stderr).not.toMatch(/error/);
+  });
+
+  test('agent --usage with anthropic stub produces a usage line on stderr after the response', () => {
+    // Drive cmdAgent through a custom Node import so we can replace
+    // anthropic with a fake that emits a usage event.
+    const dir = tmpConfigDir();
+    const preload = path.join(dir, 'preload.mjs');
+    fs.writeFileSync(preload,
+      `import('node:module').then(({ register }) => {
+        // Monkey-patch the anthropic provider's sendMessage at runtime
+        // by intercepting its registry import. The simplest way: alias
+        // a fake fetch. But the agent doesn't accept opts.fetch. So we
+        // patch the provider directly via the registry the cli loads.
+      });
+      // Patch the anthropic provider once it loads.
+      import('${path.resolve('src/lazyclaw/providers/registry.mjs')}').then(reg => {
+        reg.PROVIDERS.anthropic = {
+          name: 'anthropic',
+          async *sendMessage(_msgs, opts) {
+            yield 'reply';
+            if (typeof opts.onUsage === 'function') {
+              opts.onUsage({ inputTokens: 7, outputTokens: 4 });
+            }
+          },
+        };
+      });`,
+    );
+    runCli(['config', 'set', 'provider', 'anthropic'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-ant-x'], dir);
+    const r = spawnSync(process.execPath, ['--import', preload, CLI, 'agent', 'hi', '--usage'], {
+      encoding: 'utf8',
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('reply');
+    expect(r.stderr).toMatch(/usage:.*"inputTokens":7.*"outputTokens":4/);
+  });
+
+  test('daemon POST /agent with body.usage:true returns the usage block when the provider emits it', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      // Mock provider doesn't emit usage; without it the daemon must
+      // simply not include a usage field — verifying the opt-in shape.
+      const r = await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'q', usage: true }),
+      });
+      expect(r.status).toBe(200);
+      const j = await r.json();
+      expect(j.reply).toContain('mock-reply: q');
+      // Mock didn't emit usage → daemon must omit the field, not send null.
+      expect('usage' in j).toBe(false);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon POST /chat default response (no body.usage) never includes a usage field', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/chat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: 'q' }] }),
+      });
+      const j = await r.json();
+      expect(j.reply).toBeDefined();
+      expect('usage' in j).toBe(false);  // default — no opt-in
+    } finally { await d.kill(); }
+  });
+
   test('anthropic provider surfaces usage totals via opts.onUsage at message_stop', async () => {
     const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
     const sse =

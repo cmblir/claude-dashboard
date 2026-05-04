@@ -504,10 +504,15 @@ export function makeHandler(ctx) {
           const messages = Array.isArray(body.messages) ? body.messages.filter(m => m && typeof m.role === 'string' && typeof m.content === 'string') : null;
           if (!messages || messages.length === 0) return writeJson(res, 400, { error: 'messages array required' });
           const thinkingBudget = Number(body.thinkingBudget) || 0;
+          // Usage capture: opt-in via body.usage. The provider only does
+          // the extra work (and pays the wire cost on OpenAI) when the
+          // caller asks for it.
+          let captured = null;
           const sendOpts = {
             apiKey: cfg['api-key'],
             model: body.model || cfg.model,
             thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
+            onUsage: body.usage ? (u) => { captured = u; } : undefined,
           };
           if (body.stream === true) {
             writeSseHead(res);
@@ -516,6 +521,7 @@ export function makeHandler(ctx) {
                 writeSse(res, 'token', { text: chunk });
                 await new Promise(r => setImmediate(r));
               }
+              if (captured) writeSse(res, 'usage', captured);
               writeSse(res, 'done', { ok: true });
               return res.end();
             } catch (err) {
@@ -526,7 +532,7 @@ export function makeHandler(ctx) {
           let acc = '';
           try {
             for await (const chunk of prov.sendMessage(messages, sendOpts)) acc += chunk;
-            return writeJson(res, 200, { reply: acc });
+            return writeJson(res, 200, captured ? { reply: acc, usage: captured } : { reply: acc });
           } catch (err) {
             const m = statusForProviderError(err);
             return writeJson(res, m.status, {
@@ -570,6 +576,16 @@ export function makeHandler(ctx) {
           messages.push({ role: 'user', content: prompt });
           if (sid) ctx.sessionsMod.appendTurn(sid, 'user', prompt, cfgDir);
 
+          // body.usage opt-in mirrors POST /chat — provider only does the
+          // extra work when the caller asks for it.
+          let agentCaptured = null;
+          const agentSendOpts = {
+            apiKey: cfg['api-key'],
+            model,
+            thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
+            onUsage: body.usage ? (u) => { agentCaptured = u; } : undefined,
+          };
+
           if (body.stream === true) {
             writeSseHead(res);
             // Forward client disconnect to the provider so we don't keep
@@ -579,12 +595,7 @@ export function makeHandler(ctx) {
             res.on('close', () => { if (!res.writableEnded) ac.abort(); });
             let acc = '';
             try {
-              for await (const chunk of prov.sendMessage(messages, {
-                apiKey: cfg['api-key'],
-                model,
-                thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
-                signal: ac.signal,
-              })) {
+              for await (const chunk of prov.sendMessage(messages, { ...agentSendOpts, signal: ac.signal })) {
                 if (ac.signal.aborted) break;
                 acc += chunk;
                 writeSse(res, 'token', { text: chunk });
@@ -592,7 +603,10 @@ export function makeHandler(ctx) {
                 await new Promise(r => setImmediate(r));
               }
               if (sid && !ac.signal.aborted) ctx.sessionsMod.appendTurn(sid, 'assistant', acc, cfgDir);
-              if (!ac.signal.aborted) writeSse(res, 'done', { ok: true });
+              if (!ac.signal.aborted) {
+                if (agentCaptured) writeSse(res, 'usage', agentCaptured);
+                writeSse(res, 'done', { ok: true });
+              }
               return res.end();
             } catch (err) {
               if (err?.code === 'ABORT' || ac.signal.aborted) {
@@ -604,16 +618,14 @@ export function makeHandler(ctx) {
             }
           }
 
-          // Non-streaming: collect then return once.
+          // Non-streaming: collect then return once. Reuse agentSendOpts
+          // (carrying the optional onUsage capture) so usage lands in the
+          // response when body.usage was set.
           let acc = '';
           try {
-            for await (const chunk of prov.sendMessage(messages, {
-              apiKey: cfg['api-key'],
-              model,
-              thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
-            })) acc += chunk;
+            for await (const chunk of prov.sendMessage(messages, agentSendOpts)) acc += chunk;
             if (sid) ctx.sessionsMod.appendTurn(sid, 'assistant', acc, cfgDir);
-            return writeJson(res, 200, { reply: acc });
+            return writeJson(res, 200, agentCaptured ? { reply: acc, usage: agentCaptured } : { reply: acc });
           } catch (err) {
             const m = statusForProviderError(err);
             return writeJson(res, m.status, {

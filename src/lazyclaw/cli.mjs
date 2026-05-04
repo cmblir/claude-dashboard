@@ -464,7 +464,7 @@ const HELP_DETAILS = {
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
   config: 'Usage: lazyclaw config <get|set|list|delete> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
-  agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.',
+  agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, totalTokens?, ...} to stderr after the response.',
   doctor: 'Usage: lazyclaw doctor\n  Validates configuration and registered providers. Exits 0 only when no issues.',
   status: 'Usage: lazyclaw status\n  Provider, model, and masked API key. Never prints the raw key.',
   onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
@@ -567,12 +567,17 @@ async function cmdAgent(prompt, flags) {
   // --show-thinking prints thinking deltas to stderr while text deltas
   // continue to stream to stdout. This keeps stdout clean for piping.
   const showThinking = flags['show-thinking'];
+  // --usage prints normalized token totals to stderr after the response
+  // streams. Same stderr-not-stdout split as --show-thinking so piping
+  // the answer text downstream isn't polluted with metadata.
+  const showUsage = flags.usage;
   try {
     for await (const chunk of prov.sendMessage(messages, {
       apiKey: cfg['api-key'],
       model: flags.model || cfg.model,
       thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
       onThinking: showThinking ? t => process.stderr.write(t) : undefined,
+      onUsage: showUsage ? (u) => process.stderr.write('usage: ' + JSON.stringify(u) + '\n') : undefined,
     })) {
       process.stdout.write(chunk);
     }
@@ -1074,6 +1079,7 @@ const BOOLEAN_FLAGS = new Set([
   'no-overwrite-config',
   'import-sessions',
   'show-thinking',
+  'usage',
   'response-cache',
   'help',         // also handled as a subcommand alias
   'version',

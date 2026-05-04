@@ -10,6 +10,55 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.98.0] — 2026-05-05
+
+**Usage capture: end-to-end CLI + daemon plumbing.**
+
+The provider-level `opts.onUsage` callback shipped in 2.97.0/2.97.1.
+This iteration plumbs it through to the user-facing surfaces.
+
+### CLI: `agent --usage`
+Prints the normalized usage totals to **stderr** (not stdout — keeps
+the answer text pipe-clean) after the response streams:
+
+```bash
+$ lazyclaw agent --usage "summarize this" 2> usage.log
+[response goes to stdout]
+$ cat usage.log
+usage: {"inputTokens":1234,"outputTokens":567}
+```
+
+Mock provider doesn't emit usage events, so `--usage` against mock
+is silently a no-op (no crash, no spurious stderr).
+
+### Daemon: `body.usage: true`
+- `POST /agent` — when set, the response JSON gains a `usage` field:
+  `{"reply": "...", "usage": {"inputTokens": ..., "outputTokens": ...}}`.
+- `POST /chat` — same.
+- Streaming mode (`stream: true`) emits an `event: usage` SSE frame
+  before `event: done`.
+- Without `body.usage`, the response shape is **identical** to before —
+  no `usage` field, no `null`, no shape change. Verified by spec.
+
+### Why opt-in
+OpenAI requires `stream_options: {include_usage: true}` to emit usage
+on the wire — that's an extra response chunk for every request. The
+opt-in keeps the cost zero for callers who don't need the data.
+
+### Tests
+4 new phase 6 specs:
+- `agent --usage` against mock: no crash, no spurious stderr (verifies
+  the opt-in surface tolerates providers that don't emit usage)
+- `agent --usage` against an anthropic stub that emits `{inputTokens, outputTokens}`:
+  stderr contains the JSON line; stdout still has the response text
+- daemon `POST /agent` with `body.usage:true` against mock: response
+  body omits `usage` (mock doesn't emit), but doesn't crash
+- daemon `POST /chat` default (no `body.usage`): no `usage` field on
+  the response — guarantees backwards-compatible shape
+
+Suite: 221/221. tsc clean.
+
+---
 ## [2.97.1] — 2026-05-05
 
 **OpenAI: usage capture via `opts.onUsage` (parity with anthropic).**
