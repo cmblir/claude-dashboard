@@ -2367,6 +2367,134 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(check.stderr).toBe('');
   });
 
+  test('export produces a JSON bundle with config + skills, redacting the api-key by default', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-ant-supersecret'], dir);
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'reviewer.md'), '# Reviewer\nbe blunt\n');
+
+    const r = runCli(['export'], dir);
+    expect(r.status).toBe(0);
+    const bundle = JSON.parse(r.stdout);
+    expect(bundle.bundleVersion).toBe(1);
+    expect(bundle.config.provider).toBe('mock');
+    expect(bundle.config['api-key']).toBe('***REDACTED***');
+    expect(bundle.secretsIncluded).toBe(false);
+    expect(bundle.skills).toHaveLength(1);
+    expect(bundle.skills[0].name).toBe('reviewer');
+    expect(bundle.skills[0].content).toContain('be blunt');
+    // raw key must not appear *anywhere* in the JSON
+    expect(r.stdout).not.toContain('sk-ant-supersecret');
+  });
+
+  test('export --include-secrets keeps the raw api-key', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-ant-keep-me'], dir);
+    const r = runCli(['export', '--include-secrets'], dir);
+    expect(r.status).toBe(0);
+    const bundle = JSON.parse(r.stdout);
+    expect(bundle.secretsIncluded).toBe(true);
+    expect(bundle.config['api-key']).toBe('sk-ant-keep-me');
+  });
+
+  test('export --include-sessions inlines turn content; default keeps metadata only', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 's1.jsonl'),
+      JSON.stringify({ role: 'user', content: 'q', ts: 1 }) + '\n' +
+      JSON.stringify({ role: 'assistant', content: 'a', ts: 2 }) + '\n');
+
+    const meta = JSON.parse(runCli(['export'], dir).stdout);
+    expect(meta.sessions[0].id).toBe('s1');
+    expect(meta.sessions[0].turns).toBeUndefined();
+
+    const full = JSON.parse(runCli(['export', '--include-sessions'], dir).stdout);
+    expect(full.sessionContentIncluded).toBe(true);
+    expect(full.sessions[0].turns).toHaveLength(2);
+    expect(full.sessions[0].turns[0].content).toBe('q');
+  });
+
+  test('import via --from applies config + skills; redacted key is dropped not written', () => {
+    const dir = tmpConfigDir();
+    const bundle = {
+      bundleVersion: 1,
+      config: { provider: 'mock', model: 'm-x', 'api-key': '***REDACTED***' },
+      skills: [{ name: 'imported', content: '# Imported\nhi from import\n' }],
+      sessions: [],
+      secretsIncluded: false,
+      sessionContentIncluded: false,
+    };
+    const bundlePath = path.join(dir, 'bundle.json');
+    fs.writeFileSync(bundlePath, JSON.stringify(bundle));
+
+    const r = runCli(['import', '--from', bundlePath], dir);
+    expect(r.status).toBe(0);
+    const stats = JSON.parse(r.stdout);
+    expect(stats.skillsAdded).toBe(1);
+    const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'));
+    expect(cfg.provider).toBe('mock');
+    expect(cfg.model).toBe('m-x');
+    // The placeholder string must NEVER land on disk.
+    expect(cfg['api-key']).toBeUndefined();
+    expect(fs.readFileSync(path.join(dir, 'skills', 'imported.md'), 'utf8')).toContain('hi from import');
+  });
+
+  test('import skips existing skills by default; --overwrite-skills replaces them', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'a.md'), '# old\noriginal\n');
+    const bundle = {
+      bundleVersion: 1,
+      config: {},
+      skills: [{ name: 'a', content: '# new\nfrom bundle\n' }],
+      sessions: [],
+    };
+    const p = path.join(dir, 'b.json');
+    fs.writeFileSync(p, JSON.stringify(bundle));
+
+    // Default — skipped, original kept
+    const r1 = runCli(['import', '--from', p], dir);
+    expect(JSON.parse(r1.stdout).skillsSkipped).toBe(1);
+    expect(fs.readFileSync(path.join(dir, 'skills', 'a.md'), 'utf8')).toContain('original');
+
+    // With override — replaced
+    const r2 = runCli(['import', '--from', p, '--overwrite-skills'], dir);
+    expect(JSON.parse(r2.stdout).skillsAdded).toBe(1);
+    expect(fs.readFileSync(path.join(dir, 'skills', 'a.md'), 'utf8')).toContain('from bundle');
+  });
+
+  test('import refuses unknown bundleVersion (forward-compat guard)', () => {
+    const dir = tmpConfigDir();
+    const bundle = { bundleVersion: 999, config: {}, skills: [], sessions: [] };
+    const p = path.join(dir, 'future.json');
+    fs.writeFileSync(p, JSON.stringify(bundle));
+    const r = runCli(['import', '--from', p], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/unsupported bundleVersion/);
+  });
+
+  test('export → import round-trip reproduces config + skills on a fresh dir', () => {
+    const src = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], src);
+    runCli(['config', 'set', 'model', 'roundtrip-model'], src);
+    fs.mkdirSync(path.join(src, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(src, 'skills', 'shared.md'), '# Shared\nbody\n');
+
+    const exported = runCli(['export'], src).stdout;
+    const dst = tmpConfigDir();
+    const r = spawnSync(process.execPath, [CLI, 'import'], {
+      input: exported,
+      encoding: 'utf8',
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dst },
+    });
+    expect(r.status).toBe(0);
+    const cfg = JSON.parse(fs.readFileSync(path.join(dst, 'config.json'), 'utf8'));
+    expect(cfg).toMatchObject({ provider: 'mock', model: 'roundtrip-model' });
+    expect(fs.readFileSync(path.join(dst, 'skills', 'shared.md'), 'utf8')).toContain('body');
+  });
+
   test('help with no argument lists every subcommand with a one-liner', () => {
     const dir = tmpConfigDir();
     const r = runCli(['help'], dir);

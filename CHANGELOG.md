@@ -10,6 +10,62 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.88.0] — 2026-05-05
+
+**Portable bundles: `lazyclaw export` / `lazyclaw import`.**
+
+A bundle is a JSON object with `config + skills + sessions`. Pipe it
+to wherever you want — disk, scp, gist, encrypted vault — and apply
+it on another machine with `import`. Useful for backing up before a
+clean reinstall, syncing between machines, or sharing a curated skill
+set with a teammate.
+
+### Export
+```bash
+lazyclaw export > backup.json                   # default: redacted key, metadata-only sessions
+lazyclaw export --include-secrets > full.json   # MY-laptop-to-MY-drive only
+lazyclaw export --include-sessions > talks.json # full turn content
+```
+
+Defaults are conservative because a bundle on someone else's laptop
+shouldn't carry your API keys. The default redacts `api-key` to
+`***REDACTED***`. The placeholder is recognised on import and dropped
+rather than written.
+
+### Import
+```bash
+lazyclaw import < backup.json                   # stdin
+lazyclaw import --from backup.json              # path
+lazyclaw import --overwrite-skills < new.json   # replace existing skills
+lazyclaw import --import-sessions < talks.json  # also create sessions
+```
+
+Conflict policy:
+- **Config keys** overwrite by default (`--no-overwrite-config` to
+  preserve existing values when both define the same key).
+- **Skills** skip on existing-name by default (`--overwrite-skills`
+  to replace).
+- **Sessions** are NEVER overwritten — only created when the id is
+  free *and* `--import-sessions` is set. We don't want to clobber
+  active conversations.
+- **Redacted api-keys** are dropped, never written.
+- **Unknown `bundleVersion`** → exit 2 (forward-compat guard).
+
+### Tests
+7 new phase 6 specs:
+- export redacts api-key; raw secret never appears anywhere in output
+- `--include-secrets` opts back in
+- `--include-sessions` inlines turn content; default keeps metadata
+- import via `--from` applies config + skills; redacted placeholder
+  is dropped, not written to disk
+- import skips existing skills (default); `--overwrite-skills` replaces
+- unknown `bundleVersion` → exit 2 with the expected version in stderr
+- end-to-end round-trip: export from one config dir, import via stdin
+  into a fresh dir, config + skill content match
+
+Suite: 171/171. tsc clean.
+
+---
 ## [2.87.0] — 2026-05-05
 
 **Daemon: `PUT` and `DELETE /skills/<name>` for HTTP skill management.**

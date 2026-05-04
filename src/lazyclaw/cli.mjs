@@ -207,6 +207,7 @@ const SUBCOMMANDS = [
   'doctor', 'status', 'onboard',
   'sessions', 'skills', 'providers',
   'daemon', 'version', 'completion', 'help',
+  'export', 'import',
 ];
 
 const SUBCOMMAND_SUBS = {
@@ -291,6 +292,118 @@ async function cmdCompletion(shell) {
   process.exit(2);
 }
 
+const BUNDLE_VERSION = 1;
+
+async function cmdExport(flags) {
+  // Portable bundle: config + every installed skill + (optionally) every
+  // persisted session. Writes JSON to stdout so the caller pipes it
+  // wherever they want — disk, scp, gist, encrypted vault.
+  //
+  // Secrets default to redacted because a bundle on a teammate's laptop
+  // shouldn't carry your API keys. --include-secrets flips that behavior
+  // for the use case of "back up MY laptop to MY external drive".
+  const skillsMod = await import('./skills.mjs');
+  const sessionsMod = await import('./sessions.mjs');
+  const cfgDir = path.dirname(configPath());
+  const cfg = readConfig();
+  const safeCfg = { ...cfg };
+  if (!flags['include-secrets']) {
+    if (safeCfg['api-key']) safeCfg['api-key'] = '***REDACTED***';
+  }
+  const skills = skillsMod.listSkills(cfgDir).map(s => ({
+    name: s.name,
+    content: skillsMod.loadSkill(s.name, cfgDir),
+  }));
+  const includeSessions = !!flags['include-sessions'];
+  const sessions = sessionsMod.listSessions(cfgDir).map(s => {
+    const base = { id: s.id, mtime: new Date(s.mtimeMs).toISOString(), bytes: s.bytes };
+    if (includeSessions) base.turns = sessionsMod.loadTurns(s.id, cfgDir);
+    return base;
+  });
+  const bundle = {
+    bundleVersion: BUNDLE_VERSION,
+    exportedAt: new Date().toISOString(),
+    config: safeCfg,
+    skills,
+    sessions,
+    secretsIncluded: !!flags['include-secrets'],
+    sessionContentIncluded: includeSessions,
+  };
+  process.stdout.write(JSON.stringify(bundle, null, 2) + '\n');
+}
+
+async function cmdImport(flags) {
+  // Read JSON bundle from stdin (or --from <path>). Apply with these rules:
+  //   - config keys land via writeConfig; existing keys are overwritten
+  //     UNLESS --no-overwrite-config is set.
+  //   - skills land via installSkill; existing names are skipped UNLESS
+  //     --overwrite-skills is set.
+  //   - sessions land only when the bundle carried turn content AND
+  //     --import-sessions is set; existing session files are NEVER
+  //     overwritten (we don't want to clobber active conversations).
+  //   - REDACTED api-key in the bundle is dropped (never written).
+  const skillsMod = await import('./skills.mjs');
+  const sessionsMod = await import('./sessions.mjs');
+  const cfgDir = path.dirname(configPath());
+  let raw;
+  if (flags.from) raw = fs.readFileSync(flags.from, 'utf8');
+  else {
+    raw = await new Promise(resolve => {
+      let buf = '';
+      process.stdin.setEncoding('utf8');
+      process.stdin.on('data', d => { buf += d; });
+      process.stdin.on('end', () => resolve(buf));
+    });
+  }
+  let bundle;
+  try { bundle = JSON.parse(raw); }
+  catch (e) { console.error(`import: invalid JSON: ${e.message}`); process.exit(2); }
+  if (!bundle || typeof bundle !== 'object' || bundle.bundleVersion !== BUNDLE_VERSION) {
+    console.error(`import: unsupported bundleVersion (got ${bundle?.bundleVersion}, expected ${BUNDLE_VERSION})`);
+    process.exit(2);
+  }
+  const stats = { configKeys: 0, skillsAdded: 0, skillsSkipped: 0, sessionsAdded: 0, sessionsSkipped: 0 };
+  // Config
+  if (bundle.config && typeof bundle.config === 'object') {
+    const existing = readConfig();
+    const next = flags['no-overwrite-config']
+      ? { ...bundle.config, ...existing }    // existing wins
+      : { ...existing, ...bundle.config };   // bundle wins (default)
+    // Drop redacted secrets so we never write the placeholder string.
+    if (next['api-key'] === '***REDACTED***') delete next['api-key'];
+    writeConfig(next);
+    stats.configKeys = Object.keys(bundle.config).length;
+  }
+  // Skills
+  for (const s of bundle.skills || []) {
+    if (!s?.name || typeof s.content !== 'string') continue;
+    const file = skillsMod.skillPath(s.name, cfgDir);
+    if (fs.existsSync(file) && !flags['overwrite-skills']) {
+      stats.skillsSkipped += 1;
+      continue;
+    }
+    skillsMod.installSkill(s.name, s.content, cfgDir);
+    stats.skillsAdded += 1;
+  }
+  // Sessions — never overwrite, only add new
+  if (flags['import-sessions']) {
+    for (const sess of bundle.sessions || []) {
+      if (!sess?.id || !Array.isArray(sess.turns)) continue;
+      try {
+        const file = sessionsMod.sessionPath(sess.id, cfgDir);
+        if (fs.existsSync(file)) { stats.sessionsSkipped += 1; continue; }
+        for (const t of sess.turns) {
+          if (t?.role && typeof t.content === 'string') {
+            sessionsMod.appendTurn(sess.id, t.role, t.content, cfgDir);
+          }
+        }
+        stats.sessionsAdded += 1;
+      } catch { stats.sessionsSkipped += 1; }
+    }
+  }
+  console.log(JSON.stringify({ ok: true, ...stats }));
+}
+
 // One-line summaries used by `lazyclaw help`. Format keeps it scan-friendly
 // in a 80-column terminal: subcommand padded to 12 chars, then the summary.
 const HELP_SUMMARIES = {
@@ -308,6 +421,8 @@ const HELP_SUMMARIES = {
   daemon:     'Run the local HTTP gateway (--port, --auth-token, --allow-origin)',
   version:    'Print VERSION + node + platform as JSON',
   completion: 'Emit shell completion script (completion <bash|zsh>)',
+  export:     'Dump config + skills (+ optional sessions) as a JSON bundle',
+  import:     'Apply a JSON bundle from stdin or --from <path>',
 };
 
 // Detailed usage per subcommand for `lazyclaw help <name>`. Kept as flat
@@ -327,6 +442,8 @@ const HELP_DETAILS = {
   daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.',
   version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
+  export: 'Usage: lazyclaw export [--include-secrets] [--include-sessions] > bundle.json\n  --include-secrets keeps the raw api-key in the bundle (default redacts it).\n  --include-sessions adds full turn content (default keeps metadata only).',
+  import: 'Usage: lazyclaw import [--from <path>] [--overwrite-skills] [--no-overwrite-config] [--import-sessions]\n  Reads JSON from stdin (or --from <path>). Sessions are NEVER overwritten.\n  Redacted api-keys (***REDACTED***) are dropped, never written.',
 };
 
 function cmdHelp(name) {
@@ -972,6 +1089,14 @@ async function main() {
     }
     case 'completion': {
       await cmdCompletion(rest.positional[0]);
+      break;
+    }
+    case 'export': {
+      await cmdExport(rest.flags);
+      break;
+    }
+    case 'import': {
+      await cmdImport(rest.flags);
       break;
     }
     case 'help':
