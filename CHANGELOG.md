@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.80.2] — 2026-05-05
+
+**Test coverage: `sessions export` CLI behavior.**
+
+Backfilling specs that should have shipped with 2.80.1 — the
+`sessions export` CLI binding had no test coverage of its own.
+
+Added 3 phase 6 specs:
+- exporting a real session prints the Markdown dump (H1, `Turns: N`,
+  `## User` / `## Assistant` sections, exact content preserved)
+- exporting an empty session prints `_(empty)_` placeholder
+- missing id exits 2 with the usage line on stderr
+
+Suite: 92/92 (was 89; +3 from this commit, +1 from sessions.exportMarkdown
+helper coverage, +1 from sessions.exportMarkdown empty-case).
+
+---
 ## [2.80.1] — 2026-05-05
 
 **`lazyclaw sessions export <id>` — print a session as Markdown.**
