@@ -46,15 +46,17 @@ for await (const chunk of safe.sendMessage(messages, { apiKey, model, signal }))
    stops immediately rather than waiting for wake-up.
 
 ### Tests
-6 new phase 6 specs:
+8 new phase 6 specs:
 - happy-path retry: yields the second attempt
 - exhausted attempts → rethrow last `RATE_LIMIT`
 - mid-stream `RATE_LIMIT` is NOT retried (duplicate-output guard)
 - non-`RATE_LIMIT` errors pass through immediately
 - `onRetry` callback receives `{attempt, retryAfterMs}`
 - `clampBackoff` clamps to `maxBackoffMs` and the 5-minute ceiling
+- first-attempt success: zero retries, single underlying call
+- `opts.signal` aborts during backoff sleep (no second attempt)
 
-Suite: 106/106. tsc clean.
+Suite: 102/102. tsc clean.
 
 ---
 ## [2.81.1] — 2026-05-05
