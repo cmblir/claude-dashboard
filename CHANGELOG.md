@@ -10,6 +10,51 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.98.1] — 2026-05-05
+
+**Chat `/usage` slash now reports running token totals.**
+
+The slash always reported `{messageCount, charsSent}` — useful but
+local-only. Now it accumulates real provider usage across turns and
+includes a `tokens` block when the provider emits `onUsage`:
+
+```json
+{"messageCount": 4, "charsSent": 87, "tokens": {
+  "inputTokens": 1234,
+  "outputTokens": 567,
+  "totalTokens": 1801,
+  "turnsWithUsage": 2
+}}
+```
+
+`turnsWithUsage` ≤ `messageCount/2` because not every model call
+emits usage (e.g., the mock provider doesn't). Lets the user spot
+when their session has hit a provider that doesn't expose token
+counts.
+
+### Reset semantics
+`/new` and `/reset` clear the accumulator alongside `messages` and
+`charsSent` — start of a new conversation = start of a new bill.
+
+### No `tokens` field when nothing emitted
+The mock provider doesn't emit usage, so a session that ran entirely
+against mock leaves the `tokens` field absent (not null, not zeros).
+Tests pin this down: callers reading the `/usage` JSON know that
+`tokens` being present means "the provider actually told us
+something" and not "we attributed work to it without confirmation."
+
+### Tests
+3 new phase 6 specs:
+- mock-only chat: `/usage` returns `{messageCount, charsSent}` with
+  no `tokens` field
+- anthropic-stub chat over 2 turns emitting usage per turn: `/usage`
+  reports `inputTokens=10+20`, `outputTokens=5+10`, `turnsWithUsage=2`
+- `/new` resets the accumulator: `/usage` after `/new` has no `tokens`
+  field even though the previous turn had populated it
+
+Suite: 224/224. tsc clean.
+
+---
 ## [2.98.0] — 2026-05-05
 
 **Usage capture: end-to-end CLI + daemon plumbing.**

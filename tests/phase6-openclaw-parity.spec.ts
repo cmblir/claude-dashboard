@@ -1678,6 +1678,122 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('chat /usage with mock provider reports messageCount + charsSent only (no tokens block)', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+
+    const child = spawn(process.execPath, [CLI, 'chat'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stdin.write('hello\n');
+    await new Promise(r => setTimeout(r, 250));
+    child.stdin.write('/usage\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+    const out = chunks.join('');
+    // Find the /usage JSON line
+    const usageLine = out.split('\n').find(l => l.startsWith('{') && l.includes('messageCount'));
+    expect(usageLine).toBeDefined();
+    const u = JSON.parse(usageLine!);
+    expect(u.messageCount).toBeGreaterThanOrEqual(2);
+    expect(u.charsSent).toBe('hello'.length);
+    // Mock doesn't emit usage events → no tokens block
+    expect(u.tokens).toBeUndefined();
+  });
+
+  test('chat /usage accumulates token totals across turns when the provider emits onUsage', async () => {
+    const dir = tmpConfigDir();
+    // We monkey-patch the anthropic provider via Node --import preload
+    // (same trick used by the agent --usage tests above) so the chat
+    // REPL talks to a fake that emits {inputTokens, outputTokens} per turn.
+    runCli(['config', 'set', 'provider', 'anthropic'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-ant-x'], dir);
+    const preload = path.join(dir, 'preload.mjs');
+    fs.writeFileSync(preload,
+      `import('${path.resolve('src/lazyclaw/providers/registry.mjs')}').then(reg => {
+        let turn = 0;
+        reg.PROVIDERS.anthropic = {
+          name: 'anthropic',
+          async *sendMessage(_msgs, opts) {
+            turn += 1;
+            yield 'reply' + turn;
+            if (typeof opts.onUsage === 'function') {
+              opts.onUsage({ inputTokens: 10 * turn, outputTokens: 5 * turn });
+            }
+          },
+        };
+      });`,
+    );
+    const child = spawn(process.execPath, ['--import', preload, CLI, 'chat'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stdin.write('first\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('second\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('/usage\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+    const out = chunks.join('');
+    const usageLine = out.split('\n').find(l => l.startsWith('{') && l.includes('tokens'));
+    expect(usageLine).toBeDefined();
+    const u = JSON.parse(usageLine!);
+    // 2 turns × (10+5 input/output) = 30 across the test stub
+    expect(u.tokens.inputTokens).toBe(10 + 20);    // turn 1 (10) + turn 2 (20)
+    expect(u.tokens.outputTokens).toBe(5 + 10);    // turn 1 (5) + turn 2 (10)
+    expect(u.tokens.turnsWithUsage).toBe(2);
+  });
+
+  test('chat /new resets the running usage accumulator', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'anthropic'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-ant-x'], dir);
+    const preload = path.join(dir, 'preload.mjs');
+    fs.writeFileSync(preload,
+      `import('${path.resolve('src/lazyclaw/providers/registry.mjs')}').then(reg => {
+        reg.PROVIDERS.anthropic = {
+          name: 'anthropic',
+          async *sendMessage(_msgs, opts) {
+            yield 'r';
+            opts.onUsage?.({ inputTokens: 100, outputTokens: 50 });
+          },
+        };
+      });`,
+    );
+    const child = spawn(process.execPath, ['--import', preload, CLI, 'chat'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stdin.write('q\n');
+    await new Promise(r => setTimeout(r, 200));
+    child.stdin.write('/new\n');
+    await new Promise(r => setTimeout(r, 100));
+    child.stdin.write('/usage\n');
+    await new Promise(r => setTimeout(r, 100));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+    const out = chunks.join('');
+    // After /new, /usage should NOT have a tokens block (accumulator reset).
+    const lines = out.split('\n').filter(l => l.startsWith('{') && l.includes('messageCount'));
+    expect(lines.length).toBeGreaterThanOrEqual(1);
+    const post = JSON.parse(lines[lines.length - 1]);
+    expect(post.tokens).toBeUndefined();
+    expect(post.messageCount).toBe(0);
+  });
+
   test('agent --usage prints normalized totals to stderr (mock provider yields no usage so absence is OK)', () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);

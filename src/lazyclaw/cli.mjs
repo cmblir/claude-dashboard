@@ -639,6 +639,20 @@ async function cmdChat(flags = {}) {
   if (sessionId && messages.length > (skillNames.length > 0 ? 1 : 0)) {
     process.stdout.write(`resumed session ${sessionId} with ${messages.length} prior turn(s)\n`);
   }
+  // Running usage accumulator. /usage reports both the cheap local
+  // estimate (messageCount + charsSent) AND the provider-reported
+  // totals when the provider emits them on each turn. Mock provider
+  // doesn't emit usage, so usage stays null there — no surprise.
+  /** @type {{ inputTokens: number, outputTokens: number, totalTokens: number, turnsWithUsage: number } | null} */
+  let runningUsage = null;
+  const accumulateUsage = (u) => {
+    if (!u) return;
+    if (!runningUsage) runningUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0, turnsWithUsage: 0 };
+    runningUsage.inputTokens  += Number(u.inputTokens) || 0;
+    runningUsage.outputTokens += Number(u.outputTokens) || 0;
+    runningUsage.totalTokens  += Number(u.totalTokens) || ((Number(u.inputTokens) || 0) + (Number(u.outputTokens) || 0));
+    runningUsage.turnsWithUsage += 1;
+  };
   const persistTurn = (role, content) => {
     if (!sessionId) return;
     sessionsMod.appendTurn(sessionId, role, content, cfgDir);
@@ -711,6 +725,7 @@ async function cmdChat(flags = {}) {
       case '/reset': {
         messages = [];
         charsSent = 0;
+        runningUsage = null;
         if (sessionId) {
           const sm = await import('./sessions.mjs');
           sm.resetSession(sessionId, cfgDir);
@@ -719,7 +734,9 @@ async function cmdChat(flags = {}) {
         return true;
       }
       case '/usage': {
-        process.stdout.write(JSON.stringify({ messageCount: messages.length, charsSent }) + '\n');
+        const out = { messageCount: messages.length, charsSent };
+        if (runningUsage) out.tokens = runningUsage;
+        process.stdout.write(JSON.stringify(out) + '\n');
         return true;
       }
       case '/skill': {
@@ -803,6 +820,7 @@ async function cmdChat(flags = {}) {
         apiKey: cfg['api-key'],
         model: activeModel,
         signal: turnAc.signal,
+        onUsage: accumulateUsage,
       })) {
         process.stdout.write(chunk);
         acc += chunk;
