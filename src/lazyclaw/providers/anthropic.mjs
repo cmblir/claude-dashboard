@@ -210,13 +210,44 @@ export const anthropicProvider = {
     // input_json_delta partials. We accumulate per index; at content_block_stop
     // we hand the assembled object to opts.onToolUse.
     const openToolBlocks = new Map();
+    // Usage accumulator. The Messages API splits totals across two events:
+    //   message_start  → message.usage.{input_tokens, cache_creation_input_tokens, cache_read_input_tokens}
+    //   message_delta  → usage.output_tokens (final)
+    // We collect both and emit a single opts.onUsage call right before
+    // we return on message_stop.
+    let usage = null;
     for await (const chunk of iterateBody(res.body)) {
       if (opts.signal?.aborted) throw new AbortError('aborted mid-stream');
       buffer += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
       let consumed = 0;
       for (const frame of parseSseFrames(buffer)) {
         consumed = frame.nextCursor;
-        if (frame.event === 'content_block_start' && frame.data) {
+        if (frame.event === 'message_start' && frame.data) {
+          try {
+            const obj = JSON.parse(frame.data);
+            const u = obj?.message?.usage;
+            if (u) {
+              usage = {
+                inputTokens: u.input_tokens ?? null,
+                outputTokens: u.output_tokens ?? null,
+                cacheCreationInputTokens: u.cache_creation_input_tokens ?? null,
+                cacheReadInputTokens: u.cache_read_input_tokens ?? null,
+              };
+            }
+          } catch { /* skip malformed */ }
+        } else if (frame.event === 'message_delta' && frame.data) {
+          try {
+            const obj = JSON.parse(frame.data);
+            const u = obj?.usage;
+            if (u && usage) {
+              // message_delta carries the final output_tokens — overwrite
+              // the input-side initial value with the canonical total.
+              if (Number.isFinite(u.output_tokens)) usage.outputTokens = u.output_tokens;
+            } else if (u) {
+              usage = { inputTokens: null, outputTokens: u.output_tokens ?? null, cacheCreationInputTokens: null, cacheReadInputTokens: null };
+            }
+          } catch { /* skip malformed */ }
+        } else if (frame.event === 'content_block_start' && frame.data) {
           try {
             const obj = JSON.parse(frame.data);
             if (obj?.content_block?.type === 'tool_use') {
@@ -260,6 +291,9 @@ export const anthropicProvider = {
             }
           } catch { /* skip malformed */ }
         } else if (frame.event === 'message_stop') {
+          if (usage && typeof opts.onUsage === 'function') {
+            try { opts.onUsage(usage); } catch { /* never let a callback abort */ }
+          }
           return;
         } else if (frame.event === 'error' && frame.data) {
           let parsed = null;

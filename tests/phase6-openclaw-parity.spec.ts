@@ -1678,6 +1678,52 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('anthropic provider surfaces usage totals via opts.onUsage at message_stop', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    const sse =
+      'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_1","model":"claude-opus-4-7","usage":{"input_tokens":42,"cache_creation_input_tokens":10,"cache_read_input_tokens":0}}}\n\n' +
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hello"}}\n\n' +
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":17}}\n\n' +
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n';
+    const fakeFetch = async () => ({
+      ok: true, status: 200,
+      body: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(sse)); c.close(); } }),
+    });
+    let captured: any = null;
+    const out: string[] = [];
+    for await (const c of mod.anthropicProvider.sendMessage(
+      [{ role: 'user', content: 'q' }],
+      { apiKey: 'sk-ant-x', model: 'claude-opus-4-7', fetch: fakeFetch as any, onUsage: (u: any) => { captured = u; } },
+    )) out.push(c);
+    expect(out.join('')).toBe('hello');
+    expect(captured).toEqual({
+      inputTokens: 42,
+      outputTokens: 17,
+      cacheCreationInputTokens: 10,
+      cacheReadInputTokens: 0,
+    });
+  });
+
+  test('anthropic onUsage: missing callback is a no-op (back-compat for existing callers)', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    const sse =
+      'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":1}}}\n\n' +
+      'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"x"}}\n\n' +
+      'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":2}}\n\n' +
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n';
+    const fakeFetch = async () => ({
+      ok: true, status: 200,
+      body: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(sse)); c.close(); } }),
+    });
+    // No onUsage provided — must not throw or change yielded text.
+    const out: string[] = [];
+    for await (const c of mod.anthropicProvider.sendMessage(
+      [{ role: 'user', content: 'q' }],
+      { apiKey: 'sk-ant-x', model: 'claude-opus-4-7', fetch: fakeFetch as any },
+    )) out.push(c);
+    expect(out.join('')).toBe('x');
+  });
+
   test('cache wrapper: onHit/onMiss callbacks fire once per call with the right shape', async () => {
     const { withResponseCache } = await import('../src/lazyclaw/providers/cache.mjs' as string);
     const events: any[] = [];

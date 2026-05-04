@@ -10,6 +10,61 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.97.0] — 2026-05-05
+
+**Anthropic: usage totals surfaced via `opts.onUsage` callback.**
+
+The Messages API splits usage across two SSE events:
+- `message_start` carries `message.usage` with `input_tokens`,
+  `cache_creation_input_tokens`, `cache_read_input_tokens`
+- `message_delta` carries the final `usage.output_tokens`
+
+The provider already parsed the rest of the stream; usage was being
+discarded. Now they get accumulated and emitted once via
+`opts.onUsage` right before the iterator returns on `message_stop`:
+
+```js
+let usage = null;
+for await (const chunk of anthropic.sendMessage(messages, {
+  apiKey, model,
+  onUsage: u => { usage = u; },
+})) {
+  process.stdout.write(chunk);
+}
+console.log(usage);
+// { inputTokens: 1234, outputTokens: 567,
+//   cacheCreationInputTokens: 500, cacheReadInputTokens: 0 }
+```
+
+### Why this matters
+- Cost tracking: input × input-rate + output × output-rate
+- Prompt-caching ROI: `cacheReadInputTokens` shows how much of the
+  prefix actually hit the cache vs paid full input cost
+- Budget enforcement: callers can shed load when running totals
+  cross a threshold
+
+### Back-compat
+Missing callback is a no-op — existing callers see no behavior
+change. Malformed `message_start` / `message_delta` JSON is
+swallowed at parse time, same posture as the rest of the SSE
+parser.
+
+### Tests
+2 new phase 6 specs:
+- happy path: `message_start` (input + cache fields) + `message_delta`
+  (output) → callback fires once with all four fields populated
+- back-compat: missing `onUsage` is a no-op; iterator still yields
+  the text and completes normally
+
+Suite: 215/215. tsc clean.
+
+Out of scope: OpenAI usage capture. The Chat Completions API only
+emits usage in the stream when `stream_options: {include_usage: true}`
+is set in the request body, and even then the field shape varies
+between endpoint versions. Adding that needs a careful contract
+design and another round of tests; deferring rather than scaffolding.
+
+---
 ## [2.96.0] — 2026-05-05
 
 **Provider tracing: decorator transitions land in the daemon log at debug level.**
