@@ -10,6 +10,55 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.94.0] — 2026-05-05
+
+**Daemon: `GET /metrics` for runtime observability.**
+
+Counters track every request and the access-log code already had the
+hook point. This iteration exposes them as JSON:
+
+```json
+{
+  "uptimeMs": 12345,
+  "requestsTotal": 42,
+  "requestsByStatus": { "200": 38, "404": 3, "429": 1 },
+  "rateLimitDenied": 1,
+  "cache": { "hits": 5, "misses": 8, "size": 8 },
+  "timestamp": "2026-05-05T..."
+}
+```
+
+`cache` is `null` unless `--response-cache` is on; `rateLimitDenied`
+is `0` unless `--rate-limit` is set — but the counter exists either
+way, so monitoring tooling sees a stable schema regardless of the
+daemon's optional features.
+
+### Counters fire on res.close
+The same hook point as the access log, so middleware short-circuits
+(403 / 401 / 429) get counted. This means `requestsByStatus["429"]`
+and `rateLimitDenied` *both* increment for a denied request — one
+records the HTTP outcome, the other the policy decision. The two are
+useful in different observability contexts (alerting on 429s vs
+charting cap saturation).
+
+### Robustness fix found by the new tests
+The metrics hook crashed when unit tests drove the handler with a
+stub `res` that lacked `once`. Fixed by guarding `typeof res.once === 'function'`
+before attaching — exercise without an event-emitter surface no
+longer breaks.
+
+### Tests
+3 new phase 6 specs:
+- `/metrics` without optional features: counts 200s + a 404, reports
+  cache:null, rateLimitDenied:0
+- `/metrics` with `--rate-limit 2`: third request 429s; the counter
+  registers `rateLimitDenied >= 1`
+- `/metrics` with `--response-cache`: 1 miss + 2 hits → `cache.hits=2,
+  cache.misses=1, cache.size>=1`
+
+Suite: 202/202. tsc clean.
+
+---
 ## [2.93.0] — 2026-05-05
 
 **Structured logging + daemon access log (opt-in).**

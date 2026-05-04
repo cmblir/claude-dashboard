@@ -229,6 +229,14 @@ export function makeHandler(ctx) {
   // Logger is opt-in via ctx.logger (the CLI passes one when --log <level>
   // is set). Falsy → silent (the historical default; tests stay quiet).
   const logger = ctx.logger || null;
+  // Per-handler metrics. The /metrics endpoint reads these. Bumped on
+  // res.close so middleware short-circuits (403/401/429) get counted.
+  const metrics = {
+    startedAtMs: Date.now(),
+    requestsTotal: 0,
+    requestsByStatus: /** @type {Record<string, number>} */({}),
+    rateLimitDenied: 0,
+  };
   return async function handler(req, res) {
     // Capture method+path before any handler logic runs; req.url survives
     // the response but capturing now keeps the log line stable even if a
@@ -245,12 +253,22 @@ export function makeHandler(ctx) {
       observedStatus = status;
       return origWriteHead(status, ...rest);
     };
-    if (logger) {
+    // Attach the close-handler only when res supports it. Unit tests
+    // sometimes drive the handler with a stub `res` that has writeHead +
+    // end but no event-emitter surface; those exercises don't care about
+    // metrics or access logs and should not crash.
+    if (typeof res.once === 'function') {
       res.once('close', () => {
-        const durationMs = Date.now() - startedAt;
-        logger.info('access', {
-          method, path, status: observedStatus, durationMs, remote,
-        });
+        // Counters fire even without a logger so /metrics is meaningful
+        // by default. Status 0 means writeHead never ran (e.g. body parse
+        // crashed) — bucket those as "0" so we don't lose the request.
+        metrics.requestsTotal += 1;
+        const sk = String(observedStatus || 0);
+        metrics.requestsByStatus[sk] = (metrics.requestsByStatus[sk] || 0) + 1;
+        if (logger) {
+          const durationMs = Date.now() - startedAt;
+          logger.info('access', { method, path, status: observedStatus, durationMs, remote });
+        }
       });
     }
     try {
@@ -279,6 +297,7 @@ export function makeHandler(ctx) {
         const key = req.socket?.remoteAddress || 'no-socket';
         const verdict = limiter.consume(key);
         if (!verdict.allowed) {
+          metrics.rateLimitDenied += 1;
           const retrySeconds = Math.max(1, Math.ceil(verdict.retryAfterMs / 1000));
           return writeJson(res, 429, {
             error: 'rate limit exceeded',
@@ -293,6 +312,30 @@ export function makeHandler(ctx) {
       switch (true) {
         case route === 'GET /version':
           return writeJson(res, 200, { version: ctx.version(), nodeVersion: process.version, platform: `${process.platform}-${process.arch}` });
+        case route === 'GET /metrics': {
+          // Aggregate per-handler counters. cacheStats are pulled per
+          // wrapped provider — we report a sum across all populated
+          // entries so the figure reflects total cache activity.
+          let cacheHits = 0, cacheMisses = 0, cacheSize = 0;
+          if (cachedByName) {
+            for (const wrapped of cachedByName.values()) {
+              const s = typeof wrapped.cacheStats === 'function' ? wrapped.cacheStats() : null;
+              if (s) {
+                cacheHits += s.hits || 0;
+                cacheMisses += s.misses || 0;
+                cacheSize += s.size || 0;
+              }
+            }
+          }
+          return writeJson(res, 200, {
+            uptimeMs: Date.now() - metrics.startedAtMs,
+            requestsTotal: metrics.requestsTotal,
+            requestsByStatus: metrics.requestsByStatus,
+            rateLimitDenied: metrics.rateLimitDenied,
+            cache: cachedByName ? { hits: cacheHits, misses: cacheMisses, size: cacheSize } : null,
+            timestamp: new Date().toISOString(),
+          });
+        }
         case route === 'GET /providers':
           return writeJson(res, 200, Object.keys(PROVIDERS).map(name => {
             const meta = PROVIDER_INFO[name] || { name };

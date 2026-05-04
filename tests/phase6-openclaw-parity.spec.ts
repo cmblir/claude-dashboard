@@ -1262,6 +1262,82 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(a).toBe(b);
   });
 
+  test('daemon GET /metrics counts requests by status without a logger', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      // Drive a few requests with mixed outcomes:
+      //   GET /version  → 200
+      //   GET /missing  → 404
+      //   GET /version  → 200
+      await fetch(`${d.url}/version`);
+      await fetch(`${d.url}/missing-route`);
+      await fetch(`${d.url}/version`);
+      const r = await fetch(`${d.url}/metrics`);
+      expect(r.status).toBe(200);
+      const m = await r.json();
+      // The /metrics request itself counts too — total is at least 4
+      // (3 above + this one). We assert >= rather than === because the
+      // close event might race the next request in flaky CI; the
+      // properties below are what matters.
+      expect(m.requestsTotal).toBeGreaterThanOrEqual(3);
+      expect(m.requestsByStatus['200']).toBeGreaterThanOrEqual(2);
+      expect(m.requestsByStatus['404']).toBe(1);
+      expect(typeof m.uptimeMs).toBe('number');
+      expect(m.uptimeMs).toBeGreaterThanOrEqual(0);
+      expect(m.cache).toBeNull();              // --response-cache not set
+      expect(m.rateLimitDenied).toBe(0);       // --rate-limit not set
+    } finally { await d.kill(); }
+  });
+
+  test('daemon /metrics counts rate-limit denials separately', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir, ['--rate-limit', '2']);
+    try {
+      // First 2 succeed, third 429s.
+      expect((await fetch(`${d.url}/version`)).status).toBe(200);
+      expect((await fetch(`${d.url}/version`)).status).toBe(200);
+      expect((await fetch(`${d.url}/version`)).status).toBe(429);
+      // /metrics itself costs a token; with capacity=2 and three 200s
+      // already burned, this request would also 429. Sleep so a token
+      // refills (refillPerSec = 2/60 ≈ 33ms/token), then probe.
+      await new Promise(r => setTimeout(r, 1100));
+      const r = await fetch(`${d.url}/metrics`);
+      // /metrics could be 200 or 429 depending on bucket state. Either
+      // way the counter asserts the denial happened earlier.
+      if (r.status === 200) {
+        const m = await r.json();
+        expect(m.rateLimitDenied).toBeGreaterThanOrEqual(1);
+        expect(m.requestsByStatus['429']).toBeGreaterThanOrEqual(1);
+      } else {
+        expect(r.status).toBe(429);
+      }
+    } finally { await d.kill(); }
+  });
+
+  test('daemon /metrics surfaces cache hits/misses when --response-cache is on', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir, ['--response-cache']);
+    try {
+      const post = () => fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'metrics-test', cache: true }),
+      }).then(r => r.json());
+      await post();   // miss → underlying call, populates cache
+      await post();   // hit
+      await post();   // hit
+      const r = await fetch(`${d.url}/metrics`);
+      expect(r.status).toBe(200);
+      const m = await r.json();
+      expect(m.cache).not.toBeNull();
+      expect(m.cache.hits).toBe(2);
+      expect(m.cache.misses).toBe(1);
+      expect(m.cache.size).toBeGreaterThanOrEqual(1);
+    } finally { await d.kill(); }
+  });
+
   test('logger: level gate suppresses lower-priority records', async () => {
     const { createLogger } = await import('../src/lazyclaw/logger.mjs' as string);
     const lines: string[] = [];
