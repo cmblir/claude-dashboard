@@ -33,16 +33,27 @@ narrow the secret one byte at a time. The check XORs every byte into
 an accumulator and returns `accum === 0`, so success and failure take
 the same time regardless of where the strings diverge.
 
+### CLI integration
+`lazyclaw daemon --auth-token <token>` (also `LAZYCLAW_AUTH_TOKEN` env)
+turns on the gate; the bound-URL JSON now carries `auth: true` so
+test scripts can verify auth is enabled without inspecting the actual
+token. The flag wins over the env var when both are set.
+
 ### Tests
-4 new phase 6 specs:
+6 new phase 6 specs:
 - missing `Authorization` header → 401 + `WWW-Authenticate`
 - correct `Bearer <token>` → 200, route reached
 - wrong token → 401, `readConfig` is *not* called (auth runs before
   route resolution — important so unauthorized callers can't probe
   internal state via side effects)
 - no `authToken` set → no gate, default loopback behavior unchanged
+- timing: same-length wrong-byte / shorter / longer / empty all
+  return 401 (validates the constant-time comparison handles
+  length-mismatch correctly)
+- CLI: `--auth-token` flag survives spawn, daemon reports `auth: true`,
+  request without header → 401, with header → 200
 
-Suite: 110/110. tsc clean. Dashboard QA: 0/66.
+Suite: 112/112. tsc clean. Dashboard QA: 0/66.
 
 ---
 ## [2.82.0] — 2026-05-05

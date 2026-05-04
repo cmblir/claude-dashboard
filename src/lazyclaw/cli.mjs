@@ -388,6 +388,10 @@ async function cmdDaemon(flags) {
   const { startDaemon } = await import('./daemon.mjs');
   const port = flags.port !== undefined ? parseInt(flags.port, 10) : 0;
   const once = !!flags.once;
+  // --auth-token wins over the env var so a per-invocation override works.
+  // When neither is set, the daemon runs unauthenticated (the historical
+  // single-user-loopback default).
+  const authToken = flags['auth-token'] || process.env.LAZYCLAW_AUTH_TOKEN || null;
   const cfgDir = path.dirname(configPath());
   const d = await startDaemon({
     port: Number.isFinite(port) ? port : 0,
@@ -396,10 +400,13 @@ async function cmdDaemon(flags) {
     sessionsDirGetter: () => cfgDir,
     sessionsMod,
     version: () => readVersionFromRepo(),
+    authToken: authToken || undefined,
   });
   // Print the bound port immediately so test/script callers can pick it up
-  // even when we asked for port 0.
-  process.stdout.write(JSON.stringify({ ok: true, url: `http://127.0.0.1:${d.port}`, port: d.port, once }) + '\n');
+  // even when we asked for port 0. Indicate auth presence (not the token).
+  process.stdout.write(JSON.stringify({
+    ok: true, url: `http://127.0.0.1:${d.port}`, port: d.port, once, auth: !!authToken,
+  }) + '\n');
   if (!once) {
     // Forward SIGINT/SIGTERM to a clean shutdown.
     const shutdown = async () => { try { await d.close(); } catch {} process.exit(0); };

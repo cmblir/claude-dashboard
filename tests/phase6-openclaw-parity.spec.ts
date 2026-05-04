@@ -626,6 +626,40 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('lazyclaw daemon --auth-token T enforces the token end-to-end', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const child = spawn(process.execPath, [CLI, 'daemon', '--port', '0', '--auth-token', 'tok-xyz'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let url = '';
+    let auth = false;
+    await new Promise<void>((resolve, reject) => {
+      let buf = '';
+      child.stdout.on('data', (d) => {
+        buf += d.toString();
+        const nl = buf.indexOf('\n');
+        if (nl < 0) return;
+        try {
+          const obj = JSON.parse(buf.slice(0, nl));
+          if (obj.url) { url = obj.url; auth = !!obj.auth; resolve(); }
+        } catch { /* keep buffering */ }
+      });
+      child.on('error', reject);
+      setTimeout(() => reject(new Error('daemon did not boot in 5s')), 5000);
+    });
+    try {
+      expect(auth).toBe(true);
+      const r1 = await fetch(`${url}/version`);
+      expect(r1.status).toBe(401);
+      const r2 = await fetch(`${url}/version`, { headers: { authorization: 'Bearer tok-xyz' } });
+      expect(r2.status).toBe(200);
+    } finally {
+      await new Promise<void>(resolve => { child.once('close', () => resolve()); child.kill('SIGTERM'); });
+    }
+  });
+
   test('daemon makeHandler without authToken: any request goes through (default loopback mode)', async () => {
     const mod = await import('../src/lazyclaw/daemon.mjs' as string);
     const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
