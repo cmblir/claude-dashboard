@@ -10,6 +10,63 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.72.0] — 2026-05-05
+
+**LazyClaw OpenClaw-parity: phase 6** — `doctor`, `onboard`, `status`,
+real Anthropic streaming, slash commands.
+
+LazyClaw stops at "config set + chat" was a phase-4 placeholder. This
+release lifts it to OpenClaw's CLI shape so a fresh install can be
+configured and validated in one command set.
+
+### CLI additions
+- `lazyclaw onboard [--non-interactive]` — guided setup. Accepts the
+  unified `--model anthropic/claude-opus-4-7` form (provider extracted
+  automatically) or the split `--provider anthropic --model claude-opus-4-7`.
+  `--api-key` writes the key. With `--non-interactive` it's automation-safe;
+  without, it prompts for missing fields.
+- `lazyclaw doctor` — prints diagnostic JSON (config path, provider,
+  model, hasApiKey, node version, platform, registered providers, issue
+  list). Exits 0 only when no issues. Mock provider does not require a
+  key; non-mock providers do.
+- `lazyclaw status` — single-shot config view. Always emits `keyMasked`
+  (e.g. `sk-ant-****abcd`) — never the raw key.
+
+### Chat slash commands
+`/help`, `/status`, `/new`, `/reset` (alias for `/new`), `/usage`, `/exit`.
+- `/status` prints provider, model, keyMasked, current message count.
+  Asserted not to leak the raw key.
+- `/new` clears the in-memory message array so the next user line is
+  the start of a fresh conversation.
+- `/usage` reports `messageCount` + `charsSent`.
+
+### Provider layer
+- `providers/anthropic.mjs` — real Messages-API SSE streaming. Splits
+  the body, parses `event: content_block_delta` frames, yields
+  `delta.text` per chunk, terminates on `message_stop`. Surfaces 401/403
+  as `InvalidApiKeyError { code: 'INVALID_KEY' }`. Accepts a `fetch`
+  option for offline tests.
+- `providers/registry.mjs` — re-exports the real provider, adds two
+  helpers: `parseProviderModel("anthropic/claude-opus-4-7")` and
+  `maskApiKey("sk-ant-...")`. The mask only honours known vendor
+  prefixes (`sk-ant-`, `sk-or-`, `sk-`); custom keys mask completely
+  rather than risk surfacing a meaningful chunk.
+
+### Tests
+- `tests/phase6-openclaw-parity.spec.ts` — 10 specs covering every new
+  CLI command, both onboard variants, /status leak guard, /new reset,
+  /help inventory, anthropic SSE shape, anthropic 401 → INVALID_KEY.
+- Full Playwright run: 35/35 passing (25 prior + 10 new).
+- `tsc --noEmit` clean. `npm run lint` exit 0.
+
+### Out of scope (called out per §1.1)
+OpenClaw's multi-channel inbox (WhatsApp, Signal, Slack, Telegram, etc.),
+voice/wake-word, mobile companion apps, Live Canvas, Docker/SSH/OpenShell
+sandbox backends are platform integrations that need real API
+credentials, mobile builds, or daemon installation — none of which are
+appropriate for autonomous-mode commits.
+
+---
 ## [2.71.116] — 2026-05-05
 
 **Dashboard QA pass (LCO1)** — squashed `<select>` + new QA harness.

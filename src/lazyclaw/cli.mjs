@@ -68,20 +68,168 @@ function cmdConfigSet(key, value) {
   console.log(JSON.stringify({ ok: true, key, value }));
 }
 
+function applyOnboardConfig(currentCfg, flags) {
+  // Honors the OpenClaw-style unified provider/model string ("anthropic/claude-opus-4-7")
+  // by splitting it, but explicit --provider always wins.
+  const { parseProviderModel } = require_registry_sync();
+  const next = { ...currentCfg };
+  if (flags.model) {
+    const parsed = parseProviderModel(flags.model);
+    if (parsed.provider && !flags.provider) next.provider = parsed.provider;
+    next.model = parsed.model || flags.model;
+  }
+  if (flags.provider) next.provider = flags.provider;
+  if (flags['api-key']) next['api-key'] = flags['api-key'];
+  return next;
+}
+
+// Module is ESM but we want a synchronous-looking helper for the CLI flow.
+// Cache the import on first use so we don't pay for it on every config call.
+let _registryMod = null;
+function require_registry_sync() {
+  if (!_registryMod) {
+    // eslint-disable-next-line no-undef
+    throw new Error('registry module not pre-loaded — call ensureRegistry() first');
+  }
+  return _registryMod;
+}
+async function ensureRegistry() {
+  if (!_registryMod) _registryMod = await import('./providers/registry.mjs');
+  return _registryMod;
+}
+
+async function cmdOnboard(flags) {
+  await ensureRegistry();
+  if (!flags['non-interactive']) {
+    // Interactive onboarding is a single guided prompt sequence — kept tiny.
+    // For automation always use --non-interactive plus the value flags.
+    const readline = await import('node:readline');
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ask = q => new Promise(resolve => rl.question(q, resolve));
+    flags.provider = flags.provider || (await ask('provider [mock|anthropic]: ')).trim();
+    flags.model = flags.model || (await ask('model (or "anthropic/claude-opus-4-7"): ')).trim();
+    flags['api-key'] = flags['api-key'] || (await ask('api-key (leave blank for mock): ')).trim();
+    rl.close();
+  }
+  const next = applyOnboardConfig(readConfig(), flags);
+  if (!next.provider) { console.error('onboard: provider is required'); process.exit(2); }
+  writeConfig(next);
+  console.log(JSON.stringify({ ok: true, written: configPath(), provider: next.provider, model: next.model || null, hasApiKey: !!next['api-key'] }));
+}
+
+async function cmdDoctor() {
+  await ensureRegistry();
+  const cfg = readConfig();
+  const issues = [];
+  if (!cfg.provider) issues.push('config.provider is missing — run `lazyclaw onboard`');
+  if (cfg.provider && cfg.provider !== 'mock' && !cfg['api-key']) {
+    issues.push(`config['api-key'] is missing for provider "${cfg.provider}"`);
+  }
+  if (cfg.provider && !PROVIDERS_HAS(_registryMod.PROVIDERS, cfg.provider)) {
+    issues.push(`unknown provider "${cfg.provider}" — registered: ${Object.keys(_registryMod.PROVIDERS).join(', ')}`);
+  }
+  const ok = issues.length === 0;
+  const out = {
+    ok,
+    configPath: configPath(),
+    provider: cfg.provider || null,
+    model: cfg.model || null,
+    hasApiKey: !!cfg['api-key'],
+    nodeVersion: process.version,
+    platform: `${process.platform}-${process.arch}`,
+    issues,
+    knownProviders: Object.keys(_registryMod.PROVIDERS),
+    timestamp: new Date().toISOString(),
+  };
+  console.log(JSON.stringify(out, null, 2));
+  process.exit(ok ? 0 : 1);
+}
+
+function PROVIDERS_HAS(map, name) {
+  return Object.prototype.hasOwnProperty.call(map, name);
+}
+
+async function cmdStatus() {
+  await ensureRegistry();
+  const cfg = readConfig();
+  const out = {
+    configPath: configPath(),
+    provider: cfg.provider || null,
+    model: cfg.model || null,
+    keyMasked: _registryMod.maskApiKey(cfg['api-key']),
+  };
+  console.log(JSON.stringify(out, null, 2));
+}
+
+const SLASH_COMMANDS = [
+  { cmd: '/help',   help: 'list available slash commands' },
+  { cmd: '/status', help: 'print current provider, model, masked key' },
+  { cmd: '/new',    help: 'clear conversation and start over' },
+  { cmd: '/reset',  help: 'alias for /new' },
+  { cmd: '/usage',  help: 'show message count + chars sent so far' },
+  { cmd: '/exit',   help: 'leave the chat' },
+];
+
 async function cmdChat() {
+  await ensureRegistry();
   const cfg = readConfig();
   const provName = cfg.provider || 'mock';
-  const { PROVIDERS } = await import('./providers/registry.mjs');
-  const prov = PROVIDERS[provName];
+  const prov = _registryMod.PROVIDERS[provName];
   if (!prov) { console.error(`unknown provider: ${provName}`); process.exit(2); }
 
   const readline = await import('node:readline');
   const rl = readline.createInterface({ input: process.stdin, terminal: false });
-  const messages = [];
+  let messages = [];
+  let charsSent = 0;
+
+  const handleSlash = async (line) => {
+    const cmd = line.split(/\s+/)[0];
+    switch (cmd) {
+      case '/help': {
+        process.stdout.write('slash commands:\n');
+        for (const c of SLASH_COMMANDS) process.stdout.write(`  ${c.cmd.padEnd(8)} — ${c.help}\n`);
+        return true;
+      }
+      case '/status': {
+        const out = {
+          provider: cfg.provider || null,
+          model: cfg.model || null,
+          keyMasked: _registryMod.maskApiKey(cfg['api-key']),
+          messageCount: messages.length,
+        };
+        process.stdout.write(JSON.stringify(out) + '\n');
+        return true;
+      }
+      case '/new':
+      case '/reset': {
+        messages = [];
+        charsSent = 0;
+        process.stdout.write('cleared — new conversation\n');
+        return true;
+      }
+      case '/usage': {
+        process.stdout.write(JSON.stringify({ messageCount: messages.length, charsSent }) + '\n');
+        return true;
+      }
+      case '/exit': {
+        return 'EXIT';
+      }
+      default:
+        process.stdout.write(`unknown slash: ${cmd} (try /help)\n`);
+        return true;
+    }
+  };
+
   for await (const line of rl) {
-    if (!line.trim()) continue;
-    if (line.trim() === '/exit') break;
-    messages.push({ role: 'user', content: line });
+    const text = line.trim();
+    if (!text) continue;
+    if (text.startsWith('/')) {
+      const r = await handleSlash(text);
+      if (r === 'EXIT') break;
+      continue;
+    }
+    messages.push({ role: 'user', content: text });
+    charsSent += text.length;
     let acc = '';
     try {
       for await (const chunk of prov.sendMessage(messages, { apiKey: cfg['api-key'], model: cfg.model })) {
@@ -108,8 +256,18 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a.startsWith('--')) {
       const eq = a.indexOf('=');
-      if (eq >= 0) out.flags[a.slice(2, eq)] = a.slice(eq + 1);
-      else out.flags[a.slice(2)] = argv[++i];
+      if (eq >= 0) {
+        out.flags[a.slice(2, eq)] = a.slice(eq + 1);
+      } else {
+        const next = argv[i + 1];
+        if (next === undefined || next.startsWith('--')) {
+          // bare boolean flag
+          out.flags[a.slice(2)] = true;
+        } else {
+          out.flags[a.slice(2)] = next;
+          i += 1;
+        }
+      }
     } else out.positional.push(a);
   }
   return out;
@@ -148,8 +306,20 @@ async function main() {
       await cmdChat();
       break;
     }
+    case 'doctor': {
+      await cmdDoctor();
+      break;
+    }
+    case 'status': {
+      await cmdStatus();
+      break;
+    }
+    case 'onboard': {
+      await cmdOnboard(rest.flags);
+      break;
+    }
     default:
-      console.error('Usage: lazyclaw <run|resume|config|chat> ...');
+      console.error('Usage: lazyclaw <run|resume|config|chat|doctor|status|onboard> ...');
       process.exit(2);
   }
 }
