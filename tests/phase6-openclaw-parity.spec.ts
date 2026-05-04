@@ -528,6 +528,144 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(caught?.retryAfterMs).toBeLessThan(8000);
   });
 
+  test('withRateLimitRetry retries on RATE_LIMIT and yields the second attempt', async () => {
+    const mod = await import('../src/lazyclaw/providers/retry.mjs' as string);
+    const calls: number[] = [];
+    let attempt = 0;
+    const fakeProv = {
+      name: 'fake',
+      async *sendMessage(_messages: any, _opts: any) {
+        attempt += 1;
+        calls.push(attempt);
+        if (attempt === 1) {
+          const e: any = new Error('rate limited');
+          e.code = 'RATE_LIMIT';
+          e.retryAfterMs = 50;
+          throw e;
+        }
+        yield 'finally';
+      },
+    };
+    const sleeps: number[] = [];
+    const sleep = async (ms: number) => { sleeps.push(ms); };
+    const retried = mod.withRateLimitRetry(fakeProv, { attempts: 3, sleep });
+    const out: string[] = [];
+    for await (const chunk of retried.sendMessage([{ role: 'user', content: 'q' }], {})) {
+      out.push(chunk);
+    }
+    expect(out.join('')).toBe('finally');
+    expect(calls).toEqual([1, 2]);
+    expect(sleeps).toEqual([50]);
+  });
+
+  test('withRateLimitRetry exhausts attempts and rethrows the last RATE_LIMIT', async () => {
+    const mod = await import('../src/lazyclaw/providers/retry.mjs' as string);
+    const fakeProv = {
+      name: 'fake',
+      async *sendMessage(_m: any, _o: any) {
+        const e: any = new Error('rate limited');
+        e.code = 'RATE_LIMIT';
+        e.retryAfterMs = 1;
+        throw e;
+      },
+    };
+    let caught: any = null;
+    const sleep = async () => {};
+    const retried = mod.withRateLimitRetry(fakeProv, { attempts: 2, sleep });
+    try {
+      for await (const _c of retried.sendMessage([{ role: 'user', content: 'q' }], {})) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('RATE_LIMIT');
+  });
+
+  test('withRateLimitRetry does NOT retry mid-stream RATE_LIMIT (would duplicate output)', async () => {
+    const mod = await import('../src/lazyclaw/providers/retry.mjs' as string);
+    let calls = 0;
+    const fakeProv = {
+      name: 'fake',
+      async *sendMessage() {
+        calls += 1;
+        yield 'partial';
+        const e: any = new Error('rate limited');
+        e.code = 'RATE_LIMIT';
+        e.retryAfterMs = 0;
+        throw e;
+      },
+    };
+    const out: string[] = [];
+    let caught: any = null;
+    const retried = mod.withRateLimitRetry(fakeProv, { attempts: 5, sleep: async () => {} });
+    try {
+      for await (const c of retried.sendMessage([{ role: 'user', content: 'q' }], {})) { out.push(c); }
+    } catch (e) { caught = e; }
+    expect(out).toEqual(['partial']);
+    expect(caught?.code).toBe('RATE_LIMIT');
+    expect(calls).toBe(1);
+  });
+
+  test('withRateLimitRetry does NOT retry non-RATE_LIMIT errors', async () => {
+    const mod = await import('../src/lazyclaw/providers/retry.mjs' as string);
+    let calls = 0;
+    const fakeProv = {
+      name: 'fake',
+      async *sendMessage() {
+        calls += 1;
+        const e: any = new Error('boom');
+        e.code = 'INVALID_KEY';
+        throw e;
+      },
+    };
+    const retried = mod.withRateLimitRetry(fakeProv, { attempts: 5, sleep: async () => {} });
+    let caught: any = null;
+    try {
+      for await (const _c of retried.sendMessage([{ role: 'user', content: 'q' }], {})) { /* drain */ }
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('INVALID_KEY');
+    expect(calls).toBe(1);
+  });
+
+  test('withRateLimitRetry onRetry callback receives attempt number and waited ms', async () => {
+    const mod = await import('../src/lazyclaw/providers/retry.mjs' as string);
+    const log: any[] = [];
+    let attempt = 0;
+    const fakeProv = {
+      name: 'fake',
+      async *sendMessage() {
+        attempt += 1;
+        if (attempt < 3) {
+          const e: any = new Error('rl');
+          e.code = 'RATE_LIMIT';
+          e.retryAfterMs = 100;
+          throw e;
+        }
+        yield 'ok';
+      },
+    };
+    const retried = mod.withRateLimitRetry(fakeProv, {
+      attempts: 5,
+      sleep: async () => {},
+      onRetry: (info: any) => log.push({ attempt: info.attempt, ms: info.retryAfterMs }),
+    });
+    const out: string[] = [];
+    for await (const c of retried.sendMessage([{ role: 'user', content: 'q' }], {})) out.push(c);
+    expect(out.join('')).toBe('ok');
+    expect(log).toEqual([
+      { attempt: 1, ms: 100 },
+      { attempt: 2, ms: 100 },
+    ]);
+  });
+
+  test('clampBackoff clamps to maxBackoffMs and to absolute ceiling 5 minutes', async () => {
+    const mod = await import('../src/lazyclaw/providers/retry.mjs' as string);
+    expect(mod.clampBackoff(50, 60000)).toBe(50);
+    expect(mod.clampBackoff(70_000, 60_000)).toBe(60_000);
+    // Absolute ceiling overrides even an oversized maxBackoffMs from the caller.
+    expect(mod.clampBackoff(10 * 60_000, 10 * 60_000)).toBe(5 * 60_000);
+    // Negative or non-finite → ceiling
+    expect(mod.clampBackoff(-1, 30_000)).toBe(30_000);
+    expect(mod.clampBackoff(Number.NaN, 30_000)).toBe(30_000);
+  });
+
   test('ollama provider streams newline-delimited JSON chunks and stops on done:true', async () => {
     const mod = await import('../src/lazyclaw/providers/ollama.mjs' as string);
     const ndjson =
@@ -654,6 +792,37 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].name).toBe('ping');
     expect(calls[0].input).toEqual({ x: 1 });
+  });
+
+  test('anthropic provider sends system as a plain string by default', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    let body: any = null;
+    const fakeFetch = async (_url: string, init: any) => {
+      body = JSON.parse(init.body);
+      return { ok: true, status: 200, body: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('event: message_stop\ndata: {"type":"message_stop"}\n\n')); c.close(); } }) };
+    };
+    for await (const _c of mod.anthropicProvider.sendMessage(
+      [{ role: 'user', content: 'q' }],
+      { apiKey: 'sk-ant-x', model: 'claude-opus-4-7', fetch: fakeFetch as any, system: 'be terse' },
+    )) { /* drain */ }
+    expect(body.system).toBe('be terse');
+  });
+
+  test('anthropic provider opts.cache lifts system into a cache_control text block', async () => {
+    const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
+    let body: any = null;
+    const fakeFetch = async (_url: string, init: any) => {
+      body = JSON.parse(init.body);
+      return { ok: true, status: 200, body: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('event: message_stop\ndata: {"type":"message_stop"}\n\n')); c.close(); } }) };
+    };
+    for await (const _c of mod.anthropicProvider.sendMessage(
+      [{ role: 'user', content: 'q' }],
+      { apiKey: 'sk-ant-x', model: 'claude-opus-4-7', fetch: fakeFetch as any, system: 'long stable prefix', cache: true },
+    )) { /* drain */ }
+    expect(Array.isArray(body.system)).toBe(true);
+    expect(body.system[0].type).toBe('text');
+    expect(body.system[0].text).toBe('long stable prefix');
+    expect(body.system[0].cache_control).toEqual({ type: 'ephemeral' });
   });
 
   test('anthropic provider passes through tool definitions and surfaces tool_use via callback', async () => {

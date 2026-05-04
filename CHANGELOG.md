@@ -10,6 +10,36 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.81.1] — 2026-05-05
+
+**Anthropic prompt caching: `opts.cache: true`.**
+
+When the system prompt is long and stable across calls (skill bundles
+are the common case), pass `cache: true` to `anthropicProvider.sendMessage`
+and the provider lifts the system string into the cache-control text-block
+shape:
+
+```json
+{
+  "system": [
+    { "type": "text", "text": "...", "cache_control": { "type": "ephemeral" } }
+  ]
+}
+```
+
+Repeated calls with the same prefix only pay full input cost once; subsequent
+calls within the cache TTL hit the cache. No-op when `cache` is falsy
+(default) — `body.system` stays a plain string, identical to prior behavior.
+
+### Tests
+2 new phase 6 specs:
+- default path: `body.system` is a plain string
+- `cache: true`: `body.system` is the array-of-text-blocks form with
+  `cache_control: { type: 'ephemeral' }`
+
+Suite: 100/100 (milestone). tsc clean.
+
+---
 ## [2.81.0] — 2026-05-05
 
 **Provider throughput benchmark (`make bench-providers`).**

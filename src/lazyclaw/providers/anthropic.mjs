@@ -146,7 +146,17 @@ export const anthropicProvider = {
       messages: apiMessages,
     };
     const sys = opts.system || messages.find(m => m.role === 'system')?.content;
-    if (sys) body.system = sys;
+    if (sys) {
+      // Prompt caching: when opts.cache is truthy, mark the system prompt
+      // as ephemeral-cacheable so repeated calls with the same system
+      // prefix only pay full input cost once. The Messages API expects
+      // an array of text blocks here, so we lift the string into one.
+      if (opts.cache) {
+        body.system = [{ type: 'text', text: String(sys), cache_control: { type: 'ephemeral' } }];
+      } else {
+        body.system = sys;
+      }
+    }
     // Extended thinking. opts.thinking: { enabled?: boolean, budgetTokens?: number }.
     // The thinking field is opt-in; when budget is set we always treat it as enabled
     // because the API rejects budget without a corresponding type.
