@@ -10,6 +10,42 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.84.0] — 2026-05-05
+
+**`lazyclaw help` + `--help` / `-h` for centralized usage info.**
+
+Each subcommand had its usage line scattered across the source. Users
+who wanted a one-stop overview had to read CLAUDE.md or hunt through
+errors.
+
+### CLI
+- `lazyclaw help` — lists every subcommand with a one-line summary,
+  padded to 12 columns for scan-friendliness in an 80-column terminal
+- `lazyclaw help <subcommand>` — detailed usage for that subcommand:
+  flag list, env var fallbacks, alias forms
+- `lazyclaw --help` and `lazyclaw -h` are aliases for `lazyclaw help`
+- `help <unknown>` → exit 2 with a hint to run `lazyclaw help` for
+  the inventory
+- Unknown top-level subcommand also points at `lazyclaw help`
+
+### Source-of-truth
+`HELP_SUMMARIES` (one-liners) and `HELP_DETAILS` (multi-line usage)
+live next to `SUBCOMMANDS` in `cli.mjs` so adding a subcommand
+naturally surfaces a docs-touch reminder. Tests assert every
+subcommand in `SUBCOMMANDS` has both a summary and a detailed entry.
+
+### Tests
+4 new phase 6 specs:
+- `help` lists every subcommand and the `help <subcommand>` hint
+- `help <subcommand>` returns *that* subcommand's usage (verified by
+  comparing two different subcommands — daemon mentions
+  `--auth-token`, sessions does not)
+- unknown subcommand → exit 2 with the inventory hint on stderr
+- `--help` and `-h` mirror the bare `help` output
+
+Suite: 143/143. tsc clean.
+
+---
 ## [2.83.5] — 2026-05-05
 
 **Wire `withFallback` through CLI `agent --fallback` + daemon `body.fallback`.**
