@@ -108,6 +108,65 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(all).not.toContain('sk-secret-leak-test');
   });
 
+  test('chat --skill prepends a system message and persists it for --session', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'concise.md'), '# Concise\nbe brief\n');
+
+    const child = spawn(process.execPath, [CLI, 'chat', '--skill', 'concise', '--session', 'sk-test'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stdin.write('hello\n');
+    await new Promise(r => setTimeout(r, 600));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+
+    // Persisted JSONL should have the system message followed by user + assistant.
+    const file = path.join(dir, 'sessions', 'sk-test.jsonl');
+    const turns = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+    expect(turns[0].role).toBe('system');
+    expect(turns[0].content).toContain('skill: concise');
+    expect(turns[0].content).toContain('be brief');
+    expect(turns[1]).toMatchObject({ role: 'user', content: 'hello' });
+    expect(turns[2].role).toBe('assistant');
+  });
+
+  test('chat --skill resume does NOT re-prepend the system message', async () => {
+    // After the first invocation persisted a system message, a second
+    // invocation with --skill must not duplicate it.
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'a.md'), '# A\nbody-A\n');
+    // Pre-seed a session that already has the system message.
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'resume.jsonl'),
+      JSON.stringify({ role: 'system', content: '<!-- skill: a -->\n# A\nbody-A', ts: 1 }) + '\n' +
+      JSON.stringify({ role: 'user', content: 'first', ts: 2 }) + '\n' +
+      JSON.stringify({ role: 'assistant', content: 'mock-reply: first', ts: 3 }) + '\n');
+
+    const child = spawn(process.execPath, [CLI, 'chat', '--skill', 'a', '--session', 'resume'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    child.stdin.write('second\n');
+    await new Promise(r => setTimeout(r, 500));
+    child.stdin.write('/exit\n');
+    child.stdin.end();
+    await new Promise<void>(resolve => child.on('close', () => resolve()));
+
+    const turns = fs.readFileSync(path.join(dir, 'sessions', 'resume.jsonl'), 'utf8')
+      .split('\n').filter(Boolean).map(l => JSON.parse(l));
+    // Exactly one system message, despite the second --skill invocation.
+    const systems = turns.filter(t => t.role === 'system');
+    expect(systems).toHaveLength(1);
+  });
+
   test('chat /new clears messages so the next reply does not see prior context', async () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);
@@ -436,6 +495,28 @@ test.describe('Phase 6 — OpenClaw parity', () => {
       const getMissing = await fetch(`${d.url}/sessions/apple`);
       expect(getMissing.status).toBe(404);
     } finally { await d.kill(); }
+  });
+
+  test('daemon accepts retry body shape and still returns the mock reply', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'hi', retry: { attempts: 3 } }),
+      }).then(x => x.json());
+      expect(r.reply).toContain('mock-reply: hi');
+    } finally { await d.kill(); }
+  });
+
+  test('agent --retry N wraps the provider (mock still replies)', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const r = runCli(['agent', 'hello', '--retry', '3'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('mock-reply: hello');
   });
 
   test('daemon POST /agent with no prompt returns 400', async () => {

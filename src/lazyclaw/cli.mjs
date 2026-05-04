@@ -204,8 +204,17 @@ async function cmdAgent(prompt, flags) {
   const skillsMod = await import('./skills.mjs');
   const cfg = readConfig();
   const provName = flags.provider || cfg.provider || 'mock';
-  const prov = _registryMod.PROVIDERS[provName];
+  let prov = _registryMod.PROVIDERS[provName];
   if (!prov) { console.error(`unknown provider: ${provName}`); process.exit(2); }
+  // --retry N wraps the chosen provider with the rate-limit-aware retry
+  // helper. N is exclusive of the initial call (--retry 3 = up to 4 tries).
+  // Default 0 keeps behavior identical to before for callers that don't
+  // explicitly opt in.
+  const retryN = flags.retry !== undefined ? parseInt(flags.retry, 10) : 0;
+  if (Number.isFinite(retryN) && retryN > 0) {
+    const { withRateLimitRetry } = await import('./providers/retry.mjs');
+    prov = withRateLimitRetry(prov, { attempts: retryN });
+  }
 
   // --skill resolves a comma-separated list to a composed system prompt.
   // Defaults from config.skills (same shape) if --skill not passed.
@@ -258,6 +267,7 @@ async function cmdAgent(prompt, flags) {
 async function cmdChat(flags = {}) {
   await ensureRegistry();
   const sessionsMod = await import('./sessions.mjs');
+  const skillsMod = await import('./skills.mjs');
   const cfg = readConfig();
   const provName = cfg.provider || 'mock';
   const prov = _registryMod.PROVIDERS[provName];
@@ -274,8 +284,29 @@ async function cmdChat(flags = {}) {
   let messages = sessionId
     ? sessionsMod.loadTurns(sessionId, cfgDir).map(t => ({ role: t.role, content: t.content }))
     : [];
+
+  // --skill (comma-separated names) composes into a system message at the
+  // head of the conversation. Same shape as `agent --skill`. Defaults from
+  // config.skills array when --skill not passed. We only inject if no
+  // system message is already present (so resuming a session doesn't
+  // double-prepend skills that the prior invocation already added).
+  const skillNames = (flags.skill ? String(flags.skill) : (Array.isArray(cfg.skills) ? cfg.skills.join(',') : ''))
+    .split(',').map(s => s.trim()).filter(Boolean);
+  if (skillNames.length > 0 && !messages.some(m => m.role === 'system')) {
+    try {
+      const sys = skillsMod.composeSystemPrompt(skillNames, cfgDir);
+      if (sys) {
+        messages.unshift({ role: 'system', content: sys });
+        if (sessionId) sessionsMod.appendTurn(sessionId, 'system', sys, cfgDir);
+      }
+    } catch (e) {
+      console.error(`skill error: ${e.message}`);
+      process.exit(2);
+    }
+  }
+
   let charsSent = messages.reduce((n, m) => n + (m.role === 'user' ? String(m.content || '').length : 0), 0);
-  if (sessionId && messages.length > 0) {
+  if (sessionId && messages.length > (skillNames.length > 0 ? 1 : 0)) {
     process.stdout.write(`resumed session ${sessionId} with ${messages.length} prior turn(s)\n`);
   }
   const persistTurn = (role, content) => {

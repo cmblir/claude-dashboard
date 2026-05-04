@@ -10,6 +10,45 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.82.0] — 2026-05-05
+
+**`chat --skill` parity + daemon retry plumbing.**
+
+`agent --skill` worked since 2.77.0; `chat` ignored the flag. Closing the
+gap so users can use the same comma-separated skill list across both
+entry points.
+
+### `chat --skill`
+- `lazyclaw chat --skill review,style` composes the named skills via
+  `composeSystemPrompt` and prepends the result as a `system` message.
+- `--session <id>` persists the system message into the session JSONL
+  on first invocation. On subsequent invocations of the same session,
+  if a `system` turn already exists in the hydrated history, we do
+  **not** re-prepend — protecting against the most common bug class
+  ("system prompt accidentally repeated for every resume").
+- Defaults: when `config.skills` is set to a string array (e.g.
+  `["review","style"]`), it auto-applies on `chat` the same way it does
+  on `agent`.
+
+### Daemon retry plumbing
+`POST /agent` and `POST /chat` accept an optional `retry` body field:
+```json
+{ "prompt": "...", "retry": { "attempts": 3, "maxBackoffMs": 60000 } }
+```
+The daemon wraps the resolved provider with `withRateLimitRetry` so
+HTTP callers get the same backoff behavior the CLI gets. Falsy or
+zero `attempts` skips wrapping (existing callers see no change).
+
+### Tests
+2 new phase 6 specs:
+- `chat --skill` writes the system message into the session JSONL on
+  first run (verified by reading back the file)
+- resuming a session that already has a system message does NOT
+  re-prepend (exactly one system turn after the second invocation)
+
+Suite: 104/104. tsc clean.
+
+---
 ## [2.81.2] — 2026-05-05
 
 **Provider retry wrapper: `withRateLimitRetry` for `RATE_LIMIT` backoff.**

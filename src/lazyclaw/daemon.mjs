@@ -16,7 +16,23 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 import { PROVIDERS, PROVIDER_INFO, maskApiKey } from './providers/registry.mjs';
+import { withRateLimitRetry } from './providers/retry.mjs';
 import { composeSystemPrompt } from './skills.mjs';
+
+// Resolve the provider for a request, optionally wrapping it with the
+// retry policy from body.retry: { attempts?, maxBackoffMs? }. Falsy or
+// zero `attempts` skips wrapping entirely, so callers that don't opt in
+// see the bare provider behavior unchanged.
+function resolveProvider(body, providerName) {
+  const base = PROVIDERS[providerName];
+  if (!base) return null;
+  const r = body?.retry;
+  if (!r || !Number.isFinite(r.attempts) || r.attempts <= 0) return base;
+  return withRateLimitRetry(base, {
+    attempts: r.attempts,
+    maxBackoffMs: r.maxBackoffMs,
+  });
+}
 
 async function fileExists(p) {
   try { await fs.promises.access(p); return true; }
@@ -169,7 +185,7 @@ export function makeHandler(ctx) {
           const body = await readJson(req);
           const cfg = ctx.readConfig();
           const provName = body.provider || cfg.provider || 'mock';
-          const prov = PROVIDERS[provName];
+          const prov = resolveProvider(body, provName);
           if (!prov) return writeJson(res, 400, { error: `unknown provider: ${provName}` });
           const messages = Array.isArray(body.messages) ? body.messages.filter(m => m && typeof m.role === 'string' && typeof m.content === 'string') : null;
           if (!messages || messages.length === 0) return writeJson(res, 400, { error: 'messages array required' });
@@ -210,7 +226,7 @@ export function makeHandler(ctx) {
           const body = await readJson(req);
           const cfg = ctx.readConfig();
           const provName = body.provider || cfg.provider || 'mock';
-          const prov = PROVIDERS[provName];
+          const prov = resolveProvider(body, provName);
           if (!prov) return writeJson(res, 400, { error: `unknown provider: ${provName}` });
           const prompt = String(body.prompt ?? '').trim();
           if (!prompt) return writeJson(res, 400, { error: 'prompt required' });
