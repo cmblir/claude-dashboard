@@ -10,6 +10,47 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.83.5] — 2026-05-05
+
+**Wire `withFallback` through CLI `agent --fallback` + daemon `body.fallback`.**
+
+`withFallback` shipped in 2.83.3 but no user-facing surface called it.
+Now it does.
+
+### CLI
+```bash
+lazyclaw agent --fallback "openai,ollama" "explain quicksort"
+```
+- Comma-separated provider names; primary comes from `--provider` /
+  `config.provider` as before
+- Unknown name → exit 2 with `unknown fallback provider: <name>`
+  (better than a silent skip — chain length affects user expectations)
+- Composes with `--retry N`: fallback runs first (try alternates),
+  retry wraps the resulting chain (retry the chain on `RATE_LIMIT`)
+
+### Daemon
+```http
+POST /agent
+{ "prompt": "...", "fallback": ["openai", "ollama"], "retry": { "attempts": 2 } }
+```
+- `body.fallback` is an array of provider names
+- Unknown name in the array → `400 {error: "unknown fallback provider: <name>"}`
+  before any provider call
+- `resolveProvider` now returns `{ provider } | { error }` so the call
+  sites at `POST /chat` and `POST /agent` surface the specific error
+  message instead of a generic "unknown provider" string
+
+### Tests
+5 new phase 6 specs:
+- CLI `--fallback "openai,ollama"` happy path (mock primary still replies)
+- CLI `--fallback unknown-name` exits 2 with stderr message
+- daemon `body.fallback` happy path
+- daemon `body.fallback: ['nope']` → 400 with the exact unknown name
+- daemon composing both `fallback` + `retry` doesn't break the happy path
+
+Suite: 148/148. tsc clean.
+
+---
 ## [2.83.4] — 2026-05-05
 
 **`lazyclaw completion bash|zsh` for shell autocompletion.**

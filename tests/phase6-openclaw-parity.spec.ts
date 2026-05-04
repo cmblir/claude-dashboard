@@ -519,6 +519,70 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r.stdout).toContain('mock-reply: hello');
   });
 
+  test('agent --fallback "openai,ollama" wraps in withFallback (mock primary still replies)', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const r = runCli(['agent', 'hi', '--fallback', 'openai,ollama'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('mock-reply: hi');
+  });
+
+  test('agent --fallback with an unknown provider name exits 2', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const r = runCli(['agent', 'hi', '--fallback', 'definitely-not-a-provider'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/unknown fallback provider/);
+  });
+
+  test('daemon body.fallback wraps the chain (smoke: mock primary still replies)', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'hi', fallback: ['openai', 'ollama'] }),
+      }).then(x => x.json());
+      expect(r.reply).toContain('mock-reply: hi');
+    } finally { await d.kill(); }
+  });
+
+  test('daemon body.fallback with unknown name → 400', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'hi', fallback: ['nope'] }),
+      });
+      expect(r.status).toBe(400);
+      const j = await r.json();
+      expect(j.error).toMatch(/unknown fallback provider: nope/);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon composes both fallback + retry layers without breaking the happy path', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          prompt: 'compose',
+          fallback: ['openai'],
+          retry: { attempts: 2 },
+        }),
+      }).then(x => x.json());
+      expect(r.reply).toContain('mock-reply: compose');
+    } finally { await d.kill(); }
+  });
+
   test('daemon makeHandler with authToken: missing Authorization → 401', async () => {
     const mod = await import('../src/lazyclaw/daemon.mjs' as string);
     const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
@@ -2008,6 +2072,45 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     });
     expect(check.status).toBe(0);
     expect(check.stderr).toBe('');
+  });
+
+  test('help with no argument lists every subcommand with a one-liner', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['help'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('lazyclaw — terminal AI assistant');
+    for (const sub of ['run', 'resume', 'config', 'chat', 'agent', 'doctor', 'status', 'onboard', 'sessions', 'skills', 'providers', 'daemon', 'version', 'completion']) {
+      expect(r.stdout).toContain(sub);
+    }
+    expect(r.stdout).toMatch(/lazyclaw help <subcommand>/);
+  });
+
+  test('help <subcommand> prints detailed usage', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['help', 'daemon'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/^Usage: lazyclaw daemon/);
+    expect(r.stdout).toContain('--auth-token');
+    expect(r.stdout).toContain('--allow-origin');
+    // Different subcommand returns its own usage, not daemon's
+    const r2 = runCli(['help', 'sessions'], dir);
+    expect(r2.stdout).toMatch(/^Usage: lazyclaw sessions/);
+    expect(r2.stdout).toContain('export');
+    expect(r2.stdout).not.toContain('--auth-token');
+  });
+
+  test('help <unknown> exits 2 with a hint to run `help`', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['help', 'nonsense-command'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/unknown subcommand: nonsense-command/);
+    expect(r.stderr).toMatch(/run `lazyclaw help`/);
+  });
+
+  test('--help and -h are aliases for `help` (no argument lists subcommands)', () => {
+    const dir = tmpConfigDir();
+    expect(runCli(['--help'], dir).stdout).toContain('lazyclaw — terminal AI assistant');
+    expect(runCli(['-h'], dir).stdout).toContain('lazyclaw — terminal AI assistant');
   });
 
   test('version subcommand prints VERSION + node + platform as JSON', () => {

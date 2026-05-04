@@ -17,21 +17,35 @@ import fs from 'node:fs';
 
 import { PROVIDERS, PROVIDER_INFO, maskApiKey } from './providers/registry.mjs';
 import { withRateLimitRetry } from './providers/retry.mjs';
+import { withFallback } from './providers/fallback.mjs';
 import { composeSystemPrompt } from './skills.mjs';
 
-// Resolve the provider for a request, optionally wrapping it with the
-// retry policy from body.retry: { attempts?, maxBackoffMs? }. Falsy or
-// zero `attempts` skips wrapping entirely, so callers that don't opt in
-// see the bare provider behavior unchanged.
+// Resolve the provider for a request. Composes two opt-in wrappers:
+//   - body.fallback: array of provider names to chain after the primary.
+//     Pre-yield recoverable errors fall through; mid-stream errors bubble.
+//   - body.retry: { attempts?, maxBackoffMs? } — applied AFTER fallback so
+//     each retry covers the full chain (retry exhausts → 429 to client).
+// Returns { provider } on success or { error } when the primary or any
+// listed fallback name is unknown.
 function resolveProvider(body, providerName) {
-  const base = PROVIDERS[providerName];
-  if (!base) return null;
+  if (!PROVIDERS[providerName]) return { error: `unknown provider: ${providerName}` };
+  let prov = PROVIDERS[providerName];
+  if (Array.isArray(body?.fallback) && body.fallback.length > 0) {
+    const chain = [prov];
+    for (const name of body.fallback) {
+      if (!PROVIDERS[name]) return { error: `unknown fallback provider: ${name}` };
+      chain.push(PROVIDERS[name]);
+    }
+    prov = withFallback(chain);
+  }
   const r = body?.retry;
-  if (!r || !Number.isFinite(r.attempts) || r.attempts <= 0) return base;
-  return withRateLimitRetry(base, {
-    attempts: r.attempts,
-    maxBackoffMs: r.maxBackoffMs,
-  });
+  if (r && Number.isFinite(r.attempts) && r.attempts > 0) {
+    prov = withRateLimitRetry(prov, {
+      attempts: r.attempts,
+      maxBackoffMs: r.maxBackoffMs,
+    });
+  }
+  return { provider: prov };
 }
 
 async function fileExists(p) {
@@ -251,8 +265,9 @@ export function makeHandler(ctx) {
           const body = await readJson(req);
           const cfg = ctx.readConfig();
           const provName = body.provider || cfg.provider || 'mock';
-          const prov = resolveProvider(body, provName);
-          if (!prov) return writeJson(res, 400, { error: `unknown provider: ${provName}` });
+          const resolved = resolveProvider(body, provName);
+          if (resolved.error) return writeJson(res, 400, { error: resolved.error });
+          const prov = resolved.provider;
           const messages = Array.isArray(body.messages) ? body.messages.filter(m => m && typeof m.role === 'string' && typeof m.content === 'string') : null;
           if (!messages || messages.length === 0) return writeJson(res, 400, { error: 'messages array required' });
           const thinkingBudget = Number(body.thinkingBudget) || 0;
@@ -292,8 +307,9 @@ export function makeHandler(ctx) {
           const body = await readJson(req);
           const cfg = ctx.readConfig();
           const provName = body.provider || cfg.provider || 'mock';
-          const prov = resolveProvider(body, provName);
-          if (!prov) return writeJson(res, 400, { error: `unknown provider: ${provName}` });
+          const resolved = resolveProvider(body, provName);
+          if (resolved.error) return writeJson(res, 400, { error: resolved.error });
+          const prov = resolved.provider;
           const prompt = String(body.prompt ?? '').trim();
           if (!prompt) return writeJson(res, 400, { error: 'prompt required' });
           const model = body.model || cfg.model;

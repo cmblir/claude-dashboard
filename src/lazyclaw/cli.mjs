@@ -203,7 +203,7 @@ const SUBCOMMANDS = [
   'config', 'chat', 'agent',
   'doctor', 'status', 'onboard',
   'sessions', 'skills', 'providers',
-  'daemon', 'version', 'completion',
+  'daemon', 'version', 'completion', 'help',
 ];
 
 const SUBCOMMAND_SUBS = {
@@ -288,6 +288,64 @@ async function cmdCompletion(shell) {
   process.exit(2);
 }
 
+// One-line summaries used by `lazyclaw help`. Format keeps it scan-friendly
+// in a 80-column terminal: subcommand padded to 12 chars, then the summary.
+const HELP_SUMMARIES = {
+  run:        'Execute a workflow file (run <session-id> <workflow.mjs>)',
+  resume:     'Resume a workflow from its last persisted checkpoint',
+  config:     'Manage local config (get|set|list|delete <key>)',
+  chat:       'Interactive REPL with the configured provider',
+  agent:      'One-shot prompt: streams a single response, exits',
+  doctor:     'Print diagnostic JSON; exits non-zero on issues',
+  status:     'Print current provider/model/masked key as JSON',
+  onboard:    'Guided setup (use --non-interactive for scripts)',
+  sessions:   'Persistent chat sessions (list|show|clear|export)',
+  skills:     'Markdown skill bundles (list|show|install|remove)',
+  providers:  'Inspect registered providers (list|info <name>)',
+  daemon:     'Run the local HTTP gateway (--port, --auth-token, --allow-origin)',
+  version:    'Print VERSION + node + platform as JSON',
+  completion: 'Emit shell completion script (completion <bash|zsh>)',
+};
+
+// Detailed usage per subcommand for `lazyclaw help <name>`. Kept as flat
+// strings so the help output is identical in every terminal.
+const HELP_DETAILS = {
+  run: 'Usage: lazyclaw run <session-id> <workflow.mjs>\n  Persists state to .workflow-state/<session-id>.json so the run can be resumed.',
+  resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
+  config: 'Usage: lazyclaw config <get|set|list|delete> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).',
+  chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
+  agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.',
+  doctor: 'Usage: lazyclaw doctor\n  Validates configuration and registered providers. Exits 0 only when no issues.',
+  status: 'Usage: lazyclaw status\n  Provider, model, and masked API key. Never prints the raw key.',
+  onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
+  sessions: 'Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>>\n  list — recent sessions by mtime; export — render as Markdown for sharing.',
+  skills: 'Usage: lazyclaw skills <list|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>>\n  --from-url fetches over HTTPS only; 1 MiB body cap.',
+  providers: 'Usage: lazyclaw providers <list|info <name>>\n  Static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.',
+  daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.',
+  version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
+  completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
+};
+
+function cmdHelp(name) {
+  if (!name) {
+    process.stdout.write('lazyclaw — terminal AI assistant + workflow engine\n\n');
+    process.stdout.write('Subcommands:\n');
+    for (const sub of SUBCOMMANDS) {
+      const summary = HELP_SUMMARIES[sub] || '';
+      process.stdout.write(`  ${sub.padEnd(12)}${summary}\n`);
+    }
+    process.stdout.write('\nlazyclaw help <subcommand>   detailed usage\n');
+    return;
+  }
+  const detail = HELP_DETAILS[name];
+  if (!detail) {
+    process.stderr.write(`unknown subcommand: ${name}\n`);
+    process.stderr.write(`run \`lazyclaw help\` to see the list\n`);
+    process.exit(2);
+  }
+  process.stdout.write(detail + '\n');
+}
+
 async function cmdAgent(prompt, flags) {
   // OpenClaw-style one-shot: send a single prompt, stream the response,
   // exit. Useful in scripts and pipelines. Honors --provider and --model
@@ -299,6 +357,22 @@ async function cmdAgent(prompt, flags) {
   const provName = flags.provider || cfg.provider || 'mock';
   let prov = _registryMod.PROVIDERS[provName];
   if (!prov) { console.error(`unknown provider: ${provName}`); process.exit(2); }
+  // --fallback "openai,ollama" wraps the primary in a withFallback chain so
+  // RATE_LIMIT/CONNECTION_REFUSED/5xx on the primary trips through to the
+  // listed providers in order. Unknown names exit 2 — better than a silent
+  // skip, the chain lengths matter for user expectations.
+  const fallbackList = (flags.fallback ? String(flags.fallback) : '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  if (fallbackList.length > 0) {
+    const chain = [prov];
+    for (const fb of fallbackList) {
+      const fp = _registryMod.PROVIDERS[fb];
+      if (!fp) { console.error(`unknown fallback provider: ${fb}`); process.exit(2); }
+      chain.push(fp);
+    }
+    const { withFallback } = await import('./providers/fallback.mjs');
+    prov = withFallback(chain);
+  }
   // --retry N wraps the chosen provider with the rate-limit-aware retry
   // helper. N is exclusive of the initial call (--retry 3 = up to 4 tries).
   // Default 0 keeps behavior identical to before for callers that don't
@@ -801,8 +875,15 @@ async function main() {
       await cmdCompletion(rest.positional[0]);
       break;
     }
+    case 'help':
+    case '--help':
+    case '-h': {
+      cmdHelp(rest.positional[0]);
+      break;
+    }
     default:
       console.error('Usage: lazyclaw <' + SUBCOMMANDS.join('|') + '> ...');
+      console.error('Run `lazyclaw help` for a one-line summary of each subcommand.');
       process.exit(2);
   }
 }
