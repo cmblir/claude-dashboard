@@ -101,6 +101,12 @@ export const openaiProvider = {
       stream: true,
       messages: apiMessages,
     };
+    // Tool-use passthrough mirrors the anthropic provider: opts.tools is an
+    // array of OpenAI-shaped tools. opts.toolChoice maps to tool_choice.
+    if (Array.isArray(opts.tools) && opts.tools.length > 0) {
+      body.tools = opts.tools;
+      if (opts.toolChoice) body.tool_choice = opts.toolChoice;
+    }
 
     if (opts.signal?.aborted) throw new AbortError('aborted before request');
     const res = await fetchFn('https://api.openai.com/v1/chat/completions', {
@@ -121,6 +127,28 @@ export const openaiProvider = {
 
     const decoder = new TextDecoder('utf-8', { fatal: false });
     let buffer = '';
+    // OpenAI streams tool_calls as deltas with an `index` we use as the
+    // accumulation key. Each delta may carry a partial id, name, and/or
+    // arguments string. We assemble until the stream signals
+    // finish_reason: tool_calls (the final tool_call delta in that choice).
+    const toolCallsByIndex = new Map();
+    const flushToolCall = (idx) => {
+      const tc = toolCallsByIndex.get(idx);
+      if (!tc || !tc.function?.name) return;
+      toolCallsByIndex.delete(idx);
+      if (typeof opts.onToolUse !== 'function') return;
+      let input = {};
+      try { input = tc.function.arguments ? JSON.parse(tc.function.arguments) : {}; }
+      catch { /* malformed → empty + raw */ }
+      try {
+        opts.onToolUse({
+          id: tc.id || null,
+          name: tc.function.name,
+          input,
+          raw: tc.function.arguments || '',
+        });
+      } catch { /* never let a callback abort the stream */ }
+    };
     for await (const chunk of iterateBody(res.body)) {
       if (opts.signal?.aborted) throw new AbortError('aborted mid-stream');
       buffer += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
@@ -128,11 +156,29 @@ export const openaiProvider = {
       for (const frame of parseSseFrames(buffer)) {
         consumed = frame.nextCursor;
         if (!frame.data) continue;
-        if (frame.data === '[DONE]') return;
+        if (frame.data === '[DONE]') {
+          // Drain any tool calls that haven't been flushed by finish_reason.
+          for (const idx of Array.from(toolCallsByIndex.keys())) flushToolCall(idx);
+          return;
+        }
         try {
           const obj = JSON.parse(frame.data);
-          const text = obj?.choices?.[0]?.delta?.content;
-          if (text) yield text;
+          const choice = obj?.choices?.[0];
+          const delta = choice?.delta || {};
+          if (delta.content) yield delta.content;
+          if (Array.isArray(delta.tool_calls)) {
+            for (const td of delta.tool_calls) {
+              const idx = td.index ?? 0;
+              const cur = toolCallsByIndex.get(idx) || { id: null, function: { name: '', arguments: '' } };
+              if (td.id) cur.id = td.id;
+              if (td.function?.name) cur.function.name = td.function.name;
+              if (typeof td.function?.arguments === 'string') cur.function.arguments += td.function.arguments;
+              toolCallsByIndex.set(idx, cur);
+            }
+          }
+          if (choice?.finish_reason === 'tool_calls') {
+            for (const idx of Array.from(toolCallsByIndex.keys())) flushToolCall(idx);
+          }
         } catch {
           // Ignore malformed frames; keep scanning the rest of the buffer.
         }

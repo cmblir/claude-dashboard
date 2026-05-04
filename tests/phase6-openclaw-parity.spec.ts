@@ -453,6 +453,58 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('openai provider passes through tools and surfaces assembled tool_calls via onToolUse', async () => {
+    const mod = await import('../src/lazyclaw/providers/openai.mjs' as string);
+    const calls: any[] = [];
+    const sse =
+      'data: {"choices":[{"delta":{"content":"checking"}}]}\n\n' +
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":""}}]}}]}\n\n' +
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"city\\":"}}]}}]}\n\n' +
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"Seoul\\"}"}}]}}]}\n\n' +
+      'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n' +
+      'data: [DONE]\n\n';
+    let sentBody: any = null;
+    const fakeFetch = async (_url: string, init: any) => {
+      sentBody = JSON.parse(init.body);
+      return {
+        ok: true, status: 200,
+        body: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(sse)); c.close(); } }),
+      };
+    };
+    const tools = [{ type: 'function', function: { name: 'get_weather', description: 'Get weather', parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] } } }];
+    const text: string[] = [];
+    for await (const c of mod.openaiProvider.sendMessage(
+      [{ role: 'user', content: 'weather in Seoul' }],
+      { apiKey: 'sk-x', model: 'gpt-4.1', fetch: fakeFetch as any, tools, toolChoice: 'auto', onToolUse: (call: any) => calls.push(call) },
+    )) text.push(c);
+    expect(text.join('')).toBe('checking');
+    expect(sentBody.tools).toEqual(tools);
+    expect(sentBody.tool_choice).toBe('auto');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].id).toBe('call_1');
+    expect(calls[0].name).toBe('get_weather');
+    expect(calls[0].input).toEqual({ city: 'Seoul' });
+  });
+
+  test('openai provider flushes pending tool_calls on [DONE] when finish_reason was missing', async () => {
+    const mod = await import('../src/lazyclaw/providers/openai.mjs' as string);
+    const calls: any[] = [];
+    const sse =
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_2","type":"function","function":{"name":"ping","arguments":"{\\"x\\":1}"}}]}}]}\n\n' +
+      'data: [DONE]\n\n';
+    const fakeFetch = async () => ({
+      ok: true, status: 200,
+      body: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(sse)); c.close(); } }),
+    });
+    for await (const _c of mod.openaiProvider.sendMessage(
+      [{ role: 'user', content: 'q' }],
+      { apiKey: 'sk-x', model: 'gpt-4.1', fetch: fakeFetch as any, onToolUse: (c: any) => calls.push(c) },
+    )) { /* drain */ }
+    expect(calls).toHaveLength(1);
+    expect(calls[0].name).toBe('ping');
+    expect(calls[0].input).toEqual({ x: 1 });
+  });
+
   test('anthropic provider passes through tool definitions and surfaces tool_use via callback', async () => {
     const mod = await import('../src/lazyclaw/providers/anthropic.mjs' as string);
     const calls: any[] = [];

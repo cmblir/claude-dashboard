@@ -10,6 +10,33 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.79.1] — 2026-05-05
+
+**OpenAI tool calling for symmetry with Anthropic.**
+
+The OpenAI provider now mirrors what 2.79.0 added for Anthropic:
+
+- `opts.tools` (OpenAI shape: `[{type:'function', function:{name, parameters}}]`)
+  forwards to the request body
+- `opts.toolChoice` maps to `tool_choice` (`'auto' | 'none' | {type, function:{name}}`)
+- streamed `delta.tool_calls[i]` deltas accumulate per `index`; the
+  final assembled call surfaces via `opts.onToolUse({id, name, input, raw})`
+- still a passthrough — execution remains the caller's job
+
+### Edge case
+OpenAI sometimes ends a response with `[DONE]` without first emitting
+`finish_reason: tool_calls`. We drain any pending tool calls on `[DONE]`
+so the callback always fires for completed deltas.
+
+### Tests
+2 new phase 6 specs:
+- happy path: chunked `function.arguments` partials assemble into the
+  parsed `input` object; `tools` + `tool_choice` land in the request body
+- `[DONE]`-only flush still surfaces the tool call
+
+Suite: 79/79. tsc clean.
+
+---
 ## [2.79.0] — 2026-05-05
 
 **Anthropic tool-use passthrough.**
