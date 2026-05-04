@@ -10,6 +10,55 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.96.0] — 2026-05-05
+
+**Provider tracing: decorator transitions land in the daemon log at debug level.**
+
+The daemon's structured logger (2.93.0) covered access lines but the
+decorator stack (retry / fallback / cache) was opaque. With
+`--log debug`, the daemon now emits one debug record per transition:
+
+- `provider.retry` — `{attempt, retryAfterMs, errorCode}` per retry
+  attempt
+- `provider.fallback` — `{from, to, errorCode, errorMsg}` when a
+  chain link transitions to the next
+- `cache.hit` / `cache.miss` — `{provider, keyHash, size}` (keyHash
+  truncated to 12 chars; full hash is overkill for a log)
+
+These ride on the existing decorator hooks (`onRetry`, `onFallback`,
+new `onHit` / `onMiss` on the cache wrapper). Default level is `info`,
+so production deployments don't pay the noise unless they set
+`--log debug` to diagnose a specific issue.
+
+### Cache wrapper API expansion
+`withResponseCache(provider, { onHit, onMiss })` — both fire once per
+`sendMessage` call with the same `keyHash` so a caller can correlate
+hit/miss events back to a specific cache key.
+
+### Composition order
+Reminder: `cache → fallback → retry` (innermost to outermost). So:
+- A cache hit fires `cache.hit` and short-circuits — no
+  `provider.fallback` or `provider.retry` log lines for that request.
+- A cache miss + fallback transition fires `cache.miss` then
+  `provider.fallback` (assuming the request was configured with both).
+- Retry events appear only when the *full chain* fails — so when both
+  retry and fallback are configured, retry events imply both providers
+  in the chain hit `RATE_LIMIT`.
+
+### Tests
+3 new phase 6 specs:
+- `withResponseCache` `onHit`/`onMiss` callbacks fire once per call
+  with `{keyHash, size}` shape and the right ordering across 1 miss + 2 hits
+- daemon retry-only path: `RATE_LIMIT` from primary, `body.retry: {attempts: 2}`,
+  no fallback → 2 `provider.retry` records with `attempt=1` and `attempt=2`,
+  third throw exhausts → 429
+- daemon fallback-only path: primary RATE_LIMITs, alt serves → exactly
+  one `provider.fallback` record with `from='mock'`, `to='anthropic'`,
+  `errorCode='RATE_LIMIT'`
+
+Suite: 213/213. tsc clean.
+
+---
 ## [2.95.3] — 2026-05-05
 
 **Test coverage: gate ordering for the security stack — pinned down.**

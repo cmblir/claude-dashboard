@@ -66,12 +66,16 @@ function hashKey(messages, model, opts) {
  *   maxEntries?: number,
  *   ttlMs?: number,
  *   now?: () => number,
+ *   onHit?: (info: { keyHash: string, size: number }) => void,
+ *   onMiss?: (info: { keyHash: string }) => void,
  * }} [opts]
  */
 export function withResponseCache(provider, opts = {}) {
   const maxEntries = opts.maxEntries ?? DEFAULT_MAX_ENTRIES;
   const ttlMs = opts.ttlMs ?? DEFAULT_TTL_MS;
   const now = opts.now ?? (() => Date.now());
+  const onHit = typeof opts.onHit === 'function' ? opts.onHit : null;
+  const onMiss = typeof opts.onMiss === 'function' ? opts.onMiss : null;
   /** @type {Map<string, CacheEntry>} */
   const cache = new Map();
   let hits = 0;
@@ -93,10 +97,12 @@ export function withResponseCache(provider, opts = {}) {
       if (cached && cached.expiresAt > now()) {
         hits += 1;
         touch(key, cached);
+        if (onHit) { try { onHit({ keyHash: key, size: cache.size }); } catch { /* swallow */ } }
         for (const chunk of cached.chunks) yield chunk;
         return;
       }
       misses += 1;
+      if (onMiss) { try { onMiss({ keyHash: key }); } catch { /* swallow */ } }
       // Drop expired entry if we found one
       if (cached) cache.delete(key);
 

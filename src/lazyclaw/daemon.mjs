@@ -37,14 +37,20 @@ import { createLogger } from './logger.mjs';
 //
 // Returns { provider } on success or { error } when the primary or any
 // listed fallback name is unknown.
-function resolveProvider(body, providerName, cachedByName) {
+function resolveProvider(body, providerName, cachedByName, logger) {
   if (!PROVIDERS[providerName]) return { error: `unknown provider: ${providerName}` };
+  // The decorator callbacks emit one debug line each — useful for ops who
+  // set --log debug to diagnose why a request is slow or which provider
+  // actually served it. With the default level (info) these are silent.
+  const dbg = (msg, fields) => { if (logger) logger.debug(msg, fields); };
   const wrapWithCache = (name) => {
     if (!cachedByName) return PROVIDERS[name];
     if (!cachedByName.has(name)) {
       cachedByName.set(name, withResponseCache(PROVIDERS[name], {
         maxEntries: cachedByName._opts?.maxEntries,
         ttlMs: cachedByName._opts?.ttlMs,
+        onHit:  ({ keyHash, size }) => dbg('cache.hit',  { provider: name, keyHash: keyHash.slice(0, 12), size }),
+        onMiss: ({ keyHash })       => dbg('cache.miss', { provider: name, keyHash: keyHash.slice(0, 12) }),
       }));
     }
     return cachedByName.get(name);
@@ -60,13 +66,20 @@ function resolveProvider(body, providerName, cachedByName) {
       if (!PROVIDERS[name]) return { error: `unknown fallback provider: ${name}` };
       chain.push(useCache ? wrapWithCache(name) : PROVIDERS[name]);
     }
-    prov = withFallback(chain);
+    prov = withFallback(chain, {
+      onFallback: ({ from, to, err }) => dbg('provider.fallback', {
+        from, to, errorCode: err?.code || null, errorMsg: String(err?.message || err).slice(0, 120),
+      }),
+    });
   }
   const r = body?.retry;
   if (r && Number.isFinite(r.attempts) && r.attempts > 0) {
     prov = withRateLimitRetry(prov, {
       attempts: r.attempts,
       maxBackoffMs: r.maxBackoffMs,
+      onRetry: ({ attempt, retryAfterMs, err }) => dbg('provider.retry', {
+        attempt, retryAfterMs, errorCode: err?.code || null,
+      }),
     });
   }
   return { provider: prov };
@@ -485,7 +498,7 @@ export function makeHandler(ctx) {
           const body = await readJson(req);
           const cfg = ctx.readConfig();
           const provName = body.provider || cfg.provider || 'mock';
-          const resolved = resolveProvider(body, provName, cachedByName);
+          const resolved = resolveProvider(body, provName, cachedByName, logger);
           if (resolved.error) return writeJson(res, 400, { error: resolved.error });
           const prov = resolved.provider;
           const messages = Array.isArray(body.messages) ? body.messages.filter(m => m && typeof m.role === 'string' && typeof m.content === 'string') : null;
@@ -527,7 +540,7 @@ export function makeHandler(ctx) {
           const body = await readJson(req);
           const cfg = ctx.readConfig();
           const provName = body.provider || cfg.provider || 'mock';
-          const resolved = resolveProvider(body, provName, cachedByName);
+          const resolved = resolveProvider(body, provName, cachedByName, logger);
           if (resolved.error) return writeJson(res, 400, { error: resolved.error });
           const prov = resolved.provider;
           const prompt = String(body.prompt ?? '').trim();

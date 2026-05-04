@@ -1678,6 +1678,127 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('cache wrapper: onHit/onMiss callbacks fire once per call with the right shape', async () => {
+    const { withResponseCache } = await import('../src/lazyclaw/providers/cache.mjs' as string);
+    const events: any[] = [];
+    const inner = { name: 'mock', async *sendMessage() { yield 'X'; } };
+    const cached = withResponseCache(inner, {
+      onMiss: (info: any) => events.push({ kind: 'miss', ...info }),
+      onHit:  (info: any) => events.push({ kind: 'hit',  ...info }),
+    });
+    const drain = async () => {
+      for await (const _c of cached.sendMessage([{ role: 'user', content: 'q' }], { model: 'm' })) { /* drain */ }
+    };
+    await drain();   // miss
+    await drain();   // hit
+    await drain();   // hit
+    expect(events.map(e => e.kind)).toEqual(['miss', 'hit', 'hit']);
+    expect(events[0].keyHash).toMatch(/^[0-9a-f]+$/);
+    expect(events[1].size).toBe(1);
+  });
+
+  // Helper for the two log-wiring tests: build a minimal handler harness
+  // and a fake req/res that lets us drive POST /agent with a body.
+  async function driveAgent(daemonOpts: any, body: any): Promise<{ status: number; body: any; lines: string[] }> {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const { createLogger } = await import('../src/lazyclaw/logger.mjs' as string);
+    const lines: string[] = [];
+    const logger = createLogger({ level: 'debug', sink: (l: string) => lines.push(l) });
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      logger,
+      ...daemonOpts,
+    });
+    let capturedStatus = 0;
+    let capturedBody = '';
+    const req: any = {
+      method: 'POST',
+      url: '/agent',
+      headers: { 'content-type': 'application/json' },
+      socket: { remoteAddress: '127.0.0.1' },
+      setEncoding() {},
+      on(event: string, fn: any) {
+        if (event === 'data') fn(JSON.stringify(body));
+        if (event === 'end') fn();
+      },
+    };
+    const res: any = {
+      writeHead(s: number) { capturedStatus = s; },
+      write() {},
+      end(d?: string) { if (d) capturedBody = d; },
+      once: () => {},
+    };
+    await handler(req, res);
+    return { status: capturedStatus, body: capturedBody ? JSON.parse(capturedBody) : null, lines };
+  }
+
+  test('daemon with --log debug: retry-only path emits provider.retry log lines', async () => {
+    // Force the mock provider to RATE_LIMIT every call. With body.retry
+    // and NO fallback, retry exhausts and the request 429s — but along
+    // the way each retry attempt should log a provider.retry record.
+    const reg = await import('../src/lazyclaw/providers/registry.mjs' as string);
+    const orig = reg.PROVIDERS.mock;
+    reg.PROVIDERS.mock = {
+      name: 'mock',
+      async *sendMessage() {
+        const e: any = new Error('rate limited');
+        e.code = 'RATE_LIMIT'; e.retryAfterMs = 1;
+        throw e;
+      },
+    };
+    try {
+      const { status, lines } = await driveAgent({}, { prompt: 'hi', retry: { attempts: 2, maxBackoffMs: 1 } });
+      expect(status).toBe(429);
+      const recs = lines.map(l => JSON.parse(l));
+      const retryEvents = recs.filter(r => r.msg === 'provider.retry');
+      // attempts: 2 → 2 retries fire (each logged); the third throw exhausts.
+      expect(retryEvents.length).toBe(2);
+      expect(retryEvents[0].errorCode).toBe('RATE_LIMIT');
+      expect(retryEvents[0].attempt).toBe(1);
+      expect(retryEvents[1].attempt).toBe(2);
+    } finally {
+      reg.PROVIDERS.mock = orig;
+    }
+  });
+
+  test('daemon with --log debug: fallback path emits provider.fallback log line', async () => {
+    // Mock RATE_LIMITs once; anthropic-stub serves successfully. With
+    // body.fallback and NO retry, fallback transitions and logs the move.
+    const reg = await import('../src/lazyclaw/providers/registry.mjs' as string);
+    const origMock = reg.PROVIDERS.mock;
+    const origAnt = reg.PROVIDERS.anthropic;
+    reg.PROVIDERS.mock = {
+      name: 'mock',
+      async *sendMessage() {
+        const e: any = new Error('rate limited');
+        e.code = 'RATE_LIMIT'; e.retryAfterMs = 1;
+        throw e;
+      },
+    };
+    reg.PROVIDERS.anthropic = {
+      name: 'anthropic',
+      async *sendMessage() { yield 'fromAlt'; },
+    };
+    try {
+      const { status, body, lines } = await driveAgent({}, { prompt: 'hi', fallback: ['anthropic'] });
+      expect(status).toBe(200);
+      expect(body.reply).toBe('fromAlt');
+      const recs = lines.map(l => JSON.parse(l));
+      const fallbackEvents = recs.filter(r => r.msg === 'provider.fallback');
+      expect(fallbackEvents.length).toBe(1);
+      expect(fallbackEvents[0].from).toBe('mock');
+      expect(fallbackEvents[0].to).toBe('anthropic');
+      expect(fallbackEvents[0].errorCode).toBe('RATE_LIMIT');
+    } finally {
+      reg.PROVIDERS.mock = origMock;
+      reg.PROVIDERS.anthropic = origAnt;
+    }
+  });
+
   test('daemon: forbidden-Origin requests do NOT cost a rate-limit token (Origin runs first)', async () => {
     // Symmetric to the auth-before-rate-limit test: a malicious browser
     // page hitting 127.0.0.1 with a foreign Origin must not be able to
