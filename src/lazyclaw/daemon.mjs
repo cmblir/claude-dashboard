@@ -21,6 +21,7 @@ import { withFallback } from './providers/fallback.mjs';
 import { withResponseCache } from './providers/cache.mjs';
 import { composeSystemPrompt, listSkills, loadSkill, skillPath, installSkill, removeSkill } from './skills.mjs';
 import { TokenBucketLimiter } from './ratelimit.mjs';
+import { createLogger } from './logger.mjs';
 
 // Resolve the provider for a request. Composes opt-in wrappers in this
 // order (innermost first):
@@ -206,6 +207,7 @@ function isOriginAllowed(req, allowedOrigins) {
  *   allowedOrigins?: string[],
  *   rateLimit?: { capacity?: number, refillPerSec?: number } | null,
  *   responseCache?: { maxEntries?: number, ttlMs?: number } | true | null,
+ *   logger?: ReturnType<typeof createLogger> | null,
  * }} ctx
  */
 export function makeHandler(ctx) {
@@ -224,7 +226,33 @@ export function makeHandler(ctx) {
   // actually hits. We attach the configured opts so the lazy init
   // gets the right TTL/maxEntries.
   const cachedByName = ctx.responseCache ? Object.assign(new Map(), { _opts: ctx.responseCache === true ? {} : ctx.responseCache }) : null;
+  // Logger is opt-in via ctx.logger (the CLI passes one when --log <level>
+  // is set). Falsy → silent (the historical default; tests stay quiet).
+  const logger = ctx.logger || null;
   return async function handler(req, res) {
+    // Capture method+path before any handler logic runs; req.url survives
+    // the response but capturing now keeps the log line stable even if a
+    // future refactor mutates req.
+    const startedAt = Date.now();
+    const method = req.method;
+    const path = (req.url || '/').split('?')[0];
+    const remote = req.socket?.remoteAddress || 'no-socket';
+    // Hook res.writeHead to capture the eventual status without
+    // intercepting the response body. We log on res 'close'.
+    let observedStatus = 0;
+    const origWriteHead = res.writeHead.bind(res);
+    res.writeHead = (status, ...rest) => {
+      observedStatus = status;
+      return origWriteHead(status, ...rest);
+    };
+    if (logger) {
+      res.once('close', () => {
+        const durationMs = Date.now() - startedAt;
+        logger.info('access', {
+          method, path, status: observedStatus, durationMs, remote,
+        });
+      });
+    }
     try {
       // Origin gate runs *before* auth so a browser-originated request
       // can't even probe whether a token is required.
@@ -561,6 +589,7 @@ export function makeHandler(ctx) {
  *   allowedOrigins?: string[],
  *   rateLimit?: { capacity?: number, refillPerSec?: number } | null,
  *   responseCache?: { maxEntries?: number, ttlMs?: number } | true | null,
+ *   logger?: ReturnType<typeof createLogger> | null,
  * }} opts
  * @returns {Promise<{ port: number, server: http.Server, close: () => Promise<void> }>}
  */

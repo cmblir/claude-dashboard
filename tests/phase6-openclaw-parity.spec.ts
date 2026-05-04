@@ -1262,6 +1262,109 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(a).toBe(b);
   });
 
+  test('logger: level gate suppresses lower-priority records', async () => {
+    const { createLogger } = await import('../src/lazyclaw/logger.mjs' as string);
+    const lines: string[] = [];
+    const log = createLogger({ level: 'warn', sink: (l: string) => lines.push(l), now: () => 1000 });
+    log.debug('d');
+    log.info('i');
+    log.warn('w', { k: 1 });
+    log.error('e');
+    expect(lines).toHaveLength(2);
+    const w = JSON.parse(lines[0]);
+    expect(w.level).toBe('warn');
+    expect(w.msg).toBe('w');
+    expect(w.k).toBe(1);
+    expect(w.ts).toBe(new Date(1000).toISOString());
+  });
+
+  test('logger: child() merges base fields without mutating the parent', async () => {
+    const { createLogger } = await import('../src/lazyclaw/logger.mjs' as string);
+    const lines: string[] = [];
+    const log = createLogger({ level: 'info', sink: (l: string) => lines.push(l), now: () => 0, base: { svc: 'daemon' } });
+    const child = log.child({ requestId: 'r-1' });
+    child.info('hi');
+    log.info('hi');
+    const recs = lines.map(l => JSON.parse(l));
+    expect(recs[0]).toMatchObject({ svc: 'daemon', requestId: 'r-1', msg: 'hi' });
+    expect(recs[1]).toMatchObject({ svc: 'daemon', msg: 'hi' });
+    expect(recs[1].requestId).toBeUndefined();
+  });
+
+  test('daemon makeHandler with logger: emits a JSON-line access record per request', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const { createLogger } = await import('../src/lazyclaw/logger.mjs' as string);
+    const lines: string[] = [];
+    const logger = createLogger({ level: 'info', sink: (l: string) => lines.push(l) });
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      logger,
+    });
+    // Fake req/res with a `close` event so the handler's res.once('close')
+    // hook fires and the logger captures the access line.
+    const events: Record<string, Array<() => void>> = {};
+    const req: any = { method: 'GET', url: '/version', headers: {}, socket: { remoteAddress: '127.0.0.1' } };
+    const res: any = {
+      writeHead() {},
+      end() {
+        // Trigger the close handler on next tick so the logger sees it.
+        setImmediate(() => (events['close'] || []).forEach(fn => fn()));
+      },
+      once(name: string, fn: () => void) {
+        (events[name] = events[name] || []).push(fn);
+      },
+    };
+    await handler(req, res);
+    // Wait for setImmediate to fire.
+    await new Promise(r => setImmediate(r));
+    expect(lines).toHaveLength(1);
+    const rec = JSON.parse(lines[0]);
+    expect(rec.msg).toBe('access');
+    expect(rec.method).toBe('GET');
+    expect(rec.path).toBe('/version');
+    expect(rec.status).toBe(200);
+    expect(rec.remote).toBe('127.0.0.1');
+    expect(typeof rec.durationMs).toBe('number');
+  });
+
+  test('daemon CLI --log info emits one access line per request on stderr', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    // Spawn directly so we can read stderr.
+    const child = spawn(process.execPath, [CLI, 'daemon', '--port', '0', '--log', 'info'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const stderr: string[] = [];
+    child.stderr.on('data', d => stderr.push(d.toString()));
+    const url: string = await new Promise((resolve, reject) => {
+      let buf = '';
+      child.stdout.on('data', d => {
+        buf += d.toString();
+        const nl = buf.indexOf('\n');
+        if (nl < 0) return;
+        try { resolve(JSON.parse(buf.slice(0, nl)).url); } catch (e) { reject(e); }
+      });
+      setTimeout(() => reject(new Error('boot timeout')), 5000);
+    });
+    try {
+      await fetch(`${url}/version`);
+      // Allow the access line to flush.
+      await new Promise(r => setTimeout(r, 100));
+      const stderrStr = stderr.join('');
+      // Should contain a JSON line with msg:"access" and method:"GET".
+      const lines = stderrStr.split('\n').filter(l => l.startsWith('{'));
+      const accessLines = lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+      expect(accessLines.some(r => r.msg === 'access' && r.method === 'GET' && r.path === '/version')).toBe(true);
+    } finally {
+      await new Promise<void>(r => { child.once('close', () => r()); child.kill('SIGTERM'); });
+    }
+  });
+
   test('decorator stack: cache hit short-circuits fallback and retry entirely', async () => {
     // Real-world flow: a previously-served prompt comes back. The cache
     // should serve it without ever consulting fallback or retry —

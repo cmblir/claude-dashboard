@@ -10,6 +10,55 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.93.0] — 2026-05-05
+
+**Structured logging + daemon access log (opt-in).**
+
+Plain stderr printlns are fine for a CLI; once the daemon is taking
+remote requests with auth + rate limits, a structured log makes
+observability tractable.
+
+### `src/lazyclaw/logger.mjs`
+80-line module, no transitive deps. JSON-line output, level-gated
+(`debug` < `info` < `warn` < `error`). `createLogger({level, sink, base, now})`
+returns a logger; `logger.child({extraBase})` derives a child without
+mutating the parent. Default sink writes to `process.stderr`; tests
+inject their own.
+
+### Daemon access log
+`lazyclaw daemon --log info` (also `LAZYCLAW_LOG_LEVEL`) emits one
+JSON line per request on stderr:
+```json
+{"ts":"2026-05-05T12:34:56.789Z","level":"info","msg":"access","method":"GET","path":"/version","status":200,"durationMs":3,"remote":"127.0.0.1"}
+```
+
+The line lands on `res.close` so it captures the actual final status
+even when middleware (Origin gate, auth, rate limit) short-circuits.
+We hook `res.writeHead` to capture status without intercepting the
+body — zero overhead per chunk.
+
+### Bound-URL JSON
+Now includes `log: <level>|null` so callers can see whether logging
+is enabled.
+
+### Why JSON-line and not a real logger lib (pino/winston)
+A single dep would dwarf the entire CLI. JSON-line is the de-facto
+observability format — `jq` and every log shipper ingest it natively.
+
+### Tests
+4 new phase 6 specs:
+- level gate: `warn` suppresses `debug`+`info`, allows `warn`+`error`
+- `child()` merges base fields without mutating parent (verified via
+  field appearance in child output and absence from sibling parent
+  output)
+- `makeHandler` with logger: GET /version emits one access record
+  with `msg:'access'`, method, path, status, durationMs, remote
+- CLI integration: `--log info` produces JSON access lines on stderr;
+  one matching record per HTTP request
+
+Suite: 199/199. tsc clean.
+
+---
 ## [2.92.2] — 2026-05-05
 
 **Test coverage: decorator-stack composition (cache + fallback + retry).**
