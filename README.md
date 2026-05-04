@@ -246,18 +246,31 @@ exits non-zero when anything is missing.
 
 ```bash
 node src/lazyclaw/cli.mjs daemon --port 0    # binds 127.0.0.1, prints url
+node src/lazyclaw/cli.mjs daemon --port 8081 --auth-token "$(openssl rand -hex 32)"
+LAZYCLAW_AUTH_TOKEN=mysecret node src/lazyclaw/cli.mjs daemon --port 8081
 ```
 
-Loopback-only (no auth — assumes one local user). Endpoints:
+Always binds 127.0.0.1. Default mode is no auth — assumes one local
+user, the historical loopback default. Pass `--auth-token <token>`
+(or set `LAZYCLAW_AUTH_TOKEN`) to require `Authorization: Bearer <token>`
+on every request — useful when SSH-tunneling the port to a shared host
+or running the daemon under a service account others share. The token
+comparison is constant-time. The bound-URL JSON includes `auth: true|false`.
+
+Endpoints:
 
 - `GET /version`, `/providers`, `/status`, `/doctor`, `/sessions`
 - `GET /sessions/<id>` → `{id, turns}` (404 when missing)
 - `DELETE /sessions/<id>` (idempotent)
-- `POST /agent` `{prompt, provider?, model?, skills?, thinkingBudget?, sessionId?, stream?}`
-- `POST /chat` `{messages: [...], provider?, model?, stream?}`
+- `POST /agent` `{prompt, provider?, model?, skills?, thinkingBudget?, sessionId?, retry?, stream?}`
+- `POST /chat` `{messages: [...], provider?, model?, retry?, stream?}`
 
 `stream:true` returns `text/event-stream` with `event: token`,
 `event: done`, `event: error` frames.
+
+`retry: { attempts, maxBackoffMs }` wraps the provider with
+`withRateLimitRetry` so HTTP callers get the same backoff behavior
+the CLI gets.
 
 ### Providers
 

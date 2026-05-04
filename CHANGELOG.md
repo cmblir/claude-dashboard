@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.82.2] — 2026-05-05
+
+**Docs: README documents the daemon `--auth-token` and `retry` body field.**
+
+§4.5 obligation. The 2.82.0 daemon retry plumbing and 2.82.1 bearer-token
+auth shipped without README mention. Closing the gap:
+
+- HTTP daemon section now shows the three startup forms (no auth /
+  `--auth-token` / `LAZYCLAW_AUTH_TOKEN`)
+- Documents the constant-time check and the `auth: true|false` field
+  in the bound-URL JSON
+- `POST /agent` and `POST /chat` body shapes mention the
+  `retry: { attempts, maxBackoffMs }` field
+
+No code changes.
+
+---
 ## [2.82.1] — 2026-05-05
 
 **Daemon: optional bearer-token auth for non-loopback exposure.**
