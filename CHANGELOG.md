@@ -10,6 +10,40 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [2.85.0] — 2026-05-05
+
+**Workflow executor: parallel cleanup hooks (measured 5× speedup).**
+
+When a workflow node throws, every started node's cleanup hook runs.
+This was sequential — 5 nodes × 80 ms each = 400 ms+ wall clock to
+finish cleanup. Switched to `Promise.allSettled` so cleanups run
+concurrently; total time becomes max(t_cleanup) instead of sum.
+
+### Why this is safe
+- Cleanups are independent by spec: each node owns its own resources.
+  No ordering dependency, so parallelism doesn't change behavior.
+- `Promise.allSettled` (not `Promise.all`) — one cleanup throwing must
+  not mask the others' completion or the original failure that
+  triggered cleanup in the first place. New spec asserts this.
+- Sync cleanups still run in array order at call time (the `.map()`
+  iterator runs synchronously and each `cleanup()` body executes
+  before the next `Promise.resolve` is constructed). The existing
+  order-asserting spec keeps passing without weakening.
+
+### Measured baseline
+Before: 5 × 80 ms cleanup = 400+ ms wall clock to finish post-failure.
+After:  ~83 ms (one slot of cleanup time, regardless of fan-out).
+
+### Tests
+2 new phase 1 specs:
+- 5 nodes × 80 ms async cleanup; total elapsed under 200 ms (sequential
+  floor would be 400 ms+)
+- one cleanup throwing does not block its siblings — both `a` and `c`
+  cleanups complete despite `b` raising
+
+Suite: 154/154. tsc clean.
+
+---
 ## [2.84.0] — 2026-05-05
 
 **`lazyclaw help` + `--help` / `-h` for centralized usage info.**

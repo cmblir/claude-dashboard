@@ -59,11 +59,18 @@ export async function runSequential(nodes, initialInput = null) {
       const duration = performance.now() - t0;
       results.push({ id: node.id, duration, output: undefined, status: 'failed' });
       const error = err instanceof Error ? err : new Error(String(err));
-      for (const n of started) {
-        if (typeof n.cleanup === 'function') {
-          try { await n.cleanup(); } catch { /* swallow cleanup errors */ }
-        }
-      }
+      // Cleanup runs in parallel via Promise.allSettled — for async cleanups
+      // (close a socket, flush a buffer) total time is max(t_cleanup) instead
+      // of sum(t_cleanup). Sync cleanups push their side-effects in array
+      // order (the iterator runs synchronously in the .map call) so the
+      // existing order-asserting tests keep passing without weakening.
+      // Errors are swallowed individually so a flaky cleanup can't mask the
+      // original failure that triggered cleanup in the first place.
+      await Promise.allSettled(started.map(n => {
+        if (typeof n.cleanup !== 'function') return null;
+        try { return Promise.resolve(n.cleanup()); }
+        catch (e) { return Promise.resolve(); }
+      }));
       for (const k of Object.keys(session)) delete session[k];
       return { success: false, results, error, failedAt: node.id, session };
     }
