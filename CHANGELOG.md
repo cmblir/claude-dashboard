@@ -10,6 +10,58 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.6.0] — 2026-05-05
+
+**Workflow: per-node `timeoutMs` across all engines.**
+
+`runPersistent` had a workflow-wide `opts.timeoutMs`; the other
+engines had none. Now every engine honors `node.timeoutMs` per-node,
+with `runPersistentDag` using `opts.timeoutMs` as a workflow-wide
+fallback when the node doesn't set its own.
+
+```js
+const nodes = [
+  { id: 'fast', deps: [], async execute() { return await fetch(...); } },
+  {
+    id: 'slow',
+    deps: ['fast'],
+    timeoutMs: 30_000,            // hard cap on this node alone
+    retry:    { max: 3, baseDelayMs: 500 },
+    async execute(input) { /* long network call */ },
+  },
+];
+```
+
+### Composition with retry
+The timeout wraps each `execute()` call; retry wraps the timed call.
+So `timeoutMs: 5000` + `retry: {max: 3}` gives up-to-3 attempts of
+up-to-5 seconds each — total wall-clock cap = 15s + backoff. Each
+attempt is independent: an attempt that times out is retryable, a
+non-timeout error is also retryable (caller chooses what to throw).
+
+### `runWithTimeout` exported from `executor.mjs`
+Single source of truth. `persistent.mjs` now imports it instead of
+duplicating the helper. Timeout shape stays identical across
+engines and any caller that wants to reuse it.
+
+### `runPersistentDag`: node beats workflow
+`node.timeoutMs` (per-node) takes precedence over `opts.timeoutMs`
+(workflow-wide default), so a fast node with a tight cap doesn't
+inherit a slower node's lenient cap when both are set.
+
+### Tests
+5 new phase 1 specs:
+- `runWithTimeout`: fast pass-through, slow → `TIMEOUT` code, ms=0/null
+  disables the timer
+- `runSequential`: per-node timeout trips a slow node, workflow
+  fails at that node, downstream nodes never run
+- `runSequential`: timeout + retry compose — 3 attempts where the
+  first 2 time out and the 3rd succeeds → workflow succeeds with the
+  late attempt's output
+
+Suite: 266/266. tsc clean.
+
+---
 ## [3.5.1] — 2026-05-05
 
 **Test coverage: cost-cap gate ordering pinned down vs Origin/auth/rate-limit.**

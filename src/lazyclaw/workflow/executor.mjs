@@ -29,6 +29,31 @@ import { performance } from 'node:perf_hooks';
  */
 
 /**
+ * Race a promise against a timeout. Returns whatever the inner fn
+ * resolves with; rejects with `Error('TIMEOUT'){code:'TIMEOUT'}` after
+ * `ms` if the inner fn hasn't settled. Pass ms=0 / null / undefined
+ * to skip the timer entirely.
+ *
+ * Exported so callers (workflow nodes, daemon endpoints, ad-hoc
+ * scripts) can apply the same timeout shape without reinventing the
+ * race + cleanup pattern.
+ */
+export function runWithTimeout(fn, ms) {
+  if (!ms || ms <= 0) return fn();
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => {
+      const e = new Error('TIMEOUT');
+      e.code = 'TIMEOUT';
+      reject(e);
+    }, ms);
+    fn().then(
+      v => { clearTimeout(t); resolve(v); },
+      e => { clearTimeout(t); reject(e); },
+    );
+  });
+}
+
+/**
  * Per-node retry helper. Honored by both runSequential and runParallel:
  * when `node.retry = { max: N, baseDelayMs: M }`, a throwing execute()
  * is retried up to N times with exponential backoff (baseDelayMs × 2^attempt).
@@ -82,9 +107,13 @@ export async function runSequential(nodes, initialInput = null) {
     started.push(node);
     const t0 = performance.now();
     try {
+      // Build the actual call: optional timeout wraps execute(); retry
+      // wraps the timed call. So a flaky 5-second op with `retry:{max:3}`
+      // and `timeoutMs:5000` gets up-to-3 attempts of up-to-5s each.
+      const call = () => runWithTimeout(() => node.execute(input), node.timeoutMs);
       const output = node.retry && Number.isFinite(node.retry.max) && node.retry.max > 0
-        ? await retryWithBackoff(() => node.execute(input), node.retry)
-        : await node.execute(input);
+        ? await retryWithBackoff(call, node.retry)
+        : await call();
       const duration = performance.now() - t0;
       results.push({ id: node.id, duration, output, status: 'success' });
       session[node.id] = output;
@@ -201,9 +230,10 @@ export async function runParallel(nodes, opts = {}) {
         : Object.fromEntries(deps.map(d => [d, session[d]]));
       const t0 = performance.now();
       try {
+        const call = () => runWithTimeout(() => node.execute(input), node.timeoutMs);
         const output = node.retry && Number.isFinite(node.retry.max) && node.retry.max > 0
-          ? await retryWithBackoff(() => node.execute(input), node.retry)
-          : await node.execute(input);
+          ? await retryWithBackoff(call, node.retry)
+          : await call();
         const duration = performance.now() - t0;
         return { ok: true, record: { id, duration, output, status: /** @type {'success'} */('success') } };
       } catch (err) {

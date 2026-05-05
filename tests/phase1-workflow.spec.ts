@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { runSequential, runParallel, topologicalLevels, retryWithBackoff } from '../src/lazyclaw/workflow/executor.mjs';
+import { runSequential, runParallel, topologicalLevels, retryWithBackoff, runWithTimeout } from '../src/lazyclaw/workflow/executor.mjs';
 
 interface WorkflowNode {
   id: string;
@@ -247,6 +247,65 @@ test.describe('Phase 1 — Workflow Engine Core', () => {
     expect(r.success).toBe(true);
     expect(bAttempt).toBe(2);
     expect(r.session.b).toBe('B');
+  });
+
+  test('runWithTimeout: passes through fast results', async () => {
+    const r = await runWithTimeout(async () => 'fast', 1000);
+    expect(r).toBe('fast');
+  });
+
+  test('runWithTimeout: rejects with TIMEOUT code on slow execution', async () => {
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    let caught: any = null;
+    try {
+      await runWithTimeout(async () => { await sleep(200); return 'late'; }, 30);
+    } catch (e) { caught = e; }
+    expect(caught?.code).toBe('TIMEOUT');
+    expect(caught?.message).toBe('TIMEOUT');
+  });
+
+  test('runWithTimeout: ms=0 / null disables the timer (returns whenever the fn settles)', async () => {
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    expect(await runWithTimeout(async () => { await sleep(20); return 'A'; }, 0)).toBe('A');
+    expect(await runWithTimeout(async () => 'B', null as any)).toBe('B');
+  });
+
+  test('runSequential: per-node timeoutMs trips a slow node and the workflow fails at that node', async () => {
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    const nodes = [
+      { id: 'fast', type: 't', async execute() { return 'A'; } },
+      { id: 'slow', type: 't', timeoutMs: 30, async execute() { await sleep(200); return 'late'; } },
+      { id: 'never', type: 't', async execute() { return 'unreachable'; } },
+    ];
+    const r = await runSequential(nodes, null);
+    expect(r.success).toBe(false);
+    expect(r.failedAt).toBe('slow');
+    expect(r.error?.message).toBe('TIMEOUT');
+    // 'never' must not have run
+    expect(r.results.find(x => x.id === 'never')).toBeUndefined();
+  });
+
+  test('runSequential: timeout + retry compose — N attempts of M-ms each', async () => {
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    let attempts = 0;
+    const nodes = [
+      {
+        id: 'flaky-slow',
+        type: 't',
+        timeoutMs: 30,
+        retry: { max: 2, baseDelayMs: 1 },
+        async execute() {
+          attempts += 1;
+          // Succeed on the third attempt; first two time out.
+          if (attempts < 3) { await sleep(200); return 'late'; }
+          return 'fast';
+        },
+      },
+    ];
+    const r = await runSequential(nodes, null);
+    expect(r.success).toBe(true);
+    expect(attempts).toBe(3);
+    expect(r.results[0].output).toBe('fast');
   });
 
   test('runParallel: detects cycles and refuses to run', async () => {

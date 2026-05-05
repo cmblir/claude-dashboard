@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { topologicalLevels, retryWithBackoff } from './executor.mjs';
+import { topologicalLevels, retryWithBackoff, runWithTimeout } from './executor.mjs';
 
 const DEFAULT_DIR = '.workflow-state';
 
@@ -73,20 +73,9 @@ function initState(sessionId, nodes) {
   };
 }
 
-async function runWithTimeout(fn, ms) {
-  if (!ms || ms <= 0) return fn();
-  return await new Promise((resolve, reject) => {
-    const t = setTimeout(() => {
-      const e = new Error('TIMEOUT');
-      e.code = 'TIMEOUT';
-      reject(e);
-    }, ms);
-    fn().then(
-      v => { clearTimeout(t); resolve(v); },
-      e => { clearTimeout(t); reject(e); },
-    );
-  });
-}
+// runWithTimeout lives in executor.mjs (imported above) — single
+// source of truth so the timeout shape stays identical across both
+// engines and any caller that wants to reuse it.
 
 function isTimeout(err) {
   if (!err) return false;
@@ -263,7 +252,11 @@ export async function runPersistentDag(nodes, opts) {
       // node.retry). This composition gives users two distinct knobs:
       //   - node.retry  → recover transient faults within one run
       //   - resume      → recover catastrophic faults across runs
-      const fn = () => runWithTimeout(() => node.execute(input), opts.timeoutMs);
+      // node.timeoutMs (per-node) takes precedence over opts.timeoutMs
+      // (workflow-wide default) so a fast node with a tight cap doesn't
+      // inherit a slower node's lenient cap.
+      const effectiveTimeout = Number.isFinite(node.timeoutMs) ? node.timeoutMs : opts.timeoutMs;
+      const fn = () => runWithTimeout(() => node.execute(input), effectiveTimeout);
       try {
         const output = node.retry && Number.isFinite(node.retry.max) && node.retry.max > 0
           ? await retryWithBackoff(fn, node.retry)
