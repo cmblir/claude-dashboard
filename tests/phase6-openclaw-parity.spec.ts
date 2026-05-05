@@ -846,6 +846,86 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r4.stderr).toMatch(/No node "never-existed"/);
   });
 
+  test('lazyclaw inspect --critical-path computes the longest weighted path', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'flow.mjs');
+    // Diamond DAG:
+    //   a -> b -> d
+    //   a -> c -> d
+    // With durations: a=10, b=50, c=30, d=20.
+    // Critical path = a -> b -> d = 80ms (b > c).
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a', deps: [],          async execute() {} },
+         { id: 'b', deps: ['a'],       async execute() {} },
+         { id: 'c', deps: ['a'],       async execute() {} },
+         { id: 'd', deps: ['b', 'c'],  async execute() {} },
+       ];`,
+    );
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job',
+      order: ['a', 'b', 'c', 'd'],
+      nodes: {
+        a: { status: 'success', attempts: 1, durationMs: 10 },
+        b: { status: 'success', attempts: 1, durationMs: 50 },
+        c: { status: 'success', attempts: 1, durationMs: 30 },
+        d: { status: 'success', attempts: 1, durationMs: 20 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['inspect', 'job', '--dir', stateDir, '--critical-path', wfPath], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.path).toEqual(['a', 'b', 'd']);
+    expect(out.totalMs).toBe(80);   // 10 + 50 + 20
+    // perNodeMs is included for context.
+    expect(out.perNodeMs).toEqual({ a: 10, b: 50, c: 30, d: 20 });
+  });
+
+  test('lazyclaw inspect --critical-path: missing durations default to 0 (path uses any node)', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'flow.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a', deps: [],     async execute() {} },
+         { id: 'b', deps: ['a'],  async execute() {} },
+       ];`,
+    );
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    // State has no durationMs for any node — engine never recorded
+    // them (e.g. brand-new persistence file, no run yet).
+    fs.writeFileSync(path.join(stateDir, 'fresh.json'), JSON.stringify({
+      sessionId: 'fresh',
+      order: ['a', 'b'],
+      nodes: {
+        a: { status: 'pending', attempts: 0 },
+        b: { status: 'pending', attempts: 0 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['inspect', 'fresh', '--dir', stateDir, '--critical-path', wfPath], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.totalMs).toBe(0);
+    expect(out.path).toEqual(['a', 'b']);   // Path still recovered from deps even with 0 duration
+  });
+
+  test('lazyclaw inspect --critical-path: missing workflow file → exit 2', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job', order: ['a'], nodes: { a: { status: 'success', durationMs: 1 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['inspect', 'job', '--dir', stateDir, '--critical-path', path.join(dir, 'no-such.mjs')], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/critical-path:/);
+  });
+
   test('lazyclaw inspect --summary trims per-node detail in single-session mode', () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'st');

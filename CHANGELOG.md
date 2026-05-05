@@ -10,6 +10,61 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.43.0] — 2026-05-05
+
+**`lazyclaw inspect <session> --critical-path <workflow.mjs>` — bottleneck finder.**
+
+After a slow run, the natural question is "where's the time
+going?" The critical path through a DAG is the longest
+weighted root-to-leaf chain — the bound on how fast the workflow
+could possibly finish. Optimizing any node off the path doesn't
+help; only the path matters.
+
+```
+$ lazyclaw inspect my-job --critical-path ./flow.mjs
+{
+  "sessionId": "my-job",
+  "path": ["fetch", "embed", "merge"],
+  "totalMs": 4280,
+  "perNodeMs": { "fetch": 80, "embed": 4150, "classify": 2100, "tag": 1900, "merge": 50 }
+}
+```
+
+In this example, embed alone is 97% of the critical path. The two
+other parallel branches (classify, tag) don't matter for total
+runtime — optimize embed first.
+
+### Algorithm
+Dynamic programming over a topological order:
+```
+for each node in topo order:
+  bestPred = arg max over deps (bestFinish[dep])
+  bestFinish[node] = bestFinish[bestPred] + duration[node]
+  prev[node] = bestPred
+```
+Then walk `prev[]` back from the node with the max `bestFinish`.
+
+### Tie-breaking
+When two paths have equal total weight (e.g. all-zero durations on
+a fresh state file), the algorithm prefers the longer dependency
+chain. So a user running `--critical-path` on a brand-new state
+sees the topological depth instead of an arbitrary single node.
+
+### Why it needs the workflow file
+Persisted state stores `durationMs` per node but not `deps`. The
+workflow file IS the source of truth for the DAG shape. Pass the
+same `flow.mjs` you used to create the run.
+
+### Tests
+3 new phase 6 specs:
+- diamond DAG with mixed durations → correct longest path + total
+- all-zero durations → algorithm falls back to topological depth
+  (longer-chain tie-break)
+- missing workflow file → exit 2 with helpful stderr
+
+Suite: 358 → 361 (+3); `tsc --noEmit` clean.
+
+---
 ## [3.42.0] — 2026-05-05
 
 **Daemon `GET /workflows/<id>?node=<nid>` mirrors CLI `--node` drill-down.**

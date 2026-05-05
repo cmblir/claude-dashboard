@@ -73,6 +73,109 @@ export function summarizeState(state) {
 }
 
 /**
+ * Compute the critical path (longest weighted path) through a DAG.
+ *
+ * Given the persisted state's node order + a deps map (which the
+ * caller supplies, since the engine doesn't persist deps — it
+ * persists outputs and statuses), this walks the DAG in
+ * topological order and finds the chain of nodes whose summed
+ * `durationMs` is the largest among all root-to-leaf paths.
+ *
+ * Algorithm — straightforward DP over a topo order:
+ *   for each node in topo order:
+ *     bestPredecessor = arg max over deps (bestFinish[dep])
+ *     bestFinish[node] = (bestFinish[bestPredecessor] || 0) + duration[node]
+ *     prev[node] = bestPredecessor
+ *
+ * Then walk `prev[]` backwards from the node with the max
+ * bestFinish to recover the path.
+ *
+ * @param {{ id: string, deps?: string[] }[]} graphNodes  Workflow shape (deps = id[])
+ * @param {Record<string, { durationMs?: number, status?: string }>} stateNodes  Persisted state (durationMs)
+ * @returns {{ path: string[], totalMs: number, perNodeMs: Record<string, number> }}
+ *          - path: ordered list of node ids on the critical path
+ *          - totalMs: sum of durationMs across the path
+ *          - perNodeMs: durationMs lookup for every node (0 if missing)
+ */
+export function criticalPath(graphNodes, stateNodes) {
+  const idToDeps = new Map(graphNodes.map(n => [n.id, n.deps || []]));
+  const ids = graphNodes.map(n => n.id);
+  // Topological order — Kahn's algorithm. We don't need levels here,
+  // just an order where every dep comes before its dependents.
+  const indegree = new Map(ids.map(id => [id, 0]));
+  for (const n of graphNodes) {
+    for (const d of n.deps || []) {
+      if (indegree.has(d)) indegree.set(n.id, (indegree.get(n.id) || 0) + 1);
+    }
+  }
+  const topo = [];
+  const queue = ids.filter(id => (indegree.get(id) || 0) === 0);
+  while (queue.length) {
+    const id = queue.shift();
+    topo.push(id);
+    for (const m of graphNodes) {
+      if ((m.deps || []).includes(id) && indegree.has(m.id)) {
+        const next = (indegree.get(m.id) || 0) - 1;
+        indegree.set(m.id, next);
+        if (next === 0) queue.push(m.id);
+      }
+    }
+  }
+  // If there's a cycle, topo will be shorter than ids.length. Rather
+  // than crash, we walk what we got — the result is the best path
+  // we can compute over the acyclic portion. Caller can `validate`
+  // up front if they want strict.
+  const perNodeMs = {};
+  for (const id of ids) {
+    const ns = stateNodes?.[id];
+    perNodeMs[id] = (ns && Number.isFinite(ns.durationMs)) ? ns.durationMs : 0;
+  }
+  const bestFinish = {};
+  const chainLen = {};   // path length (node count) ending at this id
+  const prev = {};
+  let bestEnd = null;
+  let bestEndFinish = -Infinity;
+  let bestEndChainLen = 0;
+  for (const id of topo) {
+    const deps = idToDeps.get(id) || [];
+    let bestPred = null;
+    let bestPredFinish = 0;
+    let bestPredChainLen = 0;
+    for (const d of deps) {
+      const f = bestFinish[d];
+      const cl = chainLen[d] || 0;
+      if (typeof f !== 'number') continue;
+      // Tie-break: weight first, then chain length. Prefer longer
+      // dependency chains when totalMs is the same — useful for
+      // fresh / pre-run state where durations are all 0 and the
+      // user actually wants topological depth.
+      if (f > bestPredFinish || (f === bestPredFinish && cl > bestPredChainLen)) {
+        bestPredFinish = f;
+        bestPredChainLen = cl;
+        bestPred = d;
+      }
+    }
+    bestFinish[id] = bestPredFinish + perNodeMs[id];
+    chainLen[id] = bestPredChainLen + 1;
+    prev[id] = bestPred;
+    if (bestFinish[id] > bestEndFinish ||
+        (bestFinish[id] === bestEndFinish && chainLen[id] > bestEndChainLen)) {
+      bestEndFinish = bestFinish[id];
+      bestEndChainLen = chainLen[id];
+      bestEnd = id;
+    }
+  }
+  // Recover the path by walking prev[] backwards.
+  const path = [];
+  for (let cur = bestEnd; cur != null; cur = prev[cur]) path.unshift(cur);
+  return {
+    path,
+    totalMs: Math.max(0, bestEndFinish),
+    perNodeMs,
+  };
+}
+
+/**
  * Read every state file in `dir` and return a sorted listing.
  * Newest activity first (by `updatedAt`); secondary sort by sessionId
  * for deterministic ordering on ties.
