@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.45.0] — 2026-05-05
+
+**Daemon `GET /workflows/<id>?slowest=<N>` mirrors CLI v3.44.**
+
+Same shape v3.44 produces over the CLI, so a dashboard can render
+"top 10 slowest nodes" by hitting one endpoint instead of pulling
+the full state and sorting client-side.
+
+```
+GET /workflows/my-job?slowest=3
+→ 200 {
+    "sessionId": "my-job",
+    "top": [
+      { "id": "embed",    "status": "success", "durationMs": 4150 },
+      { "id": "classify", "status": "success", "durationMs": 2100 },
+      { "id": "tag",      "status": "success", "durationMs": 1900 }
+    ]
+  }
+
+GET /workflows/my-job?slowest=0           # invalid N
+→ 400 { "error": "slowest must be a positive integer (got \"0\")" }
+```
+
+### Composes with other query params
+The single-session GET endpoint now supports four query
+parameters in order of precedence:
+- `?slowest=<N>` — top-N node ranking (this release)
+- `?node=<id>` — drill into one node (v3.42)
+- `?summary=true` — trim per-node detail (v3.22)
+- (none) — full state
+
+Only one applies per request — the precedence above resolves any
+ambiguity. Listed here for documentation; the endpoint reads them
+in this order via `if/else`.
+
+### Tests
+1 new phase 6 spec covering the top-N ranking + the invalid-N 400
+path.
+
+Suite: 365 → 366 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.44.0] — 2026-05-05
 
 **`lazyclaw inspect <session> --slowest <N>` — top N nodes by duration.**

@@ -1891,6 +1891,35 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /workflows/<id>?slowest=<N> mirrors CLI top-N node ranking', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'wf-slowest');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job',
+      order: ['fast', 'slow', 'slowest'],
+      nodes: {
+        fast:    { status: 'success', durationMs: 50 },
+        slow:    { status: 'success', durationMs: 800 },
+        slowest: { status: 'success', durationMs: 1500 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      const r = await fetch(`${d.url}/workflows/job?slowest=2`).then(x => x.json());
+      expect(r.top).toHaveLength(2);
+      expect(r.top.map((n: any) => n.id)).toEqual(['slowest', 'slow']);
+      expect(r.top[0].durationMs).toBe(1500);
+
+      // Invalid N → 400.
+      const bad = await fetch(`${d.url}/workflows/job?slowest=0`);
+      expect(bad.status).toBe(400);
+      const badBody = await bad.json();
+      expect(badBody.error).toMatch(/positive integer/);
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /workflows/<id>?node=<nid> drills into one node; HTTP status mirrors CLI exit', async () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'wf-node');

@@ -697,6 +697,28 @@ export function makeHandler(ctx) {
           // CLI exit codes): 200 success/pending/running, 410 Gone
           // for failed (request was valid, but the resource is in a
           // failed state), 404 for unknown node id.
+          // ?slowest=<N>: top N nodes by durationMs. Same shape as
+          // CLI v3.44 — pure state-file analysis, no deps needed.
+          const qSlowest = url.searchParams.get('slowest');
+          if (qSlowest) {
+            const n = parseInt(qSlowest, 10);
+            if (!Number.isFinite(n) || n <= 0) {
+              return writeJson(res, 400, {
+                error: `slowest must be a positive integer (got ${JSON.stringify(qSlowest)})`,
+              });
+            }
+            const entries = Object.entries(state.nodes || {}).map(([id, ns]) => ({
+              id,
+              status: ns?.status || 'pending',
+              durationMs: Number.isFinite(ns?.durationMs) ? ns.durationMs : 0,
+              attempts: ns?.attempts ?? 0,
+            }));
+            entries.sort((a, b) => (b.durationMs - a.durationMs) || a.id.localeCompare(b.id));
+            return writeJson(res, 200, {
+              sessionId: state.sessionId,
+              top: entries.slice(0, n),
+            });
+          }
           const qNode = url.searchParams.get('node');
           if (qNode) {
             const ns = state.nodes?.[qNode];
