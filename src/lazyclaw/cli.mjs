@@ -1632,58 +1632,14 @@ async function cmdRates(sub, positional, flags = {}) {
       return;
     }
     case 'validate': {
-      // Check the shape of cfg.rates without trying to use it. Reports:
-      //   - keys that don't match 'provider/model' shape
-      //   - cards missing required fields (inputPer1M, outputPer1M)
-      //   - cards with negative or non-finite numbers
-      //   - cards referring to providers not in PROVIDERS (warn — user
-      //     might have a custom provider, so non-fatal)
+      // Shape check shared with daemon's GET /rates/validate via
+      // rates-validate.mjs. Single source of truth.
       const cfg = readConfig();
-      const rates = cfg.rates && typeof cfg.rates === 'object' ? cfg.rates : {};
-      const issues = [];
-      const warnings = [];
       await ensureRegistry();
-      const knownProviders = new Set(Object.keys(_registryMod.PROVIDERS));
-      for (const key of Object.keys(rates)) {
-        if (!key.includes('/')) {
-          issues.push(`key "${key}": expected "provider/model" shape (slash required)`);
-          continue;
-        }
-        const [provider] = key.split('/');
-        if (!knownProviders.has(provider)) {
-          warnings.push(`key "${key}": provider "${provider}" not in registered providers (registered: ${[...knownProviders].join(', ')})`);
-        }
-        const card = rates[key];
-        if (!card || typeof card !== 'object') {
-          issues.push(`key "${key}": value must be an object`);
-          continue;
-        }
-        for (const required of ['inputPer1M', 'outputPer1M']) {
-          const v = card[required];
-          if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
-            issues.push(`key "${key}": ${required} must be a non-negative finite number (got ${JSON.stringify(v)})`);
-          }
-        }
-        for (const optional of ['cacheReadPer1M', 'cacheCreatePer1M']) {
-          if (card[optional] !== undefined) {
-            const v = card[optional];
-            if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
-              issues.push(`key "${key}": ${optional} must be a non-negative finite number when set (got ${JSON.stringify(v)})`);
-            }
-          }
-        }
-        if (card.currency !== undefined && typeof card.currency !== 'string') {
-          issues.push(`key "${key}": currency must be a string (got ${typeof card.currency})`);
-        }
-      }
-      const ok = issues.length === 0;
-      console.log(JSON.stringify({
-        ok,
-        rateCount: Object.keys(rates).length,
-        issues,
-        warnings,
-      }, null, 2));
-      process.exit(ok ? 0 : 1);
+      const { validateRates } = await import('./rates-validate.mjs');
+      const result = validateRates(cfg.rates, _registryMod.PROVIDERS);
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(result.ok ? 0 : 1);
     }
     default:
       console.error('Usage: lazyclaw rates <list|set <key>|delete <key>|shape|validate>');

@@ -10,6 +10,55 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.47.0] — 2026-05-05
+
+**Daemon `GET /rates/validate` mirrors CLI v3.30 + shared validator.**
+
+Same shape `lazyclaw rates validate` produces, with HTTP status
+mapping to CLI exit code (same pattern as v3.40's
+`/config/validate`):
+
+- `200 OK` — rates are well-formed
+- `422 Unprocessable Entity` — rates have hard issues
+
+```
+GET /rates/validate
+→ 200 { "ok": true, "rateCount": 4, "issues": [], "warnings": [] }
+
+GET /rates/validate                          (malformed)
+→ 422 { "ok": false, "rateCount": 3,
+        "issues": [
+          "key \"noslash\": expected \"provider/model\" shape (slash required)",
+          "key \"a/missing-out\": outputPer1M must be a non-negative finite number (got undefined)",
+          "key \"a/negative\": inputPer1M must be a non-negative finite number (got -2)"
+        ],
+        "warnings": [] }
+```
+
+### Single source of truth — `rates-validate.mjs`
+Both `lazyclaw rates validate` (CLI) and the daemon's
+`/rates/validate` go through one shared `validateRates(rates,
+providers)` function. Bit-for-bit identical output across the two
+surfaces.
+
+### Validator pair complete
+| Validator | CLI | Daemon |
+|-----------|-----|--------|
+| config | v3.39 | v3.40 |
+| **rates** | v3.30 | **v3.47** |
+
+Both validators now have CLI + HTTP parity with shared
+implementations. A CI gate can pick either surface; a UI's
+config-status panel can poll either depending on what's
+convenient.
+
+### Tests
+1 new phase 6 spec covering 200 (well-formed) + 422 (malformed)
+round-trips.
+
+Suite: 367 → 368 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.46.0] — 2026-05-05
 
 **`lazyclaw rates list --filter / --limit` (CLI + daemon).**

@@ -25,6 +25,7 @@ import { TokenBucketLimiter } from './ratelimit.mjs';
 import { createLogger } from './logger.mjs';
 import { summarizeState, listSessions as listWorkflowSessions, loadStateFile as loadWorkflowState } from './workflow/summary.mjs';
 import { validateConfig } from './config-validate.mjs';
+import { validateRates } from './rates-validate.mjs';
 
 // Resolve the provider for a request. Composes opt-in wrappers in this
 // order (innermost first):
@@ -467,6 +468,17 @@ export function makeHandler(ctx) {
             if (Number.isFinite(n) && n > 0) entries = entries.slice(0, n);
           }
           return writeJson(res, 200, Object.fromEntries(entries));
+        }
+        case route === 'GET /rates/validate': {
+          // Mirror of v3.30's `lazyclaw rates validate`. Same shape
+          // (single source of truth in rates-validate.mjs). HTTP
+          // status reflects ok/issues so a UI's cost-config badge
+          // can branch on HTTP code: 200 ok, 422 issues
+          // (Unprocessable Entity, same pattern as /config/validate
+          // in v3.40).
+          const cfg = ctx.readConfig();
+          const result = validateRates(cfg.rates, PROVIDERS);
+          return writeJson(res, result.ok ? 200 : 422, result);
         }
         case route === 'GET /status': {
           const cfg = ctx.readConfig();

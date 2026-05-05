@@ -1758,6 +1758,39 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d2.kill(); }
   });
 
+  test('daemon GET /rates/validate mirrors CLI; 200 ok, 422 issues', async () => {
+    const dir = tmpConfigDir();
+    runCli(['rates', 'set', 'anthropic/opus', '--input', '15', '--output', '75'], dir);
+    const d1 = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d1.url}/rates/validate`);
+      expect(r.status).toBe(200);
+      const body = await r.json();
+      expect(body.ok).toBe(true);
+      expect(body.rateCount).toBe(1);
+      expect(body.issues).toEqual([]);
+    } finally { await d1.kill(); }
+
+    // Hand-craft malformed config, fresh daemon.
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
+      rates: {
+        'noslash':       { inputPer1M: 1, outputPer1M: 1 },
+        'a/missing-out': { inputPer1M: 1 },                    // outputPer1M missing
+        'a/negative':    { inputPer1M: -2, outputPer1M: 1 },
+      },
+    }, null, 2));
+    const d2 = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d2.url}/rates/validate`);
+      expect(r.status).toBe(422);
+      const body = await r.json();
+      expect(body.ok).toBe(false);
+      expect(body.issues.some((m: string) => m.includes('provider/model'))).toBe(true);
+      expect(body.issues.some((m: string) => m.includes('outputPer1M'))).toBe(true);
+      expect(body.issues.some((m: string) => m.includes('non-negative'))).toBe(true);
+    } finally { await d2.kill(); }
+  });
+
   test('daemon GET /rates returns the configured rate cards (read-only)', async () => {
     const dir = tmpConfigDir();
     runCli(['rates', 'set', 'anthropic/claude-opus-4-7', '--input', '15', '--output', '75'], dir);
