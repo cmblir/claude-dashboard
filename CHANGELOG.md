@@ -10,6 +10,61 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.25.0] — 2026-05-05
+
+**`lazyclaw graph <workflow.mjs>` — emit DAG as Mermaid syntax.**
+
+Visualize a workflow's topology before running it. Output is paste-
+ready for GitHub markdown, Notion, Obsidian, GitLab — all of
+which render Mermaid inline.
+
+```
+$ lazyclaw graph ./flow.mjs
+graph TD
+  fetch[fetch]
+  embed[embed]
+  classify[classify]
+  merge[merge]
+  fetch --> embed
+  fetch --> classify
+  embed --> merge
+  classify --> merge
+```
+
+### `--lr` flag for wide DAGs
+Default direction is top-down (`graph TD`). For DAGs with many
+parallel branches, `--lr` (left-right) reads better:
+
+```
+$ lazyclaw graph ./flow.mjs --lr
+graph LR
+...
+```
+
+### Mermaid-safe identifiers
+Mermaid's id rules are stricter than ours: identifiers must match
+`/[a-zA-Z][a-zA-Z0-9_]*/`. The graph command sanitizes each id
+to that grammar (non-alphanumerics → underscore; leading digit
+gets an `n_` prefix), then keeps the original id as the visible
+label via `[label]` syntax. So `fetch-data` becomes
+`fetch_data[fetch-data]` — identifier safe, visible text true.
+
+### No fence wrapper
+Output is the bare Mermaid block (no triple-backtick fences). The
+user adds the fence when embedding so the same output works for
+plain-text editors that don't render markdown.
+
+### Tests
+4 new phase 6 specs:
+- standard 4-node DAG → correct node decls + edges
+- `--lr` flag flips direction to `graph LR`
+- ids with hyphens / dots / leading digits get sanitized while
+  labels keep the original (round-trip identity check)
+- missing file → exit 2 with helpful stderr
+
+Suite: 313 → 317 (+4); `tsc --noEmit` clean.
+
+---
 ## [3.24.0] — 2026-05-05
 
 **Daemon `GET /sessions/search?q=…&regex=true` mirrors CLI sessions search.**

@@ -486,6 +486,79 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r.stderr).toMatch(/validate:/);
   });
 
+  test('lazyclaw graph: emits Mermaid graph TD with node decls and dep edges', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'flow.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'fetch',    deps: [],                        async execute() {} },
+         { id: 'embed',    deps: ['fetch'],                 async execute() {} },
+         { id: 'classify', deps: ['fetch'],                 async execute() {} },
+         { id: 'merge',    deps: ['embed','classify'],      async execute() {} },
+       ];`,
+    );
+    const r = runCli(['graph', wfPath], dir);
+    expect(r.status).toBe(0);
+    const lines = r.stdout.split('\n').filter(Boolean);
+    expect(lines[0]).toBe('graph TD');
+    // Node declarations precede edges (every id gets a `id[label]` line).
+    expect(lines).toEqual(expect.arrayContaining([
+      '  fetch[fetch]',
+      '  embed[embed]',
+      '  classify[classify]',
+      '  merge[merge]',
+    ]));
+    // Edges fetch→embed, fetch→classify, embed→merge, classify→merge.
+    expect(lines).toEqual(expect.arrayContaining([
+      '  fetch --> embed',
+      '  fetch --> classify',
+      '  embed --> merge',
+      '  classify --> merge',
+    ]));
+  });
+
+  test('lazyclaw graph --lr emits graph LR', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'flow.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a', deps: [],     async execute() {} },
+         { id: 'b', deps: ['a'],  async execute() {} },
+       ];`,
+    );
+    const r = runCli(['graph', wfPath, '--lr'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout.split('\n')[0]).toBe('graph LR');
+  });
+
+  test('lazyclaw graph: ids with non-Mermaid-safe chars get sanitized identifiers but the visible label keeps the original', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'flow.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'fetch-data',     deps: [],               async execute() {} },
+         { id: '2nd-step',       deps: ['fetch-data'],   async execute() {} },
+         { id: 'final.merge',    deps: ['2nd-step'],     async execute() {} },
+       ];`,
+    );
+    const r = runCli(['graph', wfPath], dir);
+    expect(r.status).toBe(0);
+    // hyphens → underscores; identifiers starting with a digit get n_ prefix.
+    expect(r.stdout).toContain('fetch_data[fetch-data]');
+    expect(r.stdout).toContain('n_2nd_step[2nd-step]');
+    expect(r.stdout).toContain('final_merge[final.merge]');
+    // Edges use the safe identifier form on both sides.
+    expect(r.stdout).toContain('fetch_data --> n_2nd_step');
+    expect(r.stdout).toContain('n_2nd_step --> final_merge');
+  });
+
+  test('lazyclaw graph: missing file → exit 2 with helpful stderr', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['graph', path.join(dir, 'no-such.mjs')], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/graph:/);
+  });
+
   test('lazyclaw clear: deletes existing state file → exit 0 with removed:true', () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'st');

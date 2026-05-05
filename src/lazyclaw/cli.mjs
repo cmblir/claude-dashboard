@@ -337,6 +337,65 @@ async function cmdValidate(file) {
   process.exit(ok ? 0 : 1);
 }
 
+// Emit a workflow's DAG as Mermaid syntax. Useful for docs, code
+// review, and quick visual debugging — Mermaid renders inline in
+// GitHub markdown, GitLab, Notion, Obsidian, and most modern note
+// tools, so the output is paste-ready.
+//
+// Direction is top-down (`graph TD`) by default; --lr flag flips it
+// to left-right which is more readable for wide DAGs.
+//
+// Output goes to stdout as plain text (the Mermaid block contents,
+// no fenced ```mermaid wrapper). The user adds the fence when
+// embedding so the same output works for the editors that DON'T
+// render markdown.
+//
+// Each node id is sanitized to a Mermaid-safe identifier (letters,
+// digits, underscores) for the LHS reference, with the original id
+// in brackets as the visible label. So `fetch-data` becomes
+// `fetch_data[fetch-data]` in the output — Mermaid's id rules are
+// stricter than ours.
+async function cmdGraph(file, opts = {}) {
+  if (!file) { console.error('Usage: lazyclaw graph <workflow.mjs> [--lr]'); process.exit(2); }
+  let nodes;
+  try {
+    nodes = await importWorkflow(file);
+  } catch (e) {
+    console.error(`graph: ${e?.message || e}`);
+    process.exit(2);
+  }
+  const direction = opts.lr ? 'LR' : 'TD';
+  const lines = [`graph ${direction}`];
+  // Mermaid node ids must match /[a-zA-Z][a-zA-Z0-9_]*/ — anything
+  // else needs the bracketed-label form. We always emit the bracket
+  // label so the visible text is the user's actual id (no ambiguity)
+  // while the LHS identifier is always Mermaid-safe.
+  const safeId = (id) => {
+    const s = String(id).replace(/[^a-zA-Z0-9_]/g, '_');
+    return /^[a-zA-Z]/.test(s) ? s : `n_${s}`;
+  };
+  // First emit a node declaration for every id (so isolated nodes
+  // still appear in the rendered graph). Then emit edges in dep order.
+  // Use a Set to dedupe even though the workflow shouldn't have dupes
+  // — defensive against malformed input. Validate-then-graph is the
+  // recommended pipeline.
+  const declared = new Set();
+  const declare = (id) => {
+    if (declared.has(id)) return;
+    lines.push(`  ${safeId(id)}[${id}]`);
+    declared.add(id);
+  };
+  for (const n of nodes) declare(n.id);
+  for (const n of nodes) {
+    for (const d of n.deps || []) {
+      // Edge: dep → node. Mermaid syntax `a --> b`.
+      lines.push(`  ${safeId(d)} --> ${safeId(n.id)}`);
+    }
+  }
+  console.log(lines.join('\n'));
+  process.exit(0);
+}
+
 async function cmdResume(sessionId, file, opts = {}) {
   const { runPersistent, loadState } = await loadEngine();
   const dir = opts.dir || '.workflow-state';
@@ -571,7 +630,7 @@ async function cmdVersion() {
 // truth so adding a subcommand updates the completion script too. The
 // dispatcher in main() is the runtime authority; this list mirrors it.
 const SUBCOMMANDS = [
-  'run', 'resume', 'inspect', 'clear', 'validate',
+  'run', 'resume', 'inspect', 'clear', 'validate', 'graph',
   'config', 'chat', 'agent',
   'doctor', 'status', 'onboard',
   'sessions', 'skills', 'providers',
@@ -798,6 +857,7 @@ const HELP_SUMMARIES = {
   inspect:    'Print persisted workflow state without executing',
   clear:      'Delete a persisted workflow state file (idempotent)',
   validate:   'Static-check a workflow file: shape, deps, cycles, parallelism',
+  graph:      'Emit workflow DAG as Mermaid syntax (paste-ready for docs)',
 };
 
 // Detailed usage per subcommand for `lazyclaw help <name>`. Kept as flat
@@ -808,6 +868,7 @@ const HELP_DETAILS = {
   inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
   validate: 'Usage: lazyclaw validate <workflow.mjs>\n  Static check: load + shape + dep + cycle + parallelism estimate.\n  Exit 0 valid · 1 hard failure (issues populated) · 2 file/import error.',
+  graph: 'Usage: lazyclaw graph <workflow.mjs> [--lr]\n  Emit the workflow DAG as Mermaid syntax (graph TD by default; --lr for left-right).\n  Output is paste-ready for GitHub markdown / Notion / Obsidian.',
   config: 'Usage: lazyclaw config <get|set|list|delete|path|edit> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
   agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage] [--cost]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, ...} to stderr after the response.\n  --cost adds a cost line on stderr when config.rates has a card for the active provider/model.',
@@ -1643,6 +1704,7 @@ const BOOLEAN_FLAGS = new Set([
   'version',
   'summary',      // inspect: trim per-node detail
   'regex',        // sessions search: treat query as a regex
+  'lr',           // graph: emit Mermaid `graph LR` (left-right)
 ]);
 
 function parseArgs(argv) {
@@ -1719,6 +1781,11 @@ async function main() {
     case 'validate': {
       const [file] = rest.positional;
       await cmdValidate(file);
+      break;
+    }
+    case 'graph': {
+      const [file] = rest.positional;
+      await cmdGraph(file, { lr: !!rest.flags.lr });
       break;
     }
     case 'config': {
