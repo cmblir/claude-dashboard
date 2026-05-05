@@ -10,6 +10,45 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.2.0] — 2026-05-05
+
+**`lazyclaw rates` subcommand for managing cost-card config.**
+
+3.0.x cost wiring required hand-editing `cfg.rates` JSON. This adds
+a first-class subcommand so users can write rate cards safely:
+
+```bash
+lazyclaw rates set anthropic/claude-opus-4-7 \
+  --input 15 --output 75 --cache-read 1.5 --cache-create 18.75
+lazyclaw rates list
+lazyclaw rates delete anthropic/claude-opus-4-7
+lazyclaw rates shape    # zero-filled reference template
+```
+
+### Validation
+- Key MUST be `provider/model` form (slash required) — prevents
+  someone from setting `claude-opus-4-7` and wondering why
+  `costFromUsage` never finds it.
+- `--input` and `--output` must be non-negative numbers (per million
+  tokens). Negative or non-numeric → exit 2 with a usage hint.
+- `--currency` defaults to `USD` when omitted; `--cache-read` and
+  `--cache-create` are optional (provider-dependent).
+
+### Anti-typo guarantee
+The `provider/model` slash check catches the most common cost-card
+mistake: shipping a card under just the model name and getting
+silent zero-cost lookups forever. Now you get an immediate `usage`
+hint instead.
+
+### Tests
+6 new phase 6 specs covering set/list round-trip, validation
+rejection (non-numeric, negative, missing slash), idempotent delete
+with `removed:true|false`, `shape` audit, and the `{}` default for
+fresh configs.
+
+Suite: 247/247. tsc clean.
+
+---
 ## [3.1.0] — 2026-05-05
 
 **Daemon: graceful shutdown with hard timeout + double-signal force exit.**

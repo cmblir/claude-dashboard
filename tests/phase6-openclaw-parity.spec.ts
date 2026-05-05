@@ -1756,6 +1756,71 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('rates set persists a card with the right shape; rates list reads it back', () => {
+    const dir = tmpConfigDir();
+    const r1 = runCli([
+      'rates', 'set', 'anthropic/claude-opus-4-7',
+      '--input', '15', '--output', '75',
+      '--cache-read', '1.5', '--cache-create', '18.75',
+    ], dir);
+    expect(r1.status).toBe(0);
+    const out1 = JSON.parse(r1.stdout);
+    expect(out1.card).toEqual({
+      inputPer1M: 15, outputPer1M: 75,
+      cacheReadPer1M: 1.5, cacheCreatePer1M: 18.75,
+      currency: 'USD',
+    });
+    // List reads back
+    const r2 = runCli(['rates', 'list'], dir);
+    expect(r2.status).toBe(0);
+    const list = JSON.parse(r2.stdout);
+    expect(list['anthropic/claude-opus-4-7'].inputPer1M).toBe(15);
+  });
+
+  test('rates set rejects non-numeric or negative input/output', () => {
+    const dir = tmpConfigDir();
+    const r1 = runCli(['rates', 'set', 'x/y', '--input', 'banana', '--output', '5'], dir);
+    expect(r1.status).toBe(2);
+    expect(r1.stderr).toMatch(/non-negative/);
+    const r2 = runCli(['rates', 'set', 'x/y', '--input', '-1', '--output', '5'], dir);
+    expect(r2.status).toBe(2);
+  });
+
+  test('rates set rejects keys without a slash (forces provider/model shape)', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['rates', 'set', 'just-model', '--input', '1', '--output', '1'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/provider\/model/);
+  });
+
+  test('rates delete removes the card and reports removed:true|false', () => {
+    const dir = tmpConfigDir();
+    runCli(['rates', 'set', 'a/b', '--input', '1', '--output', '2'], dir);
+    const r1 = runCli(['rates', 'delete', 'a/b'], dir);
+    expect(JSON.parse(r1.stdout).removed).toBe(true);
+    const r2 = runCli(['rates', 'delete', 'a/b'], dir);
+    expect(JSON.parse(r2.stdout).removed).toBe(false);
+  });
+
+  test('rates shape prints the zero-filled reference template', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['rates', 'shape'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    // Shape audit: every numeric is 0 (callers MUST fill in real numbers).
+    for (const card of Object.values(out)) {
+      expect((card as any).inputPer1M).toBe(0);
+      expect((card as any).outputPer1M).toBe(0);
+    }
+  });
+
+  test('rates list on a fresh config prints {} (no rates configured yet)', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['rates', 'list'], dir);
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout)).toEqual({});
+  });
+
   test('costFromUsage: anthropic with cache fields produces a 4-bucket breakdown', async () => {
     const { costFromUsage } = await import('../src/lazyclaw/providers/rates.mjs' as string);
     const rates = {

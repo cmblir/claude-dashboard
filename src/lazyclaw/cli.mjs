@@ -276,13 +276,15 @@ const SUBCOMMANDS = [
   'sessions', 'skills', 'providers',
   'daemon', 'version', 'completion', 'help',
   'export', 'import',
+  'rates',
 ];
 
 const SUBCOMMAND_SUBS = {
-  config:    ['get', 'set', 'list', 'delete', 'unset'],
+  config:    ['get', 'set', 'list', 'delete', 'unset', 'path', 'edit'],
   sessions:  ['list', 'show', 'clear', 'export'],
   skills:    ['list', 'show', 'install', 'remove'],
   providers: ['list', 'info'],
+  rates:     ['list', 'set', 'delete', 'shape'],
   completion: ['bash', 'zsh'],
 };
 
@@ -491,6 +493,7 @@ const HELP_SUMMARIES = {
   completion: 'Emit shell completion script (completion <bash|zsh>)',
   export:     'Dump config + skills (+ optional sessions) as a JSON bundle',
   import:     'Apply a JSON bundle from stdin or --from <path>',
+  rates:      'Manage cost rate-cards in config (rates list|set <provider/model>|delete|shape)',
 };
 
 // Detailed usage per subcommand for `lazyclaw help <name>`. Kept as flat
@@ -512,6 +515,7 @@ const HELP_DETAILS = {
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
   export: 'Usage: lazyclaw export [--include-secrets] [--include-sessions] > bundle.json\n  --include-secrets keeps the raw api-key in the bundle (default redacts it).\n  --include-sessions adds full turn content (default keeps metadata only).',
   import: 'Usage: lazyclaw import [--from <path>] [--overwrite-skills] [--no-overwrite-config] [--import-sessions]\n  Reads JSON from stdin (or --from <path>). Sessions are NEVER overwritten.\n  Redacted api-keys (***REDACTED***) are dropped, never written.',
+  rates: 'Usage: lazyclaw rates <list | set <provider/model> --input <N> --output <N> [--cache-read <N>] [--cache-create <N>] [--currency USD] | delete <key> | shape>\n  Rates are per million tokens. costFromUsage uses cfg.rates to compute the cost block in /usage and body.cost.\n  `shape` prints the reference template (zero-filled) you can copy into config.',
 };
 
 function cmdHelp(name) {
@@ -999,6 +1003,65 @@ async function cmdDaemon(flags) {
   }
 }
 
+async function cmdRates(sub, positional, flags = {}) {
+  // Manage cfg.rates without hand-editing JSON. Same shape as
+  // RATE_CARD_SHAPE in providers/rates.mjs:
+  //   { 'provider/model': { inputPer1M, outputPer1M, cacheReadPer1M?, cacheCreatePer1M?, currency? } }
+  switch (sub) {
+    case undefined:
+    case 'list': {
+      const cfg = readConfig();
+      const rates = cfg.rates && typeof cfg.rates === 'object' ? cfg.rates : {};
+      console.log(JSON.stringify(rates, null, 2));
+      return;
+    }
+    case 'set': {
+      const key = positional[0];
+      if (!key || !key.includes('/')) {
+        console.error('Usage: lazyclaw rates set <provider/model> --input <N> --output <N> [--cache-read <N>] [--cache-create <N>] [--currency USD]');
+        process.exit(2);
+      }
+      const inputPer1M = flags.input !== undefined ? Number(flags.input) : null;
+      const outputPer1M = flags.output !== undefined ? Number(flags.output) : null;
+      if (!Number.isFinite(inputPer1M) || !Number.isFinite(outputPer1M) || inputPer1M < 0 || outputPer1M < 0) {
+        console.error('rates set: --input and --output must be non-negative numbers (per million tokens)');
+        process.exit(2);
+      }
+      const card = { inputPer1M, outputPer1M };
+      if (flags['cache-read'] !== undefined) card.cacheReadPer1M = Number(flags['cache-read']);
+      if (flags['cache-create'] !== undefined) card.cacheCreatePer1M = Number(flags['cache-create']);
+      if (flags.currency) card.currency = String(flags.currency);
+      else card.currency = 'USD';
+      const cfg = readConfig();
+      cfg.rates = cfg.rates || {};
+      cfg.rates[key] = card;
+      writeConfig(cfg);
+      console.log(JSON.stringify({ ok: true, key, card }));
+      return;
+    }
+    case 'delete':
+    case 'unset': {
+      const key = positional[0];
+      if (!key) { console.error('Usage: lazyclaw rates delete <provider/model>'); process.exit(2); }
+      const cfg = readConfig();
+      const had = !!(cfg.rates && cfg.rates[key]);
+      if (cfg.rates) delete cfg.rates[key];
+      writeConfig(cfg);
+      console.log(JSON.stringify({ ok: true, key, removed: had }));
+      return;
+    }
+    case 'shape': {
+      // Print the reference shape so users can copy-paste into config.
+      const mod = await import('./providers/rates.mjs');
+      console.log(JSON.stringify(mod.RATE_CARD_SHAPE, null, 2));
+      return;
+    }
+    default:
+      console.error('Usage: lazyclaw rates <list|set <key>|delete <key>|shape>');
+      process.exit(2);
+  }
+}
+
 async function cmdSkills(sub, positional, flags = {}) {
   const skillsMod = await import('./skills.mjs');
   const cfgDir = path.dirname(configPath());
@@ -1282,6 +1345,11 @@ async function main() {
     case 'skills': {
       const sub = rest.positional[0];
       await cmdSkills(sub, rest.positional.slice(1), rest.flags);
+      break;
+    }
+    case 'rates': {
+      const sub = rest.positional[0];
+      await cmdRates(sub, rest.positional.slice(1), rest.flags);
       break;
     }
     case 'daemon': {
