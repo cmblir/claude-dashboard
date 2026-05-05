@@ -6,6 +6,9 @@ Thumbs.db
 
 # Local-only tooling state (per-machine; should never be committed)
 .claude/ralph-loop.local.md
+.claude/scheduled_tasks.lock
+.claude/*.local.md
+.claude/*.lock
 
 # Python
 __pycache__/
