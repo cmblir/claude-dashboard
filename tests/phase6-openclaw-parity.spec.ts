@@ -1994,6 +1994,51 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(post.messageCount).toBe(0);
   });
 
+  test('agent --cost prints cost line to stderr when rates configured', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'anthropic'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-ant-x'], dir);
+    runCli(['config', 'set', 'model', 'claude-opus-4-7'], dir);
+    // Inject rates manually since `config set` only handles strings.
+    const cfgPath = path.join(dir, 'config.json');
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    cfg.rates = {
+      'anthropic/claude-opus-4-7': { inputPer1M: 15, outputPer1M: 75, currency: 'USD' },
+    };
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg));
+
+    // Stub anthropic so onUsage emits known totals.
+    const preload = path.join(dir, 'preload.mjs');
+    fs.writeFileSync(preload,
+      `import('${path.resolve('src/lazyclaw/providers/registry.mjs')}').then(reg => {
+        reg.PROVIDERS.anthropic = {
+          name: 'anthropic',
+          async *sendMessage(_msgs, opts) {
+            yield 'reply';
+            opts.onUsage?.({ inputTokens: 1000, outputTokens: 500 });
+          },
+        };
+      });`,
+    );
+    const r = spawnSync(process.execPath, ['--import', preload, CLI, 'agent', 'q', '--cost'], {
+      encoding: 'utf8',
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('reply');
+    expect(r.stderr).toMatch(/cost:.*"cost":0\.0525/);
+  });
+
+  test('agent --cost without cfg.rates is silently a no-op (response still streams)', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const r = runCli(['agent', 'q', '--cost'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('mock-reply: q');
+    // No cost line — mock doesn't emit usage, and rates aren't set.
+    expect(r.stderr).not.toMatch(/cost:/);
+  });
+
   test('agent --usage prints normalized totals to stderr (mock provider yields no usage so absence is OK)', () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);

@@ -10,6 +10,39 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.0.2] — 2026-05-05
+
+**`lazyclaw agent --cost` for parity with daemon `body.cost`.**
+
+The daemon could surface cost in 3.0.1; the CLI's one-shot couldn't.
+Now it can:
+
+```bash
+$ lazyclaw agent --usage --cost "summarize this" 2> meta.log
+[response on stdout]
+$ cat meta.log
+usage: {"inputTokens":1234,"outputTokens":567}
+cost:  {"cost":0.0525,"currency":"USD","breakdown":{...}}
+```
+
+Both flags write to stderr (`stdout` stays pipe-clean). `--cost` is a
+silent no-op without `cfg.rates` — same posture as the daemon, same
+posture as `body.cost`. No surprise zero values.
+
+`costFromUsage` is dynamically imported only when `--cost` is set, so
+the agent's hot path doesn't pay the import cost when the flag is off.
+
+### Tests
+2 new phase 6 specs:
+- `agent --cost` with rates populated + injected anthropic stub:
+  stderr matches `/cost:.*"cost":0\.0525/`, stdout still has the
+  reply
+- `agent --cost` without rates: no `cost:` line on stderr, response
+  still streams normally — no crash
+
+Suite: 238/238. tsc clean.
+
+---
 ## [3.0.1] — 2026-05-05
 
 **Cost wiring: chat `/usage` and daemon `body.cost` surface dollar

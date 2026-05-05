@@ -500,7 +500,7 @@ const HELP_DETAILS = {
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
   config: 'Usage: lazyclaw config <get|set|list|delete|path|edit> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
-  agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, totalTokens?, ...} to stderr after the response.',
+  agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage] [--cost]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, ...} to stderr after the response.\n  --cost adds a cost line on stderr when config.rates has a card for the active provider/model.',
   doctor: 'Usage: lazyclaw doctor\n  Validates configuration and registered providers. Exits 0 only when no issues.',
   status: 'Usage: lazyclaw status\n  Provider, model, and masked API key. Never prints the raw key.',
   onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
@@ -604,16 +604,35 @@ async function cmdAgent(prompt, flags) {
   // continue to stream to stdout. This keeps stdout clean for piping.
   const showThinking = flags['show-thinking'];
   // --usage prints normalized token totals to stderr after the response
-  // streams. Same stderr-not-stdout split as --show-thinking so piping
-  // the answer text downstream isn't polluted with metadata.
+  // streams. --cost adds a cost line when cfg.rates has a card matching
+  // the active provider/model. Both write to stderr so piping the answer
+  // text downstream isn't polluted with metadata.
   const showUsage = flags.usage;
+  const showCost = flags.cost;
+  // Loading rates is lazy: only when --cost is on, and we resolve once
+  // up-front so the onUsage callback below doesn't need to import on a
+  // hot path.
+  let costFromUsage = null;
+  if (showCost) {
+    const ratesMod = await import('./providers/rates.mjs');
+    costFromUsage = ratesMod.costFromUsage;
+  }
   try {
     for await (const chunk of prov.sendMessage(messages, {
       apiKey: cfg['api-key'],
       model: flags.model || cfg.model,
       thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
       onThinking: showThinking ? t => process.stderr.write(t) : undefined,
-      onUsage: showUsage ? (u) => process.stderr.write('usage: ' + JSON.stringify(u) + '\n') : undefined,
+      onUsage: (showUsage || showCost) ? (u) => {
+        if (showUsage) process.stderr.write('usage: ' + JSON.stringify(u) + '\n');
+        if (showCost && cfg.rates) {
+          const c = costFromUsage(
+            { provider: flags.provider || cfg.provider, model: flags.model || cfg.model, usage: u },
+            cfg.rates,
+          );
+          if (c) process.stderr.write('cost: ' + JSON.stringify(c) + '\n');
+        }
+      } : undefined,
     })) {
       process.stdout.write(chunk);
     }
@@ -1147,6 +1166,7 @@ const BOOLEAN_FLAGS = new Set([
   'import-sessions',
   'show-thinking',
   'usage',
+  'cost',
   'response-cache',
   'help',         // also handled as a subcommand alias
   'version',
