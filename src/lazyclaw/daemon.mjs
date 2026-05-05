@@ -460,6 +460,53 @@ export function makeHandler(ctx) {
             const meta = PROVIDER_INFO[name] || { name };
             return { name, requiresApiKey: !!meta.requiresApiKey, defaultModel: meta.defaultModel || null, suggestedModels: meta.suggestedModels || [] };
           }));
+        case route === 'GET /providers/test': {
+          // Mirror of CLI v3.55 `lazyclaw providers test` (no name).
+          // A dashboard's "key validity" badge calls this once and
+          // gets a per-provider verdict in one round trip. HTTP
+          // status mirrors CLI exit code:
+          //   200 — every provider returned a non-empty reply
+          //   503 — at least one provider failed (Service Unavailable;
+          //         "the system is partially unhealthy")
+          // 503 is the right code because a dashboard observing it
+          // can render a yellow status without parsing the body.
+          const cfg = ctx.readConfig();
+          const apiKey = cfg['api-key'] || '';
+          const sharedPrompt = url.searchParams.get('prompt') || 'ping';
+          const tAll = Date.now();
+          const results = await Promise.all(
+            Object.entries(PROVIDERS).map(async ([pid, provider]) => {
+              const meta = PROVIDER_INFO[pid] || {};
+              const model = url.searchParams.get('model') || cfg.model || meta.defaultModel || 'unknown';
+              const t0 = Date.now();
+              try {
+                let reply = '';
+                const stream = provider.sendMessage([{ role: 'user', content: sharedPrompt }], { apiKey, model });
+                for await (const chunk of stream) {
+                  if (typeof chunk === 'string') reply += chunk;
+                }
+                return {
+                  name: pid, ok: reply.length > 0, model,
+                  durationMs: Date.now() - t0,
+                  replyLength: reply.length,
+                };
+              } catch (err) {
+                return {
+                  name: pid, ok: false, model,
+                  durationMs: Date.now() - t0,
+                  error: err?.message || String(err),
+                  code: err?.code || null,
+                };
+              }
+            }),
+          );
+          const allOk = results.every(r => r.ok);
+          return writeJson(res, allOk ? 200 : 503, {
+            ok: allOk,
+            totalDurationMs: Date.now() - tAll,
+            results,
+          });
+        }
         case route === 'GET /rates': {
           // Read-only view of cfg.rates so a dashboard's cost panel
           // can render the configured cards without shelling to the

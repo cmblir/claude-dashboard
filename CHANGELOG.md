@@ -10,6 +10,53 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.56.0] — 2026-05-05
+
+**Daemon `GET /providers/test` mirrors CLI v3.55 parallel batch.**
+
+Same shape v3.55 produces over the CLI: every provider tested in
+parallel, unified verdict in one round trip. A dashboard's
+"key validity" badge calls this once instead of N times.
+
+```
+GET /providers/test
+→ 200 (all ok) | 503 (at least one failed)
+{
+  "ok": false,
+  "totalDurationMs": 832,
+  "results": [
+    { "name": "mock",      "ok": true,  ... },
+    { "name": "anthropic", "ok": true,  ... },
+    { "name": "openai",    "ok": false, "error": "INVALID_KEY", "code": "INVALID_KEY" },
+    ...
+  ]
+}
+
+GET /providers/test?prompt=hello-from-daemon&model=claude-haiku-4-5
+→ same shape with overridden prompt and model
+```
+
+### Why 503 for partial failure
+A "key validity" panel observing 503 can render a yellow warning
+without parsing the body. 200 is fully healthy, 503 means
+something's degraded — same Service Unavailable semantic load
+balancers expect for "system is partially unhealthy."
+
+### Query params
+- `?prompt=<text>` — overrides the default `"ping"` (same as CLI's
+  `--prompt`)
+- `?model=<id>` — overrides the model resolution chain
+
+### Tests
+2 new phase 6 specs:
+- happy-path: results array, mock entry is ok, totalDurationMs
+  reported, status is 200 or 503
+- `?prompt=` override: mock's replyLength reflects the longer
+  prompt being echoed back
+
+Suite: 385 → 387 (+2); `tsc --noEmit` clean.
+
+---
 ## [3.55.0] — 2026-05-05
 
 **`lazyclaw providers test` (no name) tests every provider in parallel.**

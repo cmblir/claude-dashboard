@@ -1890,6 +1890,37 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /providers/test mirrors CLI parallel batch; status reflects ok/all-fail', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/providers/test`);
+      // mock will pass; real providers will likely fail without keys.
+      // 503 is the expected status when at least one fails.
+      expect([200, 503]).toContain(r.status);
+      const body = await r.json();
+      expect(typeof body.ok).toBe('boolean');
+      expect(body.results.length).toBeGreaterThan(0);
+      const mock = body.results.find((p: any) => p.name === 'mock');
+      expect(mock).toBeDefined();
+      expect(mock.ok).toBe(true);
+      expect(typeof body.totalDurationMs).toBe('number');
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /providers/test ?prompt= overrides the default ping', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/providers/test?prompt=hello-from-daemon`);
+      const body = await r.json();
+      const mock = body.results.find((p: any) => p.name === 'mock');
+      // Mock echoes "mock-reply: <prompt>" — replyLength should
+      // reflect the longer prompt.
+      expect(mock.replyLength).toBeGreaterThan('mock-reply: ping'.length);
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /providers matches the providers list CLI subcommand', async () => {
     const dir = tmpConfigDir();
     const d = await startDaemonProc(dir);
