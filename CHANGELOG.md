@@ -10,6 +10,50 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.31.0] — 2026-05-05
+
+**`lazyclaw sessions export --format md|json|text`.**
+
+Markdown was the only export format; that's great for human
+sharing but inconvenient for tooling pipelines or paste-into-
+plain-text contexts. Adding two more formats covers both gaps.
+
+```
+$ lazyclaw sessions export demo                       # default: markdown
+$ lazyclaw sessions export demo --format json | jq .  # parseable for tooling
+$ lazyclaw sessions export demo --format text         # plain text, paste-anywhere
+```
+
+### JSON format
+Pretty-printed JSON with `id`, `turnCount`, `first` / `last` ISO
+timestamps, and `turns: [{ role, content, ts }]`. The `first` and
+`last` fields are omitted on empty sessions so a downstream tool
+can distinguish "no turns yet" from "first turn at epoch 0."
+
+### Text format
+`Session: <id>` header, `Turns: N`, then each turn as `ROLE:` line
+followed by the content and a blank-line separator. No markdown
+fences, no headers — paste-into-anything contexts (issue
+templates, plain-text email).
+
+### Default unchanged
+Without `--format`, output is still markdown. Two aliases each:
+`md`/`markdown`, `text`/`txt`. Unknown format → exit 2 with the
+expected list.
+
+### Tests
+4 new phase 6 specs:
+- `--format json` emits parseable JSON with role/content/ts
+  preservation
+- `--format text` emits plain text with `ROLE:` headers, no
+  markdown anywhere
+- `--format pdf` (unknown) → exit 2 with helpful stderr
+- `--format json` on empty session: `turnCount: 0`, `first`/`last`
+  omitted, `turns: []`
+
+Suite: 332 → 336 (+4); `tsc --noEmit` clean.
+
+---
 ## [3.30.0] — 2026-05-05
 
 **`lazyclaw rates validate` — sanity-check `cfg.rates` shape.**

@@ -5218,6 +5218,65 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r.stdout).toContain('Turns: 2');
   });
 
+  test('sessions export --format json emits parseable JSON with role/content/ts per turn', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'demo.jsonl'),
+      JSON.stringify({ role: 'user', content: 'hello', ts: 1234567890000 }) + '\n' +
+      JSON.stringify({ role: 'assistant', content: 'hi there', ts: 1234567891000 }) + '\n');
+    const r = runCli(['sessions', 'export', 'demo', '--format', 'json'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.id).toBe('demo');
+    expect(out.turnCount).toBe(2);
+    expect(out.turns).toEqual([
+      { role: 'user', content: 'hello', ts: 1234567890000 },
+      { role: 'assistant', content: 'hi there', ts: 1234567891000 },
+    ]);
+    expect(out.first).toBeDefined();
+    expect(out.last).toBeDefined();
+  });
+
+  test('sessions export --format text emits plain text with ROLE: headers', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'demo.jsonl'),
+      JSON.stringify({ role: 'user', content: 'hello', ts: 1 }) + '\n' +
+      JSON.stringify({ role: 'assistant', content: 'hi there', ts: 2 }) + '\n');
+    const r = runCli(['sessions', 'export', 'demo', '--format', 'text'], dir);
+    expect(r.status).toBe(0);
+    // No markdown headers; just `ROLE:` lines.
+    expect(r.stdout).toContain('Session: demo');
+    expect(r.stdout).toContain('Turns: 2');
+    expect(r.stdout).toContain('USER:');
+    expect(r.stdout).toContain('ASSISTANT:');
+    expect(r.stdout).not.toContain('# Session');   // no markdown H1
+    expect(r.stdout).not.toContain('## ');
+  });
+
+  test('sessions export --format unknown → exit 2 with helpful stderr', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'a.jsonl'),
+      JSON.stringify({ role: 'user', content: 'x', ts: 1 }) + '\n');
+    const r = runCli(['sessions', 'export', 'a', '--format', 'pdf'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/unknown export format/);
+  });
+
+  test('sessions export --format json on empty session has turnCount 0 and no first/last', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'blank.jsonl'), '');
+    const r = runCli(['sessions', 'export', 'blank', '--format', 'json'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.turnCount).toBe(0);
+    expect(out.first).toBeUndefined();
+    expect(out.last).toBeUndefined();
+    expect(out.turns).toEqual([]);
+  });
+
   test('sessions export on empty session prints "(empty)" body', () => {
     const dir = tmpConfigDir();
     fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });

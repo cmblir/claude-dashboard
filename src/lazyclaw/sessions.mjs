@@ -123,3 +123,55 @@ export function exportMarkdown(id, configDir = defaultConfigDir()) {
   }
   return lines.join('\n');
 }
+
+/**
+ * Structured export — JSON object with session id + ISO timestamps.
+ * Useful for piping into jq or feeding analytics tooling that
+ * doesn't want to parse markdown.
+ *
+ * Shape:
+ *   { id, turnCount, first?, last?, turns: [{ role, content, ts }] }
+ *
+ * `first` / `last` are omitted on empty sessions so a downstream
+ * tool can distinguish "no turns yet" from "first turn at epoch 0".
+ *
+ * @param {string} id
+ * @param {string} [configDir]
+ * @returns {string} pretty-printed JSON (2-space indent)
+ */
+export function exportJson(id, configDir = defaultConfigDir()) {
+  const turns = loadTurns(id, configDir);
+  const out = { id, turnCount: turns.length };
+  if (turns.length > 0) {
+    out.first = new Date(turns[0]?.ts || Date.now()).toISOString();
+    out.last = new Date(turns[turns.length - 1]?.ts || Date.now()).toISOString();
+  }
+  out.turns = turns.map(t => ({
+    role: t.role,
+    content: String(t.content || ''),
+    ts: typeof t.ts === 'number' ? t.ts : null,
+  }));
+  return JSON.stringify(out, null, 2);
+}
+
+/**
+ * Plain-text export — `<ROLE>:` headers and turn content separated
+ * by blank lines, no markdown / fences / headers. Ideal for paste-
+ * into-anything contexts (issue templates, plain-text email).
+ *
+ * @param {string} id
+ * @param {string} [configDir]
+ * @returns {string}
+ */
+export function exportText(id, configDir = defaultConfigDir()) {
+  const turns = loadTurns(id, configDir);
+  if (turns.length === 0) return `Session: ${id}\n(empty)\n`;
+  const lines = [`Session: ${id}`, `Turns: ${turns.length}`, ''];
+  for (const t of turns) {
+    const role = (t.role || 'unknown').toUpperCase();
+    lines.push(`${role}:`);
+    lines.push(String(t.content || ''));
+    lines.push('');
+  }
+  return lines.join('\n');
+}

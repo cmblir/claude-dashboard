@@ -940,7 +940,7 @@ const HELP_DETAILS = {
   doctor: 'Usage: lazyclaw doctor\n  Validates configuration and registered providers. Exits 0 only when no issues.',
   status: 'Usage: lazyclaw status\n  Provider, model, and masked API key. Never prints the raw key.',
   onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
-  sessions: 'Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>|search <query> [--regex]>\n  list — recent sessions by mtime; export — render as Markdown for sharing.\n  search — case-insensitive substring (or --regex pattern) match across all session content; returns first excerpt + match count per matching session.',
+  sessions: 'Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id> [--format md|json|text]|search <query> [--regex]>\n  list — recent sessions by mtime; export — render in chosen format (md default for human sharing, json for tooling, text for paste).\n  search — case-insensitive substring (or --regex pattern) match across all session content; returns first excerpt + match count per matching session.',
   skills: 'Usage: lazyclaw skills <list|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>|search <query> [--regex]>\n  --from-url fetches over HTTPS only; 1 MiB body cap.\n  search — case-insensitive substring (or --regex) match across all skill markdown bodies; returns first excerpt + match count per skill.',
   providers: 'Usage: lazyclaw providers <list | info <name> | test <name> [--model X] [--prompt T]>\n  list/info — static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.\n  test — send a 1-token "ping" through the provider and report ok/error + duration.\n         Useful after configuring an API key to verify it works before relying on it.',
   daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>] [--shutdown-timeout-ms <N>] [--cost-cap-<currency> <N> ...] [--workflow-state-dir <dir>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).\n  --shutdown-timeout-ms <N> caps graceful drain on SIGINT/SIGTERM (default 10000). Second signal forces immediate exit.\n  --cost-cap-usd 100 (or any currency code in lowercase) rejects POST /agent + /chat with 402 once cumulative cost reaches the cap.\n  --workflow-state-dir <dir> backs GET /workflows + GET /workflows/<id> (default .workflow-state, also reads $LAZYCLAW_WORKFLOW_STATE_DIR).',
@@ -1854,8 +1854,21 @@ async function cmdSessions(sub, positional, flags = {}) {
     }
     case 'export': {
       const id = positional[0];
-      if (!id) { console.error('Usage: lazyclaw sessions export <id>'); process.exit(2); }
-      try { process.stdout.write(sessionsMod.exportMarkdown(id, cfgDir)); }
+      if (!id) { console.error('Usage: lazyclaw sessions export <id> [--format md|json|text]'); process.exit(2); }
+      const format = (flags.format || 'md').toLowerCase();
+      const formatters = {
+        md: sessionsMod.exportMarkdown,
+        markdown: sessionsMod.exportMarkdown,
+        json: sessionsMod.exportJson,
+        text: sessionsMod.exportText,
+        txt: sessionsMod.exportText,
+      };
+      const fn = formatters[format];
+      if (!fn) {
+        console.error(`unknown export format: ${format} (expected: md, json, text)`);
+        process.exit(2);
+      }
+      try { process.stdout.write(fn(id, cfgDir)); }
       catch (e) { console.error(e.message); process.exit(1); }
       return;
     }
