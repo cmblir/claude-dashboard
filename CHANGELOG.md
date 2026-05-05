@@ -10,6 +10,59 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.30.0] — 2026-05-05
+
+**`lazyclaw rates validate` — sanity-check `cfg.rates` shape.**
+
+Anyone hand-editing `config.json` (or copying rate cards between
+machines) can now verify the shape before relying on cost
+calculations. Same algorithmic style as `validate` for workflows:
+hard issues exit 1, soft warnings keep exit 0, all surfaced in one
+pass so the user sees every problem at once.
+
+```
+$ lazyclaw rates validate
+{
+  "ok": false,
+  "rateCount": 4,
+  "issues": [
+    "key \"anthropic/claude-opus-4-7\": outputPer1M must be a non-negative finite number (got undefined)",
+    "key \"openai/gpt-4.1\": inputPer1M must be a non-negative finite number (got -2)",
+    "key \"no-slash-key\": expected \"provider/model\" shape (slash required)"
+  ],
+  "warnings": [
+    "key \"unknown-provider/foo\": provider \"unknown-provider\" not in registered providers (registered: mock, anthropic, openai, ollama, gemini)"
+  ]
+}
+```
+
+### Checks
+- **Hard (issue → exit 1)**:
+  - key not in `provider/model` shape
+  - missing `inputPer1M` or `outputPer1M`
+  - non-finite or negative numbers in any rate field
+  - `currency` not a string when set
+- **Soft (warning → exit 0)**:
+  - provider name not in registered providers (custom CLIs are
+    legitimate, so this stays non-fatal)
+
+### Why a separate validate command
+`rates set` already validates input on write, but users
+sometimes hand-edit config.json or copy bundles between machines.
+Without a validator, the next `--cost` call silently produces
+wrong numbers. Validate catches it up front.
+
+### Tests
+3 new phase 6 specs:
+- well-formed `cfg.rates` → exit 0 with empty issues + warnings
+- malformed cards (missing field, negative, no-slash, unknown
+  provider) → exit 1 with hard issues + the unknown-provider
+  warning
+- empty `cfg.rates` → exit 0 with `rateCount: 0`
+
+Suite: 329 → 332 (+3); `tsc --noEmit` clean.
+
+---
 ## [3.29.0] — 2026-05-05
 
 **`lazyclaw graph --state <session-id>` — overlay run status on the DAG.**

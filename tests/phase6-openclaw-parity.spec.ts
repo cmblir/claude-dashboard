@@ -3027,6 +3027,50 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(JSON.parse(r2.stdout).removed).toBe(false);
   });
 
+  test('rates validate: well-formed cfg.rates → exit 0 with no issues', () => {
+    const dir = tmpConfigDir();
+    runCli(['rates', 'set', 'anthropic/claude-opus-4-7', '--input', '15', '--output', '75', '--cache-read', '1.5', '--cache-create', '18.75'], dir);
+    runCli(['rates', 'set', 'openai/gpt-4.1', '--input', '2', '--output', '8'], dir);
+    const r = runCli(['rates', 'validate'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(true);
+    expect(out.rateCount).toBe(2);
+    expect(out.issues).toEqual([]);
+    expect(out.warnings).toEqual([]);
+  });
+
+  test('rates validate: missing required field → exit 1 with issue', () => {
+    const dir = tmpConfigDir();
+    // Hand-write a malformed rate-card to bypass `rates set`'s strict
+    // validation — simulate someone hand-editing config.json.
+    const cfgPath = path.join(dir, 'config.json');
+    fs.writeFileSync(cfgPath, JSON.stringify({
+      rates: {
+        'anthropic/claude-opus-4-7': { inputPer1M: 15 /* outputPer1M missing */, currency: 'USD' },
+        'openai/gpt-4.1':            { inputPer1M: -2, outputPer1M: 8 },
+        'no-slash-key':              { inputPer1M: 1, outputPer1M: 1 },
+        'unknown-provider/foo':      { inputPer1M: 1, outputPer1M: 1 },
+      },
+    }, null, 2));
+    const r = runCli(['rates', 'validate'], dir);
+    expect(r.status).toBe(1);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(false);
+    expect(out.issues.some((m: string) => m.includes('outputPer1M'))).toBe(true);
+    expect(out.issues.some((m: string) => m.includes('inputPer1M'))).toBe(true);
+    expect(out.issues.some((m: string) => m.includes('no-slash-key'))).toBe(true);
+    // Unknown provider is a warning, not an issue (custom providers ok).
+    expect(out.warnings.some((m: string) => m.includes('unknown-provider'))).toBe(true);
+  });
+
+  test('rates validate: empty cfg.rates → exit 0 with rateCount 0', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['rates', 'validate'], dir);
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout).rateCount).toBe(0);
+  });
+
   test('rates shape prints the zero-filled reference template', () => {
     const dir = tmpConfigDir();
     const r = runCli(['rates', 'shape'], dir);
