@@ -10,6 +10,35 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.35.0] — 2026-05-05
+
+**`lazyclaw skills list --filter / --limit` (CLI + daemon).**
+
+Same flags v3.33/v3.34 added to sessions list — case-insensitive
+name substring match, then post-filter cap. Mirrors on the daemon
+via `GET /skills?filter=…&limit=…`.
+
+```
+$ lazyclaw skills list --filter rust --limit 2
+[
+  { "name": "rust-style", "bytes": 412, "summary": "..." },
+  { "name": "rust-tests", "bytes": 215, "summary": "..." }
+]
+```
+
+### Why the same flag pair across sessions and skills
+A dashboard rendering both lists side-by-side gets uniform paging
+semantics. Power users get the same shell-pipeline pattern across
+both surfaces (`grep`-then-`head` analogue).
+
+### Tests
+1 new phase 6 spec covering CLI `--filter`, `--limit`, the
+filter+limit composition, and the daemon `?filter=&limit=`
+parity in a single end-to-end run.
+
+Suite: 341 → 342 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.34.0] — 2026-05-05
 
 **Daemon `GET /sessions?filter=...&limit=...` mirrors CLI v3.33.**

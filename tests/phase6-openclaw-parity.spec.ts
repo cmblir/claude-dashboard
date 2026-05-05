@@ -4792,6 +4792,41 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(caught?.code).toBe('ABORT');
   });
 
+  test('skills list --filter / --limit (CLI + daemon parity)', async () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    for (const name of ['rust-style', 'rust-tests', 'python-style', 'commit', 'review']) {
+      fs.writeFileSync(path.join(dir, 'skills', `${name}.md`), `# ${name}\n\nbody\n`);
+    }
+
+    // CLI: --filter
+    const r1 = runCli(['skills', 'list', '--filter', 'RUST'], dir);
+    expect(r1.status).toBe(0);
+    const ids1 = JSON.parse(r1.stdout).map((s: any) => s.name).sort();
+    expect(ids1).toEqual(['rust-style', 'rust-tests']);
+
+    // CLI: --limit
+    const r2 = runCli(['skills', 'list', '--limit', '2'], dir);
+    expect(JSON.parse(r2.stdout)).toHaveLength(2);
+
+    // CLI: filter + limit composition.
+    const r3 = runCli(['skills', 'list', '--filter', 'rust', '--limit', '1'], dir);
+    const ids3 = JSON.parse(r3.stdout).map((s: any) => s.name);
+    expect(ids3).toHaveLength(1);
+    expect(ids3[0]).toMatch(/^rust-/);
+
+    // Daemon: ?filter=&limit= produces the same shape.
+    const d = await startDaemonProc(dir);
+    try {
+      const list = await fetch(`${d.url}/skills?filter=rust&limit=1`).then(x => x.json());
+      expect(list).toHaveLength(1);
+      expect(list[0].name).toMatch(/^rust-/);
+      // No-flag baseline: 5 skills total.
+      const all = await fetch(`${d.url}/skills`).then(x => x.json());
+      expect(all).toHaveLength(5);
+    } finally { await d.kill(); }
+  });
+
   test('lazyclaw skills search: substring match across skill bodies', () => {
     const dir = tmpConfigDir();
     fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });

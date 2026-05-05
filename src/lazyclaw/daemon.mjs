@@ -686,11 +686,22 @@ export function makeHandler(ctx) {
         case route === 'GET /skills': {
           // List installed skills with their first-line summary so a UI
           // can render them without a follow-up read for each one.
+          // ?filter=<substr>&limit=<N> mirror the v3.33 CLI flags.
           const cfgDir = ctx.sessionsDirGetter();
-          const items = listSkills(cfgDir).map(s => ({
+          let items = listSkills(cfgDir);
+          const filter = url.searchParams.get('filter');
+          if (filter) {
+            const f = filter.toLowerCase();
+            items = items.filter(s => s.name.toLowerCase().includes(f));
+          }
+          const limitStr = url.searchParams.get('limit');
+          if (limitStr) {
+            const n = parseInt(limitStr, 10);
+            if (Number.isFinite(n) && n > 0) items = items.slice(0, n);
+          }
+          return writeJson(res, 200, items.map(s => ({
             name: s.name, bytes: s.bytes, summary: s.summary,
-          }));
-          return writeJson(res, 200, items);
+          })));
         }
         case route === 'GET /skills/search': {
           // Mirror of `lazyclaw skills search`. ?q=<query> required;
