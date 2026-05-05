@@ -47,9 +47,17 @@ def _stub_provider(reg_mod, pid: str, *, available: bool, error_msg: str = "rate
 
 
 def test_unavailable_provider_message(reg):
-    """provider not available → message points the user at the AI Providers tab."""
+    """provider not available → message points the user at the AI Providers tab.
+
+    fallback=False so the assertion is about THIS provider's error
+    shape, not "did the chain happen to find a working provider on
+    this machine." The default chain includes claude-cli / ollama,
+    which may be installed locally; that path is covered by the
+    integration tests downstream.
+    """
     r = reg.get_registry().execute(
         provider_id="openai-api", model="gpt-4.1-mini", prompt="hi",
+        fallback=False,
     )
     assert r.status == "err"
     assert "available" in r.error.lower() or "not installed" in r.error.lower()
@@ -58,8 +66,10 @@ def test_unavailable_provider_message(reg):
 
 
 def test_unregistered_provider_message(reg):
+    # fallback=False — same rationale as test_unavailable_provider_message.
     r = reg.get_registry().execute(
         provider_id="totally-fake-provider", model="x", prompt="hi",
+        fallback=False,
     )
     assert r.status == "err"
     assert "not registered" in r.error.lower()
