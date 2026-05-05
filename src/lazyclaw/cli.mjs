@@ -38,45 +38,99 @@ async function importWorkflow(file) {
   return mod.nodes;
 }
 
+// Wire SIGINT/SIGTERM to an AbortController so a workflow run aborts
+// at the next node/level boundary (or sooner if execute() subscribed
+// to the signal). Returns { signal, dispose } — the caller MUST call
+// dispose() in a finally so we don't leak listeners across REPL turns.
+//
+// Exit-code semantics:
+//   - normal success → 0
+//   - normal failure → 1
+//   - ABORT (signal-driven cancellation) → 130 (conventional Ctrl+C)
+function makeRunSignal() {
+  const ac = new AbortController();
+  let received = null;
+  const onSig = (sig) => {
+    if (!received) {
+      received = sig;
+      ac.abort();
+    } else {
+      // Second signal: bail immediately without waiting for the engine.
+      // Same "I really mean it" semantic the daemon uses.
+      process.exit(130);
+    }
+  };
+  const onSigint  = () => onSig('SIGINT');
+  const onSigterm = () => onSig('SIGTERM');
+  process.on('SIGINT', onSigint);
+  process.on('SIGTERM', onSigterm);
+  return {
+    signal: ac.signal,
+    dispose() {
+      process.off('SIGINT', onSigint);
+      process.off('SIGTERM', onSigterm);
+    },
+    wasAborted() { return ac.signal.aborted; },
+  };
+}
+
+function exitCodeFor(result, sig) {
+  if (sig.wasAborted() || result?.code === 'ABORT' || result?.error?.code === 'ABORT') return 130;
+  return result?.success ? 0 : 1;
+}
+
 async function cmdRun(sessionId, file, opts = {}) {
   const nodes = await importWorkflow(file);
   const dir = opts.dir || '.workflow-state';
-  if (opts['parallel-persistent']) {
-    // --parallel-persistent: DAG with checkpoint + resume. Same state
-    // file shape as the sequential path so a session id collision is
-    // observable, not silently corrupting.
-    const { runPersistentDag } = await loadEngine();
-    const r = await runPersistentDag(nodes, { sessionId, dir, timeoutMs: opts.timeoutMs });
+  const sig = makeRunSignal();
+  try {
+    if (opts['parallel-persistent']) {
+      // --parallel-persistent: DAG with checkpoint + resume. Same state
+      // file shape as the sequential path so a session id collision is
+      // observable, not silently corrupting.
+      const { runPersistentDag } = await loadEngine();
+      const r = await runPersistentDag(nodes, { sessionId, dir, timeoutMs: opts.timeoutMs, signal: sig.signal });
+      console.log(JSON.stringify({
+        success: r.success,
+        executedNodes: r.executedNodes || [],
+        failedAt: r.failedAt || null,
+        mode: 'parallel-persistent',
+        aborted: r.code === 'ABORT' || sig.wasAborted() || undefined,
+        error: r.error || null,
+      }));
+      process.exit(exitCodeFor(r, sig));
+    }
+    if (opts.parallel) {
+      // --parallel: schedule by `deps`. No state persistence — `runParallel`
+      // is a one-shot DAG run; resume semantics belong to runPersistent or
+      // runPersistentDag. failedAt + executedNodes are derived from results
+      // so the JSON shape stays compatible with the sequential path.
+      const { runParallel } = await import('./workflow/executor.mjs');
+      const r = await runParallel(nodes, { signal: sig.signal });
+      const executedNodes = r.results.filter(x => x.status === 'success').map(x => x.id);
+      console.log(JSON.stringify({
+        success: r.success,
+        executedNodes,
+        failedAt: r.failedAt || null,
+        mode: 'parallel',
+        aborted: r.error?.code === 'ABORT' || sig.wasAborted() || undefined,
+        error: r.error?.message || null,
+      }));
+      process.exit(exitCodeFor(r, sig));
+    }
+    const { runPersistent } = await loadEngine();
+    const r = await runPersistent(nodes, { sessionId, dir, maxRetries: opts.maxRetries ?? 3, signal: sig.signal });
     console.log(JSON.stringify({
       success: r.success,
-      executedNodes: r.executedNodes || [],
-      failedAt: r.failedAt || null,
-      mode: 'parallel-persistent',
-      error: r.error || null,
+      executedNodes: r.executedNodes,
+      failedAt: r.failedAt,
+      mode: 'sequential',
+      aborted: r.code === 'ABORT' || sig.wasAborted() || undefined,
     }));
-    process.exit(r.success ? 0 : 1);
+    process.exit(exitCodeFor(r, sig));
+  } finally {
+    sig.dispose();
   }
-  if (opts.parallel) {
-    // --parallel: schedule by `deps`. No state persistence — `runParallel`
-    // is a one-shot DAG run; resume semantics belong to runPersistent or
-    // runPersistentDag. failedAt + executedNodes are derived from results
-    // so the JSON shape stays compatible with the sequential path.
-    const { runParallel } = await import('./workflow/executor.mjs');
-    const r = await runParallel(nodes);
-    const executedNodes = r.results.filter(x => x.status === 'success').map(x => x.id);
-    console.log(JSON.stringify({
-      success: r.success,
-      executedNodes,
-      failedAt: r.failedAt || null,
-      mode: 'parallel',
-      error: r.error?.message || null,
-    }));
-    process.exit(r.success ? 0 : 1);
-  }
-  const { runPersistent } = await loadEngine();
-  const r = await runPersistent(nodes, { sessionId, dir, maxRetries: opts.maxRetries ?? 3 });
-  console.log(JSON.stringify({ success: r.success, executedNodes: r.executedNodes, failedAt: r.failedAt, mode: 'sequential' }));
-  process.exit(r.success ? 0 : 1);
 }
 
 async function cmdResume(sessionId, file, opts = {}) {
@@ -88,9 +142,20 @@ async function cmdResume(sessionId, file, opts = {}) {
     process.exit(2);
   }
   const nodes = await importWorkflow(file);
-  const r = await runPersistent(nodes, { sessionId, dir, maxRetries: opts.maxRetries ?? 3 });
-  console.log(JSON.stringify({ success: r.success, executedNodes: r.executedNodes, failedAt: r.failedAt, resumed: true }));
-  process.exit(r.success ? 0 : 1);
+  const sig = makeRunSignal();
+  try {
+    const r = await runPersistent(nodes, { sessionId, dir, maxRetries: opts.maxRetries ?? 3, signal: sig.signal });
+    console.log(JSON.stringify({
+      success: r.success,
+      executedNodes: r.executedNodes,
+      failedAt: r.failedAt,
+      resumed: true,
+      aborted: r.code === 'ABORT' || sig.wasAborted() || undefined,
+    }));
+    process.exit(exitCodeFor(r, sig));
+  } finally {
+    sig.dispose();
+  }
 }
 
 async function cmdConfigEdit() {

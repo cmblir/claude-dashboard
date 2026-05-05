@@ -10,6 +10,62 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.9.0] — 2026-05-05
+
+**CLI: Ctrl+C aborts a running workflow cleanly via the new signal contract.**
+
+`lazyclaw run` and `lazyclaw resume` now wire `SIGINT`/`SIGTERM`
+to an `AbortController` and pass `signal` into whichever engine is
+chosen (sequential / parallel / parallel-persistent). Hitting
+Ctrl+C during a workflow run no longer SIGKILLs Node mid-await —
+it triggers a graceful abort.
+
+```
+$ lazyclaw run my-job ./flow.mjs
+^C
+{"success":false,"executedNodes":["fetch","embed"],"failedAt":"classify",
+ "mode":"sequential","aborted":true}
+$ echo $?
+130
+```
+
+### What changes
+- **Exit code**: ABORT runs exit `130` (conventional Ctrl+C). Non-abort
+  failure stays `1`. Success stays `0`.
+- **JSON output**: gains `aborted: true` when the run was cancelled by
+  signal. Other fields are unchanged.
+- **Resume**: persistent engines leave the in-flight node as `pending`
+  on disk, so `lazyclaw resume <session> <flow.mjs>` picks up exactly
+  where the SIGINT'd run stopped — no replay of completed nodes.
+- **Double-signal**: a second signal during shutdown bypasses the
+  engine and exits 130 immediately, same "I really mean it" semantic
+  the daemon already had.
+
+### Signal-aware nodes
+Nodes that subscribe to the forwarded signal abort *immediately*
+instead of waiting for their natural completion:
+
+```js
+{
+  id: 'fetch',
+  async execute(input, { signal }) {
+    return await fetch(url, { signal });   // cancels with Ctrl+C
+  },
+}
+```
+
+### Tests
+2 new phase 6 specs:
+- `lazyclaw run` SIGINT mid-flow → exit 130, `aborted:true`, disk
+  state has the in-flight node as `pending`, resume completes
+  remaining nodes without re-running the completed ones
+- `lazyclaw run --parallel` SIGINT forwards signal so signal-aware
+  nodes bail well before their natural sleep — verified by
+  end-to-end wall-clock timing
+
+Suite: 273 → 275 (+2); `tsc --noEmit` clean.
+
+---
 ## [3.8.0] — 2026-05-05
 
 **Workflow: AbortSignal across resumable engines too.**

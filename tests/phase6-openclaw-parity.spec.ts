@@ -272,6 +272,114 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(out.executedNodes).toEqual([]);
   });
 
+  test('lazyclaw run SIGINT mid-flow exits 130 with aborted:true and state stays resumable', async () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'long.mjs');
+    // Three nodes: a (instant), b (sleeps 2s — we'll SIGINT during this),
+    // c (would run after b). Persistent sequential mode so we can verify
+    // the disk state survives the abort and a follow-up run resumes.
+    fs.writeFileSync(wfPath,
+      `// b subscribes to the forwarded signal so SIGINT aborts it
+       // immediately instead of waiting for the natural 2s sleep.
+       export const nodes = [
+         { id: 'a', type: 't', async execute() { return 'A'; } },
+         { id: 'b', type: 't', async execute(_, opts) {
+             return new Promise((resolve, reject) => {
+               const t = setTimeout(() => resolve('B'), 2000);
+               opts?.signal?.addEventListener('abort', () => {
+                 clearTimeout(t);
+                 const e = new Error('aborted'); e.code = 'ABORT'; reject(e);
+               });
+             });
+         } },
+         { id: 'c', type: 't', async execute() { return 'C'; } },
+       ];`,
+    );
+    const stateDir = path.join(dir, 'st');
+    const child = spawn(process.execPath, [CLI, 'run', 'sigint-job', wfPath, '--dir', stateDir], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    child.stderr.on('data', d => chunks.push(d.toString()));
+
+    // Wait long enough for the engine to commit `a=success` and start `b`.
+    await new Promise(r => setTimeout(r, 250));
+    child.kill('SIGINT');
+
+    const code = await new Promise<number>(resolve => child.on('exit', c => resolve(c ?? -1)));
+    expect(code).toBe(130);   // ABORT exit code
+    const stdout = chunks.join('');
+    const out = JSON.parse(stdout.trim().split('\n').pop() as string);
+    expect(out.aborted).toBe(true);
+    expect(out.success).toBe(false);
+
+    // Disk state: a=success, b=pending (NOT failed — it's resumable).
+    const stateFile = path.join(stateDir, 'sigint-job.json');
+    expect(fs.existsSync(stateFile)).toBe(true);
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    expect(state.nodes.a.status).toBe('success');
+    expect(state.nodes.b.status).toBe('pending');
+    expect(state.nodes.c.status).toBe('pending');
+
+    // Resume run: replace the slow node with a fast one (we don't want to
+    // wait 2s just to confirm resume works) and verify a is skipped.
+    const fastWf = path.join(dir, 'fast.mjs');
+    fs.writeFileSync(fastWf,
+      `export const nodes = [
+         { id: 'a', type: 't', async execute() { return 'A'; } },
+         { id: 'b', type: 't', async execute() { return 'B'; } },
+         { id: 'c', type: 't', async execute() { return 'C'; } },
+       ];`,
+    );
+    const r2 = runCli(['resume', 'sigint-job', fastWf, '--dir', stateDir], dir);
+    expect(r2.status).toBe(0);
+    const o2 = JSON.parse(r2.stdout);
+    expect(o2.success).toBe(true);
+    expect(o2.executedNodes).toEqual(['b', 'c']);   // a was skipped
+  });
+
+  test('lazyclaw run SIGINT in --parallel mode forwards signal and exits 130', async () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'pwf.mjs');
+    // Three independent nodes; each sleeps 2s. SIGINT should abort the
+    // whole level even though each node is mid-execute.
+    fs.writeFileSync(wfPath,
+      `// Both nodes subscribe to the forwarded signal so SIGINT aborts
+       // both immediately. The engine waits for the whole level to settle
+       // before reporting — without signal-aware nodes, the slowest one
+       // would set the lower bound on how long abort takes.
+       const abortable = (label) => (_, opts) => new Promise((resolve, reject) => {
+         const t = setTimeout(() => resolve(label), 2000);
+         opts?.signal?.addEventListener('abort', () => {
+           clearTimeout(t);
+           const e = new Error('aborted'); e.code = 'ABORT'; reject(e);
+         });
+       });
+       export const nodes = [
+         { id: 'x', type: 't', deps: [], execute: abortable('X') },
+         { id: 'y', type: 't', deps: [], execute: abortable('Y') },
+       ];`,
+    );
+    const child = spawn(process.execPath, [CLI, 'run', '--parallel', 'demo', wfPath], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const chunks: string[] = [];
+    child.stdout.on('data', d => chunks.push(d.toString()));
+    await new Promise(r => setTimeout(r, 200));
+    const t0 = Date.now();
+    child.kill('SIGINT');
+    const code = await new Promise<number>(resolve => child.on('exit', c => resolve(c ?? -1)));
+    const elapsed = Date.now() - t0;
+    expect(code).toBe(130);
+    // Node x subscribed to the signal — should bail well before 2s elapses.
+    expect(elapsed).toBeLessThan(1500);
+    const out = JSON.parse(chunks.join('').trim().split('\n').pop() as string);
+    expect(out.aborted).toBe(true);
+  });
+
   test('chat SIGINT mid-stream interrupts the turn but keeps the REPL alive', async () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);
