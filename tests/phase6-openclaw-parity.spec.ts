@@ -2281,6 +2281,29 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /rates/shape returns the zero-filled template (mirrors CLI v3.62 rates shape)', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/rates/shape`);
+      expect(r.status).toBe(200);
+      const body = await r.json();
+      // Shape must contain at least one model key; each card must have the
+      // required fields at zero so a dashboard can render an editable form.
+      const keys = Object.keys(body);
+      expect(keys.length).toBeGreaterThan(0);
+      for (const key of keys) {
+        expect(key).toContain('/');          // 'provider/model' shape
+        expect(body[key]).toMatchObject({
+          inputPer1M: expect.any(Number),
+          outputPer1M: expect.any(Number),
+        });
+        expect(body[key].inputPer1M).toBe(0);
+        expect(body[key].outputPer1M).toBe(0);
+      }
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /sessions?filter=&limit= mirrors CLI sessions list flags', async () => {
     const dir = tmpConfigDir();
     fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });

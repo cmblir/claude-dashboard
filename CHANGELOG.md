@@ -10,6 +10,30 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.62.0] — 2026-05-05
+
+**Daemon `GET /rates/shape` mirrors CLI v3.62's `rates shape`.**
+
+Returns the zero-filled reference rate-card template so a dashboard
+config panel or a script scaffolding a new card can discover required
+fields without shelling to the CLI.
+
+```
+GET /rates/shape
+→ { "anthropic/claude-opus-4-7": { inputPer1M: 0, outputPer1M: 0, ... }, ... }
+```
+
+Adds `RATE_CARD_SHAPE` to the daemon's import from `providers/rates.mjs`
+(previously only `costFromUsage` was imported).
+
+### Tests
+
+1 new spec covering shape structure, key format (`provider/model`),
+required numeric fields, and zero-fill invariant.
+
+Suite: 393 → 394 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.61.0] — 2026-05-05
 
 **Daemon `GET /sessions?sortBy=` mirrors CLI v3.60's `--sort-by`.**

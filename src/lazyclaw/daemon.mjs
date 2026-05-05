@@ -19,7 +19,7 @@ import { PROVIDERS, PROVIDER_INFO, maskApiKey } from './providers/registry.mjs';
 import { withRateLimitRetry } from './providers/retry.mjs';
 import { withFallback } from './providers/fallback.mjs';
 import { withResponseCache } from './providers/cache.mjs';
-import { costFromUsage } from './providers/rates.mjs';
+import { costFromUsage, RATE_CARD_SHAPE } from './providers/rates.mjs';
 import { composeSystemPrompt, listSkills, loadSkill, skillPath, installSkill, removeSkill } from './skills.mjs';
 import { TokenBucketLimiter } from './ratelimit.mjs';
 import { createLogger } from './logger.mjs';
@@ -571,6 +571,13 @@ export function makeHandler(ctx) {
           const cfg = ctx.readConfig();
           const result = validateRates(cfg.rates, PROVIDERS);
           return writeJson(res, result.ok ? 200 : 422, result);
+        }
+        case route === 'GET /rates/shape': {
+          // Mirror of `lazyclaw rates shape`. Returns the zero-filled
+          // reference rate-card template so a dashboard config panel
+          // or a script that scaffolds a new card can get the required
+          // fields without shelling to the CLI.
+          return writeJson(res, 200, RATE_CARD_SHAPE);
         }
         case route === 'GET /status': {
           const cfg = ctx.readConfig();
