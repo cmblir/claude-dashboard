@@ -507,7 +507,7 @@ const HELP_DETAILS = {
   sessions: 'Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>>\n  list — recent sessions by mtime; export — render as Markdown for sharing.',
   skills: 'Usage: lazyclaw skills <list|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>>\n  --from-url fetches over HTTPS only; 1 MiB body cap.',
   providers: 'Usage: lazyclaw providers <list|info <name>>\n  Static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.',
-  daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).',
+  daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>] [--shutdown-timeout-ms <N>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).\n  --shutdown-timeout-ms <N> caps graceful drain on SIGINT/SIGTERM (default 10000). Second signal forces immediate exit.',
   version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
   export: 'Usage: lazyclaw export [--include-secrets] [--include-sessions] > bundle.json\n  --include-secrets keeps the raw api-key in the bundle (default redacts it).\n  --include-sessions adds full turn content (default keeps metadata only).',
@@ -973,8 +973,24 @@ async function cmdDaemon(flags) {
     log: logLevel || null,
   }) + '\n');
   if (!once) {
-    // Forward SIGINT/SIGTERM to a clean shutdown.
-    const shutdown = async () => { try { await d.close(); } catch {} process.exit(0); };
+    // Forward SIGINT/SIGTERM to a graceful shutdown with a hard timeout
+    // (default 10 s, override with --shutdown-timeout-ms). Second signal
+    // bypasses the wait and exits immediately — the orchestrator's "I
+    // mean it" signal.
+    const { gracefulShutdown } = await import('./daemon.mjs');
+    const timeoutMs = flags['shutdown-timeout-ms'] ? parseInt(flags['shutdown-timeout-ms'], 10) : 10_000;
+    let shuttingDown = false;
+    const shutdown = async () => {
+      if (shuttingDown) {
+        if (logger) logger.warn('shutdown.force', { reason: 'second signal' });
+        return process.exit(1);
+      }
+      shuttingDown = true;
+      if (logger) logger.info('shutdown.begin', { timeoutMs });
+      const result = await gracefulShutdown(d.server, timeoutMs);
+      if (logger) logger.info('shutdown.end', result);
+      process.exit(result.forced ? 1 : 0);
+    };
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
   } else {

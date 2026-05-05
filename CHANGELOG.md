@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.1.0] — 2026-05-05
+
+**Daemon: graceful shutdown with hard timeout + double-signal force exit.**
+
+Production hardening. The previous shutdown awaited `server.close()`
+forever — a hung stream could keep the process alive past any
+orchestrator's deadline. Now SIGINT/SIGTERM run a graceful drain
+**bounded** by `--shutdown-timeout-ms` (default 10000):
+
+1. First signal:
+   - Stop accepting new connections.
+   - Wait up to `timeoutMs` for in-flight requests to finish.
+   - On timeout: `server.closeAllConnections()` (Node ≥18.2),
+     exit code 1.
+   - On clean drain: exit code 0.
+2. Second signal (orchestrator's "I mean it"):
+   - Exit immediately with code 1.
+
+Exit codes give orchestrators a useful signal: 0 = clean drain,
+1 = forced or double-tap. Same convention as `systemd` graceful-stop
+semantics.
+
+### Logging
+With `--log info` the shutdown emits structured records on stderr:
+```
+{"msg":"shutdown.begin","timeoutMs":10000}
+{"msg":"shutdown.end","forced":false}
+```
+or `{"msg":"shutdown.force","reason":"second signal"}` on the
+double-tap path.
+
+### `gracefulShutdown` helper
+Exported from `daemon.mjs` so callers wrapping a daemon manually can
+reuse the same logic. Returns `{forced: boolean}`. Tested directly
+with mock servers — no real socket needed.
+
+### Tests
+3 new phase 6 specs:
+- close completes in time → `forced: false`
+- close hangs → timeout fires within budget, `closeAllConnections`
+  called, `forced: true`, elapsed within `< 500ms` even with timeout
+  set to 50ms
+- works on older Node lacking `closeAllConnections` — still resolves
+  with `forced: true`, just no force-close to call
+
+Suite: 241/241. tsc clean.
+
+---
 ## [3.0.2] — 2026-05-05
 
 **`lazyclaw agent --cost` for parity with daemon `body.cost`.**

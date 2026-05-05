@@ -682,6 +682,44 @@ export function makeHandler(ctx) {
 }
 
 /**
+ * Graceful shutdown with a hard timeout. Calls `server.close()` so the
+ * server stops accepting new connections and waits for in-flight to
+ * drain — but races against `timeoutMs` so a hung stream can't keep
+ * the process alive forever. After timeout we force-close every open
+ * connection (Node ≥18.2) and resolve.
+ *
+ * Returns `{ forced: boolean }`:
+ *   forced=false → graceful drain completed in time
+ *   forced=true  → timeout fired; connections were force-closed
+ *
+ * Exported for unit testing without spawning a real daemon.
+ *
+ * @param {{ close: (cb: (err?: Error) => void) => void, closeAllConnections?: () => void }} server
+ * @param {number} timeoutMs
+ */
+export function gracefulShutdown(server, timeoutMs) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (forced) => {
+      if (resolved) return;
+      resolved = true;
+      resolve({ forced });
+    };
+    const timer = setTimeout(() => {
+      if (typeof server.closeAllConnections === 'function') {
+        try { server.closeAllConnections(); } catch { /* swallow */ }
+      }
+      finish(true);
+    }, timeoutMs);
+    timer.unref?.();
+    server.close((err) => {
+      clearTimeout(timer);
+      finish(false);
+    });
+  });
+}
+
+/**
  * Start the daemon. Always binds 127.0.0.1.
  * @param {{
  *   port?: number,

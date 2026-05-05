@@ -1994,6 +1994,40 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(post.messageCount).toBe(0);
   });
 
+  test('gracefulShutdown: server closes in time → forced=false', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    // Mock server whose close() invokes the callback right away.
+    const fakeServer = {
+      close(cb: any) { setImmediate(() => cb()); },
+    };
+    const r = await mod.gracefulShutdown(fakeServer, 1000);
+    expect(r.forced).toBe(false);
+  });
+
+  test('gracefulShutdown: timeout wins → forced=true and closeAllConnections is called', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    let forceCalled = 0;
+    // close() never invokes the callback — simulates a hung connection.
+    const fakeServer = {
+      close(_cb: any) { /* never resolve */ },
+      closeAllConnections() { forceCalled += 1; },
+    };
+    const t0 = Date.now();
+    const r = await mod.gracefulShutdown(fakeServer, 50);
+    const elapsed = Date.now() - t0;
+    expect(r.forced).toBe(true);
+    expect(forceCalled).toBe(1);
+    // Should have unblocked at the timeout, not waited longer.
+    expect(elapsed).toBeLessThan(500);
+  });
+
+  test('gracefulShutdown: timeout works even when server lacks closeAllConnections (older Node)', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const fakeServer = { close(_cb: any) { /* never resolve */ } };
+    const r = await mod.gracefulShutdown(fakeServer, 30);
+    expect(r.forced).toBe(true);  // still resolves; just no force-close to call
+  });
+
   test('agent --cost prints cost line to stderr when rates configured', () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'anthropic'], dir);
