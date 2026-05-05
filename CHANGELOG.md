@@ -10,6 +10,56 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.36.0] — 2026-05-05
+
+**`lazyclaw inspect --filter / --limit` (CLI + daemon).**
+
+Final piece in the v3.33–v3.35 list-flag rollout: the workflow
+list mode (`lazyclaw inspect` no-arg, daemon `GET /workflows`)
+gets the same flag pair as sessions and skills.
+
+```
+$ lazyclaw inspect --filter etl --limit 2
+{
+  "dir": ".workflow-state", "status": null,
+  "sessions": [
+    { "sessionId": "etl-2026-05-03", "summary": {...} },
+    { "sessionId": "etl-2026-05-02", "summary": {...} }
+  ]
+}
+```
+
+### Composition order
+`--status` first (lifecycle bucket), `--filter` next
+(case-insensitive sessionId substring), `--limit` last
+(post-filter cap). Matches the order a user would naturally chain
+(`grep | grep | head`).
+
+### Daemon parity
+`GET /workflows?status=failed&filter=etl&limit=5` produces the
+same shape. A monitoring dashboard can drill from "show me failed
+runs" to "show me the 5 most recent failed runs whose id contains
+'etl'" without pulling the full list.
+
+### List-flag rollout summary (v3.33 → v3.36)
+| Surface  | CLI flag         | Daemon query    |
+|----------|------------------|-----------------|
+| sessions | `--filter --limit` (v3.33) | `?filter=&limit=` (v3.34) |
+| skills   | `--filter --limit` (v3.35) | `?filter=&limit=` (v3.35) |
+| workflows| `--filter --limit` (v3.36) | `?filter=&limit=` (v3.36) |
+
+All three surfaces now have uniform paging semantics — a
+dashboard rendering them side-by-side gets consistent UX, a
+power user gets the same shell-pipeline pattern across all three.
+
+### Tests
+1 new phase 6 spec covering CLI `--filter` + `--limit` +
+composition + the daemon `?filter=&limit=` parity in one
+end-to-end run.
+
+Suite: 342 → 343 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.35.0] — 2026-05-05
 
 **`lazyclaw skills list --filter / --limit` (CLI + daemon).**

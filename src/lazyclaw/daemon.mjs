@@ -628,6 +628,17 @@ export function makeHandler(ctx) {
                 return true;
               });
             }
+            // ?filter=<substr>&limit=<N> mirror v3.33 sessions/skills list flags.
+            const qFilter = url.searchParams.get('filter');
+            if (qFilter) {
+              const f = qFilter.toLowerCase();
+              sessions = sessions.filter(s => s.sessionId.toLowerCase().includes(f));
+            }
+            const qLimit = url.searchParams.get('limit');
+            if (qLimit) {
+              const n = parseInt(qLimit, 10);
+              if (Number.isFinite(n) && n > 0) sessions = sessions.slice(0, n);
+            }
             return writeJson(res, 200, { dir: stateDir, status: qStatus || null, sessions });
           } catch (err) {
             if (err?.code === 'ENOENT') {

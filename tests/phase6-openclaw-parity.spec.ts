@@ -775,6 +775,44 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(compact.updatedAt).toBe(2);
   });
 
+  test('lazyclaw inspect --filter / --limit + daemon /workflows?filter=&limit= parity', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    const mk = (id: string, updatedAt: number) => fs.writeFileSync(path.join(stateDir, `${id}.json`), JSON.stringify({
+      sessionId: id, order: ['x'],
+      nodes: { x: { status: 'success', attempts: 1, durationMs: 1 } },
+      startedAt: 0, updatedAt,
+    }));
+    mk('etl-2026-05-01', 100);
+    mk('etl-2026-05-02', 200);
+    mk('etl-2026-05-03', 300);
+    mk('embed-batch-7', 400);
+    mk('analytics-1', 500);
+
+    // CLI: --filter + --limit
+    const r1 = runCli(['inspect', '--dir', stateDir, '--filter', 'etl', '--limit', '2'], dir);
+    expect(r1.status).toBe(0);
+    const out1 = JSON.parse(r1.stdout);
+    expect(out1.sessions.map((s: any) => s.sessionId)).toEqual(['etl-2026-05-03', 'etl-2026-05-02']);
+
+    // CLI: --filter alone
+    const r2 = runCli(['inspect', '--dir', stateDir, '--filter', 'etl'], dir);
+    expect(JSON.parse(r2.stdout).sessions).toHaveLength(3);
+
+    // Daemon parity: ?filter=&limit=
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      const list = await fetch(`${d.url}/workflows?filter=etl&limit=1`).then(x => x.json());
+      expect(list.sessions).toHaveLength(1);
+      expect(list.sessions[0].sessionId).toBe('etl-2026-05-03');   // newest matching
+
+      // No flags = full list (5 sessions).
+      const all = await fetch(`${d.url}/workflows`).then(x => x.json());
+      expect(all.sessions).toHaveLength(5);
+    } finally { await d.kill(); }
+  });
+
   test('lazyclaw inspect --status filters list mode by lifecycle bucket', () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'st');

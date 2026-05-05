@@ -191,6 +191,18 @@ async function cmdInspect(sessionId, opts = {}) {
         return true;
       });
     }
+    // --filter <substr>: case-insensitive sessionId substring (same
+    // semantic as v3.33's sessions/skills list filter).
+    // --limit <N>: post-filter cap. Composes with --status (status
+    // first, then filter, then limit).
+    if (opts.filter) {
+      const f = String(opts.filter).toLowerCase();
+      sessions = sessions.filter(s => s.sessionId.toLowerCase().includes(f));
+    }
+    if (opts.limit !== undefined) {
+      const n = parseInt(opts.limit, 10);
+      if (Number.isFinite(n) && n > 0) sessions = sessions.slice(0, n);
+    }
     console.log(JSON.stringify({ dir, status: status || null, sessions }, null, 2));
     process.exit(0);
   }
@@ -930,7 +942,7 @@ const HELP_SUMMARIES = {
 const HELP_DETAILS = {
   run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent] [--concurrency <N>]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  --concurrency <N>: cap in-flight nodes within a level (DAG modes only). 0/missing → unbounded.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs> [--parallel-persistent] [--concurrency <N>]\n  Re-enters a previously persisted run; succeeds nodes are skipped.\n  Pass --parallel-persistent to resume a DAG run (must match the original run\'s mode).\n  --concurrency <N>: cap in-flight nodes per level (DAG mode only).',
-  inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
+  inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary] [--filter <substr>] [--limit <N>]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  --filter / --limit refine list-mode further (case-insensitive sessionId substring + post-filter cap).\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
   validate: 'Usage: lazyclaw validate <workflow.mjs>\n  Static check: load + shape + dep + cycle + parallelism estimate.\n  Exit 0 valid · 1 hard failure (issues populated) · 2 file/import error.',
   graph: 'Usage: lazyclaw graph <workflow.mjs> [--lr] [--state <session-id>] [--dir <state-dir>]\n  Emit the workflow DAG as Mermaid syntax (graph TD by default; --lr for left-right).\n  --state overlays a persisted run\'s status (success ✓ / running ⏳ / failed ✗ / pending) with classDef styling.\n  Output is paste-ready for GitHub markdown / Notion / Obsidian.',
@@ -2065,7 +2077,13 @@ async function main() {
       // Pass the empty positional through; cmdInspect's list mode
       // handles it.
       const [sessionId] = rest.positional;
-      await cmdInspect(sessionId, { dir: rest.flags.dir, status: rest.flags.status, summary: !!rest.flags.summary });
+      await cmdInspect(sessionId, {
+        dir: rest.flags.dir,
+        status: rest.flags.status,
+        summary: !!rest.flags.summary,
+        filter: rest.flags.filter,
+        limit: rest.flags.limit,
+      });
       break;
     }
     case 'clear': {
