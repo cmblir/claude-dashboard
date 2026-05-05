@@ -1056,7 +1056,7 @@ const HELP_DETAILS = {
   onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
   sessions: 'Usage: lazyclaw sessions <list [--filter <substr>] [--limit <N>]|show <id>|clear <id>|export <id> [--format md|json|text]|search <query> [--regex]>\n  list — recent sessions by mtime; --filter caps to ids containing substring (case-insensitive); --limit caps result count.\n  export — render in chosen format (md default for human sharing, json for tooling, text for paste).\n  search — case-insensitive substring (or --regex pattern) match across all session content; returns first excerpt + match count per matching session.',
   skills: 'Usage: lazyclaw skills <list [--filter <substr>] [--limit <N>]|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>|search <query> [--regex]>\n  list — installed skills; --filter caps to names containing substring (case-insensitive); --limit caps result count.\n  --from-url fetches over HTTPS only; 1 MiB body cap.\n  search — case-insensitive substring (or --regex) match across all skill markdown bodies; returns first excerpt + match count per skill.',
-  providers: 'Usage: lazyclaw providers <list | info <name> | test <name> [--model X] [--prompt T]>\n  list/info — static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.\n  test — send a 1-token "ping" through the provider and report ok/error + duration.\n         Useful after configuring an API key to verify it works before relying on it.',
+  providers: 'Usage: lazyclaw providers <list | info <name> | test <name> [--model X] [--prompt T] | test [--all] [--prompt T]>\n  list/info — static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.\n  test — send a 1-token "ping" through the provider and report ok/error + duration.\n         Useful after configuring an API key to verify it works before relying on it.\n         No name OR --all: tests every registered provider in parallel; exits 0 only when ALL pass.',
   daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>] [--shutdown-timeout-ms <N>] [--cost-cap-<currency> <N> ...] [--workflow-state-dir <dir>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).\n  --shutdown-timeout-ms <N> caps graceful drain on SIGINT/SIGTERM (default 10000). Second signal forces immediate exit.\n  --cost-cap-usd 100 (or any currency code in lowercase) rejects POST /agent + /chat with 402 once cumulative cost reaches the cap.\n  --workflow-state-dir <dir> backs GET /workflows + GET /workflows/<id> (default .workflow-state, also reads $LAZYCLAW_WORKFLOW_STATE_DIR).',
   version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
@@ -1895,15 +1895,58 @@ async function cmdProviders(sub, positional, flags = {}) {
       // Exit codes:
       //   0 — provider returned a non-empty reply
       //   1 — provider returned an error (auth failure, rate limit, ...)
-      //   2 — invalid invocation (missing/unknown name)
+      //   2 — invalid invocation (unknown name)
+      //
+      // No name OR --all: smoke-test every registered provider in
+      // parallel. Output is `{ ok, results: [...] }` where ok is true
+      // iff every entry passed. Exit 0 when all pass, 1 otherwise.
       const name = positional[0];
-      if (!name) { console.error('Usage: lazyclaw providers test <name> [--model <id>] [--prompt <text>]'); process.exit(2); }
+      const cfg = readConfig();
+      const promptIdx = positional.indexOf('--prompt');
+      const sharedPrompt = flags.prompt || (promptIdx >= 0 ? positional[promptIdx + 1] : null) || 'ping';
+      if (!name || flags.all) {
+        const apiKey = cfg['api-key'] || '';
+        const t0all = Date.now();
+        const results = await Promise.all(
+          Object.entries(_registryMod.PROVIDERS).map(async ([pid, provider]) => {
+            const meta = _registryMod.PROVIDER_INFO[pid] || {};
+            const model = flags.model || cfg.model || meta.defaultModel || 'unknown';
+            const t0 = Date.now();
+            try {
+              let reply = '';
+              const stream = provider.sendMessage([{ role: 'user', content: sharedPrompt }], { apiKey, model });
+              for await (const chunk of stream) {
+                if (typeof chunk === 'string') reply += chunk;
+              }
+              return {
+                name: pid, ok: reply.length > 0, model,
+                durationMs: Date.now() - t0,
+                replyLength: reply.length,
+              };
+            } catch (err) {
+              return {
+                name: pid, ok: false, model,
+                durationMs: Date.now() - t0,
+                error: err?.message || String(err),
+                code: err?.code || null,
+              };
+            }
+          }),
+        );
+        const allOk = results.every(r => r.ok);
+        console.log(JSON.stringify({
+          ok: allOk,
+          totalDurationMs: Date.now() - t0all,
+          results,
+        }, null, 2));
+        process.exit(allOk ? 0 : 1);
+      }
       const provider = _registryMod.PROVIDERS[name];
       if (!provider) {
         console.error(`unknown provider: ${name} (registered: ${Object.keys(_registryMod.PROVIDERS).join(', ')})`);
         process.exit(2);
       }
-      const cfg = readConfig();
+      // cfg already declared above for the all-mode branch; reuse it.
       const meta = _registryMod.PROVIDER_INFO[name] || {};
       // --model / --prompt come in via the parsed flags map (parseArgs
       // lifted them out of positional). --model wins over config.model
@@ -2134,6 +2177,7 @@ const BOOLEAN_FLAGS = new Set([
   'lr',           // graph: emit Mermaid `graph LR` (left-right)
   'force',        // rates copy: overwrite existing destination
   'aggregate',    // inspect (list mode): per-node stats across sessions
+  'all',          // providers test: run all providers in parallel
 ]);
 
 function parseArgs(argv) {

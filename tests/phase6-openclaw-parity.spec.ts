@@ -842,6 +842,49 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(out.reply).toContain('hello-from-test');
   });
 
+  test('lazyclaw providers test (no name) tests every provider in parallel', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['providers', 'test'], dir);
+    // Real providers will fail without keys; mock will pass. Exit 1
+    // (because not all pass) is the expected outcome.
+    expect([0, 1]).toContain(r.status);
+    const out = JSON.parse(r.stdout);
+    expect(typeof out.ok).toBe('boolean');
+    expect(out.results.length).toBeGreaterThan(0);
+    // Mock should be in the results AND ok.
+    const mock = out.results.find((p: any) => p.name === 'mock');
+    expect(mock).toBeDefined();
+    expect(mock.ok).toBe(true);
+    // totalDurationMs reflects the parallel wall time (not sum).
+    expect(typeof out.totalDurationMs).toBe('number');
+  });
+
+  test('lazyclaw providers test --all is equivalent to no name', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['providers', 'test', '--all'], dir);
+    expect([0, 1]).toContain(r.status);
+    const out = JSON.parse(r.stdout);
+    expect(out.results.some((p: any) => p.name === 'mock')).toBe(true);
+  });
+
+  test('lazyclaw providers test (no name): every result has the per-provider shape', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['providers', 'test', '--prompt', 'hello'], dir);
+    const out = JSON.parse(r.stdout);
+    for (const result of out.results) {
+      expect(result).toHaveProperty('name');
+      expect(result).toHaveProperty('ok');
+      expect(result).toHaveProperty('model');
+      expect(result).toHaveProperty('durationMs');
+      // Either reply / replyLength (when ok) or error (when not).
+      if (result.ok) {
+        expect(typeof result.replyLength).toBe('number');
+      } else {
+        expect(typeof result.error).toBe('string');
+      }
+    }
+  });
+
   test('lazyclaw providers test: unknown provider → exit 2 with helpful stderr', () => {
     const dir = tmpConfigDir();
     const r = runCli(['providers', 'test', 'never-heard-of-it'], dir);

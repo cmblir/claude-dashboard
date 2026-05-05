@@ -10,6 +10,60 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.55.0] — 2026-05-05
+
+**`lazyclaw providers test` (no name) tests every provider in parallel.**
+
+Companion to v3.26's per-provider smoke test. After configuring
+multiple keys (anthropic + openai + ollama), running the test
+once per provider was tedious. The no-name form runs them all
+concurrently and reports a unified verdict.
+
+```
+$ lazyclaw providers test
+{
+  "ok": false,
+  "totalDurationMs": 832,
+  "results": [
+    { "name": "mock",      "ok": true,  "durationMs": 27,  "model": "claude-opus-4-7", "replyLength": 33 },
+    { "name": "anthropic", "ok": true,  "durationMs": 412, "model": "claude-opus-4-7", "replyLength": 17 },
+    { "name": "openai",    "ok": false, "durationMs": 230, "error": "INVALID_KEY", "code": "INVALID_KEY" },
+    { "name": "ollama",    "ok": false, "durationMs": 32,  "error": "ECONNREFUSED" },
+    { "name": "gemini",    "ok": true,  "durationMs": 380, "replyLength": 42 }
+  ]
+}
+[exit 1]   ← because openai + ollama failed
+```
+
+### Concurrency
+`Promise.all` across the registered providers — `totalDurationMs`
+reflects the slowest one, not the sum. So testing 5 providers
+that average 400 ms each takes ~400 ms wall time, not 2 seconds.
+
+### Composition with flags
+- `--all` is equivalent to no name (kept as an explicit form for
+  scripts that always pass arguments).
+- `--prompt <text>` and `--model <id>` apply to every provider
+  in the batch (same prompt fans out to all, same model fallback
+  chain applies).
+
+### Exit codes
+- `0` — every provider returned a non-empty reply
+- `1` — at least one provider failed
+- (no exit 2 here — every registered provider is by definition
+  known)
+
+### Tests
+3 new phase 6 specs:
+- happy-path: results array contains every registered provider,
+  mock entry is ok=true, totalDurationMs is reported
+- `--all` flag is equivalent to no name
+- per-result shape: every entry has name/ok/model/durationMs;
+  successful entries have replyLength, failed entries have error
+
+Suite: 382 → 385 (+3); `tsc --noEmit` clean.
+
+---
 ## [3.54.0] — 2026-05-05
 
 **Aggregate adds p50 / p95 / p99 percentiles per node.**
