@@ -666,8 +666,29 @@ export function makeHandler(ctx) {
           // ?filter=<substr> applies before aggregation (v3.50).
           const stateDir = ctx.workflowStateDir();
           const qFilter = url.searchParams.get('filter');
+          const qNode = url.searchParams.get('node');
           try {
             const stats = aggregateNodeStats(stateDir, { filter: qFilter });
+            // ?node=<id>: drill into one node's cross-session stats
+            // (mirrors CLI v3.52 --aggregate --node). 404 when the
+            // node never appeared in any session.
+            if (qNode) {
+              const nodeStat = stats.nodeStats[qNode];
+              if (!nodeStat) {
+                return writeJson(res, 404, {
+                  error: 'node not found across sessions',
+                  nodeId: qNode,
+                  knownNodes: Object.keys(stats.nodeStats),
+                });
+              }
+              return writeJson(res, 200, {
+                dir: stateDir,
+                filter: qFilter || null,
+                sessionCount: stats.sessionCount,
+                nodeId: qNode,
+                ...nodeStat,
+              });
+            }
             return writeJson(res, 200, { dir: stateDir, filter: qFilter || null, ...stats });
           } catch (err) {
             if (err?.code === 'ENOENT') {

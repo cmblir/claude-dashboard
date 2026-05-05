@@ -10,6 +10,49 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.53.0] — 2026-05-05
+
+**Daemon `GET /workflows/aggregate?node=<id>` mirrors CLI v3.52.**
+
+Same drill-down shape: cross-session stats restricted to one node
+id. A dashboard's "this specific node" panel calls this endpoint
+to track a known bottleneck across runs without rendering the
+full aggregate table.
+
+```
+GET /workflows/aggregate?node=embed
+→ 200 {
+    "dir": ".workflow-state", "filter": null,
+    "sessionCount": 2,
+    "nodeId": "embed",
+    "count": 2, "successCount": 1, "failedCount": 1,
+    "avgDurationMs": 3000, ...
+  }
+
+GET /workflows/aggregate?node=never-seen
+→ 404 {
+    "error": "node not found across sessions",
+    "nodeId": "never-seen",
+    "knownNodes": ["embed", "fetch"]
+  }
+```
+
+### Composes with `?filter=`
+`?filter=etl&node=embed` produces embed's stats restricted to
+ETL sessions. Same composition the CLI has.
+
+### `knownNodes` on 404
+Same shape as v3.42's `/workflows/<id>?node=` — the 404 body
+lists every node id seen in matching sessions, so a UI can offer
+"did you mean ...?" without a second request.
+
+### Tests
+1 new phase 6 spec covering drill-down accuracy + 404
+knownNodes path.
+
+Suite: 378 → 379 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.52.0] — 2026-05-05
 
 **`lazyclaw inspect --aggregate --node <id>` drills into one node.**

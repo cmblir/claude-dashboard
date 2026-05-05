@@ -1825,6 +1825,45 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /workflows/aggregate?node=<id> mirrors CLI drill-down', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'wf-agg-node');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'r1.json'), JSON.stringify({
+      sessionId: 'r1', order: ['fetch', 'embed'],
+      nodes: {
+        fetch: { status: 'success', durationMs: 80 },
+        embed: { status: 'success', durationMs: 1000 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    fs.writeFileSync(path.join(stateDir, 'r2.json'), JSON.stringify({
+      sessionId: 'r2', order: ['fetch', 'embed'],
+      nodes: {
+        fetch: { status: 'success', durationMs: 120 },
+        embed: { status: 'failed', error: 'oops', durationMs: 5000 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      const r = await fetch(`${d.url}/workflows/aggregate?node=embed`).then(x => x.json());
+      expect(r.nodeId).toBe('embed');
+      expect(r.count).toBe(2);
+      expect(r.failedCount).toBe(1);
+      expect(r.avgDurationMs).toBe(3000);
+      // Other nodes' stats not in drill-down view.
+      expect(r.fetch).toBeUndefined();
+
+      // Unknown node → 404 with knownNodes list.
+      const bad = await fetch(`${d.url}/workflows/aggregate?node=never`);
+      expect(bad.status).toBe(404);
+      const badBody = await bad.json();
+      expect(badBody.knownNodes.sort()).toEqual(['embed', 'fetch']);
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /workflows/aggregate with no state dir returns sessionCount 0 (not 404)', async () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'never-created');
