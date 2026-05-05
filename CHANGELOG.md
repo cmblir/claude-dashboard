@@ -10,6 +10,52 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.50.0] — 2026-05-05  🎉 milestone
+
+**`--aggregate --filter` restricts the population (CLI + daemon).**
+
+A user with both `etl-*` and `analytics-*` workflows in the same
+state dir might want stats per workflow type, not pooled across
+both. `--filter <substr>` (CLI) / `?filter=<substr>` (daemon)
+restricts which sessions enter the aggregation, then computes
+the same shape over that subset.
+
+```
+$ lazyclaw inspect --aggregate --filter etl
+{
+  "dir": ".workflow-state",
+  "filter": "etl",
+  "sessionCount": 2,            ← only etl-* sessions counted
+  "nodeStats": { "fetch": { ..., "avgDurationMs": 100 } }
+}
+
+GET /workflows/aggregate?filter=etl
+→ same shape, same numbers
+```
+
+### How it composes
+The filter applies to `state.sessionId`, case-insensitive substring
+— same semantic as v3.36's list-mode `--filter`. So a user who
+filters lists by `etl` gets aggregation over the same population
+they see in the list.
+
+### `filter` field in the response
+Echoed in the response body (`null` when omitted) so a UI can
+render "stats for sessions matching 'etl'" without re-checking
+its own URL parameters.
+
+### Cycle milestone — 44 releases
+This is v3.50.0 — the 44th release this iteration cycle (started
+at v3.7.0). Suite: 269 → 374 (+105 tests).
+
+### Tests
+1 new phase 6 spec covering CLI `--filter` + daemon `?filter=`
+parity in one end-to-end run. The 999ms outlier from a non-matching
+session is verified absent from the filtered average.
+
+Suite: 373 → 374 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.49.0] — 2026-05-05
 
 **Daemon `GET /workflows/aggregate` mirrors CLI v3.48.**

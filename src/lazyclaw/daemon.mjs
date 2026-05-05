@@ -651,17 +651,15 @@ export function makeHandler(ctx) {
           // statistics across every persisted session in the state
           // directory. Answers "which node tends to be slow / fail
           // across all my runs?" — needs no workflow file, just state.
+          // ?filter=<substr> applies before aggregation (v3.50).
           const stateDir = ctx.workflowStateDir();
+          const qFilter = url.searchParams.get('filter');
           try {
-            const stats = aggregateNodeStats(stateDir);
-            return writeJson(res, 200, { dir: stateDir, ...stats });
+            const stats = aggregateNodeStats(stateDir, { filter: qFilter });
+            return writeJson(res, 200, { dir: stateDir, filter: qFilter || null, ...stats });
           } catch (err) {
             if (err?.code === 'ENOENT') {
-              // Empty / missing state dir is a valid "no runs yet"
-              // state — match CLI semantics? CLI exits 2; daemon
-              // returns 200 with sessionCount: 0 + empty stats so a
-              // poll loop doesn't 404 a fresh process.
-              return writeJson(res, 200, { dir: stateDir, sessionCount: 0, nodeStats: {} });
+              return writeJson(res, 200, { dir: stateDir, filter: qFilter || null, sessionCount: 0, nodeStats: {} });
             }
             return writeJson(res, 500, { error: err?.message || String(err) });
           }

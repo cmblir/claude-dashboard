@@ -83,6 +83,10 @@ export function summarizeState(state) {
  * single-session inspect can't answer.
  *
  * @param {string} dir
+ * @param {{ filter?: string }} [opts]   Optional case-insensitive
+ *        sessionId substring filter — only matching sessions
+ *        contribute to the aggregate. Same semantic as v3.36's
+ *        list-mode `--filter`.
  * @returns {{ sessionCount: number, nodeStats: Record<string, {
  *   count: number,
  *   successCount: number,
@@ -95,7 +99,7 @@ export function summarizeState(state) {
  *   totalDurationMs: number,
  * }> }}
  */
-export function aggregateNodeStats(dir) {
+export function aggregateNodeStats(dir, opts = {}) {
   if (!fs.existsSync(dir)) {
     const e = new Error(`State directory ${dir} does not exist`);
     /** @type {any} */ (e).code = 'ENOENT';
@@ -105,12 +109,14 @@ export function aggregateNodeStats(dir) {
   let sessionCount = 0;
   /** @type {Record<string, { count: number, successCount: number, failedCount: number, pendingCount: number, runningCount: number, durations: number[] }>} */
   const accumulator = {};
+  const filterLower = opts.filter ? String(opts.filter).toLowerCase() : null;
   for (const f of files) {
     let state;
     try {
       state = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
     } catch { continue; }
     if (!state?.sessionId || !state?.nodes) continue;
+    if (filterLower && !state.sessionId.toLowerCase().includes(filterLower)) continue;
     sessionCount++;
     for (const id of Object.keys(state.nodes)) {
       const ns = state.nodes[id];

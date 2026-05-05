@@ -542,6 +542,42 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     });
   });
 
+  test('lazyclaw inspect --aggregate --filter restricts the population (CLI + daemon parity)', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    // Two ETL runs and one analytics run. --filter etl picks only the first two.
+    fs.writeFileSync(path.join(stateDir, 'etl-1.json'), JSON.stringify({
+      sessionId: 'etl-1', order: ['fetch'], nodes: { fetch: { status: 'success', durationMs: 80 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    fs.writeFileSync(path.join(stateDir, 'etl-2.json'), JSON.stringify({
+      sessionId: 'etl-2', order: ['fetch'], nodes: { fetch: { status: 'success', durationMs: 120 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    fs.writeFileSync(path.join(stateDir, 'analytics-1.json'), JSON.stringify({
+      sessionId: 'analytics-1', order: ['fetch'], nodes: { fetch: { status: 'success', durationMs: 999 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+
+    // CLI: filter to etl* — analytics-1's 999ms doesn't pollute the average.
+    const r = runCli(['inspect', '--dir', stateDir, '--aggregate', '--filter', 'etl'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.filter).toBe('etl');
+    expect(out.sessionCount).toBe(2);
+    expect(out.nodeStats.fetch.avgDurationMs).toBe(100);   // (80 + 120) / 2
+
+    // Daemon: ?filter=etl produces the same shape.
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      const r2 = await fetch(`${d.url}/workflows/aggregate?filter=etl`).then(x => x.json());
+      expect(r2.filter).toBe('etl');
+      expect(r2.sessionCount).toBe(2);
+      expect(r2.nodeStats.fetch.avgDurationMs).toBe(100);
+    } finally { await d.kill(); }
+  });
+
   test('lazyclaw inspect --aggregate: missing state dir → exit 2', () => {
     const dir = tmpConfigDir();
     const r = runCli(['inspect', '--dir', path.join(dir, 'no-such'), '--aggregate'], dir);

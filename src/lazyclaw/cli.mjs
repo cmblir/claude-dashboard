@@ -165,7 +165,7 @@ async function cmdInspect(sessionId, opts = {}) {
   if (!sessionId && opts.aggregate) {
     let stats;
     try {
-      stats = aggregateNodeStats(dir);
+      stats = aggregateNodeStats(dir, { filter: opts.filter });
     } catch (e) {
       if (e?.code === 'ENOENT') {
         console.error(`State directory ${dir} does not exist`);
@@ -173,7 +173,7 @@ async function cmdInspect(sessionId, opts = {}) {
       }
       throw e;
     }
-    console.log(JSON.stringify({ dir, ...stats }, null, 2));
+    console.log(JSON.stringify({ dir, filter: opts.filter || null, ...stats }, null, 2));
     process.exit(0);
   }
 
