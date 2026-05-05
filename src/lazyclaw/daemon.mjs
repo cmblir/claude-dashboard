@@ -691,6 +691,29 @@ export function makeHandler(ctx) {
             return writeJson(res, 500, { error: err?.message || String(err) });
           }
           if (!state) return writeJson(res, 404, { error: 'workflow not found', sessionId: sid });
+          // ?node=<id> drills into one node's state — same shape as
+          // `lazyclaw inspect <session> --node <id>` (v3.41). The
+          // HTTP status reflects the node's lifecycle (mirrors the
+          // CLI exit codes): 200 success/pending/running, 410 Gone
+          // for failed (request was valid, but the resource is in a
+          // failed state), 404 for unknown node id.
+          const qNode = url.searchParams.get('node');
+          if (qNode) {
+            const ns = state.nodes?.[qNode];
+            if (!ns) {
+              return writeJson(res, 404, {
+                error: 'node not found',
+                sessionId: sid,
+                nodeId: qNode,
+                knownNodes: Object.keys(state.nodes || {}),
+              });
+            }
+            return writeJson(res, ns.status === 'failed' ? 410 : 200, {
+              sessionId: state.sessionId,
+              nodeId: qNode,
+              ...ns,
+            });
+          }
           const { summary, failedNodes } = summarizeState(state);
           // ?summary=true trims the per-node `nodes` map and `order`
           // array, matching v3.17's CLI `inspect --summary` shape and

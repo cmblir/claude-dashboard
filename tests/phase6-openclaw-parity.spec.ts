@@ -1733,6 +1733,46 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /workflows/<id>?node=<nid> drills into one node; HTTP status mirrors CLI exit', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'wf-node');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job',
+      order: ['a', 'b', 'c'],
+      nodes: {
+        a: { status: 'success', output: 'A', attempts: 1, durationMs: 5 },
+        b: { status: 'failed', error: 'boom', attempts: 3 },
+        c: { status: 'pending', attempts: 0 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      // Success: 200.
+      const r1 = await fetch(`${d.url}/workflows/job?node=a`);
+      expect(r1.status).toBe(200);
+      const o1 = await r1.json();
+      expect(o1).toMatchObject({ sessionId: 'job', nodeId: 'a', status: 'success', output: 'A' });
+
+      // Failed: 410 Gone.
+      const r2 = await fetch(`${d.url}/workflows/job?node=b`);
+      expect(r2.status).toBe(410);
+      const o2 = await r2.json();
+      expect(o2).toMatchObject({ nodeId: 'b', status: 'failed', error: 'boom' });
+
+      // Pending: 200.
+      const r3 = await fetch(`${d.url}/workflows/job?node=c`);
+      expect(r3.status).toBe(200);
+
+      // Unknown node: 404.
+      const r4 = await fetch(`${d.url}/workflows/job?node=never`);
+      expect(r4.status).toBe(404);
+      const o4 = await r4.json();
+      expect(o4.knownNodes).toEqual(['a', 'b', 'c']);
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /workflows/<id>?summary=true trims per-node detail (mirrors CLI --summary)', async () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'wf-comp');

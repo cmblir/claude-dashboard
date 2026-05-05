@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.42.0] — 2026-05-05
+
+**Daemon `GET /workflows/<id>?node=<nid>` mirrors CLI `--node` drill-down.**
+
+Same shape v3.41 produces over the CLI, with HTTP status codes
+that map to the CLI's exit codes:
+
+| CLI exit | HTTP status | Meaning |
+|----------|-------------|---------|
+| `0`      | `200 OK`    | node found; status success/pending/running |
+| `1`      | `410 Gone`  | node found; status failed |
+| `2`      | `404 Not Found` | unknown node id |
+
+```
+GET /workflows/my-job?node=fetch        → 200 { ..., status: "success" }
+GET /workflows/my-job?node=classify     → 410 { ..., status: "failed", error: "..." }
+GET /workflows/my-job?node=never-existed → 404 { error: "node not found",
+                                                  knownNodes: [...] }
+```
+
+### Why 410 for failed
+A failed node IS the resource — the request succeeded, the
+representation exists. 410 Gone is the closest semantic match in
+HTTP for "this resource exists but has reached an unrecoverable
+end state." A monitoring tool seeing 410 knows to surface the
+failure without needing body parsing on every poll.
+
+### `knownNodes` on 404
+The 404 body includes the full list of known node ids in the
+session — saves a second request to figure out what the user
+typed wrong.
+
+### Tests
+1 new phase 6 spec covering all four status-code paths (success,
+failed, pending, unknown-node), in addition to the CLI test from
+v3.41.
+
+Suite: 357 → 358 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.41.0] — 2026-05-05
 
 **`lazyclaw inspect <session> --node <node-id>` — drill into one node.**
