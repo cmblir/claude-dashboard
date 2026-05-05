@@ -2017,6 +2017,10 @@ async function cmdSessions(sub, positional, flags = {}) {
       // --limit <N> caps the result count after filter+sort. Negative
       // or zero values are ignored so a script can pass `--limit 0`
       // explicitly to opt out without special-casing.
+      // --with-turn-count: opt-in flag that adds `turnCount` per
+      // session. Loads each session file (one fs.read each) — opt-in
+      // because the default `list` should be fast even with thousands
+      // of sessions.
       let items = sessionsMod.listSessions(cfgDir);
       if (flags.filter) {
         const f = String(flags.filter).toLowerCase();
@@ -2026,7 +2030,15 @@ async function cmdSessions(sub, positional, flags = {}) {
         const n = parseInt(flags.limit, 10);
         if (Number.isFinite(n) && n > 0) items = items.slice(0, n);
       }
-      console.log(JSON.stringify(items.map(s => ({ id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString() })), null, 2));
+      const out = items.map(s => {
+        const base = { id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString() };
+        if (flags['with-turn-count']) {
+          try { base.turnCount = sessionsMod.loadTurns(s.id, cfgDir).length; }
+          catch { base.turnCount = null; }
+        }
+        return base;
+      });
+      console.log(JSON.stringify(out, null, 2));
       return;
     }
     case 'show': {
@@ -2188,6 +2200,7 @@ const BOOLEAN_FLAGS = new Set([
   'force',        // rates copy: overwrite existing destination
   'aggregate',    // inspect (list mode): per-node stats across sessions
   'all',          // providers test: run all providers in parallel
+  'with-turn-count', // sessions list: include turn count per session
 ]);
 
 function parseArgs(argv) {

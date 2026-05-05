@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.59.0] — 2026-05-05
+
+**`sessions list --with-turn-count` (CLI + daemon `?withTurnCount=true`).**
+
+The default `sessions list` is fast: `fs.readdirSync` + `fs.statSync`
+per file, no JSON parsing. That speed matters with thousands of
+sessions. But sometimes you want "longest 5 sessions by turn
+count" — for that, add `--with-turn-count` (CLI) or
+`?withTurnCount=true` (daemon).
+
+```
+$ lazyclaw sessions list --with-turn-count
+[
+  { "id": "long-debugging",   "bytes": 18420, "mtime": "...", "turnCount": 47 },
+  { "id": "quick-question",   "bytes": 220,   "mtime": "...", "turnCount": 2 },
+  ...
+]
+```
+
+### Why opt-in
+`--with-turn-count` reads every session file's contents (one JSONL
+parse per session). On a state dir with 5000 sessions averaging 5 KB
+each, that's 25 MB of disk reads instead of just stat metadata.
+Default stays fast; users who need the count opt in.
+
+### Composition with filter+limit
+The flags compose in the natural order: filter shrinks the list,
+limit caps the count, then turn counts are loaded only for the
+sessions that survived. So `sessions list --filter algo --limit 5
+--with-turn-count` reads at most 5 session files even if 5000
+match the filter.
+
+### Tests
+1 new phase 6 spec covering CLI default (no `turnCount`), CLI
+`--with-turn-count` accuracy on 1- and 7-turn sessions, and
+daemon `?withTurnCount=true` parity.
+
+Suite: 390 → 391 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.58.0] — 2026-05-05
 
 **`lazyclaw providers list --filter / --limit` (CLI + daemon).**

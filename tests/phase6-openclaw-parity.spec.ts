@@ -6244,6 +6244,44 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r.stdout).toContain('_(empty)_');
   });
 
+  test('sessions list --with-turn-count includes turnCount per session (CLI + daemon)', async () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'short.jsonl'),
+      JSON.stringify({ role: 'user', content: 'a', ts: 1 }) + '\n');
+    fs.writeFileSync(path.join(dir, 'sessions', 'long.jsonl'),
+      Array.from({ length: 7 }, (_, i) =>
+        JSON.stringify({ role: i % 2 === 0 ? 'user' : 'assistant', content: 'turn ' + i, ts: i })
+      ).join('\n') + '\n');
+
+    // Default: no turnCount field.
+    const r1 = runCli(['sessions', 'list'], dir);
+    expect(r1.status).toBe(0);
+    const list1 = JSON.parse(r1.stdout);
+    for (const s of list1) expect(s.turnCount).toBeUndefined();
+
+    // Opt-in: turnCount included.
+    const r2 = runCli(['sessions', 'list', '--with-turn-count'], dir);
+    expect(r2.status).toBe(0);
+    const list2 = JSON.parse(r2.stdout);
+    const shortS = list2.find((s: any) => s.id === 'short');
+    const longS = list2.find((s: any) => s.id === 'long');
+    expect(shortS.turnCount).toBe(1);
+    expect(longS.turnCount).toBe(7);
+
+    // Daemon: ?withTurnCount=true produces the same shape.
+    const d = await startDaemonProc(dir);
+    try {
+      const r3 = await fetch(`${d.url}/sessions?withTurnCount=true`).then(x => x.json());
+      const longD = r3.find((s: any) => s.id === 'long');
+      expect(longD.turnCount).toBe(7);
+
+      // Default (no flag): turnCount absent.
+      const r4 = await fetch(`${d.url}/sessions`).then(x => x.json());
+      for (const s of r4) expect(s.turnCount).toBeUndefined();
+    } finally { await d.kill(); }
+  });
+
   test('sessions list --filter substring matches session ids (case-insensitive)', () => {
     const dir = tmpConfigDir();
     fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });

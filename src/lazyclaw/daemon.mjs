@@ -625,7 +625,10 @@ export function makeHandler(ctx) {
           // ?filter=<substr> case-insensitive id substring;
           // ?limit=<N> caps post-filter count.
           // Same composition (filter then limit) as v3.33's CLI flag.
-          let list = ctx.sessionsMod.listSessions(ctx.sessionsDirGetter());
+          // ?withTurnCount=true mirrors CLI v3.59's --with-turn-count;
+          // opt-in because it loads each session file.
+          const cfgDir = ctx.sessionsDirGetter();
+          let list = ctx.sessionsMod.listSessions(cfgDir);
           const filter = url.searchParams.get('filter');
           if (filter) {
             const f = filter.toLowerCase();
@@ -636,7 +639,15 @@ export function makeHandler(ctx) {
             const n = parseInt(limitStr, 10);
             if (Number.isFinite(n) && n > 0) list = list.slice(0, n);
           }
-          return writeJson(res, 200, list.map(s => ({ id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString() })));
+          const withCount = url.searchParams.get('withTurnCount') === 'true';
+          return writeJson(res, 200, list.map(s => {
+            const base = { id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString() };
+            if (withCount) {
+              try { base.turnCount = ctx.sessionsMod.loadTurns(s.id, cfgDir).length; }
+              catch { base.turnCount = null; }
+            }
+            return base;
+          }));
         }
         case route === 'GET /sessions/search': {
           // Mirror of `lazyclaw sessions search <query> [--regex]`.
