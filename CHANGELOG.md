@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.52.0] — 2026-05-05
+
+**`lazyclaw inspect --aggregate --node <id>` drills into one node.**
+
+Once you've identified the bottleneck via `--aggregate`, the
+question becomes "track this specific node across runs." The
+drill-down combines aggregate data with the per-node focus from
+v3.41's `--node` flag.
+
+```
+$ lazyclaw inspect --aggregate --node embed
+{
+  "dir": ".workflow-state",
+  "filter": null,
+  "sessionCount": 2,
+  "nodeId": "embed",
+  "count": 2,
+  "successCount": 1, "failedCount": 1,
+  "minDurationMs": 1000, "maxDurationMs": 5000,
+  "avgDurationMs": 3000, "totalDurationMs": 6000
+}
+```
+
+### Composes with `--filter`
+`--aggregate --filter etl --node embed` → embed's stats restricted
+to ETL sessions only. So a user with mixed workflow types in one
+state dir can compare embed's behavior across types.
+
+### Exit codes
+- `0` — node found
+- `2` — node never appeared in any session (typo or wrong dir);
+  stderr lists known node ids for debugging
+
+### Tests
+2 new phase 6 specs:
+- 2-session drill-down: count/avg/failed accuracy + other nodes'
+  stats absent from output
+- unknown node id → exit 2 with helpful "known: ..." message
+
+Suite: 376 → 378 (+2); `tsc --noEmit` clean.
+
+---
 ## [3.51.0] — 2026-05-05
 
 **Daemon `GET /health` — conventional liveness probe.**

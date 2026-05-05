@@ -173,6 +173,25 @@ async function cmdInspect(sessionId, opts = {}) {
       }
       throw e;
     }
+    // --aggregate --node <id>: drill into one node's cross-session
+    // stats. Useful when you've already identified the bottleneck
+    // and want to track its trend across runs without scrolling
+    // the full table.
+    if (opts.node) {
+      const nodeStat = stats.nodeStats[opts.node];
+      if (!nodeStat) {
+        console.error(`No node "${opts.node}" found across sessions in ${dir} (known: ${Object.keys(stats.nodeStats).join(', ') || 'none'})`);
+        process.exit(2);
+      }
+      console.log(JSON.stringify({
+        dir,
+        filter: opts.filter || null,
+        sessionCount: stats.sessionCount,
+        nodeId: opts.node,
+        ...nodeStat,
+      }, null, 2));
+      process.exit(0);
+    }
     console.log(JSON.stringify({ dir, filter: opts.filter || null, ...stats }, null, 2));
     process.exit(0);
   }

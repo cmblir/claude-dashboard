@@ -542,6 +542,53 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     });
   });
 
+  test('lazyclaw inspect --aggregate --node <id>: drill into one node across sessions', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'r1.json'), JSON.stringify({
+      sessionId: 'r1', order: ['fetch', 'embed'],
+      nodes: {
+        fetch: { status: 'success', durationMs: 80 },
+        embed: { status: 'success', durationMs: 1000 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    fs.writeFileSync(path.join(stateDir, 'r2.json'), JSON.stringify({
+      sessionId: 'r2', order: ['fetch', 'embed'],
+      nodes: {
+        fetch: { status: 'success', durationMs: 120 },
+        embed: { status: 'failed', error: 'timeout', durationMs: 5000 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+
+    const r = runCli(['inspect', '--dir', stateDir, '--aggregate', '--node', 'embed'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.nodeId).toBe('embed');
+    expect(out.sessionCount).toBe(2);
+    expect(out.count).toBe(2);
+    expect(out.successCount).toBe(1);
+    expect(out.failedCount).toBe(1);
+    expect(out.avgDurationMs).toBe(3000);
+    // Other nodes' stats are NOT included in this drill-down view.
+    expect(out.fetch).toBeUndefined();
+  });
+
+  test('lazyclaw inspect --aggregate --node: unknown node → exit 2 with helpful stderr', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'r1.json'), JSON.stringify({
+      sessionId: 'r1', order: ['a'], nodes: { a: { status: 'success', durationMs: 1 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['inspect', '--dir', stateDir, '--aggregate', '--node', 'never'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/No node "never" found across sessions/);
+  });
+
   test('lazyclaw inspect --aggregate --filter restricts the population (CLI + daemon parity)', async () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'st');
