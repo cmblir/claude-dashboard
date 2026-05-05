@@ -10,6 +10,49 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.51.0] — 2026-05-05
+
+**Daemon `GET /health` — conventional liveness probe.**
+
+Distinct from `/doctor` (readiness — checks config, providers,
+workflow state). `/health` is the "is the daemon up?" probe that
+load balancers, k8s liveness probes, and watchdog scripts expect
+at this conventional path.
+
+```
+GET /health
+→ 200 { "ok": true, "status": "alive",
+        "uptimeMs": 12345, "timestamp": "2026-05-05T..." }
+```
+
+### Liveness vs readiness
+- `/health` (this release) — **liveness**. Always 200 if the
+  process can respond. No config inspection, no provider probe.
+  Asks "is the process alive?"
+- `/doctor` (existing) — **readiness**. Returns 503 when config
+  is missing or the active provider is unconfigured. Asks "is
+  the daemon ready to serve traffic?"
+
+Standard k8s pattern: liveness restarts a stuck container,
+readiness pulls it from rotation without restarting. Same idea
+here.
+
+### Why no auth gate
+`/health` deliberately bypasses auth/Origin/rate-limit checks at
+the same precedence as `/version` — a liveness probe that
+requires credentials is a liveness probe that fails when
+credentials are stale. The endpoint reveals nothing private
+(uptime in ms, timestamp).
+
+### Tests
+2 new phase 6 specs:
+- happy path: 200 with `ok:true`, `status:'alive'`, numeric uptime
+- with no provider configured: `/health` still 200, `/doctor`
+  returns 503 (liveness ≠ readiness)
+
+Suite: 374 → 376 (+2); `tsc --noEmit` clean.
+
+---
 ## [3.50.0] — 2026-05-05  🎉 milestone
 
 **`--aggregate --filter` restricts the population (CLI + daemon).**

@@ -378,6 +378,18 @@ export function makeHandler(ctx) {
       switch (true) {
         case route === 'GET /version':
           return writeJson(res, 200, { version: ctx.version(), nodeVersion: process.version, platform: `${process.platform}-${process.arch}` });
+        case route === 'GET /health':
+          // Conventional liveness check — always 200 if the process
+          // is alive enough to hit the route. No config inspection
+          // (use /doctor for readiness), no provider probing — this
+          // is the "is the daemon up?" probe that load balancers
+          // and watchdog scripts expect at this path.
+          return writeJson(res, 200, {
+            ok: true,
+            status: 'alive',
+            uptimeMs: Date.now() - metrics.startedAtMs,
+            timestamp: new Date().toISOString(),
+          });
         case route === 'GET /metrics': {
           // Aggregate per-handler counters. cacheStats are pulled per
           // wrapped provider — we report a sum across all populated

@@ -1696,6 +1696,35 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     });
   }
 
+  test('daemon GET /health is a no-side-effect liveness probe', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/health`);
+      expect(r.status).toBe(200);
+      const body = await r.json();
+      expect(body.ok).toBe(true);
+      expect(body.status).toBe('alive');
+      expect(typeof body.uptimeMs).toBe('number');
+      expect(body.uptimeMs).toBeGreaterThanOrEqual(0);
+      expect(body.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /health works even with no provider configured (liveness != readiness)', async () => {
+    const dir = tmpConfigDir();
+    // No `lazyclaw config set provider ...` here. /doctor would 503
+    // (provider missing) but /health is still 200 — conventionally,
+    // liveness asks "is the process alive?" not "is it ready?"
+    const d = await startDaemonProc(dir);
+    try {
+      const h = await fetch(`${d.url}/health`);
+      expect(h.status).toBe(200);
+      const doctor = await fetch(`${d.url}/doctor`);
+      expect(doctor.status).toBe(503);   // unhealthy / not ready
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /version returns the version JSON', async () => {
     const dir = tmpConfigDir();
     const d = await startDaemonProc(dir);
