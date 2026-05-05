@@ -664,7 +664,7 @@ const SUBCOMMANDS = [
 const SUBCOMMAND_SUBS = {
   config:    ['get', 'set', 'list', 'delete', 'unset', 'path', 'edit'],
   sessions:  ['list', 'show', 'clear', 'export', 'search'],
-  skills:    ['list', 'show', 'install', 'remove'],
+  skills:    ['list', 'show', 'install', 'remove', 'search'],
   providers: ['list', 'info', 'test'],
   rates:     ['list', 'set', 'delete', 'shape'],
   completion: ['bash', 'zsh'],
@@ -898,7 +898,7 @@ const HELP_DETAILS = {
   status: 'Usage: lazyclaw status\n  Provider, model, and masked API key. Never prints the raw key.',
   onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
   sessions: 'Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>|search <query> [--regex]>\n  list — recent sessions by mtime; export — render as Markdown for sharing.\n  search — case-insensitive substring (or --regex pattern) match across all session content; returns first excerpt + match count per matching session.',
-  skills: 'Usage: lazyclaw skills <list|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>>\n  --from-url fetches over HTTPS only; 1 MiB body cap.',
+  skills: 'Usage: lazyclaw skills <list|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>|search <query> [--regex]>\n  --from-url fetches over HTTPS only; 1 MiB body cap.\n  search — case-insensitive substring (or --regex) match across all skill markdown bodies; returns first excerpt + match count per skill.',
   providers: 'Usage: lazyclaw providers <list | info <name> | test <name> [--model X] [--prompt T]>\n  list/info — static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.\n  test — send a 1-token "ping" through the provider and report ok/error + duration.\n         Useful after configuring an API key to verify it works before relying on it.',
   daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>] [--shutdown-timeout-ms <N>] [--cost-cap-<currency> <N> ...] [--workflow-state-dir <dir>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).\n  --shutdown-timeout-ms <N> caps graceful drain on SIGINT/SIGTERM (default 10000). Second signal forces immediate exit.\n  --cost-cap-usd 100 (or any currency code in lowercase) rejects POST /agent + /chat with 402 once cumulative cost reaches the cap.\n  --workflow-state-dir <dir> backs GET /workflows + GET /workflows/<id> (default .workflow-state, also reads $LAZYCLAW_WORKFLOW_STATE_DIR).',
   version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
@@ -1557,8 +1557,78 @@ async function cmdSkills(sub, positional, flags = {}) {
       console.log(JSON.stringify({ ok: true, removed: name }));
       return;
     }
+    case 'search': {
+      // Mirror of `lazyclaw sessions search` — case-insensitive substring
+      // by default, --regex for pattern mode. Returns per-skill match
+      // count + first-excerpt window (40 chars before/after match).
+      // The skill body IS markdown so users typically search for terms
+      // mentioned in instructions or examples.
+      const query = positional[0];
+      if (!query) { console.error('Usage: lazyclaw skills search <query> [--regex]'); process.exit(2); }
+      const useRegex = !!flags.regex;
+      let matcher;
+      if (useRegex) {
+        try { matcher = new RegExp(query, 'i'); }
+        catch (e) { console.error(`invalid regex: ${e.message}`); process.exit(2); }
+      } else {
+        const q = query.toLowerCase();
+        matcher = { test: (s) => String(s).toLowerCase().includes(q) };
+      }
+      const items = skillsMod.listSkills(cfgDir);
+      const matches = [];
+      for (const s of items) {
+        let body;
+        try { body = skillsMod.loadSkill(s.name, cfgDir); }
+        catch { continue; }   // file may have been removed mid-listing
+        // Count matches across the whole body, not per-line. For a
+        // skill body that's a few KB this is plenty fast and the count
+        // matches the user's intuition of "how many times does it
+        // mention X."
+        let matchCount = 0;
+        let firstExcerpt = null;
+        if (useRegex) {
+          // Re-anchor the regex with /gi so we can iterate; the original
+          // matcher was /i for boolean test() above. Rebuild here.
+          const gFlag = new RegExp(query, 'gi');
+          for (const m of body.matchAll(gFlag)) {
+            matchCount++;
+            if (firstExcerpt === null) {
+              const pos = m.index ?? 0;
+              const start = Math.max(0, pos - 40);
+              const end = Math.min(body.length, pos + m[0].length + 40);
+              firstExcerpt = (start > 0 ? '…' : '') + body.slice(start, end) + (end < body.length ? '…' : '');
+            }
+          }
+        } else {
+          const lower = body.toLowerCase();
+          const q = query.toLowerCase();
+          let pos = 0;
+          while (true) {
+            const i = lower.indexOf(q, pos);
+            if (i < 0) break;
+            matchCount++;
+            if (firstExcerpt === null) {
+              const start = Math.max(0, i - 40);
+              const end = Math.min(body.length, i + q.length + 40);
+              firstExcerpt = (start > 0 ? '…' : '') + body.slice(start, end) + (end < body.length ? '…' : '');
+            }
+            pos = i + q.length;
+          }
+        }
+        if (matchCount > 0) {
+          matches.push({
+            name: s.name,
+            bytes: s.bytes,
+            matchCount,
+            excerpt: firstExcerpt,
+          });
+        }
+      }
+      console.log(JSON.stringify({ query, regex: useRegex, matches }, null, 2));
+      return;
+    }
     default:
-      console.error('Usage: lazyclaw skills <list|show <name>|install <name> [--from path]|remove <name>>');
+      console.error('Usage: lazyclaw skills <list|show <name>|install <name> [--from path]|remove <name>|search <query> [--regex]>');
       process.exit(2);
   }
 }

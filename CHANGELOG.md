@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.28.0] — 2026-05-05
+
+**`lazyclaw skills search` (CLI + daemon) — content search for skill bodies.**
+
+Symmetric with the v3.23/v3.24 sessions search. Skill bodies are
+markdown — typically instructions or examples — and grow over
+time. Searching by content lets you find "the skill where I
+documented our error-code convention" without scrolling the list.
+
+```
+$ lazyclaw skills search "result<t"
+{
+  "query": "result<t", "regex": false,
+  "matches": [
+    { "name": "rust-style", "bytes": 412, "matchCount": 2,
+      "excerpt": "...Use `Result<T, E>` for fallible APIs..." }
+  ]
+}
+```
+
+### CLI flags
+- `--regex` — switches to JavaScript RegExp with `/gi` flags (case-
+  insensitive, all-matches). Without `--regex`, the query is a
+  case-insensitive substring.
+
+### Match-count semantics
+Matches are counted across the whole body (not per-line). For a
+skill of a few KB this is fast; for users that want per-line, the
+substring/regex output is paste-ready into `grep`.
+
+### Daemon: `GET /skills/search?q=...&regex=true`
+Same shape the CLI prints. A dashboard skill picker can call this
+endpoint instead of pulling every skill body and searching client-
+side. Validation matches `/sessions/search`: missing `q` → 400,
+invalid regex → 400 with the parse error.
+
+### Tests
+5 new phase 6 specs:
+- substring match returns excerpts + per-skill counts
+- `--regex` applies the pattern (E\d{4} match across two skills)
+- empty result → exit 0 with `matches: []`
+- invalid regex → exit 2 with helpful stderr
+- daemon `/skills/search` end-to-end (substring + regex + 400 error
+  paths)
+
+Suite: 322 → 327 (+5); `tsc --noEmit` clean.
+
+---
 ## [3.27.0] — 2026-05-05
 
 **`lazyclaw resume --parallel-persistent` — DAG resume parity.**

@@ -642,6 +642,61 @@ export function makeHandler(ctx) {
           }));
           return writeJson(res, 200, items);
         }
+        case route === 'GET /skills/search': {
+          // Mirror of `lazyclaw skills search`. ?q=<query> required;
+          // ?regex=true switches to regex mode. Returns
+          //   { query, regex, matches: [{ name, bytes, matchCount, excerpt }] }
+          // — same shape the CLI prints. A dashboard skill picker can
+          // hit this endpoint instead of pulling every skill body and
+          // searching client-side.
+          const q = url.searchParams.get('q');
+          if (!q) return writeJson(res, 400, { error: 'missing q query parameter' });
+          const useRegex = url.searchParams.get('regex') === 'true';
+          let matcher;
+          if (useRegex) {
+            try { matcher = new RegExp(q, 'gi'); }
+            catch (e) { return writeJson(res, 400, { error: `invalid regex: ${e.message}` }); }
+          }
+          const cfgDir = ctx.sessionsDirGetter();
+          const items = listSkills(cfgDir);
+          const matches = [];
+          for (const s of items) {
+            let body;
+            try { body = loadSkill(s.name, cfgDir); } catch { continue; }
+            let matchCount = 0;
+            let firstExcerpt = null;
+            if (useRegex) {
+              for (const m of body.matchAll(matcher)) {
+                matchCount++;
+                if (firstExcerpt === null) {
+                  const pos = m.index ?? 0;
+                  const start = Math.max(0, pos - 40);
+                  const end = Math.min(body.length, pos + m[0].length + 40);
+                  firstExcerpt = (start > 0 ? '…' : '') + body.slice(start, end) + (end < body.length ? '…' : '');
+                }
+              }
+            } else {
+              const lower = body.toLowerCase();
+              const ql = q.toLowerCase();
+              let pos = 0;
+              while (true) {
+                const i = lower.indexOf(ql, pos);
+                if (i < 0) break;
+                matchCount++;
+                if (firstExcerpt === null) {
+                  const start = Math.max(0, i - 40);
+                  const end = Math.min(body.length, i + ql.length + 40);
+                  firstExcerpt = (start > 0 ? '…' : '') + body.slice(start, end) + (end < body.length ? '…' : '');
+                }
+                pos = i + ql.length;
+              }
+            }
+            if (matchCount > 0) {
+              matches.push({ name: s.name, bytes: s.bytes, matchCount, excerpt: firstExcerpt });
+            }
+          }
+          return writeJson(res, 200, { query: q, regex: useRegex, matches });
+        }
         case req.method === 'GET' && !!skillMatch: {
           // GET /skills/<name> — full markdown body as text/markdown.
           // 404 when the file is missing so the caller can branch.

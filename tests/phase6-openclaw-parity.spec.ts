@@ -4625,6 +4625,83 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(caught?.code).toBe('ABORT');
   });
 
+  test('lazyclaw skills search: substring match across skill bodies', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'rust.md'),
+      '# Rust style\n\nUse `Result<T, E>` for fallible APIs. Avoid `unwrap()` in production code.\n');
+    fs.writeFileSync(path.join(dir, 'skills', 'python.md'),
+      '# Python style\n\nUse type hints. Avoid mutable default args. Run black + ruff.\n');
+    fs.writeFileSync(path.join(dir, 'skills', 'commit.md'),
+      '# Commits\n\nWrite imperative subject lines. Reference Result-style errors when relevant.\n');
+
+    const r = runCli(['skills', 'search', 'result'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.query).toBe('result');
+    expect(out.regex).toBe(false);
+    // 'result' appears in rust.md (Result<T,E>) and commit.md (Result-style).
+    expect(out.matches.map((m: any) => m.name).sort()).toEqual(['commit', 'rust']);
+    expect(out.matches.find((m: any) => m.name === 'rust').excerpt.toLowerCase()).toContain('result');
+  });
+
+  test('lazyclaw skills search --regex applies the pattern', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'logs.md'),
+      'Code E1023 should never appear in production.\nE2034 means a config issue.\n');
+    fs.writeFileSync(path.join(dir, 'skills', 'unrelated.md'),
+      'Some other content with no error codes.\n');
+
+    const r = runCli(['skills', 'search', 'E\\d{4}', '--regex'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.regex).toBe(true);
+    expect(out.matches.map((m: any) => m.name)).toEqual(['logs']);
+    expect(out.matches[0].matchCount).toBe(2);   // E1023 + E2034
+  });
+
+  test('lazyclaw skills search: empty result still exits 0', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'a.md'), 'hello world\n');
+    const r = runCli(['skills', 'search', 'nothing-matches'], dir);
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout).matches).toEqual([]);
+  });
+
+  test('lazyclaw skills search --regex rejects invalid regex with exit 2', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['skills', 'search', '[unclosed', '--regex'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/invalid regex/);
+  });
+
+  test('daemon GET /skills/search mirrors CLI skills search', async () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'skills', 'rust.md'),
+      '# Rust\nUse Result<T, E> for fallible APIs.\n');
+    fs.writeFileSync(path.join(dir, 'skills', 'go.md'),
+      '# Go\nUse error returns.\n');
+
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/skills/search?q=result`).then(x => x.json());
+      expect(r.matches.map((m: any) => m.name)).toEqual(['rust']);
+      expect(r.matches[0].matchCount).toBeGreaterThan(0);
+
+      const r2 = await fetch(`${d.url}/skills/search?q=Result.%2B%3F&regex=true`).then(x => x.json());
+      expect(r2.regex).toBe(true);
+      expect(r2.matches.map((m: any) => m.name)).toEqual(['rust']);
+
+      const bad1 = await fetch(`${d.url}/skills/search`);
+      expect(bad1.status).toBe(400);
+      const bad2 = await fetch(`${d.url}/skills/search?q=%5Bunclosed&regex=true`);
+      expect(bad2.status).toBe(400);
+    } finally { await d.kill(); }
+  });
+
   test('skills install + list + show + remove round-trip', () => {
     const dir = tmpConfigDir();
     const r1 = runCli(['skills', 'install', 'commit-style', '--from', __filename], dir);
