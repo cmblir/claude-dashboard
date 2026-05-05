@@ -12,7 +12,7 @@
 // the response is a single JSON object once the full reply has arrived.
 
 import http from 'node:http';
-import path from 'node:path';
+import nodePath from 'node:path';
 import fs from 'node:fs';
 
 import { PROVIDERS, PROVIDER_INFO, maskApiKey } from './providers/registry.mjs';
@@ -599,6 +599,35 @@ export function makeHandler(ctx) {
             return writeJson(res, 200, { ok: true, id });
           } catch (err) {
             return writeJson(res, 400, { error: err?.message || String(err) });
+          }
+        }
+        case req.method === 'DELETE' && !!workflowMatch: {
+          // DELETE /workflows/<sessionId> — idempotent: 200 with
+          // `removed: true|false`. Same protection as the rest of the
+          // delete routes — only files inside the configured state dir
+          // are touched. The path matcher already rejects `..` and `/`,
+          // and we re-resolve via path.join so a sessionId that resolves
+          // outside the dir is rejected with 400.
+          const sid = workflowMatch[1];
+          const stateDir = ctx.workflowStateDir();
+          // Note: `path` is shadowed inside this handler by the URL path
+          // variable above — use `nodePath` (aliased import) for fs ops.
+          const file = nodePath.join(stateDir, `${sid}.json`);
+          // Confined-path check: file must resolve under stateDir. fs.realpathSync
+          // would resolve symlinks too, but the dir may not exist yet — use
+          // the resolved string-prefix check, which is enough since stateDir
+          // is operator-controlled.
+          const resolvedDir = nodePath.resolve(stateDir);
+          const resolvedFile = nodePath.resolve(file);
+          if (!resolvedFile.startsWith(resolvedDir + nodePath.sep) && resolvedFile !== resolvedDir) {
+            return writeJson(res, 400, { error: 'invalid sessionId' });
+          }
+          try {
+            const existed = fs.existsSync(resolvedFile);
+            if (existed) fs.unlinkSync(resolvedFile);
+            return writeJson(res, 200, { ok: true, sessionId: sid, removed: existed });
+          } catch (err) {
+            return writeJson(res, 500, { error: err?.message || String(err) });
           }
         }
         case route === 'POST /chat': {

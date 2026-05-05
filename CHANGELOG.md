@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.13.0] — 2026-05-05
+
+**Daemon: `DELETE /workflows/<id>` — idempotent state-file cleanup.**
+
+Symmetric with `DELETE /sessions/<id>` and `DELETE /skills/<name>`.
+Lets a dashboard / CI script clear out stale workflow state without
+shelling out to `rm`.
+
+```
+DELETE /workflows/job-2026-05-05
+→ 200 { "ok": true, "sessionId": "job-2026-05-05", "removed": true }
+
+# Same id, second call
+DELETE /workflows/job-2026-05-05
+→ 200 { "ok": true, "sessionId": "job-2026-05-05", "removed": false }
+```
+
+### Idempotency
+The endpoint is idempotent: it returns `200` regardless of whether
+the file existed. The `removed` boolean tells the caller which case
+they hit. This matches the existing `DELETE /sessions/<id>` and
+`DELETE /skills/<name>` shape so a UI's reset button has uniform
+semantics.
+
+### Confined-path check
+`sessionId` is resolved against the configured state dir using
+`path.resolve` + prefix check. A sessionId that resolves outside
+the directory is rejected with `400 invalid sessionId`. So a
+URL-encoded `..` can't reach files under `~` or `/etc`.
+
+### Internal cleanup
+While here: aliased the daemon's `node:path` import as `nodePath`.
+Inside the request handler, a local variable named `path` (the URL
+pathname) was shadowing the module — calling `path.join` from any
+new route would silently fail with "is not a function". The
+existing routes happened not to call `path.join` directly, so the
+bug was latent until the new DELETE handler did. Caught by tests.
+
+### Tests
+2 new phase 6 specs:
+- `DELETE /workflows/<id>` is idempotent (200 on existing AND
+  missing, with `removed:true|false`)
+- `DELETE /workflows/<id>` rejects sessionIds that resolve outside
+  the state dir — the planted "outside" file stays untouched
+
+Suite: 285 → 287 (+2); `tsc --noEmit` clean.
+
+---
 ## [3.12.0] — 2026-05-05
 
 **Daemon: `GET /workflows` and `GET /workflows/<id>` — workflow state over HTTP.**

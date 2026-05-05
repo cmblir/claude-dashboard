@@ -912,6 +912,54 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon DELETE /workflows/<id> is idempotent (200 on existing AND missing)', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'wf-del');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'doomed.json'), JSON.stringify({
+      sessionId: 'doomed',
+      order: ['x'],
+      nodes: { x: { status: 'success', output: 1, attempts: 1 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      // First delete: existed.
+      const r1 = await fetch(`${d.url}/workflows/doomed`, { method: 'DELETE' }).then(x => x.json());
+      expect(r1).toEqual({ ok: true, sessionId: 'doomed', removed: true });
+      expect(fs.existsSync(path.join(stateDir, 'doomed.json'))).toBe(false);
+      // Second delete: same id, now missing → still 200 with removed:false.
+      const r2 = await fetch(`${d.url}/workflows/doomed`, { method: 'DELETE' }).then(x => x.json());
+      expect(r2).toEqual({ ok: true, sessionId: 'doomed', removed: false });
+      // Never-existed id: same shape.
+      const r3 = await fetch(`${d.url}/workflows/never-existed`, { method: 'DELETE' }).then(x => x.json());
+      expect(r3).toEqual({ ok: true, sessionId: 'never-existed', removed: false });
+    } finally { await d.kill(); }
+  });
+
+  test('daemon DELETE /workflows/<id> rejects sessionIds that escape the state dir', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'wf-confined');
+    fs.mkdirSync(stateDir, { recursive: true });
+    // Plant a file outside the state dir to confirm it's untouched.
+    const outside = path.join(dir, 'outside-state.json');
+    fs.writeFileSync(outside, '"not workflow state"');
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      // The path matcher /\/workflows\/([^/]+)$/ already rejects literal
+      // slashes, but URL-decoded `..%2Fsomething` could decode to `../`.
+      // We're not URL-decoding the segment ourselves, but let's verify the
+      // confinement check does its job either way.
+      const sneaky = '..%2Foutside-state';
+      const res = await fetch(`${d.url}/workflows/${sneaky}`, { method: 'DELETE' });
+      // Either 400 (matcher rejected the decoded path) or 200 with
+      // removed:false — what we MUST NOT see is `outside-state.json`
+      // being deleted.
+      expect([200, 400]).toContain(res.status);
+      expect(fs.existsSync(outside)).toBe(true);
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /workflows/<id> returns full state shape; 404 on missing', async () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'wf2');
