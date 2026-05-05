@@ -10,6 +10,35 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.34.0] — 2026-05-05
+
+**Daemon `GET /sessions?filter=...&limit=...` mirrors CLI v3.33.**
+
+A dashboard's session sidebar can now ask the daemon for the
+filtered + capped list directly instead of pulling the full list
+and filtering client-side. Same composition semantic the CLI has
+(filter first, then limit).
+
+```
+GET /sessions?filter=algo&limit=5
+→ 200 [<at most 5 sessions whose id contains 'algo'>]
+
+GET /sessions
+→ 200 [<full list, unchanged from v3.33 behavior>]
+```
+
+### Boundary cases (matching CLI)
+- `?limit=0` or non-numeric → ignored (full filtered list).
+- `?filter` with no matches → empty array (not 404, not error).
+- Both omitted → unchanged response shape (backward-compatible).
+
+### Tests
+1 new phase 6 spec covering filter alone, limit alone, both
+composed, and the unchanged no-flags path.
+
+Suite: 340 → 341 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.33.0] — 2026-05-05
 
 **`lazyclaw sessions list --filter <substr> --limit <N>`.**

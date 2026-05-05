@@ -480,7 +480,20 @@ export function makeHandler(ctx) {
           });
         }
         case route === 'GET /sessions': {
-          const list = ctx.sessionsMod.listSessions(ctx.sessionsDirGetter());
+          // ?filter=<substr> case-insensitive id substring;
+          // ?limit=<N> caps post-filter count.
+          // Same composition (filter then limit) as v3.33's CLI flag.
+          let list = ctx.sessionsMod.listSessions(ctx.sessionsDirGetter());
+          const filter = url.searchParams.get('filter');
+          if (filter) {
+            const f = filter.toLowerCase();
+            list = list.filter(s => s.id.toLowerCase().includes(f));
+          }
+          const limitStr = url.searchParams.get('limit');
+          if (limitStr) {
+            const n = parseInt(limitStr, 10);
+            if (Number.isFinite(n) && n > 0) list = list.slice(0, n);
+          }
           return writeJson(res, 200, list.map(s => ({ id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString() })));
         }
         case route === 'GET /sessions/search': {

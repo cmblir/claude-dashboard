@@ -1431,6 +1431,33 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /sessions?filter=&limit= mirrors CLI sessions list flags', async () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    for (const id of ['algo-1', 'algo-2', 'react-x', 'misc']) {
+      fs.writeFileSync(path.join(dir, 'sessions', `${id}.jsonl`),
+        JSON.stringify({ role: 'user', content: 'x', ts: 1 }) + '\n');
+    }
+
+    const d = await startDaemonProc(dir);
+    try {
+      const r1 = await fetch(`${d.url}/sessions?filter=algo`).then(x => x.json());
+      expect(r1.map((s: any) => s.id).sort()).toEqual(['algo-1', 'algo-2']);
+
+      const r2 = await fetch(`${d.url}/sessions?limit=2`).then(x => x.json());
+      expect(r2).toHaveLength(2);
+
+      // Composition: filter first, then limit.
+      const r3 = await fetch(`${d.url}/sessions?filter=algo&limit=1`).then(x => x.json());
+      expect(r3).toHaveLength(1);
+      expect(r3[0].id).toMatch(/^algo-/);
+
+      // No flags = unchanged behavior (full list).
+      const r4 = await fetch(`${d.url}/sessions`).then(x => x.json());
+      expect(r4).toHaveLength(4);
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /sessions/<id>/export?format=... mirrors CLI exporter (md/json/text)', async () => {
     const dir = tmpConfigDir();
     fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
