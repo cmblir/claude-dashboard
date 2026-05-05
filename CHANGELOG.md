@@ -10,6 +10,117 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.65.0] — 2026-05-06  🚀 live TTY injection
+
+**Auto-Resume now actually injects into the live terminal.**
+
+v3.63.0 documented an architectural limit: auto-resume spawned
+`claude --resume <id> -p <prompt>` as a separate subprocess that
+wrote to the JSONL file — but the user's live terminal stayed
+frozen at whatever rate-limit prompt was blocking input. The user
+asked for a real fix.
+
+This release adds **direct live keystroke injection on macOS**:
+
+```
+POST /api/auto_resume/inject_live
+{
+  "sessionId": "<live-claude-session>",
+  "prompt": "계속 시작.",
+  "pressChoice": "1",          // optional, default "1"; null/"" to skip
+  "allowSystemEvents": true    // optional, default true
+}
+
+→ {
+    "ok": true,
+    "mechanism": "system-events:Warp",
+    "tty": "/dev/ttys000",
+    "terminalApp": "Warp",
+    "tried": ["system-events:Warp"]
+  }
+```
+
+### Two strategies — automatic dispatch
+
+**Strategy A — TTY-targeted AppleScript (iTerm, Terminal.app)**:
+walks every iTerm session / Terminal tab via AppleScript, matches
+on `tty of session/tab`, sends `write text "..." newline 1`.
+Doesn't disturb focus.
+
+**Strategy B — System Events keystroke (Warp, kitty, alacritty,
+wezterm, IDE terminals)**: walks the process tree from PID upward
+to detect the host terminal, activates it, sends keystrokes via
+clipboard-paste:
+
+```
+1. Save current clipboard
+2. tell application "<DetectedApp>" to activate; delay 0.30s
+3. For each keystroke (e.g. "1", then "계속 시작."):
+     set the clipboard to <text>
+     keystroke "v" using command down  -- Cmd+V
+     key code 36                        -- Return
+4. Restore clipboard
+```
+
+Clipboard-paste handles arbitrary Unicode (Korean, emoji)
+without depending on the active keyboard layout — `keystroke
+"한글"` is unreliable; `set clipboard + Cmd+V` is not.
+
+### Smart routing
+When the process tree shows the terminal is non-iTerm/Terminal
+(e.g. Warp), Strategy A is **skipped** to avoid multi-second
+AppleScript walks that would only fail. Detected:
+iTerm/Terminal/Warp/kitty/WezTerm/Alacritty/Ghostty/Hyper/Tabby/
+VS Code/Cursor — extensible via `_TERMINAL_APPS_BY_CMD`.
+
+### "Press 1 first" — exactly what was requested
+> 만약 1, 2와 같은 선택지가 나온다면 자동으로 1을 누르고 바로
+> 유저가 요청한 내용 주입.
+
+`pressChoice="1"` (default) sends `1` + Return as its own
+keystroke before the prompt. Dismisses "1) Continue / 2) Quit"
+rate-limit selections; harmless `1<enter>` noise if no prompt.
+Pass `null` / `""` / `"skip"` to disable.
+
+### Permissions
+First call surfaces a system dialog: "python3 wants to control
+your computer using accessibility features." Grant once in
+System Settings → Privacy & Security → Accessibility. Error
+codes `1002` / `-1719` (Accessibility denied) carry an actionable
+hint pointing at this setting.
+
+### Tests — 41 new pytest specs
+`tests/test_auto_resume_inject.py` covers:
+- TTY resolution (`ps -o tty=`, edge cases)
+- Process-tree walk for terminal detection (Warp, iTerm,
+  unknown, circular ppid, root)
+- AppleScript escaping (`"`, `\`, newlines)
+- iTerm + Terminal.app + System Events script composition
+  (TTY embedded, Cmd+V/Return key code 36, Unicode)
+- `inject_live` strategy dispatch:
+  - Smart routing skips A when detected isn't iTerm/Terminal
+  - Unknown terminal still tries A
+  - System Events disabled returns clear error
+  - All-fail surfaces last_err with terminal name
+- API endpoint:
+  - Missing fields, `pressChoice` null normalisation, default `"1"`
+  - PID resolution from sessions monitor → fallback to entry
+  - Missing PID → error
+
+**Live verification on actual Warp session**: bound auto-resume
+to my live session (PID 5154, TTY /dev/ttys000), POSTed
+inject_live with prompt "계속 시작." and pressChoice="1". Result
+ok=true; the keystrokes landed in the live Warp input area as
+user-typed text — confirmed end-to-end.
+
+Suite: pytest 451 → 491 (+40); Playwright unchanged.
+
+### Limits
+- Strategy B activates the target app (focus shift). Pass
+  `allowSystemEvents: false` to disable.
+- macOS only. Linux would need xdotool / wlroots — separate PR.
+
+---
 ## [3.64.0] — 2026-05-06  daemon: GET /config + GET /config/<key>
 
 Adds two new daemon read endpoints that mirror `lazyclaw config list` and

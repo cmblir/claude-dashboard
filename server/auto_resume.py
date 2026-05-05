@@ -685,6 +685,73 @@ def api_auto_resume_set(body: dict) -> dict:
     return out
 
 
+def api_auto_resume_inject_live(body: dict) -> dict:
+    """Live keystroke injection into the user's terminal (macOS).
+
+    Distinct from the supervised "spawn `claude --resume` as a
+    separate subprocess" path — this writes keystrokes to the live
+    iTerm2 / Terminal.app session that owns the target PID, so a
+    user stuck at a "1) Continue 2) Quit" rate-limit prompt actually
+    advances.
+
+    Request shape (all optional unless marked):
+      {
+        "sessionId": str,        # required: must be a known live CLI session
+        "prompt":    str,        # required: text to inject after any choice key
+        "pressChoice": str|null  # optional: defaults to "1"; pass null/"" to skip
+      }
+
+    Response: forwards the inject_live() report verbatim.
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "body must be object"}
+    session_id = (body.get("sessionId") or "").strip()
+    if not session_id:
+        return {"ok": False, "error": "sessionId required"}
+    prompt = (body.get("prompt") or "").strip()
+    if not prompt:
+        return {"ok": False, "error": "prompt required (cannot be empty)"}
+    # press_choice: explicit None / empty / "skip" → no choice key.
+    pc_raw = body.get("pressChoice", "1")
+    if pc_raw is None or pc_raw == "" or pc_raw == "skip":
+        press_choice: Optional[str] = None
+    else:
+        press_choice = str(pc_raw)
+    # allow_system_events: opt-out of the focus-stealing fallback
+    # for users who only want the safer TTY-targeted strategy.
+    # Default True so most non-iTerm2/Terminal.app users (Warp,
+    # kitty, IDE terminals, ...) get something working.
+    allow_se = body.get("allowSystemEvents")
+    if allow_se is None:
+        allow_se = True
+    allow_se = bool(allow_se)
+
+    # Resolve the PID. Prefer the LIVE map (live_cli_sessions) over
+    # the auto-resume entry's stored pid — the entry's pid can be
+    # stale if the user reopened claude.
+    live_map = _live_cli_sessions()
+    rec = live_map.get(session_id)
+    pid: Optional[int] = None
+    if rec and rec.get("pid"):
+        try:
+            pid = int(rec["pid"])
+        except Exception:
+            pid = None
+    if pid is None:
+        store = _load_all()
+        entry = store.get(session_id) or {}
+        try:
+            pid = int(entry.get("pid")) if entry.get("pid") is not None else None
+        except Exception:
+            pid = None
+    if not pid:
+        return {"ok": False, "error": f"no live PID for session {session_id}"}
+
+    from .auto_resume_inject import inject_live as _inject
+    result = _inject(pid, prompt, press_choice=press_choice, allow_system_events=allow_se)
+    return {"ok": bool(result.get("ok")), **result}
+
+
 def api_auto_resume_cancel(body: dict) -> dict:
     if not isinstance(body, dict):
         return {"ok": False, "error": "body must be object"}

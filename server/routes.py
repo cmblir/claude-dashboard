@@ -173,7 +173,8 @@ from .ollama_hub import (
 from .auto_resume import (
     api_auto_resume_advise,
     api_auto_resume_cancel, api_auto_resume_get,
-    api_auto_resume_hook_status, api_auto_resume_install_hooks,
+    api_auto_resume_hook_status, api_auto_resume_inject_live,
+    api_auto_resume_install_hooks,
     api_auto_resume_prune_stale,
     api_auto_resume_set, api_auto_resume_status,
     api_auto_resume_uninstall_hooks,
@@ -640,6 +641,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/prompt-library/duplicate": api_prompt_library_duplicate,
     "/api/prompt-library/to-workflow": api_prompt_library_to_workflow,
     "/api/auto_resume/set": api_auto_resume_set,
+    "/api/auto_resume/inject_live": api_auto_resume_inject_live,
     "/api/auto_resume/cancel": api_auto_resume_cancel,
     "/api/auto_resume/advise": api_auto_resume_advise,
     "/api/auto_resume/install_hooks": api_auto_resume_install_hooks,
