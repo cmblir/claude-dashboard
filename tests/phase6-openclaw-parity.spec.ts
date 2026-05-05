@@ -402,6 +402,39 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(fs.existsSync(outside)).toBe(true);
   });
 
+  test('lazyclaw inspect --summary trims per-node detail in single-session mode', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job',
+      order: ['a', 'b', 'c'],
+      nodes: {
+        a: { status: 'success', output: 'A', attempts: 1, durationMs: 5 },
+        b: { status: 'success', output: 'B', attempts: 1, durationMs: 7 },
+        c: { status: 'pending', attempts: 0 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+
+    // Default: full output includes nodes + order.
+    const full = JSON.parse(runCli(['inspect', 'job', '--dir', stateDir], dir).stdout);
+    expect(full.nodes).toBeDefined();
+    expect(full.order).toEqual(['a', 'b', 'c']);
+
+    // --summary trims them.
+    const compact = JSON.parse(runCli(['inspect', 'job', '--dir', stateDir, '--summary'], dir).stdout);
+    expect(compact.nodes).toBeUndefined();
+    expect(compact.order).toBeUndefined();
+    // But summary block, failedNodes, and timestamps are preserved.
+    expect(compact.summary.total).toBe(3);
+    expect(compact.summary.success).toBe(2);
+    expect(compact.summary.pending).toBe(1);
+    expect(compact.failedNodes).toEqual([]);
+    expect(compact.startedAt).toBe(1);
+    expect(compact.updatedAt).toBe(2);
+  });
+
   test('lazyclaw inspect --status filters list mode by lifecycle bucket', () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'st');

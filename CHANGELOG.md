@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.17.0] — 2026-05-05
+
+**`lazyclaw inspect --summary` — concise mode for single-session inspection.**
+
+By default, `lazyclaw inspect <id>` prints the full state object
+including the per-node `nodes` map and `order` array. For workflows
+with many nodes that's a lot of JSON to read. `--summary` trims to
+the essentials, matching the per-session shape that list-mode
+already produces.
+
+```
+$ lazyclaw inspect my-job --summary
+{
+  "sessionId": "my-job",
+  "dir": ".workflow-state",
+  "summary": { "total": 12, "success": 8, "pending": 4, "done": false, "resumable": true, ... },
+  "failedNodes": [],
+  "startedAt": ..., "updatedAt": ...
+}
+```
+
+### Why this shape
+The trimmed shape matches `lazyclaw inspect` (no-arg) per-session
+output exactly. So a script that processes either mode can use
+the same reducer:
+
+```bash
+# Iterate over every session including details for one of them
+lazyclaw inspect              # list every session
+lazyclaw inspect my-job --summary    # one session, same shape
+```
+
+### Tests
+1 new phase 6 spec covering the trim (default keeps `nodes` +
+`order`; `--summary` drops them) plus preservation of the
+`summary`, `failedNodes`, and timestamp fields.
+
+Suite: 293 → 294 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.16.0] — 2026-05-05
 
 **Daemon: `GET /workflows?status=…` mirrors the CLI's `--status` filter.**

@@ -201,16 +201,31 @@ async function cmdInspect(sessionId, opts = {}) {
     process.exit(2);
   }
   const { summary, failedNodes } = summarizeState(state);
-  const out = {
-    sessionId: state.sessionId,
-    dir,
-    summary,
-    failedNodes,
-    order: state.order,
-    nodes: state.nodes,
-    startedAt: state.startedAt,
-    updatedAt: state.updatedAt,
-  };
+  // --summary trims the per-node `nodes` map and `order` from the
+  // single-session output, leaving only `summary` + `failedNodes` +
+  // timestamps. Useful for "I just want the headline" — the same
+  // shape list-mode produces per session, so a script can normalize
+  // output across both modes by passing --summary in single mode.
+  const compact = !!opts.summary;
+  const out = compact
+    ? {
+        sessionId: state.sessionId,
+        dir,
+        summary,
+        failedNodes,
+        startedAt: state.startedAt,
+        updatedAt: state.updatedAt,
+      }
+    : {
+        sessionId: state.sessionId,
+        dir,
+        summary,
+        failedNodes,
+        order: state.order,
+        nodes: state.nodes,
+        startedAt: state.startedAt,
+        updatedAt: state.updatedAt,
+      };
   console.log(JSON.stringify(out, null, 2));
   if (summary.done) process.exit(1);
   if (summary.failed > 0) process.exit(3);
@@ -679,7 +694,7 @@ const HELP_SUMMARIES = {
 const HELP_DETAILS = {
   run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
-  inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
+  inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
   config: 'Usage: lazyclaw config <get|set|list|delete|path|edit> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
@@ -1452,6 +1467,7 @@ const BOOLEAN_FLAGS = new Set([
   'response-cache',
   'help',         // also handled as a subcommand alias
   'version',
+  'summary',      // inspect: trim per-node detail
 ]);
 
 function parseArgs(argv) {
@@ -1509,7 +1525,7 @@ async function main() {
       // Pass the empty positional through; cmdInspect's list mode
       // handles it.
       const [sessionId] = rest.positional;
-      await cmdInspect(sessionId, { dir: rest.flags.dir, status: rest.flags.status });
+      await cmdInspect(sessionId, { dir: rest.flags.dir, status: rest.flags.status, summary: !!rest.flags.summary });
       break;
     }
     case 'clear': {
