@@ -387,6 +387,37 @@ async function cmdDoctor() {
   if (cfg.provider && !PROVIDERS_HAS(_registryMod.PROVIDERS, cfg.provider)) {
     issues.push(`unknown provider "${cfg.provider}" — registered: ${Object.keys(_registryMod.PROVIDERS).join(', ')}`);
   }
+  // Workflow state health — informational counters that show whether
+  // the user has any failed or stuck workflow runs to attend to. We
+  // don't push these to `issues` (a stuck workflow doesn't break the
+  // CLI) but they surface in the output so `lazyclaw doctor | jq` can
+  // surface them in dashboards.
+  const stateDir = process.env.LAZYCLAW_WORKFLOW_STATE_DIR || '.workflow-state';
+  let workflows = null;
+  try {
+    const { listSessions } = await import('./workflow/summary.mjs');
+    if (fs.existsSync(stateDir)) {
+      const sessions = listSessions(stateDir);
+      const counts = { total: sessions.length, done: 0, resumable: 0, failed: 0, running: 0 };
+      for (const s of sessions) {
+        if (s.summary.done)         counts.done++;
+        if (s.summary.resumable)    counts.resumable++;
+        if (s.summary.failed > 0)   counts.failed++;
+        if (s.summary.running > 0)  counts.running++;
+      }
+      workflows = { dir: stateDir, ...counts };
+      // Surface a hint when there are stuck runs that the engine will
+      // demote to pending on next load — this often signals a process
+      // that crashed; the user should at least know.
+      if (counts.running > 0) {
+        issues.push(`${counts.running} workflow session(s) have 'running' nodes from a prior interrupted run — they will be demoted to pending on next resume.`);
+      }
+    } else {
+      workflows = { dir: stateDir, present: false };
+    }
+  } catch (e) {
+    workflows = { dir: stateDir, error: e?.message || String(e) };
+  }
   const ok = issues.length === 0;
   const out = {
     ok,
@@ -398,6 +429,7 @@ async function cmdDoctor() {
     platform: `${process.platform}-${process.arch}`,
     issues,
     knownProviders: Object.keys(_registryMod.PROVIDERS),
+    workflows,
     timestamp: new Date().toISOString(),
   };
   console.log(JSON.stringify(out, null, 2));

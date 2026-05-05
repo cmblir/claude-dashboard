@@ -1,0 +1,730 @@
+{
+  "features": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "onboarding": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "guideHub": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "overview": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "projects": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "analytics": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "aiEval": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "sessions": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "workflows": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "aiProviders": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "agents": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "projectAgents": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "skills": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "commands": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "promptCache": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "thinkingLab": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "toolUseLab": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "batchJobs": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "apiFiles": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "visionLab": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "modelBench": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "serverTools": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "citationsLab": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "agentSdkScaffold": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "embeddingLab": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "promptLibrary": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "rtk": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "sessionReplay": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "eventForwarder": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "learner": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "securityScan": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "artifacts": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "orchestrator": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "ralph": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "claudeDocs": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "hooks": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "permissions": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "mcp": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "plugins": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "settings": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "claudemd": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "zclaude": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "outputStyles": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "statusline": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "plans": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "envConfig": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "modelConfig": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "ideStatus": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "marketplaces": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "scheduled": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "usage": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "costsTimeline": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "metrics": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "memory": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "tasks": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "backups": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "bashHistory": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "telemetry": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "homunculus": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "team": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "system": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "openPorts": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "cliSessions": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "memoryManager": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  },
+  "autoResumeManager": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch",
+      "addDialog: hasSelect=true options=6",
+      "autofill: sid=d5934f1c cwd=/Users/o/lazyclaude"
+    ]
+  },
+  "backupRestore": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "overflow": [],
+    "clipped": [],
+    "notes": [
+      "view did not switch"
+    ]
+  }
+}

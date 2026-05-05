@@ -37,6 +37,54 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     });
   });
 
+  test('doctor reports workflow state directory health', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    // No workflow state dir yet → workflows.present:false (no error).
+    const r1 = runCli(['doctor'], dir, { LAZYCLAW_WORKFLOW_STATE_DIR: path.join(dir, 'no-such') });
+    const o1 = JSON.parse(r1.stdout);
+    expect(o1.workflows).toEqual({ dir: path.join(dir, 'no-such'), present: false });
+
+    // With state files: counters reflect the on-disk shapes.
+    const stateDir = path.join(dir, 'wf-state');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'done.json'), JSON.stringify({
+      sessionId: 'done', order: ['x'],
+      nodes: { x: { status: 'success', attempts: 1 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    fs.writeFileSync(path.join(stateDir, 'broken.json'), JSON.stringify({
+      sessionId: 'broken', order: ['x'],
+      nodes: { x: { status: 'failed', error: 'boom', attempts: 3 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r2 = runCli(['doctor'], dir, { LAZYCLAW_WORKFLOW_STATE_DIR: stateDir });
+    const o2 = JSON.parse(r2.stdout);
+    expect(o2.workflows).toMatchObject({
+      dir: stateDir, total: 2, done: 1, failed: 1, resumable: 0, running: 0,
+    });
+  });
+
+  test('doctor flags running-state nodes as a non-fatal issue (likely interrupted run)', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const stateDir = path.join(dir, 'wf-running');
+    fs.mkdirSync(stateDir, { recursive: true });
+    // Simulate a SIGKILL'd run — node still tagged running.
+    fs.writeFileSync(path.join(stateDir, 'stuck.json'), JSON.stringify({
+      sessionId: 'stuck', order: ['a'],
+      nodes: { a: { status: 'running', attempts: 1 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['doctor'], dir, { LAZYCLAW_WORKFLOW_STATE_DIR: stateDir });
+    expect(r.status).toBe(1);   // ok=false because issues array now non-empty
+    const out = JSON.parse(r.stdout);
+    expect(out.issues).toEqual(expect.arrayContaining([
+      expect.stringContaining("'running' nodes from a prior interrupted run"),
+    ]));
+    expect(out.workflows.running).toBe(1);
+  });
+
   test('doctor flags missing config as not ok', () => {
     const dir = tmpConfigDir();
     const r = runCli(['doctor'], dir);

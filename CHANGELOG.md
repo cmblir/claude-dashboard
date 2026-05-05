@@ -10,6 +10,52 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.19.0] — 2026-05-05
+
+**`lazyclaw doctor` reports workflow state health.**
+
+`doctor` now surfaces a `workflows` block — total persisted
+sessions plus per-bucket counts (done / resumable / failed /
+running). Useful for monitoring scripts that pipe `doctor | jq`
+into a dashboard.
+
+```
+$ lazyclaw doctor
+{
+  "ok": true, "configPath": "...", "provider": "anthropic",
+  ...
+  "workflows": {
+    "dir": ".workflow-state",
+    "total": 12, "done": 8, "resumable": 3, "failed": 1, "running": 0
+  }
+}
+```
+
+### "running" nodes flag a non-fatal issue
+A `running` status in a state file usually means a process was
+SIGKILL'd mid-run. The engine demotes those to `pending` on next
+load, so it's not a blocker — but the user should know. Doctor
+adds an `issues` entry mentioning the count, so `ok` flips to
+`false` and exit code becomes 1. (Same shape as missing-provider
+issues — surfaces in the existing CLI failure path without a
+new error category.)
+
+### Configuration
+The state dir is read from `LAZYCLAW_WORKFLOW_STATE_DIR` (env)
+with a default of `.workflow-state` (cwd-relative). Same
+resolution as the daemon and `lazyclaw inspect`, so `doctor`
+checks the same files those tools read.
+
+### Tests
+2 new phase 6 specs:
+- doctor reports workflow state health (counters reflect on-disk
+  shapes; missing dir → `present: false`)
+- running-state nodes surface as a non-fatal issue (ok=false,
+  exit 1, `workflows.running` populated)
+
+Suite: 298 → **300** (+2); `tsc --noEmit` clean.
+
+---
 ## [3.18.0] — 2026-05-05
 
 **Workflow: bounded concurrency for parallel engines.**
