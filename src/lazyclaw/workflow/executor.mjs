@@ -29,6 +29,38 @@ import { performance } from 'node:perf_hooks';
  */
 
 /**
+ * Per-node retry helper. Honored by both runSequential and runParallel:
+ * when `node.retry = { max: N, baseDelayMs: M }`, a throwing execute()
+ * is retried up to N times with exponential backoff (baseDelayMs × 2^attempt).
+ * Default baseDelayMs is 100. attempt counter is exposed via `attempts`
+ * so a node can branch on it if needed.
+ *
+ * Returns the eventual successful output, or rethrows the LAST error
+ * after exhausting retries — preserving the original error type so the
+ * outer engine's failure path is unchanged.
+ *
+ * Exported for unit testing without spinning up a full workflow.
+ *
+ * @param {() => Promise<unknown>} fn
+ * @param {{ max: number, baseDelayMs?: number, sleep?: (ms: number) => Promise<void> }} opts
+ */
+export async function retryWithBackoff(fn, opts) {
+  const max = Math.max(0, Number(opts.max) || 0);
+  const baseDelay = Number(opts.baseDelayMs) || 100;
+  const sleep = opts.sleep || (ms => new Promise(r => setTimeout(r, ms)));
+  let lastErr = null;
+  for (let attempt = 0; attempt <= max; attempt++) {
+    try { return await fn(); }
+    catch (err) {
+      lastErr = err;
+      if (attempt >= max) break;
+      await sleep(baseDelay * Math.pow(2, attempt));
+    }
+  }
+  throw lastErr;
+}
+
+/**
  * Run a flat list of nodes sequentially, threading the output of each into
  * the next. On any throw, run cleanup hooks on every started node and clear
  * the in-memory session record.
@@ -50,7 +82,9 @@ export async function runSequential(nodes, initialInput = null) {
     started.push(node);
     const t0 = performance.now();
     try {
-      const output = await node.execute(input);
+      const output = node.retry && Number.isFinite(node.retry.max) && node.retry.max > 0
+        ? await retryWithBackoff(() => node.execute(input), node.retry)
+        : await node.execute(input);
       const duration = performance.now() - t0;
       results.push({ id: node.id, duration, output, status: 'success' });
       session[node.id] = output;
@@ -167,7 +201,9 @@ export async function runParallel(nodes, opts = {}) {
         : Object.fromEntries(deps.map(d => [d, session[d]]));
       const t0 = performance.now();
       try {
-        const output = await node.execute(input);
+        const output = node.retry && Number.isFinite(node.retry.max) && node.retry.max > 0
+          ? await retryWithBackoff(() => node.execute(input), node.retry)
+          : await node.execute(input);
         const duration = performance.now() - t0;
         return { ok: true, record: { id, duration, output, status: /** @type {'success'} */('success') } };
       } catch (err) {

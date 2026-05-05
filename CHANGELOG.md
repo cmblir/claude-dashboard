@@ -10,6 +10,61 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.4.0] — 2026-05-05
+
+**Workflow: per-node retry policy with exponential backoff.**
+
+Both `runSequential` and `runParallel` now honor an optional
+`node.retry: { max, baseDelayMs? }` field. Flaky nodes (network calls,
+sub-process invocations, occasional race conditions) recover without
+the whole workflow restarting.
+
+### Node API
+```js
+const nodes = [
+  { id: 'a', deps: [], async execute() { return 'A'; } },
+  {
+    id: 'flaky',
+    deps: ['a'],
+    retry: { max: 3, baseDelayMs: 100 },   // 1 try + up to 3 retries
+    async execute(input) { /* may throw — exponential backoff retries */ },
+  },
+];
+```
+
+Backoff is `baseDelayMs × 2^attempt` (default `baseDelayMs: 100`):
+attempt 0 sleeps 100ms, attempt 1 sleeps 200ms, attempt 2 sleeps 400ms.
+
+### Error preservation
+On exhaustion, the **last** error is rethrown verbatim — original
+class, code, and stack. The outer engine's failure path (cleanup,
+session clear, state persistence in `runPersistent*`) sees exactly
+the same error shape it would for a non-retried node, so the
+existing failure semantics are unchanged.
+
+### `retryWithBackoff` helper
+Exported from `executor.mjs` for direct use in test rigs and
+workflow nodes that want the same backoff policy:
+
+```js
+import { retryWithBackoff } from './workflow/executor.mjs';
+const result = await retryWithBackoff(() => fetchTheThing(), { max: 3, baseDelayMs: 200 });
+```
+
+### Tests
+4 new phase 1 specs:
+- `retryWithBackoff` happy: second-attempt success returns the result;
+  sleep schedule matches `baseDelayMs × 2^attempt`
+- `retryWithBackoff` exhaustion: 1 initial + N retries → last error
+  rethrown with original `code` and message preserved
+- `runSequential` flaky-recovery: node b passes on second attempt,
+  workflow completes, downstream c runs with b's output
+- `runParallel` flaky-recovery: same scenario in DAG mode preserves
+  fan-in semantics
+
+Suite: 253/253. tsc clean.
+
+---
 ## [3.3.0] — 2026-05-05
 
 **Daemon `/metrics`: cumulative `tokensTotal` and `costsByCurrency`.**

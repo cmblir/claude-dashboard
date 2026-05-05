@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { runSequential, runParallel, topologicalLevels } from '../src/lazyclaw/workflow/executor.mjs';
+import { runSequential, runParallel, topologicalLevels, retryWithBackoff } from '../src/lazyclaw/workflow/executor.mjs';
 
 interface WorkflowNode {
   id: string;
@@ -175,6 +175,78 @@ test.describe('Phase 1 — Workflow Engine Core', () => {
     // and never started.
     expect(cleaned.sort()).toEqual(['a', 'b']);
     expect(Object.keys(r.session)).toEqual([]);
+  });
+
+  test('retryWithBackoff: succeeds on the second attempt and the result propagates', async () => {
+    let calls = 0;
+    const sleeps: number[] = [];
+    const r = await retryWithBackoff(async () => {
+      calls += 1;
+      if (calls === 1) throw new Error('flaky');
+      return 'ok';
+    }, {
+      max: 3,
+      baseDelayMs: 10,
+      sleep: async (ms: number) => { sleeps.push(ms); },
+    });
+    expect(r).toBe('ok');
+    expect(calls).toBe(2);
+    // baseDelayMs × 2^0 = 10
+    expect(sleeps).toEqual([10]);
+  });
+
+  test('retryWithBackoff: exhaustion rethrows the LAST error', async () => {
+    let calls = 0;
+    let caught: any = null;
+    try {
+      await retryWithBackoff(async () => {
+        calls += 1;
+        const e = new Error(`attempt-${calls}`);
+        (e as any).code = 'CUSTOM';
+        throw e;
+      }, { max: 2, baseDelayMs: 1, sleep: async () => {} });
+    } catch (e) { caught = e; }
+    // 1 initial + 2 retries = 3 calls
+    expect(calls).toBe(3);
+    expect(caught.message).toBe('attempt-3');
+    expect(caught.code).toBe('CUSTOM');  // type preserved
+  });
+
+  test('runSequential: per-node retry recovers from a flaky execute() and the workflow succeeds', async () => {
+    let bAttempt = 0;
+    const nodes = [
+      { id: 'a', type: 't', async execute() { return 'A'; } },
+      {
+        id: 'b', type: 't',
+        retry: { max: 2, baseDelayMs: 1 },
+        async execute(input: any) {
+          bAttempt += 1;
+          if (bAttempt < 2) throw new Error('flaky');
+          return `B:${input}`;
+        },
+      },
+      { id: 'c', type: 't', async execute(input: any) { return `C:${input}`; } },
+    ];
+    const r = await runSequential(nodes, null);
+    expect(r.success).toBe(true);
+    expect(bAttempt).toBe(2);  // 1 fail + 1 success
+    expect(r.results.at(-1)?.output).toBe('C:B:A');
+  });
+
+  test('runParallel: per-node retry preserves DAG semantics', async () => {
+    let bAttempt = 0;
+    const nodes = [
+      { id: 'a', type: 't', deps: [], async execute() { return 'A'; } },
+      {
+        id: 'b', type: 't', deps: ['a'],
+        retry: { max: 1, baseDelayMs: 1 },
+        async execute() { bAttempt += 1; if (bAttempt < 2) throw new Error('flaky'); return 'B'; },
+      },
+    ];
+    const r = await runParallel(nodes);
+    expect(r.success).toBe(true);
+    expect(bAttempt).toBe(2);
+    expect(r.session.b).toBe('B');
   });
 
   test('runParallel: detects cycles and refuses to run', async () => {
