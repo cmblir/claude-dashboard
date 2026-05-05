@@ -475,17 +475,40 @@ export function makeHandler(ctx) {
           // (no-arg) exactly so a dashboard can use the same renderer
           // for CLI and HTTP outputs. Per-node `nodes` map is omitted —
           // call /workflows/<sessionId> for full detail.
+          //
+          // ?status=done|resumable|failed|running mirrors the CLI's
+          // --status flag — one shared predicate so a UI can paginate
+          // by bucket without pulling the full list.
           const stateDir = ctx.workflowStateDir();
+          const qStatus = url.searchParams.get('status');
+          if (qStatus) {
+            const valid = new Set(['done', 'resumable', 'failed', 'running']);
+            if (!valid.has(qStatus)) {
+              return writeJson(res, 400, {
+                error: `invalid status: ${qStatus}`,
+                expected: [...valid],
+              });
+            }
+          }
           try {
-            const sessions = listWorkflowSessions(stateDir);
-            return writeJson(res, 200, { dir: stateDir, sessions });
+            let sessions = listWorkflowSessions(stateDir);
+            if (qStatus) {
+              sessions = sessions.filter(s => {
+                if (qStatus === 'done')      return s.summary.done;
+                if (qStatus === 'resumable') return s.summary.resumable;
+                if (qStatus === 'failed')    return s.summary.failed > 0;
+                if (qStatus === 'running')   return s.summary.running > 0;
+                return true;
+              });
+            }
+            return writeJson(res, 200, { dir: stateDir, status: qStatus || null, sessions });
           } catch (err) {
             if (err?.code === 'ENOENT') {
               // Empty dir is a valid state (no workflows ever ran). The
               // CLI distinguishes "missing dir" from "empty dir" — the
               // daemon collapses both to an empty array so a fresh
               // process doesn't 404 a UI poll loop.
-              return writeJson(res, 200, { dir: stateDir, sessions: [] });
+              return writeJson(res, 200, { dir: stateDir, status: qStatus || null, sessions: [] });
             }
             return writeJson(res, 500, { error: err?.message || String(err) });
           }

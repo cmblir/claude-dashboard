@@ -990,6 +990,41 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /workflows?status= filters by lifecycle bucket (mirrors CLI)', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'wf-fil');
+    fs.mkdirSync(stateDir, { recursive: true });
+    const mk = (id: string, nodes: any) => {
+      fs.writeFileSync(path.join(stateDir, `${id}.json`), JSON.stringify({
+        sessionId: id, order: Object.keys(nodes), nodes,
+        startedAt: 1, updatedAt: 100,
+      }));
+    };
+    mk('done', { a: { status: 'success', attempts: 1 } });
+    mk('partial', { a: { status: 'success', attempts: 1 }, b: { status: 'pending', attempts: 0 } });
+    mk('broken', { a: { status: 'success', attempts: 1 }, b: { status: 'failed', error: 'boom', attempts: 3 } });
+
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      // Each predicate isolates one bucket.
+      const failed = await fetch(`${d.url}/workflows?status=failed`).then(x => x.json());
+      expect(failed.status).toBe('failed');
+      expect(failed.sessions.map((s: any) => s.sessionId)).toEqual(['broken']);
+
+      const resumable = await fetch(`${d.url}/workflows?status=resumable`).then(x => x.json());
+      expect(resumable.sessions.map((s: any) => s.sessionId)).toEqual(['partial']);
+
+      const done = await fetch(`${d.url}/workflows?status=done`).then(x => x.json());
+      expect(done.sessions.map((s: any) => s.sessionId)).toEqual(['done']);
+
+      // Unknown bucket → 400 with helpful 'expected' field.
+      const bad = await fetch(`${d.url}/workflows?status=bogus`);
+      expect(bad.status).toBe(400);
+      const badBody = await bad.json();
+      expect(badBody.expected).toEqual(expect.arrayContaining(['done', 'resumable', 'failed', 'running']));
+    } finally { await d.kill(); }
+  });
+
   test('daemon DELETE /workflows/<id> is idempotent (200 on existing AND missing)', async () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'wf-del');

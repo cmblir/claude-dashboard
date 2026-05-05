@@ -10,6 +10,43 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.16.0] — 2026-05-05
+
+**Daemon: `GET /workflows?status=…` mirrors the CLI's `--status` filter.**
+
+Same predicate, same buckets, same validation — over HTTP for
+dashboards and CI pollers.
+
+```
+GET /workflows?status=failed
+→ 200 { "dir": ".workflow-state", "status": "failed",
+        "sessions": [<only sessions with at least one failed node>] }
+
+GET /workflows?status=bogus
+→ 400 { "error": "invalid status: bogus",
+        "expected": ["done","resumable","failed","running"] }
+```
+
+### Why over HTTP
+A monitoring dashboard polling `/workflows` to render a "failed
+runs" panel previously had to fetch the full list and filter
+client-side. With `?status=failed`, the daemon does the predicate
+once, the wire payload is smaller, and a UI's render loop touches
+only what it shows.
+
+### Validation
+Unknown `status` value returns `400` with the allowed list in
+`expected` — same self-describing pattern the rest of the API
+uses (cf. cost-cap currency, retry max). The 400 lets a UI surface
+"the server doesn't know that bucket" rather than silently
+returning the unfiltered list.
+
+### Tests
+1 new phase 6 spec covering all 4 buckets + the unknown-bucket 400.
+
+Suite: 292 → 293 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.15.0] — 2026-05-05
 
 **`lazyclaw inspect --status` — filter list mode by lifecycle bucket.**
