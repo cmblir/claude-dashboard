@@ -24,6 +24,7 @@ import { composeSystemPrompt, listSkills, loadSkill, skillPath, installSkill, re
 import { TokenBucketLimiter } from './ratelimit.mjs';
 import { createLogger } from './logger.mjs';
 import { summarizeState, listSessions as listWorkflowSessions, loadStateFile as loadWorkflowState } from './workflow/summary.mjs';
+import { validateConfig } from './config-validate.mjs';
 
 // Resolve the provider for a request. Composes opt-in wrappers in this
 // order (innermost first):
@@ -461,6 +462,22 @@ export function makeHandler(ctx) {
             provider: cfg.provider || null,
             model: cfg.model || null,
             keyMasked: maskApiKey(cfg['api-key']),
+          });
+        }
+        case route === 'GET /config/validate': {
+          // Mirror of v3.39's `lazyclaw config validate`. Same shape
+          // (single source of truth in config-validate.mjs). HTTP
+          // status reflects ok/issues so a UI's "config status"
+          // badge can branch on HTTP code: 200 = ok, 422 = issues
+          // (Unprocessable Entity — semantically right for "the
+          // config you supplied is malformed").
+          const cfg = ctx.readConfig();
+          const { ok, issues, warnings } = validateConfig(cfg, PROVIDERS);
+          return writeJson(res, ok ? 200 : 422, {
+            ok,
+            keys: Object.keys(cfg),
+            issues,
+            warnings,
           });
         }
         case route === 'GET /doctor': {

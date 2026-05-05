@@ -1535,6 +1535,33 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /config/validate mirrors CLI; 200 vs 422 for ok/issues', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d1 = await startDaemonProc(dir);
+    try {
+      const r1 = await fetch(`${d1.url}/config/validate`);
+      expect(r1.status).toBe(200);
+      const body1 = await r1.json();
+      expect(body1.ok).toBe(true);
+      expect(body1.issues).toEqual([]);
+    } finally { await d1.kill(); }
+
+    // Hand-craft a malformed config and start a fresh daemon.
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
+      provider: 'never-heard-of-it',
+      rates: { 'noslash': { inputPer1M: 1, outputPer1M: 1 } },
+    }, null, 2));
+    const d2 = await startDaemonProc(dir);
+    try {
+      const r2 = await fetch(`${d2.url}/config/validate`);
+      expect(r2.status).toBe(422);                    // semantic 422 for malformed
+      const body2 = await r2.json();
+      expect(body2.ok).toBe(false);
+      expect(body2.issues.length).toBeGreaterThan(0);
+    } finally { await d2.kill(); }
+  });
+
   test('daemon GET /rates returns the configured rate cards (read-only)', async () => {
     const dir = tmpConfigDir();
     runCli(['rates', 'set', 'anthropic/claude-opus-4-7', '--input', '15', '--output', '75'], dir);

@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.40.0] — 2026-05-05
+
+**Daemon `GET /config/validate` mirrors CLI v3.39 + shared validator.**
+
+A dashboard's "config status" badge can call this endpoint instead
+of shelling to the CLI. Returns the same `{ ok, keys, issues,
+warnings }` shape with a status code that lets the UI branch on
+HTTP code without parsing the body:
+
+- `200 OK` — config is well-formed
+- `422 Unprocessable Entity` — config has hard issues
+
+```
+GET /config/validate         (well-formed config)
+→ 200 { "ok": true, "keys": [...], "issues": [], "warnings": [] }
+
+GET /config/validate         (malformed config)
+→ 422 { "ok": false, "issues": ["config.provider \"...\" is not in registered providers", ...] }
+```
+
+### Single source of truth — `config-validate.mjs`
+Both the CLI's `lazyclaw config validate` and the daemon's
+`/config/validate` now go through one shared `validateConfig(cfg,
+providers)` function. Bit-for-bit identical output across the two
+surfaces — no chance for the predicates to drift.
+
+### Why 422 specifically
+422 Unprocessable Entity is the semantic match: the request was
+fine, but the config it describes is malformed. A monitoring tool
+seeing 422 knows to surface the issues; a `200 + ok:false` would
+require body parsing every poll.
+
+### Tests
+1 new phase 6 spec: round-trip validation (well-formed → 200,
+malformed → 422 with non-empty issues), in addition to the 5 CLI
+tests from v3.39.
+
+Suite: 355 → 356 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.39.0] — 2026-05-05
 
 **`lazyclaw config validate` — structural integrity check.**
