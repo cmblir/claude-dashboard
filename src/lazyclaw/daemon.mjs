@@ -401,6 +401,33 @@ export function makeHandler(ctx) {
             // breakdowns.
             costs[cur] = Math.round(n * 1_000_000) / 1_000_000;
           }
+          // Workflow snapshot — opportunistic. We scan the state dir
+          // once per /metrics call and count per bucket. This is
+          // cheap unless the user has thousands of state files; for
+          // truly large fleets the operator can disable by passing
+          // ctx.workflowMetrics === false.
+          let workflows = null;
+          if (ctx.workflowMetrics !== false) {
+            try {
+              const stateDir = ctx.workflowStateDir();
+              if (fs.existsSync(stateDir)) {
+                const sessions = listWorkflowSessions(stateDir);
+                workflows = { total: sessions.length, done: 0, resumable: 0, failed: 0, running: 0 };
+                for (const s of sessions) {
+                  if (s.summary.done)        workflows.done++;
+                  if (s.summary.resumable)   workflows.resumable++;
+                  if (s.summary.failed > 0)  workflows.failed++;
+                  if (s.summary.running > 0) workflows.running++;
+                }
+              } else {
+                workflows = { total: 0, done: 0, resumable: 0, failed: 0, running: 0 };
+              }
+            } catch {
+              // Don't fail /metrics because the state dir is unreadable —
+              // expose the gap as null and keep monitoring alive.
+              workflows = null;
+            }
+          }
           return writeJson(res, 200, {
             uptimeMs: Date.now() - metrics.startedAtMs,
             requestsTotal: metrics.requestsTotal,
@@ -409,6 +436,7 @@ export function makeHandler(ctx) {
             cache: cachedByName ? { hits: cacheHits, misses: cacheMisses, size: cacheSize } : null,
             tokensTotal,
             costsByCurrency: costs,
+            workflows,
             timestamp: new Date().toISOString(),
           });
         }

@@ -1071,6 +1071,39 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /metrics includes a workflows snapshot block', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'wf-metrics');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'a.json'), JSON.stringify({
+      sessionId: 'a', order: ['x'],
+      nodes: { x: { status: 'success', attempts: 1 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    fs.writeFileSync(path.join(stateDir, 'b.json'), JSON.stringify({
+      sessionId: 'b', order: ['x'],
+      nodes: { x: { status: 'failed', error: 'boom', attempts: 3 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      const r = await fetch(`${d.url}/metrics`).then(x => x.json());
+      expect(r.workflows).toMatchObject({
+        total: 2, done: 1, failed: 1, resumable: 0, running: 0,
+      });
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /metrics with no state dir yet → workflows zero counts', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'never-created');   // doesn't exist
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      const r = await fetch(`${d.url}/metrics`).then(x => x.json());
+      expect(r.workflows).toEqual({ total: 0, done: 0, resumable: 0, failed: 0, running: 0 });
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /workflows?status= filters by lifecycle bucket (mirrors CLI)', async () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'wf-fil');

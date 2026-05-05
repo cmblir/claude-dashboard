@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.20.0] — 2026-05-05
+
+**Daemon `/metrics` includes a workflows snapshot block.**
+
+Same per-bucket counts (total/done/resumable/failed/running) that
+`lazyclaw doctor` (v3.19) and `GET /workflows` produce, now folded
+into the existing `/metrics` response. A Prometheus-style scraper
+that already polls `/metrics` for cache + token + cost metrics
+gets workflow visibility without a separate poll loop.
+
+```
+GET /metrics
+→ 200 {
+  "uptimeMs": ..., "requestsTotal": ..., ...
+  "tokensTotal": {...},
+  "costsByCurrency": {...},
+  "workflows": { "total": 12, "done": 8, "resumable": 3, "failed": 1, "running": 0 }
+}
+```
+
+### Computed lazily, capped failure mode
+- The state dir is scanned once per `/metrics` call (cheap unless
+  thousands of state files; caller can disable via
+  `ctx.workflowMetrics === false`).
+- Missing state dir collapses to all-zero counts — a fresh
+  process polling `/metrics` shouldn't report `null` until the
+  first workflow runs.
+- An unreadable state dir doesn't fail `/metrics` — surfaces as
+  `workflows: null` so monitoring stays alive.
+
+### Tests
+2 new phase 6 specs:
+- `/metrics` includes the workflows snapshot block with accurate
+  counters
+- `/metrics` with no state dir yet → all-zero counts (not 404, not
+  null)
+
+Suite: 300 → 302 (+2); `tsc --noEmit` clean.
+
+---
 ## [3.19.0] — 2026-05-05
 
 **`lazyclaw doctor` reports workflow state health.**
