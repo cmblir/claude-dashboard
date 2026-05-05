@@ -10,6 +10,45 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.33.0] — 2026-05-05
+
+**`lazyclaw sessions list --filter <substr> --limit <N>`.**
+
+A heavy chat user can accumulate hundreds of sessions; dumping all
+of them to stdout makes the list useless. Two simple flags solve
+both problems.
+
+```
+$ lazyclaw sessions list --filter algo --limit 5
+[
+  { "id": "algo-quicksort", "bytes": 1234, "mtime": "..." },
+  { "id": "algo-mergesort", "bytes": 980,  "mtime": "..." },
+  ...
+]
+```
+
+### Composition order
+`--filter` runs first (case-insensitive substring on `id`), then
+`--limit N` caps the post-filter count. So
+`--filter algo --limit 5` = "the 5 most recent sessions whose id
+contains 'algo'." Same precedence as `head -n` over a `grep`.
+
+### Boundary cases
+- `--limit 0` or negative → ignored (full list returned). Lets a
+  script pass `--limit "${MAX:-0}"` without special-casing the
+  unset variable.
+- `--filter` with no matches → empty array (not an error).
+- Both omitted → list is unchanged from the v3.32 behavior.
+
+### Tests
+3 new phase 6 specs:
+- `--filter ALGO` matches case-insensitively
+- `--limit 3` caps to 3 results from a 10-session set
+- `--filter algo --limit 2` composes (filter first, then limit)
+
+Suite: 337 → 340 (+3); `tsc --noEmit` clean.
+
+---
 ## [3.32.0] — 2026-05-05
 
 **Daemon `GET /sessions/<id>/export?format=md|json|text` mirrors CLI.**

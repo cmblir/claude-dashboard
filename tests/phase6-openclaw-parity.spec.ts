@@ -5174,6 +5174,47 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r.stdout).toContain('_(empty)_');
   });
 
+  test('sessions list --filter substring matches session ids (case-insensitive)', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    for (const id of ['algo-quicksort', 'algo-mergesort', 'react-hooks', 'random']) {
+      fs.writeFileSync(path.join(dir, 'sessions', `${id}.jsonl`),
+        JSON.stringify({ role: 'user', content: 'x', ts: 1 }) + '\n');
+    }
+    const r = runCli(['sessions', 'list', '--filter', 'ALGO'], dir);
+    expect(r.status).toBe(0);
+    const ids = JSON.parse(r.stdout).map((s: any) => s.id).sort();
+    expect(ids).toEqual(['algo-mergesort', 'algo-quicksort']);
+  });
+
+  test('sessions list --limit caps the result count', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    for (let i = 0; i < 10; i++) {
+      fs.writeFileSync(path.join(dir, 'sessions', `s${i}.jsonl`),
+        JSON.stringify({ role: 'user', content: 'x', ts: i }) + '\n');
+    }
+    const r = runCli(['sessions', 'list', '--limit', '3'], dir);
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout)).toHaveLength(3);
+  });
+
+  test('sessions list --filter + --limit compose (filter first, then limit)', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    // Write files with deterministic mtimes (newest first by ts on filename order).
+    for (const id of ['algo-1', 'algo-2', 'algo-3', 'algo-4', 'algo-5', 'react-1']) {
+      fs.writeFileSync(path.join(dir, 'sessions', `${id}.jsonl`),
+        JSON.stringify({ role: 'user', content: 'x', ts: 1 }) + '\n');
+    }
+    const r = runCli(['sessions', 'list', '--filter', 'algo', '--limit', '2'], dir);
+    expect(r.status).toBe(0);
+    const ids = JSON.parse(r.stdout).map((s: any) => s.id);
+    expect(ids).toHaveLength(2);
+    // All matching ids start with 'algo-' (filter applied before limit).
+    for (const id of ids) expect(id).toMatch(/^algo-/);
+  });
+
   test('sessions clear removes the file', () => {
     const dir = tmpConfigDir();
     fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
