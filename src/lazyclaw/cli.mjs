@@ -1023,7 +1023,7 @@ const HELP_DETAILS = {
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
   export: 'Usage: lazyclaw export [--include-secrets] [--include-sessions] > bundle.json\n  --include-secrets keeps the raw api-key in the bundle (default redacts it).\n  --include-sessions adds full turn content (default keeps metadata only).',
   import: 'Usage: lazyclaw import [--from <path>] [--overwrite-skills] [--no-overwrite-config] [--import-sessions]\n  Reads JSON from stdin (or --from <path>). Sessions are NEVER overwritten.\n  Redacted api-keys (***REDACTED***) are dropped, never written.',
-  rates: 'Usage: lazyclaw rates <list | set <provider/model> --input <N> --output <N> [--cache-read <N>] [--cache-create <N>] [--currency USD] | delete <key> | shape | validate | copy <src> <dst> [--force]>\n  Rates are per million tokens. costFromUsage uses cfg.rates to compute the cost block in /usage and body.cost.\n  `shape` prints the reference template (zero-filled) you can copy into config.\n  `validate` checks the cfg.rates shape: required fields, non-negative numbers, known providers (warn-only).\n  `copy` clones an existing card to a new key (use when a new model launches at the same price as an old one).',
+  rates: 'Usage: lazyclaw rates <list [--filter <substr>] [--limit <N>] | set <provider/model> --input <N> --output <N> [--cache-read <N>] [--cache-create <N>] [--currency USD] | delete <key> | shape | validate | copy <src> <dst> [--force]>\n  Rates are per million tokens. costFromUsage uses cfg.rates to compute the cost block in /usage and body.cost.\n  `list` accepts --filter (case-insensitive key substring) and --limit (post-filter cap), same shape sessions/skills/workflows lists use.\n  `shape` prints the reference template (zero-filled) you can copy into config.\n  `validate` checks the cfg.rates shape: required fields, non-negative numbers, known providers (warn-only).\n  `copy` clones an existing card to a new key (use when a new model launches at the same price as an old one).',
 };
 
 function cmdHelp(name) {
@@ -1543,7 +1543,19 @@ async function cmdRates(sub, positional, flags = {}) {
     case 'list': {
       const cfg = readConfig();
       const rates = cfg.rates && typeof cfg.rates === 'object' ? cfg.rates : {};
-      console.log(JSON.stringify(rates, null, 2));
+      // Same --filter / --limit pattern as v3.33-v3.36 across
+      // sessions/skills/workflows. Filter on key (provider/model)
+      // case-insensitive, then post-filter cap.
+      let entries = Object.entries(rates);
+      if (flags.filter) {
+        const f = String(flags.filter).toLowerCase();
+        entries = entries.filter(([key]) => key.toLowerCase().includes(f));
+      }
+      if (flags.limit !== undefined) {
+        const n = parseInt(flags.limit, 10);
+        if (Number.isFinite(n) && n > 0) entries = entries.slice(0, n);
+      }
+      console.log(JSON.stringify(Object.fromEntries(entries), null, 2));
       return;
     }
     case 'set': {

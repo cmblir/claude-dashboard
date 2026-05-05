@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.46.0] — 2026-05-05
+
+**`lazyclaw rates list --filter / --limit` (CLI + daemon).**
+
+Last surface to get the v3.33–v3.36 list-flag pair — sessions /
+skills / workflows already had it, now rates do too. Power user
+managing 30+ rate cards (multi-provider, multi-tier) can drill
+without `jq`-piping every list call.
+
+```
+$ lazyclaw rates list --filter anthropic --limit 3
+{
+  "anthropic/claude-opus-4-7":  { ... },
+  "anthropic/claude-sonnet-4-6": { ... },
+  "anthropic/claude-haiku-4-5":  { ... }
+}
+```
+
+### Daemon parallel
+`GET /rates?filter=anthropic&limit=3` produces the same shape.
+
+### List-flag rollout — complete
+| Surface | CLI | Daemon |
+|---------|-----|--------|
+| sessions | v3.33 | v3.34 |
+| skills | v3.35 | v3.35 |
+| workflows | v3.36 | v3.36 |
+| **rates** | **v3.46** | **v3.46** |
+
+Every list endpoint in the project now supports the same filter +
+limit semantics. A dashboard rendering side-by-side panels gets
+uniform paging UX; power users get the same shell-pipeline pattern
+across all four surfaces.
+
+### Tests
+1 new phase 6 spec covering CLI `--filter`, `--limit`, the
+filter+limit composition, and daemon `?filter=&limit=` parity in
+one end-to-end run.
+
+Suite: 366 → 367 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.45.0] — 2026-05-05
 
 **Daemon `GET /workflows/<id>?slowest=<N>` mirrors CLI v3.44.**

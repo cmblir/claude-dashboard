@@ -3516,6 +3516,42 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(JSON.parse(r2.stdout).removed).toBe(false);
   });
 
+  test('rates list --filter / --limit (CLI + daemon parity)', async () => {
+    const dir = tmpConfigDir();
+    runCli(['rates', 'set', 'anthropic/claude-opus-4-7',     '--input', '15', '--output', '75'], dir);
+    runCli(['rates', 'set', 'anthropic/claude-haiku-4-5',    '--input', '0.8', '--output', '4'], dir);
+    runCli(['rates', 'set', 'openai/gpt-4.1',                '--input', '2', '--output', '8'], dir);
+    runCli(['rates', 'set', 'openai/gpt-4o-mini',            '--input', '0.15', '--output', '0.6'], dir);
+
+    // CLI: --filter (case-insensitive)
+    const r1 = runCli(['rates', 'list', '--filter', 'ANTHROPIC'], dir);
+    const out1 = JSON.parse(r1.stdout);
+    expect(Object.keys(out1).sort()).toEqual(['anthropic/claude-haiku-4-5', 'anthropic/claude-opus-4-7']);
+
+    // CLI: --limit
+    const r2 = runCli(['rates', 'list', '--limit', '2'], dir);
+    expect(Object.keys(JSON.parse(r2.stdout))).toHaveLength(2);
+
+    // CLI: filter + limit composition
+    const r3 = runCli(['rates', 'list', '--filter', 'opus', '--limit', '1'], dir);
+    const keys3 = Object.keys(JSON.parse(r3.stdout));
+    expect(keys3).toEqual(['anthropic/claude-opus-4-7']);
+
+    // Daemon parity
+    const d = await startDaemonProc(dir);
+    try {
+      const list = await fetch(`${d.url}/rates?filter=openai`).then(x => x.json());
+      expect(Object.keys(list).sort()).toEqual(['openai/gpt-4.1', 'openai/gpt-4o-mini']);
+
+      const limited = await fetch(`${d.url}/rates?filter=openai&limit=1`).then(x => x.json());
+      expect(Object.keys(limited)).toHaveLength(1);
+
+      // No flags = all 4 cards.
+      const all = await fetch(`${d.url}/rates`).then(x => x.json());
+      expect(Object.keys(all)).toHaveLength(4);
+    } finally { await d.kill(); }
+  });
+
   test('rates copy clones a card to a new key', () => {
     const dir = tmpConfigDir();
     runCli(['rates', 'set', 'anthropic/claude-opus-4-7', '--input', '15', '--output', '75', '--cache-read', '1.5'], dir);

@@ -452,9 +452,21 @@ export function makeHandler(ctx) {
           // can render the configured cards without shelling to the
           // CLI. No write surface exposed — rate-card edits go
           // through the CLI (operator-curated, deliberate).
+          // ?filter=<substr>&limit=<N> mirror v3.33+ list flags.
           const cfg = ctx.readConfig();
           const rates = cfg.rates && typeof cfg.rates === 'object' ? cfg.rates : {};
-          return writeJson(res, 200, rates);
+          let entries = Object.entries(rates);
+          const filter = url.searchParams.get('filter');
+          if (filter) {
+            const f = filter.toLowerCase();
+            entries = entries.filter(([key]) => key.toLowerCase().includes(f));
+          }
+          const limitStr = url.searchParams.get('limit');
+          if (limitStr) {
+            const n = parseInt(limitStr, 10);
+            if (Number.isFinite(n) && n > 0) entries = entries.slice(0, n);
+          }
+          return writeJson(res, 200, Object.fromEntries(entries));
         }
         case route === 'GET /status': {
           const cfg = ctx.readConfig();
