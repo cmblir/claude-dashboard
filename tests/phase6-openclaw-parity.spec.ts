@@ -865,6 +865,81 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /workflows lists every persisted workflow session', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'wf-st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    // Two hand-crafted state files — one done, one resumable. Same
+    // shape the engine writes; we want the daemon to produce the
+    // same listing the CLI does.
+    fs.writeFileSync(path.join(stateDir, 'done.json'), JSON.stringify({
+      sessionId: 'done',
+      order: ['x'],
+      nodes: { x: { status: 'success', output: 1, attempts: 1, durationMs: 4 } },
+      startedAt: 1, updatedAt: 100,
+    }));
+    fs.writeFileSync(path.join(stateDir, 'partial.json'), JSON.stringify({
+      sessionId: 'partial',
+      order: ['a', 'b'],
+      nodes: {
+        a: { status: 'success', output: 'A', attempts: 1, durationMs: 2 },
+        b: { status: 'pending', attempts: 0 },
+      },
+      startedAt: 1, updatedAt: 200,
+    }));
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      const r = await fetch(`${d.url}/workflows`).then(x => x.json());
+      expect(r.dir).toBe(stateDir);
+      // Newest first by updatedAt.
+      expect(r.sessions.map((s: any) => s.sessionId)).toEqual(['partial', 'done']);
+      expect(r.sessions[0].summary.resumable).toBe(true);
+      expect(r.sessions[1].summary.done).toBe(true);
+      // Per-node `nodes` map omitted in list mode.
+      expect(r.sessions[0].nodes).toBeUndefined();
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /workflows on missing dir returns empty sessions (not 404)', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'no-such-wf-dir');
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      const res = await fetch(`${d.url}/workflows`);
+      expect(res.status).toBe(200);   // unlike CLI, daemon collapses ENOENT to empty
+      const r = await res.json();
+      expect(r.sessions).toEqual([]);
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /workflows/<id> returns full state shape; 404 on missing', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'wf2');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job1.json'), JSON.stringify({
+      sessionId: 'job1',
+      order: ['a', 'b'],
+      nodes: {
+        a: { status: 'success', output: 'A', attempts: 1, durationMs: 5 },
+        b: { status: 'failed', error: 'boom', attempts: 3, durationMs: 12 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      const r = await fetch(`${d.url}/workflows/job1`).then(x => x.json());
+      expect(r.sessionId).toBe('job1');
+      expect(r.summary.failed).toBe(1);
+      expect(r.summary.success).toBe(1);
+      expect(r.failedNodes).toEqual([{ id: 'b', error: 'boom', attempts: 3 }]);
+      // Per-node detail IS included in single-session mode.
+      expect(r.nodes.a.output).toBe('A');
+
+      const miss = await fetch(`${d.url}/workflows/no-such`);
+      expect(miss.status).toBe(404);
+    } finally { await d.kill(); }
+  });
+
   test('daemon POST /agent returns a non-streaming reply for the mock provider', async () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);

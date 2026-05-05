@@ -23,6 +23,7 @@ import { costFromUsage } from './providers/rates.mjs';
 import { composeSystemPrompt, listSkills, loadSkill, skillPath, installSkill, removeSkill } from './skills.mjs';
 import { TokenBucketLimiter } from './ratelimit.mjs';
 import { createLogger } from './logger.mjs';
+import { summarizeState, listSessions as listWorkflowSessions, loadStateFile as loadWorkflowState } from './workflow/summary.mjs';
 
 // Resolve the provider for a request. Composes opt-in wrappers in this
 // order (innermost first):
@@ -245,6 +246,7 @@ function isOriginAllowed(req, allowedOrigins) {
  *   sessionsDirGetter: () => string,
  *   sessionsMod: typeof import('./sessions.mjs'),
  *   version: () => string,
+ *   workflowStateDir?: () => string,
  *   authToken?: string,
  *   allowedOrigins?: string[],
  *   rateLimit?: { capacity?: number, refillPerSec?: number } | null,
@@ -256,6 +258,11 @@ function isOriginAllowed(req, allowedOrigins) {
 export function makeHandler(ctx) {
   const authToken = ctx.authToken || null;
   const allowedOrigins = Array.isArray(ctx.allowedOrigins) ? ctx.allowedOrigins : [];
+  // Default state dir matches the CLI's default. Callers can override
+  // via ctx.workflowStateDir or LAZYCLAW_WORKFLOW_STATE_DIR env var.
+  const workflowStateDir = ctx.workflowStateDir
+    || (() => process.env.LAZYCLAW_WORKFLOW_STATE_DIR || '.workflow-state');
+  ctx = { ...ctx, workflowStateDir };
   // Rate limiter is opt-in; passing nothing → unlimited (the historical
   // single-user-loopback default). When enabled, scope is per remote IP.
   const limiter = ctx.rateLimit
@@ -364,6 +371,7 @@ export function makeHandler(ctx) {
       const route = `${req.method} ${url.pathname}`;
       const sessionMatch = url.pathname.match(/^\/sessions\/([^/]+)$/);
       const skillMatch = url.pathname.match(/^\/skills\/([^/]+)$/);
+      const workflowMatch = url.pathname.match(/^\/workflows\/([^/]+)$/);
       switch (true) {
         case route === 'GET /version':
           return writeJson(res, 200, { version: ctx.version(), nodeVersion: process.version, platform: `${process.platform}-${process.arch}` });
@@ -460,6 +468,53 @@ export function makeHandler(ctx) {
           } catch (err) {
             return writeJson(res, 400, { error: err?.message || String(err) });
           }
+        }
+        case route === 'GET /workflows': {
+          // List every persisted workflow session in the configured
+          // state dir, newest activity first. Mirrors `lazyclaw inspect`
+          // (no-arg) exactly so a dashboard can use the same renderer
+          // for CLI and HTTP outputs. Per-node `nodes` map is omitted —
+          // call /workflows/<sessionId> for full detail.
+          const stateDir = ctx.workflowStateDir();
+          try {
+            const sessions = listWorkflowSessions(stateDir);
+            return writeJson(res, 200, { dir: stateDir, sessions });
+          } catch (err) {
+            if (err?.code === 'ENOENT') {
+              // Empty dir is a valid state (no workflows ever ran). The
+              // CLI distinguishes "missing dir" from "empty dir" — the
+              // daemon collapses both to an empty array so a fresh
+              // process doesn't 404 a UI poll loop.
+              return writeJson(res, 200, { dir: stateDir, sessions: [] });
+            }
+            return writeJson(res, 500, { error: err?.message || String(err) });
+          }
+        }
+        case req.method === 'GET' && !!workflowMatch: {
+          // GET /workflows/<sessionId> — full state of a single
+          // workflow run. Same shape as `lazyclaw inspect <id>` (the
+          // engine's persisted object plus a derived summary block).
+          // 404 when the state file is missing.
+          const sid = workflowMatch[1];
+          const stateDir = ctx.workflowStateDir();
+          let state;
+          try {
+            state = loadWorkflowState(sid, stateDir);
+          } catch (err) {
+            return writeJson(res, 500, { error: err?.message || String(err) });
+          }
+          if (!state) return writeJson(res, 404, { error: 'workflow not found', sessionId: sid });
+          const { summary, failedNodes } = summarizeState(state);
+          return writeJson(res, 200, {
+            sessionId: state.sessionId,
+            dir: stateDir,
+            summary,
+            failedNodes,
+            order: state.order,
+            nodes: state.nodes,
+            startedAt: state.startedAt,
+            updatedAt: state.updatedAt,
+          });
         }
         case route === 'GET /skills': {
           // List installed skills with their first-line summary so a UI

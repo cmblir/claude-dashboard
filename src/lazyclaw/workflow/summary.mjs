@@ -1,0 +1,116 @@
+// Pure transformations over persisted workflow state.
+// Lifted out of the CLI so both `lazyclaw inspect` and the daemon's
+// /workflows endpoint can produce the same shape — a single source
+// of truth for what "workflow progress" looks like over the wire.
+//
+// We intentionally re-implement state-file reading here (a 3-line
+// function) instead of importing from `persistent.mjs`. The daemon's
+// import graph stays free of the workflow engine — under tsx/CJS
+// conversion in @playwright/test, importing engine modules from the
+// daemon's static graph has historically broken.
+
+import fs from 'node:fs';
+import path from 'node:path';
+
+/**
+ * Load a persisted state file. Returns null when the file does not
+ * exist (a session that has never been written). Throws on JSON
+ * parse errors so callers can surface the corruption rather than
+ * masking it as "no state".
+ *
+ * @param {string} sessionId
+ * @param {string} dir
+ * @returns {object | null}
+ */
+export function loadStateFile(sessionId, dir) {
+  const p = path.join(dir, `${sessionId}.json`);
+  if (!fs.existsSync(p)) return null;
+  return JSON.parse(fs.readFileSync(p, 'utf8'));
+}
+
+/**
+ * @typedef {{ status?: 'pending'|'running'|'success'|'failed', output?: unknown, attempts?: number, error?: string, durationMs?: number }} NodeState
+ * @typedef {{ sessionId: string, order?: string[], nodes: Record<string, NodeState>, startedAt?: number, updatedAt?: number }} PersistedState
+ * @typedef {{ total: number, pending: number, running: number, success: number, failed: number, done: boolean, resumable: boolean, durationMs: number }} StateSummary
+ */
+
+/**
+ * Reduce a persisted state object to its summary block + the list of
+ * failed nodes. The summary is the same regardless of whether you're
+ * looking at a single session or one element of a listing.
+ *
+ * @param {PersistedState} state
+ * @returns {{ summary: StateSummary, failedNodes: Array<{ id: string, error?: string, attempts?: number }> }}
+ */
+export function summarizeState(state) {
+  const counts = { pending: 0, running: 0, success: 0, failed: 0 };
+  const failedNodes = [];
+  let totalDurationMs = 0;
+  const nodes = state?.nodes || {};
+  for (const id of Object.keys(nodes)) {
+    const n = nodes[id];
+    const status = n?.status || 'pending';
+    if (counts[status] !== undefined) counts[status]++;
+    if (status === 'failed') failedNodes.push({ id, error: n.error, attempts: n.attempts });
+    if (typeof n?.durationMs === 'number') totalDurationMs += n.durationMs;
+  }
+  const total = Object.keys(nodes).length;
+  const allDone = total > 0 && counts.success === total;
+  const hasFailure = counts.failed > 0;
+  return {
+    summary: {
+      total,
+      ...counts,
+      done: allDone,
+      // "Resumable" = there's at least one non-success node AND no terminal
+      // failure. Running/pending nodes from a prior interrupted run will be
+      // demoted by the engine on next load — they count as resumable work.
+      resumable: !allDone && !hasFailure,
+      durationMs: totalDurationMs,
+    },
+    failedNodes,
+  };
+}
+
+/**
+ * Read every state file in `dir` and return a sorted listing.
+ * Newest activity first (by `updatedAt`); secondary sort by sessionId
+ * for deterministic ordering on ties.
+ *
+ * Stray non-JSON files and corrupt state are silently skipped — a
+ * left-over `.tmp` from a crashed write doesn't break the listing.
+ * Throws if `dir` does not exist; the caller decides whether that's
+ * an error (CLI exit 2) or empty result (auto-create on first run).
+ *
+ * @param {string} dir
+ * @returns {Array<{ sessionId: string, summary: StateSummary, failedNodes: Array<{ id: string, error?: string, attempts?: number }>, startedAt?: number, updatedAt?: number }>}
+ */
+export function listSessions(dir) {
+  if (!fs.existsSync(dir)) {
+    const e = new Error(`State directory ${dir} does not exist`);
+    /** @type {any} */ (e).code = 'ENOENT';
+    throw e;
+  }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  const sessions = [];
+  for (const f of files) {
+    try {
+      const raw = fs.readFileSync(path.join(dir, f), 'utf8');
+      const state = JSON.parse(raw);
+      if (!state?.sessionId) continue;
+      const { summary, failedNodes } = summarizeState(state);
+      sessions.push({
+        sessionId: state.sessionId,
+        summary,
+        failedNodes,
+        startedAt: state.startedAt,
+        updatedAt: state.updatedAt,
+      });
+    } catch {
+      // Skip non-state JSON / corrupt files — see saveState's atomic
+      // tmp+rename for the normal write path.
+    }
+  }
+  sessions.sort((a, b) => (b.updatedAt - a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
+  return sessions;
+}

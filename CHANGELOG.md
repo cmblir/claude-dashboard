@@ -10,6 +10,61 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.12.0] — 2026-05-05
+
+**Daemon: `GET /workflows` and `GET /workflows/<id>` — workflow state over HTTP.**
+
+Read-only HTTP access to persisted workflow state. Same shape as
+`lazyclaw inspect` (single-source-of-truth via the new
+`workflow/summary.mjs` helper module), so a dashboard / CI hook
+can reuse the CLI renderer.
+
+```
+GET /workflows
+→ 200 { "dir": ".workflow-state",
+        "sessions": [
+          { "sessionId": "...", "summary": { ... }, "failedNodes": [], ... },
+          ...
+        ] }
+
+GET /workflows/<sessionId>
+→ 200 { "sessionId": "...", "summary": {...}, "failedNodes": [...],
+        "order": [...], "nodes": {...}, "startedAt": ..., "updatedAt": ... }
+→ 404 { "error": "workflow not found", "sessionId": "..." }
+```
+
+### State directory configuration
+The daemon reads from `--workflow-state-dir <dir>` (CLI flag) or
+`$LAZYCLAW_WORKFLOW_STATE_DIR` (env), defaulting to
+`.workflow-state` (cwd-relative — matches the CLI's default so a
+single state directory backs both surfaces).
+
+### List vs detail semantics
+- **List** (`GET /workflows`) omits the per-node `nodes` map to
+  keep responses scannable for >100 sessions. Detail mode returns
+  the full state object.
+- **Missing dir** returns `200` with `sessions: []` rather than
+  `404` — a fresh process polling `/workflows` shouldn't 404 just
+  because no workflow has run yet. (The CLI distinguishes the two
+  cases with exit code 2; the daemon collapses them for the
+  ambient-poll case.)
+
+### Refactor: shared `workflow/summary.mjs`
+Both `lazyclaw inspect` (CLI) and the new daemon endpoints reduce
+state files through the same `summarizeState()` and
+`listSessions()` functions. The output shape is bit-for-bit
+identical.
+
+### Tests
+3 new phase 6 specs:
+- `GET /workflows` lists every persisted session sorted by recency
+- `GET /workflows` on a missing dir returns empty `sessions` (not
+  404) — shouldn't fight a UI poll loop
+- `GET /workflows/<id>` returns full state shape; 404 on missing
+
+Suite: 282 → 285 (+3); `tsc --noEmit` clean.
+
+---
 ## [3.11.0] — 2026-05-05
 
 **`lazyclaw inspect` (no-arg) — list every persisted workflow session.**
