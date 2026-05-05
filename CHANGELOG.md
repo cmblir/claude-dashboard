@@ -10,6 +10,44 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.61.0] — 2026-05-05
+
+**Daemon `GET /sessions?sortBy=` mirrors CLI v3.60's `--sort-by`.**
+
+All four sort predicates now work on the daemon API surface:
+
+```
+GET /sessions?sortBy=turn-count   # longest conversations first
+GET /sessions?sortBy=bytes        # heaviest sessions first
+GET /sessions?sortBy=id           # alphabetical
+GET /sessions?sortBy=mtime        # default — most recent first (same as no flag)
+```
+
+### Implicit turn-count loading
+
+`?sortBy=turn-count` implicitly enables turn-count loading (no need
+to also pass `?withTurnCount=true`). Lazy: only loads session files
+when a sort actually needs them.
+
+### Validation
+
+Unknown `sortBy` value → 400 with `{ error: "invalid sortBy: … (expected: mtime, turn-count, bytes, id)" }`.
+
+### Internal field hygiene
+
+`_mtimeMs` (the raw millisecond timestamp used for stable mtime
+comparisons) is stripped before serialising the response, same as
+the CLI strips it before printing.
+
+### Tests
+
+1 new phase 6 spec covering all four `?sortBy=` predicates on the
+daemon, the implicit turn-count field, the invalid-value 400, and
+the `_mtimeMs` leak guard.
+
+Suite: 392 → 393 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.60.0] — 2026-05-05  🎉 milestone
 
 **`sessions list --sort-by mtime|turn-count|bytes|id`.**

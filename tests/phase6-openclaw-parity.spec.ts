@@ -6282,6 +6282,47 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r4.stderr).toMatch(/invalid --sort-by/);
   });
 
+  test('daemon GET /sessions?sortBy= mirrors CLI --sort-by', async () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'big.jsonl'),
+      Array.from({ length: 5 }, (_, i) =>
+        JSON.stringify({ role: 'user', content: 'long content here long content here', ts: i })
+      ).join('\n') + '\n');
+    fs.writeFileSync(path.join(dir, 'sessions', 'medium.jsonl'),
+      Array.from({ length: 3 }, (_, i) =>
+        JSON.stringify({ role: 'user', content: 'mid', ts: i })
+      ).join('\n') + '\n');
+    fs.writeFileSync(path.join(dir, 'sessions', 'small.jsonl'),
+      JSON.stringify({ role: 'user', content: 'a', ts: 0 }) + '\n');
+
+    const d = await startDaemonProc(dir);
+    try {
+      // turn-count desc: big(5) > medium(3) > small(1); implicitly adds turnCount.
+      const r1 = await fetch(`${d.url}/sessions?sortBy=turn-count`).then(x => x.json());
+      expect(r1.map((s: any) => s.id)).toEqual(['big', 'medium', 'small']);
+      expect(r1[0].turnCount).toBe(5);
+
+      // bytes desc.
+      const r2 = await fetch(`${d.url}/sessions?sortBy=bytes`).then(x => x.json());
+      expect(r2.map((s: any) => s.id)).toEqual(['big', 'medium', 'small']);
+
+      // id asc (alphabetical).
+      const r3 = await fetch(`${d.url}/sessions?sortBy=id`).then(x => x.json());
+      expect(r3.map((s: any) => s.id)).toEqual(['big', 'medium', 'small']);
+
+      // Invalid sortBy → 400.
+      const r4 = await fetch(`${d.url}/sessions?sortBy=bogus`);
+      expect(r4.status).toBe(400);
+      const body4 = await r4.json();
+      expect(body4.error).toMatch(/invalid sortBy/);
+
+      // _mtimeMs must not leak into the response.
+      const r5 = await fetch(`${d.url}/sessions?sortBy=mtime`).then(x => x.json());
+      for (const s of r5) expect(s._mtimeMs).toBeUndefined();
+    } finally { await d.kill(); }
+  });
+
   test('sessions list --with-turn-count includes turnCount per session (CLI + daemon)', async () => {
     const dir = tmpConfigDir();
     fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });

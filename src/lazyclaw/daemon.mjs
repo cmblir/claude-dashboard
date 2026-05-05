@@ -627,6 +627,8 @@ export function makeHandler(ctx) {
           // Same composition (filter then limit) as v3.33's CLI flag.
           // ?withTurnCount=true mirrors CLI v3.59's --with-turn-count;
           // opt-in because it loads each session file.
+          // ?sortBy=mtime|turn-count|bytes|id mirrors CLI v3.60's --sort-by;
+          // turn-count implicitly enables turn-count loading.
           const cfgDir = ctx.sessionsDirGetter();
           let list = ctx.sessionsMod.listSessions(cfgDir);
           const filter = url.searchParams.get('filter');
@@ -639,15 +641,30 @@ export function makeHandler(ctx) {
             const n = parseInt(limitStr, 10);
             if (Number.isFinite(n) && n > 0) list = list.slice(0, n);
           }
-          const withCount = url.searchParams.get('withTurnCount') === 'true';
-          return writeJson(res, 200, list.map(s => {
-            const base = { id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString() };
+          const sortBy = url.searchParams.get('sortBy');
+          const validSortBy = new Set(['mtime', 'turn-count', 'bytes', 'id']);
+          if (sortBy && !validSortBy.has(sortBy)) {
+            return writeJson(res, 400, { error: `invalid sortBy: ${sortBy} (expected: mtime, turn-count, bytes, id)` });
+          }
+          const withCount = url.searchParams.get('withTurnCount') === 'true' || sortBy === 'turn-count';
+          let out = list.map(s => {
+            const base = { id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString(), _mtimeMs: s.mtimeMs };
             if (withCount) {
               try { base.turnCount = ctx.sessionsMod.loadTurns(s.id, cfgDir).length; }
               catch { base.turnCount = null; }
             }
             return base;
-          }));
+          });
+          if (sortBy) {
+            const cmp = {
+              mtime:        (a, b) => b._mtimeMs - a._mtimeMs,
+              'turn-count': (a, b) => (b.turnCount ?? 0) - (a.turnCount ?? 0),
+              bytes:        (a, b) => b.bytes - a.bytes,
+              id:           (a, b) => a.id.localeCompare(b.id),
+            };
+            out.sort(cmp[sortBy]);
+          }
+          return writeJson(res, 200, out.map(({ _mtimeMs, ...rest }) => rest));
         }
         case route === 'GET /sessions/search': {
           // Mirror of `lazyclaw sessions search <query> [--regex]`.
