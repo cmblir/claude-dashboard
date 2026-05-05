@@ -357,6 +357,51 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(out.sessions[0].nodes).toBeUndefined();
   });
 
+  test('lazyclaw clear: deletes existing state file → exit 0 with removed:true', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'doomed.json'), JSON.stringify({
+      sessionId: 'doomed', order: ['x'],
+      nodes: { x: { status: 'success', attempts: 1 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['clear', 'doomed', '--dir', stateDir], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out).toEqual({ ok: true, sessionId: 'doomed', removed: true });
+    expect(fs.existsSync(path.join(stateDir, 'doomed.json'))).toBe(false);
+  });
+
+  test('lazyclaw clear: idempotent — second call still exits 0 with removed:false', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    const r = runCli(['clear', 'never-existed', '--dir', stateDir], dir);
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout)).toEqual({ ok: true, sessionId: 'never-existed', removed: false });
+  });
+
+  test('lazyclaw clear: missing state dir → exit 2', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['clear', 'whatever', '--dir', path.join(dir, 'no-such')], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/does not exist/);
+  });
+
+  test('lazyclaw clear: refuses sessionId that resolves outside the state dir', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    // Plant a file outside the state dir; clear must NOT touch it.
+    const outside = path.join(dir, 'outside.json');
+    fs.writeFileSync(outside, '"not workflow state"');
+    const r = runCli(['clear', '../outside', '--dir', stateDir], dir);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/invalid sessionId/);
+    expect(fs.existsSync(outside)).toBe(true);
+  });
+
   test('lazyclaw inspect (no arg): missing state dir → exit 2', () => {
     const dir = tmpConfigDir();
     const r = runCli(['inspect', '--dir', path.join(dir, 'no-such-dir')], dir);

@@ -10,6 +10,44 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.14.0] — 2026-05-05
+
+**`lazyclaw clear <session-id>` — CLI counterpart to `DELETE /workflows/<id>`.**
+
+Idempotent state-file cleanup from the CLI, mirroring the daemon's
+delete endpoint. Exits 0 whether the file existed or not, with
+the `removed` boolean disambiguating.
+
+```
+$ lazyclaw clear my-job --dir .workflow-state
+{"ok":true,"sessionId":"my-job","removed":true}
+
+$ lazyclaw clear my-job --dir .workflow-state    # second call
+{"ok":true,"sessionId":"my-job","removed":false}
+```
+
+### Confined-path check
+Same protection as the daemon: sessionId resolves against
+`--dir` using `path.resolve` + prefix check. A `../outside`
+sessionId is rejected with exit 1 ("invalid sessionId") and
+nothing is touched.
+
+### Exit codes
+- `0` — file deleted (or didn't exist; same shape)
+- `1` — sessionId escapes the state dir / unsafe (refused)
+- `2` — state dir does not exist (no work to do)
+
+### Tests
+4 new phase 6 specs:
+- delete an existing state file → exit 0 with `removed:true`
+- idempotent: second call still exits 0 with `removed:false`
+- missing state dir → exit 2 with helpful stderr
+- `../outside` sessionId rejected with exit 1; planted file
+  outside dir stays untouched
+
+Suite: 287 → 291 (+4); `tsc --noEmit` clean.
+
+---
 ## [3.13.0] — 2026-05-05
 
 **Daemon: `DELETE /workflows/<id>` — idempotent state-file cleanup.**

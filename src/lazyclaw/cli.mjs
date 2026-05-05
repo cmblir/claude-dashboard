@@ -197,6 +197,33 @@ async function cmdInspect(sessionId, opts = {}) {
   process.exit(0);
 }
 
+// Delete a persisted workflow state file. Idempotent — same shape
+// as DELETE /workflows/<id> on the daemon. Confined to the state
+// dir; a sessionId that resolves outside is rejected.
+//
+// Exit codes:
+//   0 — file existed and was deleted (or didn't exist; either way ok)
+//   1 — sessionId escapes the state dir / unsafe (refused)
+//   2 — state directory does not exist (nothing to clear)
+async function cmdClear(sessionId, opts = {}) {
+  const dir = opts.dir || '.workflow-state';
+  if (!fs.existsSync(dir)) {
+    console.error(`State directory ${dir} does not exist`);
+    process.exit(2);
+  }
+  const file = path.join(dir, `${sessionId}.json`);
+  const resolvedDir = path.resolve(dir);
+  const resolvedFile = path.resolve(file);
+  if (!resolvedFile.startsWith(resolvedDir + path.sep) && resolvedFile !== resolvedDir) {
+    console.error(`invalid sessionId: ${sessionId}`);
+    process.exit(1);
+  }
+  const existed = fs.existsSync(resolvedFile);
+  if (existed) fs.unlinkSync(resolvedFile);
+  console.log(JSON.stringify({ ok: true, sessionId, removed: existed }));
+  process.exit(0);
+}
+
 async function cmdResume(sessionId, file, opts = {}) {
   const { runPersistent, loadState } = await loadEngine();
   const dir = opts.dir || '.workflow-state';
@@ -399,7 +426,7 @@ async function cmdVersion() {
 // truth so adding a subcommand updates the completion script too. The
 // dispatcher in main() is the runtime authority; this list mirrors it.
 const SUBCOMMANDS = [
-  'run', 'resume', 'inspect',
+  'run', 'resume', 'inspect', 'clear',
   'config', 'chat', 'agent',
   'doctor', 'status', 'onboard',
   'sessions', 'skills', 'providers',
@@ -624,6 +651,7 @@ const HELP_SUMMARIES = {
   import:     'Apply a JSON bundle from stdin or --from <path>',
   rates:      'Manage cost rate-cards in config (rates list|set <provider/model>|delete|shape)',
   inspect:    'Print persisted workflow state without executing',
+  clear:      'Delete a persisted workflow state file (idempotent)',
 };
 
 // Detailed usage per subcommand for `lazyclaw help <name>`. Kept as flat
@@ -632,6 +660,7 @@ const HELP_DETAILS = {
   run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
   inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
+  clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
   config: 'Usage: lazyclaw config <get|set|list|delete|path|edit> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
   agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage] [--cost]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, ...} to stderr after the response.\n  --cost adds a cost line on stderr when config.rates has a card for the active provider/model.',
@@ -1461,6 +1490,12 @@ async function main() {
       // handles it.
       const [sessionId] = rest.positional;
       await cmdInspect(sessionId, { dir: rest.flags.dir });
+      break;
+    }
+    case 'clear': {
+      const [sessionId] = rest.positional;
+      if (!sessionId) { console.error('Usage: lazyclaw clear <session-id> [--dir <state-dir>]'); process.exit(2); }
+      await cmdClear(sessionId, { dir: rest.flags.dir });
       break;
     }
     case 'config': {
