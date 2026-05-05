@@ -10,6 +10,58 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.26.0] — 2026-05-05
+
+**`lazyclaw providers test <name>` — smoke-test a provider.**
+
+Send a 1-token "ping" through the provider and report whether it
+worked. Useful right after configuring an API key — surfaces auth
+errors fast without waiting for the next real call to fail.
+
+```
+$ lazyclaw providers test mock
+{
+  "ok": true, "provider": "mock", "model": null,
+  "durationMs": 28, "replyLength": 16,
+  "reply": "mock-reply: ping"
+}
+
+$ lazyclaw providers test anthropic --model claude-haiku-4-5-20251001 --prompt "say hi"
+{ "ok": true, ... "reply": "Hi! How can I help?..." }
+```
+
+### Flags
+- `--model <id>` overrides the configured model. Useful when
+  testing a key against a specific tier without flipping global
+  config.
+- `--prompt <text>` overrides the default `"ping"` prompt.
+
+### Resolution order
+`flag --model` → `config.model` → `PROVIDER_INFO.defaultModel` →
+`'unknown'`. Same precedence chat / agent already use, so test
+output and real-call output behave identically.
+
+### Exit codes
+- `0` — provider returned a non-empty reply
+- `1` — provider returned an error (auth failure, rate limit, ...)
+- `2` — invalid invocation (missing/unknown provider)
+
+### Internal cleanup
+While here: `cmdProviders` now receives the parsed flags map.
+`--model` / `--prompt` were previously sniffed from the positional
+array, which broke after parseArgs lifted them out (same gotcha
+the v3.23 sessions search hit). Now consistent.
+
+### Tests
+3 new phase 6 specs:
+- mock provider → exit 0 with `reply` containing `"mock-reply: ping"`
+- `--prompt hello-from-test` reaches the provider (tests parser
+  threading)
+- unknown provider → exit 2 with helpful stderr
+
+Suite: 317 → 320 (+3); `tsc --noEmit` clean.
+
+---
 ## [3.25.0] — 2026-05-05
 
 **`lazyclaw graph <workflow.mjs>` — emit DAG as Mermaid syntax.**

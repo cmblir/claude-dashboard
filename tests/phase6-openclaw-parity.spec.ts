@@ -486,6 +486,35 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r.stderr).toMatch(/validate:/);
   });
 
+  test('lazyclaw providers test: mock provider returns ok with reply length and duration', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['providers', 'test', 'mock'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(true);
+    expect(out.provider).toBe('mock');
+    // Mock prepends "mock-reply: " to the prompt; default prompt is "ping".
+    expect(out.reply).toContain('mock-reply: ping');
+    expect(out.replyLength).toBeGreaterThan(0);
+    expect(typeof out.durationMs).toBe('number');
+  });
+
+  test('lazyclaw providers test --prompt <text> uses the supplied prompt', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['providers', 'test', 'mock', '--prompt', 'hello-from-test'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    // Mock echoes the last user message as "mock-reply: <prompt>".
+    expect(out.reply).toContain('hello-from-test');
+  });
+
+  test('lazyclaw providers test: unknown provider → exit 2 with helpful stderr', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['providers', 'test', 'never-heard-of-it'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/unknown provider/);
+  });
+
   test('lazyclaw graph: emits Mermaid graph TD with node decls and dep edges', () => {
     const dir = tmpConfigDir();
     const wfPath = path.join(dir, 'flow.mjs');

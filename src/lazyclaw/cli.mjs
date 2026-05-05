@@ -643,7 +643,7 @@ const SUBCOMMAND_SUBS = {
   config:    ['get', 'set', 'list', 'delete', 'unset', 'path', 'edit'],
   sessions:  ['list', 'show', 'clear', 'export', 'search'],
   skills:    ['list', 'show', 'install', 'remove'],
-  providers: ['list', 'info'],
+  providers: ['list', 'info', 'test'],
   rates:     ['list', 'set', 'delete', 'shape'],
   completion: ['bash', 'zsh'],
 };
@@ -877,7 +877,7 @@ const HELP_DETAILS = {
   onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
   sessions: 'Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>|search <query> [--regex]>\n  list — recent sessions by mtime; export — render as Markdown for sharing.\n  search — case-insensitive substring (or --regex pattern) match across all session content; returns first excerpt + match count per matching session.',
   skills: 'Usage: lazyclaw skills <list|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>>\n  --from-url fetches over HTTPS only; 1 MiB body cap.',
-  providers: 'Usage: lazyclaw providers <list|info <name>>\n  Static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.',
+  providers: 'Usage: lazyclaw providers <list | info <name> | test <name> [--model X] [--prompt T]>\n  list/info — static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.\n  test — send a 1-token "ping" through the provider and report ok/error + duration.\n         Useful after configuring an API key to verify it works before relying on it.',
   daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>] [--shutdown-timeout-ms <N>] [--cost-cap-<currency> <N> ...] [--workflow-state-dir <dir>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).\n  --shutdown-timeout-ms <N> caps graceful drain on SIGINT/SIGTERM (default 10000). Second signal forces immediate exit.\n  --cost-cap-usd 100 (or any currency code in lowercase) rejects POST /agent + /chat with 402 once cumulative cost reaches the cap.\n  --workflow-state-dir <dir> backs GET /workflows + GET /workflows/<id> (default .workflow-state, also reads $LAZYCLAW_WORKFLOW_STATE_DIR).',
   version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
@@ -1541,7 +1541,7 @@ async function cmdSkills(sub, positional, flags = {}) {
   }
 }
 
-async function cmdProviders(sub, positional) {
+async function cmdProviders(sub, positional, flags = {}) {
   await ensureRegistry();
   switch (sub) {
     case undefined:
@@ -1571,8 +1571,71 @@ async function cmdProviders(sub, positional) {
       console.log(JSON.stringify(meta, null, 2));
       return;
     }
+    case 'test': {
+      // Smoke-test a provider with a tiny ("ping") prompt. Useful after
+      // configuring a new API key — surfaces auth errors fast without
+      // waiting for the next real call to fail.
+      //
+      // Output:
+      //   { ok: bool, provider, model, durationMs, [reply | error, code] }
+      //
+      // Exit codes:
+      //   0 — provider returned a non-empty reply
+      //   1 — provider returned an error (auth failure, rate limit, ...)
+      //   2 — invalid invocation (missing/unknown name)
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw providers test <name> [--model <id>] [--prompt <text>]'); process.exit(2); }
+      const provider = _registryMod.PROVIDERS[name];
+      if (!provider) {
+        console.error(`unknown provider: ${name} (registered: ${Object.keys(_registryMod.PROVIDERS).join(', ')})`);
+        process.exit(2);
+      }
+      const cfg = readConfig();
+      const meta = _registryMod.PROVIDER_INFO[name] || {};
+      // --model / --prompt come in via the parsed flags map (parseArgs
+      // lifted them out of positional). --model wins over config.model
+      // wins over PROVIDER_INFO.defaultModel.
+      const model = flags.model || cfg.model || meta.defaultModel || 'unknown';
+      const prompt = flags.prompt || 'ping';
+      const apiKey = cfg['api-key'] || '';
+      const t0 = Date.now();
+      try {
+        // Drain the streaming response (every provider yields chunks of
+        // string). For mock this is instant; for real providers it's
+        // bounded by the prompt length and provider latency. We don't
+        // support a timeout flag here — the user can SIGINT if a
+        // provider hangs.
+        let reply = '';
+        const stream = provider.sendMessage([{ role: 'user', content: prompt }], { apiKey, model });
+        for await (const chunk of stream) {
+          if (typeof chunk === 'string') reply += chunk;
+        }
+        const durationMs = Date.now() - t0;
+        const ok = reply.length > 0;
+        console.log(JSON.stringify({
+          ok,
+          provider: name,
+          model,
+          durationMs,
+          replyLength: reply.length,
+          reply: reply.slice(0, 200) + (reply.length > 200 ? '…' : ''),
+        }, null, 2));
+        process.exit(ok ? 0 : 1);
+      } catch (err) {
+        const durationMs = Date.now() - t0;
+        console.log(JSON.stringify({
+          ok: false,
+          provider: name,
+          model,
+          durationMs,
+          error: err?.message || String(err),
+          code: err?.code || null,
+        }, null, 2));
+        process.exit(1);
+      }
+    }
     default:
-      console.error('Usage: lazyclaw providers <list|info <name>>');
+      console.error('Usage: lazyclaw providers <list|info <name>|test <name> [--model X] [--prompt T]>');
       process.exit(2);
   }
 }
@@ -1826,7 +1889,7 @@ async function main() {
     }
     case 'providers': {
       const sub = rest.positional[0];
-      await cmdProviders(sub, rest.positional.slice(1));
+      await cmdProviders(sub, rest.positional.slice(1), rest.flags);
       break;
     }
     case 'skills': {
