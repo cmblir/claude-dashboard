@@ -155,7 +155,27 @@ async function cmdRun(sessionId, file, opts = {}) {
 async function cmdInspect(sessionId, opts = {}) {
   const dir = opts.dir || '.workflow-state';
   const { loadState } = await loadEngine();
-  const { summarizeState, listSessions } = await import('./workflow/summary.mjs');
+  const { summarizeState, listSessions, aggregateNodeStats } = await import('./workflow/summary.mjs');
+
+  // --aggregate (list mode): per-node statistics across every
+  // session in the state dir — count, success/failed/pending/running
+  // counts, and min/max/avg/total durations. Answers "which node
+  // tends to be slow or fail across all my runs?" — a question
+  // single-session inspect can't answer.
+  if (!sessionId && opts.aggregate) {
+    let stats;
+    try {
+      stats = aggregateNodeStats(dir);
+    } catch (e) {
+      if (e?.code === 'ENOENT') {
+        console.error(`State directory ${dir} does not exist`);
+        process.exit(2);
+      }
+      throw e;
+    }
+    console.log(JSON.stringify({ dir, ...stats }, null, 2));
+    process.exit(0);
+  }
 
   // List mode — no sessionId given. Walks the state directory and
   // emits a summary per session. Per-node `nodes` map is omitted —
@@ -1005,7 +1025,7 @@ const HELP_SUMMARIES = {
 const HELP_DETAILS = {
   run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent] [--concurrency <N>]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  --concurrency <N>: cap in-flight nodes within a level (DAG modes only). 0/missing → unbounded.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs> [--parallel-persistent] [--concurrency <N>]\n  Re-enters a previously persisted run; succeeds nodes are skipped.\n  Pass --parallel-persistent to resume a DAG run (must match the original run\'s mode).\n  --concurrency <N>: cap in-flight nodes per level (DAG mode only).',
-  inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary] [--filter <substr>] [--limit <N>] [--node <node-id>] [--slowest <N>] [--critical-path <workflow.mjs>]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  --filter / --limit refine list-mode further (case-insensitive sessionId substring + post-filter cap).\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  --node <id>: print just that node\'s state. Exit 0 success/pending/running, 1 failed, 2 no such node.\n  --slowest <N>: top N nodes by durationMs (descending, ties broken by id).\n  --critical-path <workflow.mjs>: longest-weighted-path analysis using each node\'s recorded durationMs (bottleneck finder).\n  With a session-id (no per-node flag): print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
+  inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary] [--filter <substr>] [--limit <N>] [--node <node-id>] [--slowest <N>] [--critical-path <workflow.mjs>] [--aggregate]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --aggregate (list mode): per-node stats across all sessions (count, success/failed/pending/running, min/max/avg/total duration).\n  --status filters the listing to a single lifecycle bucket.\n  --filter / --limit refine list-mode further (case-insensitive sessionId substring + post-filter cap).\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  --node <id>: print just that node\'s state. Exit 0 success/pending/running, 1 failed, 2 no such node.\n  --slowest <N>: top N nodes by durationMs (descending, ties broken by id).\n  --critical-path <workflow.mjs>: longest-weighted-path analysis using each node\'s recorded durationMs (bottleneck finder).\n  With a session-id (no per-node flag): print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
   validate: 'Usage: lazyclaw validate <workflow.mjs>\n  Static check: load + shape + dep + cycle + parallelism estimate.\n  Exit 0 valid · 1 hard failure (issues populated) · 2 file/import error.',
   graph: 'Usage: lazyclaw graph <workflow.mjs> [--lr] [--state <session-id>] [--dir <state-dir>]\n  Emit the workflow DAG as Mermaid syntax (graph TD by default; --lr for left-right).\n  --state overlays a persisted run\'s status (success ✓ / running ⏳ / failed ✗ / pending) with classDef styling.\n  Output is paste-ready for GitHub markdown / Notion / Obsidian.',
@@ -2094,6 +2114,7 @@ const BOOLEAN_FLAGS = new Set([
   'regex',        // sessions search: treat query as a regex
   'lr',           // graph: emit Mermaid `graph LR` (left-right)
   'force',        // rates copy: overwrite existing destination
+  'aggregate',    // inspect (list mode): per-node stats across sessions
 ]);
 
 function parseArgs(argv) {
@@ -2174,6 +2195,7 @@ async function main() {
         node: rest.flags.node,
         criticalPath: rest.flags['critical-path'],
         slowest: rest.flags.slowest,
+        aggregate: !!rest.flags.aggregate,
       });
       break;
     }

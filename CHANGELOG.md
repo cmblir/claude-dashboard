@@ -10,6 +10,64 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.48.0] — 2026-05-05
+
+**`lazyclaw inspect --aggregate` — cross-session per-node statistics.**
+
+Up to v3.45, all per-node analytics (`--node`, `--slowest`,
+`--critical-path`) operate on a single session. `--aggregate`
+walks every session in the state directory and returns per-node
+statistics across the whole population — answering questions
+single-session inspect can't:
+
+- "Which node tends to be slow across all my runs of this workflow?"
+- "Which node is unreliable (failed in N out of M runs)?"
+- "What's the average time embed takes?"
+
+```
+$ lazyclaw inspect --aggregate
+{
+  "dir": ".workflow-state",
+  "sessionCount": 47,
+  "nodeStats": {
+    "fetch":    { "count": 47, "successCount": 47, "failedCount": 0,
+                  "minDurationMs": 42, "maxDurationMs": 220,
+                  "avgDurationMs": 84.3, "totalDurationMs": 3962.1 },
+    "embed":    { "count": 47, "successCount": 41, "failedCount": 6,
+                  "minDurationMs": 800, "maxDurationMs": 12000,
+                  "avgDurationMs": 4150, "totalDurationMs": 195050 },
+    "classify": { ... },
+    ...
+  }
+}
+```
+
+### What's tracked per node id
+- **count**: total occurrences across sessions
+- **successCount / failedCount / pendingCount / runningCount**:
+  per-status breakdown (sum equals `count`)
+- **minDurationMs / maxDurationMs / avgDurationMs / totalDurationMs**:
+  duration stats (only sessions where the node has a recorded
+  durationMs contribute; missing durations don't pull averages
+  down)
+
+All numbers rounded to 2 decimals where applicable.
+
+### Exit codes
+- `0` — stats produced (sessionCount may be 0 if dir is empty)
+- `2` — state dir does not exist (matches the rest of inspect)
+
+### Tests
+3 new phase 6 specs:
+- 3-session mixed workload → fetch (3 successes) and embed (1
+  success + 1 failed) get accurate counters and duration stats
+- missing state dir → exit 2 with helpful stderr
+- empty state dir → exit 0 with `sessionCount: 0`,
+  `nodeStats: {}`
+
+Suite: 368 → 371 (+3); `tsc --noEmit` clean.
+
+---
 ## [3.47.0] — 2026-05-05
 
 **Daemon `GET /rates/validate` mirrors CLI v3.30 + shared validator.**

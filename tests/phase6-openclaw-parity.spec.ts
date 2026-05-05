@@ -496,6 +496,70 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(out.failedNodes[0].error).toMatch(/boom/);
   });
 
+  test('lazyclaw inspect --aggregate: per-node stats across every session', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+
+    // Three sessions with overlapping nodes.
+    fs.writeFileSync(path.join(stateDir, 'r1.json'), JSON.stringify({
+      sessionId: 'r1', order: ['fetch', 'embed'],
+      nodes: {
+        fetch: { status: 'success', durationMs: 80, attempts: 1 },
+        embed: { status: 'success', durationMs: 1000, attempts: 1 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    fs.writeFileSync(path.join(stateDir, 'r2.json'), JSON.stringify({
+      sessionId: 'r2', order: ['fetch', 'embed'],
+      nodes: {
+        fetch: { status: 'success', durationMs: 120, attempts: 1 },
+        embed: { status: 'failed', error: 'timeout', durationMs: 5000, attempts: 3 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    fs.writeFileSync(path.join(stateDir, 'r3.json'), JSON.stringify({
+      sessionId: 'r3', order: ['fetch'],
+      nodes: {
+        fetch: { status: 'success', durationMs: 100, attempts: 1 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+
+    const r = runCli(['inspect', '--dir', stateDir, '--aggregate'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.sessionCount).toBe(3);
+    // fetch: ran in 3 sessions, all success.
+    expect(out.nodeStats.fetch).toMatchObject({
+      count: 3, successCount: 3, failedCount: 0,
+      minDurationMs: 80, maxDurationMs: 120, avgDurationMs: 100, totalDurationMs: 300,
+    });
+    // embed: ran in 2 sessions, 1 success + 1 failed.
+    expect(out.nodeStats.embed).toMatchObject({
+      count: 2, successCount: 1, failedCount: 1,
+      minDurationMs: 1000, maxDurationMs: 5000, avgDurationMs: 3000, totalDurationMs: 6000,
+    });
+  });
+
+  test('lazyclaw inspect --aggregate: missing state dir → exit 2', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['inspect', '--dir', path.join(dir, 'no-such'), '--aggregate'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/does not exist/);
+  });
+
+  test('lazyclaw inspect --aggregate: empty state dir → sessionCount 0', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'empty');
+    fs.mkdirSync(stateDir, { recursive: true });
+    const r = runCli(['inspect', '--dir', stateDir, '--aggregate'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.sessionCount).toBe(0);
+    expect(out.nodeStats).toEqual({});
+  });
+
   test('lazyclaw inspect (no arg): lists every session sorted by recency', () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'st');

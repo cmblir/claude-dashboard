@@ -73,6 +73,82 @@ export function summarizeState(state) {
 }
 
 /**
+ * Aggregate per-node statistics across every persisted session in
+ * a state directory. For each node id seen across sessions, compute
+ * how often it ran, how often it succeeded/failed, and the
+ * min/max/avg/total durations.
+ *
+ * Useful for cross-run analysis: "which node tends to be slow or
+ * fail across all my runs of this workflow?" — a question
+ * single-session inspect can't answer.
+ *
+ * @param {string} dir
+ * @returns {{ sessionCount: number, nodeStats: Record<string, {
+ *   count: number,
+ *   successCount: number,
+ *   failedCount: number,
+ *   pendingCount: number,
+ *   runningCount: number,
+ *   minDurationMs: number,
+ *   maxDurationMs: number,
+ *   avgDurationMs: number,
+ *   totalDurationMs: number,
+ * }> }}
+ */
+export function aggregateNodeStats(dir) {
+  if (!fs.existsSync(dir)) {
+    const e = new Error(`State directory ${dir} does not exist`);
+    /** @type {any} */ (e).code = 'ENOENT';
+    throw e;
+  }
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  let sessionCount = 0;
+  /** @type {Record<string, { count: number, successCount: number, failedCount: number, pendingCount: number, runningCount: number, durations: number[] }>} */
+  const accumulator = {};
+  for (const f of files) {
+    let state;
+    try {
+      state = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+    } catch { continue; }
+    if (!state?.sessionId || !state?.nodes) continue;
+    sessionCount++;
+    for (const id of Object.keys(state.nodes)) {
+      const ns = state.nodes[id];
+      const status = ns?.status || 'pending';
+      const slot = accumulator[id] || (accumulator[id] = {
+        count: 0, successCount: 0, failedCount: 0, pendingCount: 0, runningCount: 0,
+        durations: [],
+      });
+      slot.count++;
+      if (status === 'success')      slot.successCount++;
+      else if (status === 'failed')  slot.failedCount++;
+      else if (status === 'pending') slot.pendingCount++;
+      else if (status === 'running') slot.runningCount++;
+      if (Number.isFinite(ns?.durationMs)) slot.durations.push(ns.durationMs);
+    }
+  }
+  /** @type {Record<string, ReturnType<typeof aggregateNodeStats>['nodeStats'][string]>} */
+  const nodeStats = {};
+  for (const id of Object.keys(accumulator)) {
+    const slot = accumulator[id];
+    const durations = slot.durations;
+    const total = durations.reduce((s, x) => s + x, 0);
+    nodeStats[id] = {
+      count: slot.count,
+      successCount: slot.successCount,
+      failedCount: slot.failedCount,
+      pendingCount: slot.pendingCount,
+      runningCount: slot.runningCount,
+      minDurationMs: durations.length ? Math.min(...durations) : 0,
+      maxDurationMs: durations.length ? Math.max(...durations) : 0,
+      avgDurationMs: durations.length ? Math.round((total / durations.length) * 100) / 100 : 0,
+      totalDurationMs: Math.round(total * 100) / 100,
+    };
+  }
+  return { sessionCount, nodeStats };
+}
+
+/**
  * Compute the critical path (longest weighted path) through a DAG.
  *
  * Given the persisted state's node order + a deps map (which the
