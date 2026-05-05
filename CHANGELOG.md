@@ -10,6 +10,57 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.23.0] — 2026-05-05
+
+**`lazyclaw sessions search <query> [--regex]` — content search across sessions.**
+
+"Where did I discuss X?" answered without `grep`-piping the
+JSONL files yourself. Walks every session, scans every turn's
+content for the query, returns a per-session match count plus
+a 40-char window around the first match.
+
+```
+$ lazyclaw sessions search quicksort
+{
+  "query": "quicksort", "regex": false,
+  "matches": [
+    { "id": "algo-discussion", "mtime": "...", "matchCount": 3,
+      "excerpt": "...how do I implement quicksort in Python?..." },
+    { "id": "perf-tuning", "mtime": "...", "matchCount": 1,
+      "excerpt": "...is faster than bubblesort here..." }
+  ]
+}
+```
+
+### Two modes
+- **Substring** (default): case-insensitive `String.includes`.
+  Same shape `grep -i` would give you.
+- **`--regex`**: treats the query as a JavaScript regex with the
+  `i` flag set. Invalid regex → exit 2 with helpful stderr.
+
+### Excerpt window
+40 chars before/after the first match, with `…` ellipses on each
+side when the window doesn't reach the string boundary. Enough
+for "did I really mean to say that?" without dumping the whole
+turn.
+
+### Exit codes
+- `0` always when the search completes (even with empty matches).
+  Conventional `grep` exits 1 on no match, but a CLI tool
+  returning JSON should always exit 0 on a successful search; the
+  caller checks `matches.length === 0` for emptiness.
+- `2` on invalid regex / missing query / unparseable input.
+
+### Tests
+4 new phase 6 specs:
+- substring match returns excerpt + per-session count
+- `--regex` applies the pattern (E\d{4} match test)
+- empty match → exit 0 with `matches: []`
+- invalid regex → exit 2 with helpful stderr
+
+Suite: 308 → 312 (+4); `tsc --noEmit` clean.
+
+---
 ## [3.22.0] — 2026-05-05
 
 **Daemon `GET /workflows/<id>?summary=true` mirrors CLI `--summary`.**

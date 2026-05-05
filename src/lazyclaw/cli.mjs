@@ -582,7 +582,7 @@ const SUBCOMMANDS = [
 
 const SUBCOMMAND_SUBS = {
   config:    ['get', 'set', 'list', 'delete', 'unset', 'path', 'edit'],
-  sessions:  ['list', 'show', 'clear', 'export'],
+  sessions:  ['list', 'show', 'clear', 'export', 'search'],
   skills:    ['list', 'show', 'install', 'remove'],
   providers: ['list', 'info'],
   rates:     ['list', 'set', 'delete', 'shape'],
@@ -814,7 +814,7 @@ const HELP_DETAILS = {
   doctor: 'Usage: lazyclaw doctor\n  Validates configuration and registered providers. Exits 0 only when no issues.',
   status: 'Usage: lazyclaw status\n  Provider, model, and masked API key. Never prints the raw key.',
   onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
-  sessions: 'Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>>\n  list — recent sessions by mtime; export — render as Markdown for sharing.',
+  sessions: 'Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>|search <query> [--regex]>\n  list — recent sessions by mtime; export — render as Markdown for sharing.\n  search — case-insensitive substring (or --regex pattern) match across all session content; returns first excerpt + match count per matching session.',
   skills: 'Usage: lazyclaw skills <list|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>>\n  --from-url fetches over HTTPS only; 1 MiB body cap.',
   providers: 'Usage: lazyclaw providers <list|info <name>>\n  Static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.',
   daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>] [--shutdown-timeout-ms <N>] [--cost-cap-<currency> <N> ...] [--workflow-state-dir <dir>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).\n  --shutdown-timeout-ms <N> caps graceful drain on SIGINT/SIGTERM (default 10000). Second signal forces immediate exit.\n  --cost-cap-usd 100 (or any currency code in lowercase) rejects POST /agent + /chat with 402 once cumulative cost reaches the cap.\n  --workflow-state-dir <dir> backs GET /workflows + GET /workflows/<id> (default .workflow-state, also reads $LAZYCLAW_WORKFLOW_STATE_DIR).',
@@ -1516,7 +1516,7 @@ async function cmdProviders(sub, positional) {
   }
 }
 
-async function cmdSessions(sub, positional) {
+async function cmdSessions(sub, positional, flags = {}) {
   const sessionsMod = await import('./sessions.mjs');
   const cfgDir = path.dirname(configPath());
   switch (sub) {
@@ -1546,8 +1546,70 @@ async function cmdSessions(sub, positional) {
       catch (e) { console.error(e.message); process.exit(1); }
       return;
     }
+    case 'search': {
+      const query = positional[0];
+      if (!query) { console.error('Usage: lazyclaw sessions search <query> [--regex]'); process.exit(2); }
+      // --regex came in via the parsed flags map (parseArgs lifted it
+      // out of positional). 'regex' is also in BOOLEAN_FLAGS so it
+      // never consumes the next argument.
+      const useRegex = !!flags.regex;
+      let matcher;
+      if (useRegex) {
+        try { matcher = new RegExp(query, 'i'); }
+        catch (e) { console.error(`invalid regex: ${e.message}`); process.exit(2); }
+      } else {
+        // Case-insensitive substring search. The naive `s.includes(q)`
+        // pattern is exactly what the user wants — same shape they'd
+        // get from `grep -i`.
+        const q = query.toLowerCase();
+        matcher = { test: (s) => String(s).toLowerCase().includes(q) };
+      }
+      const items = sessionsMod.listSessions(cfgDir);
+      const matches = [];
+      for (const s of items) {
+        const turns = sessionsMod.loadTurns(s.id, cfgDir);
+        let matchCount = 0;
+        let firstExcerpt = null;
+        for (const t of turns) {
+          if (typeof t?.content !== 'string') continue;
+          if (matcher.test(t.content)) {
+            matchCount++;
+            if (firstExcerpt === null) {
+              // Excerpt: 40 chars before/after first match, clamped at
+              // string boundaries. For regex matches we need to find
+              // the actual position; for substring use indexOf.
+              const c = t.content;
+              let pos;
+              if (useRegex) {
+                pos = c.search(matcher);
+              } else {
+                pos = c.toLowerCase().indexOf(query.toLowerCase());
+              }
+              if (pos < 0) pos = 0;
+              const start = Math.max(0, pos - 40);
+              const end = Math.min(c.length, pos + query.length + 40);
+              firstExcerpt = (start > 0 ? '…' : '') + c.slice(start, end) + (end < c.length ? '…' : '');
+            }
+          }
+        }
+        if (matchCount > 0) {
+          matches.push({
+            id: s.id,
+            mtime: new Date(s.mtimeMs).toISOString(),
+            matchCount,
+            excerpt: firstExcerpt,
+          });
+        }
+      }
+      console.log(JSON.stringify({ query, regex: useRegex, matches }, null, 2));
+      // Exit 0 even on no matches — `grep` convention is exit 1, but
+      // a CLI tool that returns JSON should always exit 0 on a
+      // successful search; the caller checks `matches.length` for
+      // emptiness.
+      return;
+    }
     default:
-      console.error('Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>>');
+      console.error('Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>|search <query> [--regex]>');
       process.exit(2);
   }
 }
@@ -1580,6 +1642,7 @@ const BOOLEAN_FLAGS = new Set([
   'help',         // also handled as a subcommand alias
   'version',
   'summary',      // inspect: trim per-node detail
+  'regex',        // sessions search: treat query as a regex
 ]);
 
 function parseArgs(argv) {
@@ -1691,7 +1754,7 @@ async function main() {
     }
     case 'sessions': {
       const sub = rest.positional[0];
-      await cmdSessions(sub, rest.positional.slice(1));
+      await cmdSessions(sub, rest.positional.slice(1), rest.flags);
       break;
     }
     case 'providers': {

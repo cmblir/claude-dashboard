@@ -4768,6 +4768,68 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(fs.existsSync(path.join(dir, 'sessions', 'doomed.jsonl'))).toBe(false);
   });
 
+  test('sessions search: substring match returns excerpt + count per matching session', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    // Three sessions: two contain the keyword, one doesn't.
+    fs.writeFileSync(path.join(dir, 'sessions', 'a.jsonl'),
+      JSON.stringify({ role: 'user', content: 'how do I implement quicksort in Python?', ts: 1 }) + '\n' +
+      JSON.stringify({ role: 'assistant', content: 'Quicksort partitions the array around a pivot...', ts: 2 }) + '\n');
+    fs.writeFileSync(path.join(dir, 'sessions', 'b.jsonl'),
+      JSON.stringify({ role: 'user', content: 'TypeScript and React state management', ts: 3 }) + '\n');
+    fs.writeFileSync(path.join(dir, 'sessions', 'c.jsonl'),
+      JSON.stringify({ role: 'user', content: 'Quicksort is faster than bubblesort here', ts: 4 }) + '\n');
+
+    const r = runCli(['sessions', 'search', 'quicksort'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.query).toBe('quicksort');
+    expect(out.regex).toBe(false);
+    expect(out.matches.map((m: any) => m.id).sort()).toEqual(['a', 'c']);
+    // Per-session match count: a has 2 turns containing the word, c has 1.
+    const a = out.matches.find((m: any) => m.id === 'a');
+    const c = out.matches.find((m: any) => m.id === 'c');
+    expect(a.matchCount).toBe(2);
+    expect(c.matchCount).toBe(1);
+    // First excerpt includes a window around the match (case-insensitive).
+    expect(a.excerpt.toLowerCase()).toContain('quicksort');
+  });
+
+  test('sessions search --regex applies the pattern (case-insensitive)', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'errors.jsonl'),
+      JSON.stringify({ role: 'user', content: 'I see error code E1023 in the logs', ts: 1 }) + '\n');
+    fs.writeFileSync(path.join(dir, 'sessions', 'unrelated.jsonl'),
+      JSON.stringify({ role: 'user', content: 'no error here', ts: 2 }) + '\n');
+
+    // Pattern: error code E followed by 4 digits.
+    const r = runCli(['sessions', 'search', 'E\\d{4}', '--regex'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.regex).toBe(true);
+    expect(out.matches.map((m: any) => m.id)).toEqual(['errors']);
+    expect(out.matches[0].excerpt).toContain('E1023');
+  });
+
+  test('sessions search: empty result still exits 0 with empty matches array', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'a.jsonl'),
+      JSON.stringify({ role: 'user', content: 'hello world', ts: 1 }) + '\n');
+    const r = runCli(['sessions', 'search', 'nothing-matches-this'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.matches).toEqual([]);
+  });
+
+  test('sessions search --regex rejects invalid regex with exit 2', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['sessions', 'search', '[unclosed', '--regex'], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/invalid regex/);
+  });
+
   test('sessions export prints a Markdown dump with H1 + per-turn sections', () => {
     const dir = tmpConfigDir();
     fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
