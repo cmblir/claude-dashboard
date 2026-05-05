@@ -1680,6 +1680,52 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /workflows/aggregate mirrors CLI --aggregate', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'wf-agg');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'r1.json'), JSON.stringify({
+      sessionId: 'r1', order: ['fetch'],
+      nodes: { fetch: { status: 'success', durationMs: 80 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    fs.writeFileSync(path.join(stateDir, 'r2.json'), JSON.stringify({
+      sessionId: 'r2', order: ['fetch', 'embed'],
+      nodes: {
+        fetch: { status: 'success', durationMs: 120 },
+        embed: { status: 'failed', error: 'oops', durationMs: 1500 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      const r = await fetch(`${d.url}/workflows/aggregate`).then(x => x.json());
+      expect(r.sessionCount).toBe(2);
+      expect(r.nodeStats.fetch).toMatchObject({
+        count: 2, successCount: 2, failedCount: 0,
+        avgDurationMs: 100, minDurationMs: 80, maxDurationMs: 120,
+      });
+      expect(r.nodeStats.embed).toMatchObject({
+        count: 1, successCount: 0, failedCount: 1,
+        avgDurationMs: 1500,
+      });
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /workflows/aggregate with no state dir returns sessionCount 0 (not 404)', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'never-created');
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      const r = await fetch(`${d.url}/workflows/aggregate`);
+      expect(r.status).toBe(200);
+      const body = await r.json();
+      expect(body.sessionCount).toBe(0);
+      expect(body.nodeStats).toEqual({});
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /workflows lists every persisted workflow session', async () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'wf-st');

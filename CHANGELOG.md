@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.49.0] — 2026-05-05
+
+**Daemon `GET /workflows/aggregate` mirrors CLI v3.48.**
+
+Same `{ sessionCount, nodeStats }` shape as the CLI's
+`--aggregate`. A dashboard's "node reliability" panel can call
+this endpoint to render a sortable table of which nodes flake
+across a fleet of runs.
+
+```
+GET /workflows/aggregate
+→ 200 {
+    "dir": ".workflow-state",
+    "sessionCount": 47,
+    "nodeStats": {
+      "fetch":    { "count": 47, "successCount": 47, ... },
+      "embed":    { "count": 47, "successCount": 41, "failedCount": 6, ... },
+      ...
+    }
+  }
+```
+
+### Path placement
+The endpoint sits at `/workflows/aggregate`. Switch-case order
+in the dispatcher keeps it ahead of the regex matcher
+`/^\/workflows\/([^/]+)$/`, so `aggregate` is captured by the
+literal path and never falls into the single-session GET handler.
+
+### Missing-dir semantics
+Same shape as v3.20's `/metrics` workflows snapshot: a missing
+state dir returns `200 { sessionCount: 0, nodeStats: {} }` so a
+fresh process polling this endpoint doesn't 404 before any
+workflow has run. (CLI exits 2 in that case — humans want a
+hard signal; UIs want a smooth zero state.)
+
+### Tests
+2 new phase 6 specs: 2-session aggregate accuracy + the
+missing-dir 200/empty-stats fallback.
+
+Suite: 371 → 373 (+2); `tsc --noEmit` clean.
+
+---
 ## [3.48.0] — 2026-05-05
 
 **`lazyclaw inspect --aggregate` — cross-session per-node statistics.**

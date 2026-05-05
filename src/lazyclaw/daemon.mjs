@@ -23,7 +23,7 @@ import { costFromUsage } from './providers/rates.mjs';
 import { composeSystemPrompt, listSkills, loadSkill, skillPath, installSkill, removeSkill } from './skills.mjs';
 import { TokenBucketLimiter } from './ratelimit.mjs';
 import { createLogger } from './logger.mjs';
-import { summarizeState, listSessions as listWorkflowSessions, loadStateFile as loadWorkflowState } from './workflow/summary.mjs';
+import { summarizeState, listSessions as listWorkflowSessions, loadStateFile as loadWorkflowState, aggregateNodeStats } from './workflow/summary.mjs';
 import { validateConfig } from './config-validate.mjs';
 import { validateRates } from './rates-validate.mjs';
 
@@ -644,6 +644,26 @@ export function makeHandler(ctx) {
             return writeJson(res, 200, { id, turns });
           } catch (err) {
             return writeJson(res, 400, { error: err?.message || String(err) });
+          }
+        }
+        case route === 'GET /workflows/aggregate': {
+          // Mirror of CLI v3.48 `lazyclaw inspect --aggregate`. Per-node
+          // statistics across every persisted session in the state
+          // directory. Answers "which node tends to be slow / fail
+          // across all my runs?" — needs no workflow file, just state.
+          const stateDir = ctx.workflowStateDir();
+          try {
+            const stats = aggregateNodeStats(stateDir);
+            return writeJson(res, 200, { dir: stateDir, ...stats });
+          } catch (err) {
+            if (err?.code === 'ENOENT') {
+              // Empty / missing state dir is a valid "no runs yet"
+              // state — match CLI semantics? CLI exits 2; daemon
+              // returns 200 with sessionCount: 0 + empty stats so a
+              // poll loop doesn't 404 a fresh process.
+              return writeJson(res, 200, { dir: stateDir, sessionCount: 0, nodeStats: {} });
+            }
+            return writeJson(res, 500, { error: err?.message || String(err) });
           }
         }
         case route === 'GET /workflows': {
