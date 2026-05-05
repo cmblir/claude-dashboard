@@ -10,6 +10,44 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.41.0] — 2026-05-05
+
+**`lazyclaw inspect <session> --node <node-id>` — drill into one node.**
+
+For shell scripts that ask "did node 'classify' succeed?" the
+existing per-session inspect output is too much — you're parsing
+the full `nodes` map just to look at one entry. `--node <id>`
+returns just that node's state and exits with a status code that
+mirrors the node's lifecycle:
+
+```
+$ lazyclaw inspect my-job --node fetch
+{ "sessionId": "my-job", "nodeId": "fetch",
+  "status": "success", "output": "...", "attempts": 1, "durationMs": 42 }
+[exit 0]
+
+$ lazyclaw inspect my-job --node classify
+{ "sessionId": "my-job", "nodeId": "classify",
+  "status": "failed", "error": "...", "attempts": 3 }
+[exit 1]   ← script-friendly red
+```
+
+### Exit code semantics
+- `0` — node exists; status is `success`, `pending`, or `running`
+- `1` — node exists; status is `failed`
+- `2` — node doesn't exist in this session (typo or wrong workflow)
+
+This shape lets a CI step branch cleanly: `lazyclaw inspect $JOB
+--node fetch || retry-fetch.sh` only triggers retry on actual
+failure, not on "still running" or "missing."
+
+### Tests
+1 new phase 6 spec covering all four exit-code paths (success,
+failed, pending, unknown-node).
+
+Suite: 356 → 357 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.40.0] — 2026-05-05
 
 **Daemon `GET /config/validate` mirrors CLI v3.39 + shared validator.**

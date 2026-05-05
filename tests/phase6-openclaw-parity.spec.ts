@@ -808,6 +808,44 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(fs.existsSync(outside)).toBe(true);
   });
 
+  test('lazyclaw inspect --node <id>: drills into one node, exit code mirrors status', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job',
+      order: ['a', 'b', 'c'],
+      nodes: {
+        a: { status: 'success', output: 'A', attempts: 1, durationMs: 5 },
+        b: { status: 'failed', error: 'boom', attempts: 3 },
+        c: { status: 'pending', attempts: 0 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+
+    // Success node → exit 0.
+    const r1 = runCli(['inspect', 'job', '--dir', stateDir, '--node', 'a'], dir);
+    expect(r1.status).toBe(0);
+    const out1 = JSON.parse(r1.stdout);
+    expect(out1).toMatchObject({ sessionId: 'job', nodeId: 'a', status: 'success', output: 'A' });
+
+    // Failed node → exit 1 (script-friendly red).
+    const r2 = runCli(['inspect', 'job', '--dir', stateDir, '--node', 'b'], dir);
+    expect(r2.status).toBe(1);
+    const out2 = JSON.parse(r2.stdout);
+    expect(out2).toMatchObject({ nodeId: 'b', status: 'failed', error: 'boom' });
+
+    // Pending node → exit 0.
+    const r3 = runCli(['inspect', 'job', '--dir', stateDir, '--node', 'c'], dir);
+    expect(r3.status).toBe(0);
+    expect(JSON.parse(r3.stdout).status).toBe('pending');
+
+    // Unknown node → exit 2 with helpful stderr.
+    const r4 = runCli(['inspect', 'job', '--dir', stateDir, '--node', 'never-existed'], dir);
+    expect(r4.status).toBe(2);
+    expect(r4.stderr).toMatch(/No node "never-existed"/);
+  });
+
   test('lazyclaw inspect --summary trims per-node detail in single-session mode', () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'st');

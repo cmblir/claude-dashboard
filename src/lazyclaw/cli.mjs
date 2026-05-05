@@ -212,6 +212,26 @@ async function cmdInspect(sessionId, opts = {}) {
     console.error(`No state for session ${sessionId} in ${dir}`);
     process.exit(2);
   }
+  // --node <id>: drill into one node's state. Useful for scripts
+  // checking a specific node ("did node 'classify' succeed?")
+  // without reading the full state body. Exit codes mirror the
+  // node's status:
+  //   0 — node exists and status is success or pending or running
+  //   1 — node exists and status is failed (script-friendly red)
+  //   2 — node doesn't exist in this session (typo or wrong workflow)
+  if (opts.node) {
+    const ns = state.nodes?.[opts.node];
+    if (!ns) {
+      console.error(`No node "${opts.node}" in session ${sessionId} (known: ${Object.keys(state.nodes || {}).join(', ')})`);
+      process.exit(2);
+    }
+    console.log(JSON.stringify({
+      sessionId: state.sessionId,
+      nodeId: opts.node,
+      ...ns,
+    }, null, 2));
+    process.exit(ns.status === 'failed' ? 1 : 0);
+  }
   const { summary, failedNodes } = summarizeState(state);
   // --summary trims the per-node `nodes` map and `order` from the
   // single-session output, leaving only `summary` + `failedNodes` +
@@ -942,7 +962,7 @@ const HELP_SUMMARIES = {
 const HELP_DETAILS = {
   run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent] [--concurrency <N>]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  --concurrency <N>: cap in-flight nodes within a level (DAG modes only). 0/missing → unbounded.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs> [--parallel-persistent] [--concurrency <N>]\n  Re-enters a previously persisted run; succeeds nodes are skipped.\n  Pass --parallel-persistent to resume a DAG run (must match the original run\'s mode).\n  --concurrency <N>: cap in-flight nodes per level (DAG mode only).',
-  inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary] [--filter <substr>] [--limit <N>]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  --filter / --limit refine list-mode further (case-insensitive sessionId substring + post-filter cap).\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
+  inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary] [--filter <substr>] [--limit <N>] [--node <node-id>]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  --filter / --limit refine list-mode further (case-insensitive sessionId substring + post-filter cap).\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  --node <id>: print just that node\'s state. Exit 0 success/pending/running, 1 failed, 2 no such node.\n  With a session-id (no --node): print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
   validate: 'Usage: lazyclaw validate <workflow.mjs>\n  Static check: load + shape + dep + cycle + parallelism estimate.\n  Exit 0 valid · 1 hard failure (issues populated) · 2 file/import error.',
   graph: 'Usage: lazyclaw graph <workflow.mjs> [--lr] [--state <session-id>] [--dir <state-dir>]\n  Emit the workflow DAG as Mermaid syntax (graph TD by default; --lr for left-right).\n  --state overlays a persisted run\'s status (success ✓ / running ⏳ / failed ✗ / pending) with classDef styling.\n  Output is paste-ready for GitHub markdown / Notion / Obsidian.',
@@ -2140,6 +2160,7 @@ async function main() {
         summary: !!rest.flags.summary,
         filter: rest.flags.filter,
         limit: rest.flags.limit,
+        node: rest.flags.node,
       });
       break;
     }
