@@ -10,6 +10,69 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.7.0] — 2026-05-05
+
+**Workflow: end-to-end `AbortSignal` propagation.**
+
+Both `runSequential` and `runParallel` now accept `opts.signal`
+(an `AbortSignal`). The signal is checked between nodes (sequential)
+and between topological levels (parallel) so an in-flight workflow
+can be cancelled cleanly without waiting for the next-scheduled
+unit. The same signal is forwarded to each `node.execute(input,
+{ signal })` so long-running nodes can subscribe and abort their
+own work (HTTP fetch, child process, file IO).
+
+```js
+const ac = new AbortController();
+setTimeout(() => ac.abort(), 100);
+
+const result = await runSequential(nodes, null, { signal: ac.signal });
+// → { success: false, error: { code: 'ABORT' }, failedAt: <next-node-id>, ... }
+// Cleanup runs on every node that started before abort.
+```
+
+### Aborted-result shape
+On abort:
+- `success: false`
+- `error.code === 'ABORT'`, `error.message === 'aborted'`
+- `failedAt` is the id of the node that *would have run next*
+  (sequential) or the first node id of the level that was about
+  to start (parallel)
+- `session` is cleared (same teardown as a thrown failure)
+- `cleanup()` runs on every started node via `Promise.allSettled`
+  — a flaky cleanup can't mask the abort
+
+### Forwarding to `execute()`
+Nodes that do their own async work receive `{ signal }` as the
+second argument:
+
+```js
+{
+  id: 'fetch-thing',
+  type: 'http',
+  async execute(input, { signal }) {
+    const res = await fetch(url, { signal });   // canceled with the workflow
+    return res.json();
+  },
+}
+```
+
+If a node ignores the signal, the workflow still aborts at the
+*next* boundary — it just won't interrupt the in-flight call.
+
+### Tests
+3 new phase 1 specs:
+- `runSequential`: signal aborted mid-flow → cleanup runs, returns
+  `{ success:false, error.code:'ABORT', failedAt:<next-id> }`
+- `runSequential`: signal forwarded to `execute()` so a node can
+  subscribe and bail itself out
+- `runParallel`: signal aborted between levels stops downstream
+  level scheduling, cleanup runs on the level that finished
+
+Suite: 269 → 269 (3 new specs offset by no removals; all green).
+`tsc --noEmit` clean.
+
+---
 ## [3.6.0] — 2026-05-05
 
 **Workflow: per-node `timeoutMs` across all engines.**

@@ -90,11 +90,17 @@ export async function retryWithBackoff(fn, opts) {
  * the next. On any throw, run cleanup hooks on every started node and clear
  * the in-memory session record.
  *
+ * `opts.signal` (AbortSignal) is honored before each node starts AND
+ * passed to `node.execute(input, { signal })` so long-running nodes
+ * can react to outer cancellation. An aborted workflow runs cleanup
+ * on every started node and returns failure with code 'ABORT'.
+ *
  * @param {WorkflowNode[]} nodes
  * @param {unknown} [initialInput]
+ * @param {{ signal?: AbortSignal }} [opts]
  * @returns {Promise<RunResult>}
  */
-export async function runSequential(nodes, initialInput = null) {
+export async function runSequential(nodes, initialInput = null, opts = {}) {
   /** @type {Record<string, unknown>} */
   const session = {};
   /** @type {WorkflowNode[]} */
@@ -102,15 +108,29 @@ export async function runSequential(nodes, initialInput = null) {
   /** @type {NodeRunRecord[]} */
   const results = [];
   let input = initialInput;
+  const signal = opts.signal;
 
   for (const node of nodes) {
+    if (signal?.aborted) {
+      // Cancellation between nodes: cleanup what we started, fail fast.
+      await Promise.allSettled(started.map(n => {
+        if (typeof n.cleanup !== 'function') return null;
+        try { return Promise.resolve(n.cleanup()); }
+        catch { return Promise.resolve(); }
+      }));
+      for (const k of Object.keys(session)) delete session[k];
+      const e = new Error('aborted');
+      /** @type {any} */ (e).code = 'ABORT';
+      return { success: false, results, error: e, failedAt: node.id, session };
+    }
     started.push(node);
     const t0 = performance.now();
     try {
       // Build the actual call: optional timeout wraps execute(); retry
       // wraps the timed call. So a flaky 5-second op with `retry:{max:3}`
       // and `timeoutMs:5000` gets up-to-3 attempts of up-to-5s each.
-      const call = () => runWithTimeout(() => node.execute(input), node.timeoutMs);
+      // The signal is forwarded to execute() so the node can react.
+      const call = () => runWithTimeout(() => node.execute(input, { signal }), node.timeoutMs);
       const output = node.retry && Number.isFinite(node.retry.max) && node.retry.max > 0
         ? await retryWithBackoff(call, node.retry)
         : await call();
@@ -198,14 +218,21 @@ export function topologicalLevels(nodes) {
  * Cleanups run via `Promise.allSettled` so a flaky cleanup can't mask
  * the original error.
  *
+ * `opts.signal` is checked between levels and forwarded to each
+ * `node.execute(input, { signal })`. An aborted signal between levels
+ * stops further scheduling, runs cleanup, and returns
+ * `{ success:false, error: ABORT }`.
+ *
  * @param {Array<{
  *   id: string,
  *   type: string,
  *   deps?: string[],
- *   execute: (input: Record<string, unknown> | unknown) => Promise<unknown>,
+ *   execute: (input: Record<string, unknown> | unknown, opts?: { signal?: AbortSignal }) => Promise<unknown>,
  *   cleanup?: (() => (Promise<void>|void)),
+ *   retry?: { max: number, baseDelayMs?: number },
+ *   timeoutMs?: number,
  * }>} nodes
- * @param {{ initialInput?: unknown }} [opts]
+ * @param {{ initialInput?: unknown, signal?: AbortSignal }} [opts]
  * @returns {Promise<RunResult>}
  */
 export async function runParallel(nodes, opts = {}) {
@@ -218,7 +245,22 @@ export async function runParallel(nodes, opts = {}) {
     const error = new Error(`workflow has a cycle or unreachable nodes: ${leftover.join(', ')}`);
     return { success: false, results, error, failedAt: leftover[0], session };
   }
+  const signal = opts.signal;
   for (const level of levels) {
+    // Cancellation check between levels: don't start a new level if
+    // the caller has aborted. Cleanup runs over every node that
+    // actually started (which excludes future levels by definition).
+    if (signal?.aborted) {
+      await Promise.allSettled(started.map(n => {
+        if (typeof n.cleanup !== 'function') return null;
+        try { return Promise.resolve(n.cleanup()); }
+        catch { return Promise.resolve(); }
+      }));
+      for (const k of Object.keys(session)) delete session[k];
+      const e = new Error('aborted');
+      /** @type {any} */ (e).code = 'ABORT';
+      return { success: false, results, error: e, failedAt: level[0], session };
+    }
     // Build the input record for each node in the level: each node sees
     // a `{ depId: depOutput }` map, or `initialInput` when it has no deps.
     const settled = await Promise.allSettled(level.map(async (id) => {
@@ -230,7 +272,7 @@ export async function runParallel(nodes, opts = {}) {
         : Object.fromEntries(deps.map(d => [d, session[d]]));
       const t0 = performance.now();
       try {
-        const call = () => runWithTimeout(() => node.execute(input), node.timeoutMs);
+        const call = () => runWithTimeout(() => node.execute(input, { signal }), node.timeoutMs);
         const output = node.retry && Number.isFinite(node.retry.max) && node.retry.max > 0
           ? await retryWithBackoff(call, node.retry)
           : await call();

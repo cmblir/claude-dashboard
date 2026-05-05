@@ -4,8 +4,10 @@ import { runSequential, runParallel, topologicalLevels, retryWithBackoff, runWit
 interface WorkflowNode {
   id: string;
   type: string;
-  execute(input: unknown): Promise<unknown>;
+  execute(input: unknown, opts?: { signal?: AbortSignal }): Promise<unknown>;
   cleanup?: () => void | Promise<void>;
+  retry?: { max: number; baseDelayMs?: number };
+  timeoutMs?: number;
 }
 
 function makeNodes(count: number, failAt?: number): { nodes: WorkflowNode[]; order: string[]; cleaned: string[] } {
@@ -306,6 +308,59 @@ test.describe('Phase 1 — Workflow Engine Core', () => {
     expect(r.success).toBe(true);
     expect(attempts).toBe(3);
     expect(r.results[0].output).toBe('fast');
+  });
+
+  test('runSequential: opts.signal.aborted before next node → cleanup + ABORT failure', async () => {
+    const cleaned: string[] = [];
+    const ac = new AbortController();
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    const nodes: WorkflowNode[] = [
+      {
+        id: 'a', type: 't',
+        async execute() { ac.abort(); /* abort right after a finishes */ return 'A'; },
+        cleanup() { cleaned.push('a'); },
+      },
+      {
+        id: 'b', type: 't',
+        async execute() { return 'B'; },
+        cleanup() { cleaned.push('b'); },
+      },
+    ];
+    const r = await runSequential(nodes, null, { signal: ac.signal });
+    expect(r.success).toBe(false);
+    expect((r.error as any)?.code).toBe('ABORT');
+    expect(r.failedAt).toBe('b');
+    // a ran, b never started, cleanup ran for a but not b
+    expect(cleaned).toEqual(['a']);
+  });
+
+  test('runSequential: signal forwarded to execute() so nodes can cancel themselves', async () => {
+    let observedSignal: any = null;
+    const ac = new AbortController();
+    const nodes: WorkflowNode[] = [
+      {
+        id: 'a', type: 't',
+        async execute(_input, opts: any) {
+          observedSignal = opts?.signal;
+          return 'A';
+        },
+      },
+    ];
+    await runSequential(nodes, null, { signal: ac.signal });
+    expect(observedSignal).toBe(ac.signal);
+  });
+
+  test('runParallel: signal aborted between levels stops downstream level scheduling', async () => {
+    const ac = new AbortController();
+    let level2Ran = false;
+    const nodes = [
+      { id: 'a', type: 't', deps: [], async execute() { ac.abort(); return 'A'; } },
+      { id: 'b', type: 't', deps: ['a'], async execute() { level2Ran = true; return 'B'; } },
+    ];
+    const r = await runParallel(nodes, { signal: ac.signal });
+    expect(r.success).toBe(false);
+    expect((r.error as any)?.code).toBe('ABORT');
+    expect(level2Ran).toBe(false);
   });
 
   test('runParallel: detects cycles and refuses to run', async () => {
