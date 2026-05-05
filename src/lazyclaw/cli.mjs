@@ -2030,14 +2030,33 @@ async function cmdSessions(sub, positional, flags = {}) {
         const n = parseInt(flags.limit, 10);
         if (Number.isFinite(n) && n > 0) items = items.slice(0, n);
       }
-      const out = items.map(s => {
-        const base = { id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString() };
-        if (flags['with-turn-count']) {
+      let out = items.map(s => {
+        const base = { id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString(), _mtimeMs: s.mtimeMs };
+        if (flags['with-turn-count'] || flags['sort-by'] === 'turn-count') {
           try { base.turnCount = sessionsMod.loadTurns(s.id, cfgDir).length; }
           catch { base.turnCount = null; }
         }
         return base;
       });
+      // --sort-by mtime|turn-count|bytes|id. Default is mtime descending
+      // (matches the underlying listSessions behavior). turn-count
+      // implicitly enables turnCount loading above.
+      if (flags['sort-by']) {
+        const valid = new Set(['mtime', 'turn-count', 'bytes', 'id']);
+        if (!valid.has(flags['sort-by'])) {
+          console.error(`invalid --sort-by: ${flags['sort-by']} (expected: mtime, turn-count, bytes, id)`);
+          process.exit(2);
+        }
+        const cmp = {
+          mtime:        (a, b) => b._mtimeMs - a._mtimeMs,
+          'turn-count': (a, b) => (b.turnCount ?? 0) - (a.turnCount ?? 0),
+          bytes:        (a, b) => b.bytes - a.bytes,
+          id:           (a, b) => a.id.localeCompare(b.id),
+        };
+        out.sort(cmp[flags['sort-by']]);
+      }
+      // Strip the internal helper field before serializing.
+      out = out.map(({ _mtimeMs, ...rest }) => rest);
       console.log(JSON.stringify(out, null, 2));
       return;
     }

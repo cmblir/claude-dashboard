@@ -10,6 +10,43 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.60.0] — 2026-05-05  🎉 milestone
+
+**`sessions list --sort-by mtime|turn-count|bytes|id`.**
+
+Default sort is mtime descending (matches the underlying
+`listSessions` order). For users who want a different ordering,
+`--sort-by` provides four explicit predicates:
+
+```
+$ lazyclaw sessions list --sort-by turn-count   # longest conversations first
+$ lazyclaw sessions list --sort-by bytes        # heaviest sessions first
+$ lazyclaw sessions list --sort-by id           # alphabetical
+$ lazyclaw sessions list --sort-by mtime        # default — most recent first
+```
+
+### Implicit `--with-turn-count`
+Choosing `--sort-by turn-count` implicitly enables turn-count
+loading (no need to also pass `--with-turn-count`). Lazy: only
+loads counts when a sort actually needs them.
+
+### Validation
+Unknown `--sort-by` value → exit 2 with helpful stderr listing
+the four valid options. Same shape as v3.15's `--status`
+validation.
+
+### Cycle milestone — 54 releases
+This is v3.60.0 — the 54th release this iteration cycle (started
+at v3.7.0). Suite: 269 → 392 (+123 tests).
+
+### Tests
+1 new phase 6 spec covering all 4 sort predicates with a
+deterministic 3-session population + the unknown-bucket exit 2
+path.
+
+Suite: 391 → 392 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.59.0] — 2026-05-05
 
 **`sessions list --with-turn-count` (CLI + daemon `?withTurnCount=true`).**

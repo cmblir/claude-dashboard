@@ -6244,6 +6244,44 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r.stdout).toContain('_(empty)_');
   });
 
+  test('sessions list --sort-by orders by mtime|turn-count|bytes|id', () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    // Three sessions: 'big' has 5 turns + 200B, 'medium' has 3 turns,
+    // 'small' has 1 turn. Touch mtimes so the default ordering differs
+    // from sort-by-turn-count and sort-by-bytes.
+    fs.writeFileSync(path.join(dir, 'sessions', 'big.jsonl'),
+      Array.from({ length: 5 }, (_, i) =>
+        JSON.stringify({ role: 'user', content: 'long content here long content here', ts: i })
+      ).join('\n') + '\n');
+    fs.writeFileSync(path.join(dir, 'sessions', 'medium.jsonl'),
+      Array.from({ length: 3 }, (_, i) =>
+        JSON.stringify({ role: 'user', content: 'mid', ts: i })
+      ).join('\n') + '\n');
+    fs.writeFileSync(path.join(dir, 'sessions', 'small.jsonl'),
+      JSON.stringify({ role: 'user', content: 'a', ts: 0 }) + '\n');
+
+    // turn-count desc: big > medium > small.
+    const r1 = runCli(['sessions', 'list', '--sort-by', 'turn-count'], dir);
+    expect(r1.status).toBe(0);
+    expect(JSON.parse(r1.stdout).map((s: any) => s.id)).toEqual(['big', 'medium', 'small']);
+
+    // bytes desc.
+    const r2 = runCli(['sessions', 'list', '--sort-by', 'bytes'], dir);
+    expect(r2.status).toBe(0);
+    expect(JSON.parse(r2.stdout).map((s: any) => s.id)).toEqual(['big', 'medium', 'small']);
+
+    // id asc (alphabetical).
+    const r3 = runCli(['sessions', 'list', '--sort-by', 'id'], dir);
+    expect(r3.status).toBe(0);
+    expect(JSON.parse(r3.stdout).map((s: any) => s.id)).toEqual(['big', 'medium', 'small']);
+
+    // Invalid --sort-by → exit 2.
+    const r4 = runCli(['sessions', 'list', '--sort-by', 'bogus'], dir);
+    expect(r4.status).toBe(2);
+    expect(r4.stderr).toMatch(/invalid --sort-by/);
+  });
+
   test('sessions list --with-turn-count includes turnCount per session (CLI + daemon)', async () => {
     const dir = tmpConfigDir();
     fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
