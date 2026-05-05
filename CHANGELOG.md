@@ -10,6 +10,62 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.21.0] — 2026-05-05
+
+**`lazyclaw validate <workflow.mjs>` — static check before run.**
+
+Loads the workflow file and runs algorithmic checks: shape (each
+node has an id and `execute`), uniqueness (no duplicate ids),
+deps (warn on unknown — `topologicalLevels` treats them as
+satisfied edges, but it's almost always a typo), topology
+(no cycles, no unreachable nodes). No execution.
+
+```
+$ lazyclaw validate ./flow.mjs
+{
+  "ok": true,
+  "file": "./flow.mjs",
+  "nodeCount": 5,
+  "issues": [],
+  "warnings": [],
+  "levels": [["fetch"], ["embed", "classify", "tag"], ["merge"]],
+  "maxParallelism": 3
+}
+```
+
+### What it catches at static time
+- **Cycle**: `topologicalLevels` returns non-empty `leftover` →
+  hard failure with the leftover ids in the issue message.
+- **Duplicate id**: catches the silent bug where two nodes share
+  an id (later one wins, earlier one is dead code).
+- **Missing `execute` function**: a node with no `execute` would
+  throw `not a function` at runtime — catch it before run.
+- **Bad `deps` shape**: `deps: 'a,b'` (string) instead of array
+  is a common typo.
+- **Unknown dep** (warning): `deps: ['fetcch']` — engine treats
+  as satisfied; user sees "did you mean 'fetch'?" before launch.
+
+### `maxParallelism` informational output
+Equals the widest topological level. A user setting `--concurrency
+N` for `lazyclaw run --parallel-persistent` knows the upper bound:
+setting `--concurrency` higher than `maxParallelism` has no effect.
+
+### Exit codes
+- `0` valid (warnings ok)
+- `1` hard failure (issues populated)
+- `2` file path / import error (couldn't read or eval the workflow)
+
+### Tests
+5 new phase 6 specs:
+- well-formed DAG → ok=true with levels + maxParallelism
+- cycle → exit 1 with helpful issue
+- duplicate id + missing execute + bad deps shape → multiple issues
+- unknown dep is a warning, not a failure
+- missing file → exit 2 with helpful stderr
+
+Suite: 302 → 307 (+5); `tsc --noEmit` clean.
+
+---
 ## [3.20.0] — 2026-05-05
 
 **Daemon `/metrics` includes a workflows snapshot block.**

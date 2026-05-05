@@ -405,6 +405,87 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(out.sessions[0].nodes).toBeUndefined();
   });
 
+  test('lazyclaw validate: well-formed DAG → exit 0 with levels + maxParallelism', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'good.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'fetch',    deps: [],                        async execute() {} },
+         { id: 'embed',    deps: ['fetch'],                 async execute() {} },
+         { id: 'classify', deps: ['fetch'],                 async execute() {} },
+         { id: 'tag',      deps: ['fetch'],                 async execute() {} },
+         { id: 'merge',    deps: ['embed','classify','tag'], async execute() {} },
+       ];`,
+    );
+    const r = runCli(['validate', wfPath], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(true);
+    expect(out.nodeCount).toBe(5);
+    expect(out.issues).toEqual([]);
+    expect(out.warnings).toEqual([]);
+    // Levels: [fetch], [embed,classify,tag], [merge] → max width 3.
+    expect(out.maxParallelism).toBe(3);
+    expect(out.levels).toHaveLength(3);
+  });
+
+  test('lazyclaw validate: cycle → exit 1 with helpful issue', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'cyclic.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a', deps: ['b'], async execute() {} },
+         { id: 'b', deps: ['a'], async execute() {} },
+       ];`,
+    );
+    const r = runCli(['validate', wfPath], dir);
+    expect(r.status).toBe(1);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(false);
+    expect(out.issues.join('\n')).toMatch(/cycle/);
+  });
+
+  test('lazyclaw validate: duplicate id and missing execute → multiple issues', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'broken.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a', async execute() {} },
+         { id: 'a', async execute() {} },          // duplicate id
+         { id: 'b' },                              // missing execute
+         { id: 'c', deps: 'not-an-array', async execute() {} },   // bad deps shape
+       ];`,
+    );
+    const r = runCli(['validate', wfPath], dir);
+    expect(r.status).toBe(1);
+    const out = JSON.parse(r.stdout);
+    expect(out.issues.some((m: string) => m.includes('duplicate id'))).toBe(true);
+    expect(out.issues.some((m: string) => m.includes('execute is not a function'))).toBe(true);
+    expect(out.issues.some((m: string) => m.includes('deps must be an array'))).toBe(true);
+  });
+
+  test('lazyclaw validate: unknown dep is a warning, not a hard failure', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'warn.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a', deps: ['ghost'], async execute() {} },
+       ];`,
+    );
+    const r = runCli(['validate', wfPath], dir);
+    expect(r.status).toBe(0);   // unknown dep is soft (engine treats as satisfied)
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(true);
+    expect(out.warnings.some((m: string) => m.includes('ghost'))).toBe(true);
+  });
+
+  test('lazyclaw validate: missing file → exit 2', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['validate', path.join(dir, 'nope.mjs')], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/validate:/);
+  });
+
   test('lazyclaw clear: deletes existing state file → exit 0 with removed:true', () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'st');

@@ -259,6 +259,84 @@ async function cmdClear(sessionId, opts = {}) {
   process.exit(0);
 }
 
+// Static validation of a workflow file. No execution — pure shape +
+// topology check. Useful for CI:
+//   $ lazyclaw validate ./flow.mjs && lazyclaw run job ./flow.mjs
+//
+// Checks (in order; the first hard failure short-circuits the rest
+// for a fast CI signal, but soft warnings collect into `warnings`):
+//   1. file imports cleanly and exports `nodes` (hard)
+//   2. each node has a string `id` and an `execute` function (hard)
+//   3. ids are unique (hard — duplicate is a silent bug)
+//   4. deps reference known ids (warn — unknown deps are treated as
+//      satisfied edges by topologicalLevels, so this is not fatal
+//      but almost always a typo)
+//   5. no cycles (hard — `topologicalLevels` returns `leftover` non-empty)
+//
+// Output JSON includes:
+//   - ok: bool
+//   - issues: hard-failure messages
+//   - warnings: soft messages (still ok=true)
+//   - levels: topological levels (one per concurrent batch)
+//   - maxParallelism: max level width (informational — what the user's
+//     `--concurrency` flag should at most be set to)
+//
+// Exit codes:
+//   0 — valid (warnings ok)
+//   1 — hard failure
+//   2 — file path / import error (couldn't read or eval the file)
+async function cmdValidate(file) {
+  if (!file) { console.error('Usage: lazyclaw validate <workflow.mjs>'); process.exit(2); }
+  let nodes;
+  try {
+    nodes = await importWorkflow(file);
+  } catch (e) {
+    console.error(`validate: ${e?.message || e}`);
+    process.exit(2);
+  }
+  const issues = [];
+  const warnings = [];
+  // Per-node shape validation. We continue past per-node failures so
+  // the user sees every issue at once, not one-per-edit-cycle.
+  const ids = new Set();
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const where = `nodes[${i}]`;
+    if (!n || typeof n !== 'object') { issues.push(`${where}: must be an object`); continue; }
+    if (typeof n.id !== 'string' || n.id.length === 0) { issues.push(`${where}: missing or non-string id`); continue; }
+    if (typeof n.execute !== 'function') issues.push(`${where} (id=${n.id}): execute is not a function`);
+    if (ids.has(n.id)) issues.push(`${where}: duplicate id "${n.id}"`);
+    ids.add(n.id);
+    if (n.deps !== undefined && !Array.isArray(n.deps)) {
+      issues.push(`${where} (id=${n.id}): deps must be an array of strings`);
+    }
+  }
+  // Dep reference check (warnings — topologicalLevels tolerates them).
+  for (const n of nodes) {
+    for (const d of n?.deps || []) {
+      if (!ids.has(d)) warnings.push(`node "${n.id}": dep "${d}" not found in this workflow (will be treated as satisfied)`);
+    }
+  }
+  // Topology / cycle check — only meaningful when shape passed.
+  let levels = null;
+  let maxParallelism = 0;
+  if (issues.length === 0) {
+    const { topologicalLevels } = await import('./workflow/executor.mjs');
+    const { levels: lvls, leftover } = topologicalLevels(nodes);
+    levels = lvls;
+    maxParallelism = lvls.reduce((m, l) => Math.max(m, l.length), 0);
+    if (leftover.length > 0) {
+      issues.push(`workflow has a cycle or unreachable nodes: ${leftover.join(', ')}`);
+    }
+  }
+  const ok = issues.length === 0;
+  console.log(JSON.stringify({
+    ok, file, nodeCount: nodes.length, issues, warnings,
+    levels, maxParallelism,
+  }, null, 2));
+  process.exit(ok ? 0 : 1);
+}
+
 async function cmdResume(sessionId, file, opts = {}) {
   const { runPersistent, loadState } = await loadEngine();
   const dir = opts.dir || '.workflow-state';
@@ -493,7 +571,7 @@ async function cmdVersion() {
 // truth so adding a subcommand updates the completion script too. The
 // dispatcher in main() is the runtime authority; this list mirrors it.
 const SUBCOMMANDS = [
-  'run', 'resume', 'inspect', 'clear',
+  'run', 'resume', 'inspect', 'clear', 'validate',
   'config', 'chat', 'agent',
   'doctor', 'status', 'onboard',
   'sessions', 'skills', 'providers',
@@ -719,6 +797,7 @@ const HELP_SUMMARIES = {
   rates:      'Manage cost rate-cards in config (rates list|set <provider/model>|delete|shape)',
   inspect:    'Print persisted workflow state without executing',
   clear:      'Delete a persisted workflow state file (idempotent)',
+  validate:   'Static-check a workflow file: shape, deps, cycles, parallelism',
 };
 
 // Detailed usage per subcommand for `lazyclaw help <name>`. Kept as flat
@@ -728,6 +807,7 @@ const HELP_DETAILS = {
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
   inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
+  validate: 'Usage: lazyclaw validate <workflow.mjs>\n  Static check: load + shape + dep + cycle + parallelism estimate.\n  Exit 0 valid · 1 hard failure (issues populated) · 2 file/import error.',
   config: 'Usage: lazyclaw config <get|set|list|delete|path|edit> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
   agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage] [--cost]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, ...} to stderr after the response.\n  --cost adds a cost line on stderr when config.rates has a card for the active provider/model.',
@@ -1571,6 +1651,11 @@ async function main() {
       const [sessionId] = rest.positional;
       if (!sessionId) { console.error('Usage: lazyclaw clear <session-id> [--dir <state-dir>]'); process.exit(2); }
       await cmdClear(sessionId, { dir: rest.flags.dir });
+      break;
+    }
+    case 'validate': {
+      const [file] = rest.positional;
+      await cmdValidate(file);
       break;
     }
     case 'config': {
