@@ -10892,6 +10892,14 @@ function _arRender(panel, entry) {
     const prevPoll     = entry && entry.pollInterval ? entry.pollInterval : 300;
     const prevIdle     = entry && entry.idleSeconds ? entry.idleSeconds : 90;
     const prevMax      = entry && entry.maxAttempts ? entry.maxAttempts : 12;
+    // QQ222 — time-based deadline. Default 24h horizon. If a previous
+    // entry had an explicit deadlineMs, recover the remaining hours so
+    // re-binding doesn't reset the user's target.
+    const _nowMs = Date.now();
+    const prevDeadlineMs = (entry && entry.deadlineMs) || 0;
+    const prevHours = prevDeadlineMs > _nowMs
+      ? Math.max(1, Math.round((prevDeadlineMs - _nowMs) / 3600000))
+      : 24;
     const prevContinue = entry && entry.useContinue ? 'checked' : '';
     const prevHooks    = entry && entry.installHooks ? 'checked' : '';
     const stoppedNote  = entry && entry.stopReason
@@ -10911,8 +10919,21 @@ function _arRender(panel, entry) {
           <input id="arPoll" class="input w-24" type="number" min="30" max="3600" value="${prevPoll}" />
           <label class="text-[var(--text-dim)]">${t('정지 판정 idle(초)')}</label>
           <input id="arIdle" class="input w-24" type="number" min="30" value="${prevIdle}" />
-          <label class="text-[var(--text-dim)]">${t('최대 재시도 횟수')}</label>
-          <input id="arMax" class="input w-20" type="number" min="1" max="60" value="${prevMax}" />
+        </div>
+        <!-- QQ222 — time-based deadline replaces "max attempts." User can
+             pick a duration (hours from now) OR an explicit datetime; the
+             two stay in sync via _arDeadlineSync. -->
+        <div class="flex gap-2 items-center text-xs flex-wrap mb-2">
+          <label class="text-[var(--text-dim)]">${t('언제까지 재시도')}</label>
+          <input id="arDeadlineHours" class="input w-20" type="number" min="1" max="720" step="1" value="${prevHours}" oninput="_arDeadlineSync('hours')" title="${t('지금부터 N시간')}" />
+          <span class="text-[var(--text-dim)]">${t('시간')}</span>
+          <span class="text-[var(--text-dim)]">${t('또는')}</span>
+          <input id="arDeadlineDt" class="input flex-1 min-w-[180px]" type="datetime-local" oninput="_arDeadlineSync('dt')" />
+          <label class="cursor-pointer flex items-center gap-1 text-[10px] text-[var(--text-dim)]" title="${t('레거시 — 시도 횟수 캡 (시간 데드라인보다 먼저 적중하면 발동)')}">
+            <input id="arUseLegacyMax" type="checkbox" />
+            <span>${t('+ 시도 횟수 캡')}</span>
+            <input id="arMax" class="input w-16" type="number" min="1" max="60" value="${prevMax}" disabled style="opacity:0.5;" />
+          </label>
         </div>
         <div class="flex gap-3 items-center text-xs flex-wrap mb-2">
           <label class="cursor-pointer flex items-center gap-1">
@@ -10982,6 +11003,19 @@ function _arRender(panel, entry) {
       <div><span class="uppercase">${t('정지 idle')}:</span> ${entry.idleSeconds}s</div>
       <div><span class="uppercase">${t('마지막 시도')}:</span> ${lastRel} · exit=${lastExit}</div>
       <div><span class="uppercase">${t('스냅샷 해시 기록')}:</span> ${stallCount}/5${stallCount >= 3 ? ' ⚠' : ''}</div>
+      ${entry.deadlineMs ? `
+        <div class="col-span-2"><span class="uppercase">${t('마감')}:</span>
+          ${(() => {
+            try {
+              const dl = new Date(entry.deadlineMs);
+              const remMin = Math.max(0, Math.round((entry.deadlineMs - Date.now()) / 60000));
+              const remStr = remMin >= 60
+                ? `${Math.floor(remMin / 60)}h ${remMin % 60}m`
+                : `${remMin}m`;
+              return `${dl.toLocaleString()} <span style="color:var(--text-mute)">(${t('남음')}: ${remStr})</span>`;
+            } catch { return ''; }
+          })()}
+        </div>` : ''}
     </div>
     <details class="mb-2">
       <summary class="text-[10px] text-[var(--text-dim)] cursor-pointer">${t('재개 프롬프트')}</summary>
@@ -11028,23 +11062,81 @@ async function _arUninstallHooks(cwd, sid) {
 window._arInstallHooksOnly = _arInstallHooksOnly;
 window._arUninstallHooks   = _arUninstallHooks;
 
+// QQ222 — keep the "hours from now" and "datetime-local" inputs in sync.
+// `source` tells us which field the user just edited so we update the
+// other without ping-ponging the cursor position.
+window._arDeadlineSync = function (source) {
+  const hoursEl = document.getElementById('arDeadlineHours');
+  const dtEl    = document.getElementById('arDeadlineDt');
+  if (!hoursEl || !dtEl) return;
+  const now = Date.now();
+  if (source === 'hours') {
+    const hrs = Math.max(0, Number(hoursEl.value) || 0);
+    if (!hrs) { dtEl.value = ''; return; }
+    const target = new Date(now + hrs * 3600000);
+    // datetime-local wants YYYY-MM-DDTHH:MM in *local* time, no timezone.
+    const pad = (n) => String(n).padStart(2, '0');
+    dtEl.value = `${target.getFullYear()}-${pad(target.getMonth()+1)}-${pad(target.getDate())}T${pad(target.getHours())}:${pad(target.getMinutes())}`;
+  } else if (source === 'dt') {
+    if (!dtEl.value) { hoursEl.value = ''; return; }
+    const target = new Date(dtEl.value).getTime();
+    if (!isFinite(target)) return;
+    const hrs = Math.max(1, Math.round((target - now) / 3600000));
+    hoursEl.value = String(hrs);
+  }
+};
+// On dialog open, fire once to populate the datetime field from the
+// default hours value. Has to wait for the DOM render — caller invokes
+// _arDeadlineSync('hours') after the form is in the DOM.
+
+// QQ222 — toggle the legacy max-attempts cap. Disabled by default; user
+// must opt in if they want the old behavior on top of the deadline.
+document.addEventListener('change', (e) => {
+  if (e.target && e.target.id === 'arUseLegacyMax') {
+    const maxEl = document.getElementById('arMax');
+    if (maxEl) {
+      maxEl.disabled = !e.target.checked;
+      maxEl.style.opacity = e.target.checked ? '1' : '0.5';
+    }
+  }
+});
+
 async function _arSubmit(sessionId, cwd) {
   const promptEl   = document.getElementById('arPrompt');
   const pollEl     = document.getElementById('arPoll');
   const idleEl     = document.getElementById('arIdle');
   const maxEl      = document.getElementById('arMax');
+  const useLegacyMaxEl = document.getElementById('arUseLegacyMax');
+  const hoursEl    = document.getElementById('arDeadlineHours');
+  const dtEl       = document.getElementById('arDeadlineDt');
   const contEl     = document.getElementById('arUseContinue');
   const hooksEl    = document.getElementById('arInstallHooks');
   const allowEl    = document.getElementById('arAllowUnbound');
   const slackEl    = document.getElementById('arSlackUrl');
   const discordEl  = document.getElementById('arDiscordUrl');
+  // QQ222 — pick deadline from whichever input has a fresher value.
+  // datetime-local wins when set (more explicit); fall back to hours.
+  let deadlineMs = 0;
+  if (dtEl && dtEl.value) {
+    const t = new Date(dtEl.value).getTime();
+    if (isFinite(t) && t > Date.now()) deadlineMs = t;
+  }
+  if (!deadlineMs && hoursEl) {
+    const hrs = Math.max(0, Number(hoursEl.value) || 0);
+    if (hrs > 0) deadlineMs = Date.now() + hrs * 3600000;
+  }
   const body = {
     sessionId,
     cwd: cwd || '',
     prompt: promptEl ? promptEl.value : '',
     pollInterval: pollEl ? Number(pollEl.value) || 300 : 300,
     idleSeconds: idleEl ? Number(idleEl.value) || 90 : 90,
-    maxAttempts: maxEl ? Number(maxEl.value) || 12 : 12,
+    // Legacy maxAttempts only ships when the user explicitly opts in.
+    // The default flow uses deadlineMs alone.
+    ...((useLegacyMaxEl && useLegacyMaxEl.checked && maxEl)
+      ? { maxAttempts: Number(maxEl.value) || 12 }
+      : {}),
+    ...(deadlineMs ? { deadlineMs } : {}),
     useContinue: !!(contEl && contEl.checked),
     installHooks: !!(hooksEl && hooksEl.checked),
     allowUnboundSession: !!(allowEl && allowEl.checked),
@@ -27514,14 +27606,21 @@ AFTER.lazyclawChat = () => {
       }
       // QQ64 (v2.67.1) — Esc cancels active chat streaming.
       if (e.key === 'Escape' && _lcChatAbortCtrl) {
+        const tag = (e.target && e.target.tagName) || '';
+        // Don't steal Esc when clearing an input/textarea/filter.
+        // QQ221 — also exclude TEXTAREA (the chat input itself is a
+        // textarea, so the previous INPUT-only check was leaking the
+        // abort flag every time the user pressed Esc to dismiss
+        // their own typing). Critically, we must NOT set
+        // __lcUserAbort before this check — otherwise a leaked Esc
+        // poisons the very next send (catch block sees a stale flag
+        // and renders "중단됨" instead of the actual reply).
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        e.preventDefault();
         // QQ220 — flag this as a user-initiated abort so the catch
         // block in _lcChatSend renders the "중단됨" bubble instead of
         // silently falling back to the non-stream endpoint.
         window.__lcUserAbort = true;
-        const tag = (e.target && e.target.tagName) || '';
-        // Don't steal Esc when clearing an input/filter.
-        if (tag === 'INPUT') return;
-        e.preventDefault();
         try { _lcChatAbortCtrl.abort(); } catch (_) {}
         toast(t('스트리밍 중단됨'), 'warn');
         return;
@@ -29081,6 +29180,13 @@ async function _lcChatSend() {
     try { _lcChatAbortCtrl.abort(); } catch (_) {}
     return;
   }
+  // QQ221 — defense-in-depth: clear any leaked abort flag at the
+  // start of every fresh send. Any path that mistakenly set
+  // __lcUserAbort=true without firing the abort would otherwise
+  // poison this send's catch block. We're starting clean here:
+  // there's no in-flight controller (checked above), so no
+  // legitimate user-abort can be in progress.
+  window.__lcUserAbort = false;
   const ta = document.getElementById('lcChatInput');
   const sel = document.getElementById('lcChatAssignee');
   const sendBtn = document.getElementById('lcChatSend');

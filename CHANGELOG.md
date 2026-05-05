@@ -10,6 +10,76 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.63.0] — 2026-05-05  🐛 user bug reports
+
+**세 가지 사용자 보고 수정.**
+
+### 1. Chat "⏹ 중단됨" 거짓 양성 (QQ221)
+LazyClaw chat 탭에서 메시지를 보내면 정상 응답 대신 "⏹ 중단됨"
+버블이 표시되는 문제.
+
+원인: Esc 키 핸들러가 `window.__lcUserAbort = true` 를 INPUT/TEXTAREA
+조기 반환 **이전에** 설정해서, 사용자가 채팅 textarea 안에서 Esc 를
+누르면 abort 자체는 발생하지 않고 플래그만 남았음. 다음 send 의
+catch 블록이 stale 플래그를 보고 "사용자 abort" 경로로 들어가
+중단됨 버블을 렌더링.
+
+수정:
+- 플래그 설정을 textarea 검사 **이후** 로 이동.
+- INPUT 만이 아니라 **TEXTAREA** 도 early-return 대상에 포함
+  (chat input 자체가 textarea — 기존 검사가 무용지물이었음).
+- `_lcChatSend` 시작 시 플래그를 `false` 로 리셋해서
+  방어적으로 leak 을 차단.
+
+검증: Playwright 로 "Esc 누르고 다시 send" 시나리오 재현 — 두
+번째 메시지가 정상적으로 응답을 받고 ⏹ 가 보이지 않음을 확인.
+
+### 2. Auto-Resume 시간 기반 마감 (`deadlineMs` / `durationSec`)
+"최대 시도 횟수" 대신 "언제까지 재시도할지" 지정 가능.
+
+API 변경:
+- `api_auto_resume_set` body 가 `deadlineMs` (epoch ms) 또는
+  `durationSec` (지금부터 N초) 를 받음.
+- 둘 중 어느 것이든 도달하면 즉시 `STATE_EXHAUSTED` 로 전이,
+  `stopReason` 에 ISO 시각 기록.
+- 기존 `maxAttempts` 도 그대로 동작 (둘 다 설정 시 먼저 적중하는
+  쪽이 발동) — 하위 호환 유지.
+
+UI 변경 (`dist/app.js`):
+- "최대 재시도 횟수" 입력 자리에 두 가지 마감 입력:
+  - 시간 입력 (지금부터 N시간) — 기본 24h
+  - datetime-local 입력 (절대 시각)
+  - 두 입력은 `_arDeadlineSync()` 로 양방향 동기화.
+- "+ 시도 횟수 캡" 옵션 (기본 비활성) 으로 레거시 maxAttempts 가
+  필요한 사용자만 명시적으로 활성화.
+- 활성 패널에 "마감: YYYY-MM-DD HH:MM (남음: 3h 12m)" 표시.
+
+서버 검증 (4 new pytest specs):
+- `deadlineMs in past → exhausts immediately` (state 가 즉시
+  exhausted 로 전이)
+- `deadlineMs in future → does not exhaust` (정상 재시도 진행)
+- `durationSec` 가 정확히 epoch + duration\*1000 으로 계산됨
+- 명시적 `deadlineMs` 가 그대로 저장됨
+
+### 3. Auto-Resume 의 "선택지 1, 2 / 명령어 미주입" 한계 명시
+사용자가 보고한 "터미널에서 1/2 선택지가 뜨면 명령어가 주입이
+안 된다"는 현재 아키텍처상 알려진 한계임. Auto-Resume 은
+별도 subprocess 로 `claude --resume <id>` 를 spawn 하는
+구조 — 사용자의 기존 터미널의 대화형 prompt 에 키 입력을
+주입하지 않음. 키스트로크 주입에는 AppleScript / xdotool 등
+TTY 외부 제어가 필요해 별도 작업으로 분리. 이번 릴리스의
+시간 기반 마감은 "기존 prompt 가 막혀서 영원히 진행 안 되는"
+상황에서 자동으로 빠져나오는 안전장치 역할도 함.
+
+### Tests
+- 4 new pytest specs (auto_resume): 위 항목.
+- Playwright (auto-resume E2E): 3/3 viewports green
+- Playwright (dashboard QA): 66 tabs clean, 0 issues
+- Manual chat probe: Esc-leak scenario verified fixed.
+
+Suite: pytest 447 → 451 (+4); Playwright unchanged.
+
+---
 ## [3.62.0] — 2026-05-05
 
 **Daemon `GET /rates/shape` mirrors CLI v3.62's `rates shape`.**

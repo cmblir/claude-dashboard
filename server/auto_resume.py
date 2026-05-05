@@ -438,6 +438,7 @@ def _public_state(entry: dict) -> dict:
         "pollInterval":   entry.get("pollInterval") or DEFAULT_POLL_INTERVAL,
         "idleSeconds":    entry.get("idleSeconds") or DEFAULT_IDLE_SECONDS,
         "maxAttempts":    entry.get("maxAttempts") or DEFAULT_MAX_ATTEMPTS,
+        "deadlineMs":     int(entry.get("deadlineMs") or 0),
         "useContinue":    bool(entry.get("useContinue")),
         "extraArgs":      list(entry.get("extraArgs") or []),
         "installHooks":   bool(entry.get("installHooks")),
@@ -588,6 +589,20 @@ def api_auto_resume_set(body: dict) -> dict:
     poll = max(MIN_POLL_INTERVAL, min(MAX_POLL_INTERVAL, poll))
     idle = max(MIN_IDLE_SECONDS, int(body.get("idleSeconds") or DEFAULT_IDLE_SECONDS))
     max_attempts = max(1, min(60, int(body.get("maxAttempts") or DEFAULT_MAX_ATTEMPTS)))
+    # User-requested change: time-based deadline as the primary "give up" trigger.
+    # Two ways to express it (both optional, both honoured):
+    #   - deadlineMs: explicit epoch-ms cutoff
+    #   - durationSec: relative duration from now (creates the deadlineMs)
+    # Either one (or both maxAttempts AND deadlineMs) hitting → STATE_EXHAUSTED.
+    deadline_ms_raw = body.get("deadlineMs")
+    duration_sec_raw = body.get("durationSec")
+    deadline_ms = 0
+    if isinstance(deadline_ms_raw, (int, float)) and deadline_ms_raw > 0:
+        deadline_ms = int(deadline_ms_raw)
+    elif isinstance(duration_sec_raw, (int, float)) and duration_sec_raw > 0:
+        # Cap at 30 days so a typo can't keep auto-resume looping for years.
+        capped_sec = min(int(duration_sec_raw), 30 * 24 * 3600)
+        deadline_ms = _now_ms() + capped_sec * 1000
     use_continue = bool(body.get("useContinue"))
     install_hooks = bool(body.get("installHooks"))
 
@@ -639,6 +654,7 @@ def api_auto_resume_set(body: dict) -> dict:
             "pollInterval":    poll,
             "idleSeconds":     idle,
             "maxAttempts":     max_attempts,
+            "deadlineMs":      deadline_ms or int(existing.get("deadlineMs") or 0),
             "useContinue":     use_continue,
             "extraArgs":       extra_args,
             "installHooks":    install_hooks,
@@ -973,10 +989,31 @@ def _process_one(session_id: str) -> None:
         idle_required = int(entry.get("idleSeconds") or DEFAULT_IDLE_SECONDS)
         attempts = int(entry.get("attempts") or 0)
         max_attempts = int(entry.get("maxAttempts") or DEFAULT_MAX_ATTEMPTS)
+        deadline_ms = int(entry.get("deadlineMs") or 0)
 
     now_ms = _now_ms()
 
-    # Mechanism #6 — hard cap on attempts
+    # Mechanism #6a — time-based deadline (primary). User asked for a
+    # "until when" instead of (or alongside) the attempts cap. Either
+    # trigger flips state to EXHAUSTED — pick whichever fires first.
+    if deadline_ms and now_ms >= deadline_ms:
+        with _LOCK:
+            store = _load_all()
+            if session_id in store:
+                store[session_id]["state"] = STATE_EXHAUSTED
+                store[session_id]["enabled"] = False
+                # Format the deadline as ISO so the stop reason is
+                # human-debuggable when the user reads it back.
+                from datetime import datetime as _dt, timezone as _tz
+                iso = _dt.fromtimestamp(deadline_ms / 1000, tz=_tz.utc).isoformat()
+                store[session_id]["stopReason"] = (
+                    f"deadline reached at {iso} (after {attempts} attempts)"
+                )
+                _dump_all(store)
+        return
+
+    # Mechanism #6b — legacy hard cap on attempts (still honoured for
+    # backward compat with older entries / users who prefer this).
     if attempts >= max_attempts:
         with _LOCK:
             store = _load_all()

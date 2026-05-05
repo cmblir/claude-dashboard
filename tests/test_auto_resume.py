@@ -283,6 +283,95 @@ class TestProcessOneLifecycle:
         assert e["enabled"] is False
         assert "max attempts" in (e.get("stopReason") or "").lower()
 
+    def _stub_bind_path(self, ar, sid, monkeypatch):
+        """Stub out the filesystem probes api_auto_resume_set does so the
+        bind body reaches the deadline-resolution code without needing
+        a real ~/.claude/projects/<id>/<sid>.jsonl."""
+        from pathlib import Path as _P
+        e = ar._load_all()[sid]
+        jsonl_path = _P(e["jsonlPath"])
+        monkeypatch.setattr(ar, "_resolve_jsonl", lambda *a, **kw: jsonl_path)
+        monkeypatch.setattr(ar, "_resolve_cwd_from_jsonl", lambda p: e["cwd"])
+        monkeypatch.setattr(ar, "_live_cli_sessions", lambda: {sid: {"pid": 1}})
+        # _claude_bin already stubbed in _setup; don't override.
+
+    def test_api_set_accepts_durationSec_and_computes_deadline(self, tmp_path, monkeypatch):
+        # The user asked: "let me pick how long, not how many tries."
+        # Verify api_auto_resume_set accepts durationSec and stores the
+        # resulting deadlineMs so future _process_one ticks see it.
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        self._stub_bind_path(ar, sid, monkeypatch)
+
+        before = int(time.time() * 1000)
+        result = ar.api_auto_resume_set({
+            "sessionId":     sid,
+            "cwd":           ar._load_all()[sid]["cwd"],
+            "durationSec":   3600,        # 1 hour
+            "useContinue":   False,
+            "extraArgs":     [],
+            "installHooks":  False,
+        })
+        after = int(time.time() * 1000)
+        assert result.get("ok") is True, result
+        e = ar._load_all()[sid]
+        # deadlineMs should land within (before+3600s, after+3600s).
+        assert before + 3600 * 1000 <= e["deadlineMs"] <= after + 3600 * 1000
+        # _public_state should expose it.
+        ps = result["entry"]
+        assert ps["deadlineMs"] == e["deadlineMs"]
+
+    def test_api_set_accepts_explicit_deadlineMs(self, tmp_path, monkeypatch):
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        self._stub_bind_path(ar, sid, monkeypatch)
+        target = int(time.time() * 1000) + 7200 * 1000   # 2 hours from now
+        result = ar.api_auto_resume_set({
+            "sessionId":     sid,
+            "cwd":           ar._load_all()[sid]["cwd"],
+            "deadlineMs":    target,
+            "useContinue":   False,
+            "extraArgs":     [],
+            "installHooks":  False,
+        })
+        assert result.get("ok") is True, result
+        assert ar._load_all()[sid]["deadlineMs"] == target
+
+    def test_deadline_in_past_exhausts_immediately(self, tmp_path, monkeypatch):
+        # User asked: stop at a specific time, not after N attempts.
+        # When deadlineMs has already passed, the next _process_one
+        # tick must flip state to exhausted without spawning claude.
+        ar, sid = self._setup(
+            tmp_path, monkeypatch, claude_exit=1,
+            claude_stderr="HTTP 429 Too Many Requests",
+        )
+        store = ar._load_all()
+        # Set deadline 60 seconds in the past.
+        store[sid]["deadlineMs"] = int(time.time() * 1000) - 60_000
+        ar._dump_all(store)
+
+        ar._process_one(sid)
+        e = ar._load_all()[sid]
+        assert e["state"] == "exhausted"
+        assert e["enabled"] is False
+        assert "deadline reached" in (e.get("stopReason") or "").lower()
+
+    def test_deadline_in_future_does_not_exhaust(self, tmp_path, monkeypatch):
+        # Inverse: a future deadline should not trip the exhaustion check.
+        # The session should proceed normally (in this case schedule a retry
+        # because we set up a rate-limit exit).
+        ar, sid = self._setup(
+            tmp_path, monkeypatch, claude_exit=1,
+            claude_stderr="HTTP 429 Too Many Requests",
+        )
+        store = ar._load_all()
+        store[sid]["deadlineMs"] = int(time.time() * 1000) + 24 * 3600 * 1000
+        ar._dump_all(store)
+
+        ar._process_one(sid)
+        e = ar._load_all()[sid]
+        # State should be the rate-limit retry path, not exhausted.
+        assert e["state"] != "exhausted"
+        assert e["enabled"] is True
+
     def test_auth_expired_disables_permanently(self, tmp_path, monkeypatch):
         ar, sid = self._setup(
             tmp_path, monkeypatch, claude_exit=1,
