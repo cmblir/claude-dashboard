@@ -10,6 +10,13 @@ Thumbs.db
 .claude/*.local.md
 .claude/*.lock
 
+# QA / debug artifacts
+qa-report.json
+scripts/_*.png
+scripts/_*.json
+test-results/
+playwright-report/
+
 # Python
 __pycache__/
 *.pyc
