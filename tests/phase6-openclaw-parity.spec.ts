@@ -1220,6 +1220,46 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /sessions/search mirrors CLI sessions search', async () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'algo.jsonl'),
+      JSON.stringify({ role: 'user', content: 'how do I implement quicksort?', ts: 1 }) + '\n' +
+      JSON.stringify({ role: 'assistant', content: 'Quicksort partitions around a pivot...', ts: 2 }) + '\n');
+    fs.writeFileSync(path.join(dir, 'sessions', 'random.jsonl'),
+      JSON.stringify({ role: 'user', content: 'unrelated content here', ts: 3 }) + '\n');
+
+    const d = await startDaemonProc(dir);
+    try {
+      // Substring search.
+      const r1 = await fetch(`${d.url}/sessions/search?q=quicksort`).then(x => x.json());
+      expect(r1.query).toBe('quicksort');
+      expect(r1.regex).toBe(false);
+      expect(r1.matches.map((m: any) => m.id)).toEqual(['algo']);
+      expect(r1.matches[0].matchCount).toBe(2);
+      expect(r1.matches[0].excerpt.toLowerCase()).toContain('quicksort');
+
+      // Regex mode.
+      const r2 = await fetch(`${d.url}/sessions/search?q=quick.*sort&regex=true`).then(x => x.json());
+      expect(r2.regex).toBe(true);
+      expect(r2.matches.map((m: any) => m.id)).toEqual(['algo']);
+
+      // Missing q → 400.
+      const bad1 = await fetch(`${d.url}/sessions/search`);
+      expect(bad1.status).toBe(400);
+
+      // Invalid regex → 400.
+      const bad2 = await fetch(`${d.url}/sessions/search?q=%5Bunclosed&regex=true`);
+      expect(bad2.status).toBe(400);
+      const bad2body = await bad2.json();
+      expect(bad2body.error).toMatch(/invalid regex/);
+
+      // Empty result → 200 with matches: [].
+      const empty = await fetch(`${d.url}/sessions/search?q=nothing-matches-this-anywhere`).then(x => x.json());
+      expect(empty.matches).toEqual([]);
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /workflows/<id>?summary=true trims per-node detail (mirrors CLI --summary)', async () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'wf-comp');

@@ -10,6 +10,41 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.24.0] — 2026-05-05
+
+**Daemon `GET /sessions/search?q=…&regex=true` mirrors CLI sessions search.**
+
+Same shape v3.23 produces — `{ query, regex, matches: [{ id, mtime,
+matchCount, excerpt }] }` — over HTTP. A dashboard search box can
+talk to the daemon directly without spawning a CLI process per
+keystroke.
+
+```
+GET /sessions/search?q=quicksort
+→ 200 { "query": "quicksort", "regex": false,
+        "matches": [
+          { "id": "algo", "mtime": "...", "matchCount": 2,
+            "excerpt": "...how do I implement quicksort?..." }
+        ] }
+
+GET /sessions/search?q=quick.*sort&regex=true   # regex mode
+GET /sessions/search?q=%5Bunclosed&regex=true   # 400 invalid regex
+GET /sessions/search                            # 400 missing q
+```
+
+### Validation
+- Missing `q` → 400 with helpful error
+- Invalid regex → 400 with the underlying parse error
+- Empty match → 200 with `matches: []` (matches CLI behavior:
+  successful search ≠ found something)
+
+### Tests
+1 new phase 6 spec covering substring + regex + missing-q + invalid-
+regex + empty-result paths in a single end-to-end run.
+
+Suite: 312 → 313 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.23.0] — 2026-05-05
 
 **`lazyclaw sessions search <query> [--regex]` — content search across sessions.**

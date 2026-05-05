@@ -482,6 +482,55 @@ export function makeHandler(ctx) {
           const list = ctx.sessionsMod.listSessions(ctx.sessionsDirGetter());
           return writeJson(res, 200, list.map(s => ({ id: s.id, bytes: s.bytes, mtime: new Date(s.mtimeMs).toISOString() })));
         }
+        case route === 'GET /sessions/search': {
+          // Mirror of `lazyclaw sessions search <query> [--regex]`.
+          // ?q=<query> required; ?regex=true switches to regex mode.
+          // Returns { query, regex, matches: [{ id, mtime, matchCount, excerpt }] }
+          // — same shape the CLI prints. A dashboard rendering the
+          // search box can use the same parser for both surfaces.
+          const q = url.searchParams.get('q');
+          if (!q) return writeJson(res, 400, { error: 'missing q query parameter' });
+          const useRegex = url.searchParams.get('regex') === 'true';
+          let matcher;
+          if (useRegex) {
+            try { matcher = new RegExp(q, 'i'); }
+            catch (e) { return writeJson(res, 400, { error: `invalid regex: ${e.message}` }); }
+          } else {
+            const ql = q.toLowerCase();
+            matcher = { test: (s) => String(s).toLowerCase().includes(ql) };
+          }
+          const cfgDir = ctx.sessionsDirGetter();
+          const list = ctx.sessionsMod.listSessions(cfgDir);
+          const matches = [];
+          for (const s of list) {
+            const turns = ctx.sessionsMod.loadTurns(s.id, cfgDir);
+            let matchCount = 0;
+            let firstExcerpt = null;
+            for (const t of turns) {
+              if (typeof t?.content !== 'string') continue;
+              if (matcher.test(t.content)) {
+                matchCount++;
+                if (firstExcerpt === null) {
+                  const c = t.content;
+                  let pos = useRegex ? c.search(matcher) : c.toLowerCase().indexOf(q.toLowerCase());
+                  if (pos < 0) pos = 0;
+                  const start = Math.max(0, pos - 40);
+                  const end = Math.min(c.length, pos + q.length + 40);
+                  firstExcerpt = (start > 0 ? '…' : '') + c.slice(start, end) + (end < c.length ? '…' : '');
+                }
+              }
+            }
+            if (matchCount > 0) {
+              matches.push({
+                id: s.id,
+                mtime: new Date(s.mtimeMs).toISOString(),
+                matchCount,
+                excerpt: firstExcerpt,
+              });
+            }
+          }
+          return writeJson(res, 200, { query: q, regex: useRegex, matches });
+        }
         case req.method === 'GET' && !!sessionMatch: {
           // GET /sessions/<id> — full turn log. Returns 404 when missing
           // rather than an empty array so the caller can distinguish
