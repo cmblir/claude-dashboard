@@ -456,11 +456,24 @@ export function makeHandler(ctx) {
             timestamp: new Date().toISOString(),
           });
         }
-        case route === 'GET /providers':
-          return writeJson(res, 200, Object.keys(PROVIDERS).map(name => {
+        case route === 'GET /providers': {
+          // ?filter=<substr>&limit=<N> mirror v3.33+ list flags.
+          let out = Object.keys(PROVIDERS).map(name => {
             const meta = PROVIDER_INFO[name] || { name };
             return { name, requiresApiKey: !!meta.requiresApiKey, defaultModel: meta.defaultModel || null, suggestedModels: meta.suggestedModels || [] };
-          }));
+          });
+          const filter = url.searchParams.get('filter');
+          if (filter) {
+            const f = filter.toLowerCase();
+            out = out.filter(p => p.name.toLowerCase().includes(f));
+          }
+          const limitStr = url.searchParams.get('limit');
+          if (limitStr) {
+            const n = parseInt(limitStr, 10);
+            if (Number.isFinite(n) && n > 0) out = out.slice(0, n);
+          }
+          return writeJson(res, 200, out);
+        }
         case req.method === 'GET' && !!providerMatch && providerMatch[1] !== 'test': {
           // GET /providers/<name> — full per-provider metadata
           // (mirrors CLI `lazyclaw providers info <name>`).

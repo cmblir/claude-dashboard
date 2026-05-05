@@ -1056,7 +1056,7 @@ const HELP_DETAILS = {
   onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
   sessions: 'Usage: lazyclaw sessions <list [--filter <substr>] [--limit <N>]|show <id>|clear <id>|export <id> [--format md|json|text]|search <query> [--regex]>\n  list — recent sessions by mtime; --filter caps to ids containing substring (case-insensitive); --limit caps result count.\n  export — render in chosen format (md default for human sharing, json for tooling, text for paste).\n  search — case-insensitive substring (or --regex pattern) match across all session content; returns first excerpt + match count per matching session.',
   skills: 'Usage: lazyclaw skills <list [--filter <substr>] [--limit <N>]|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>|search <query> [--regex]>\n  list — installed skills; --filter caps to names containing substring (case-insensitive); --limit caps result count.\n  --from-url fetches over HTTPS only; 1 MiB body cap.\n  search — case-insensitive substring (or --regex) match across all skill markdown bodies; returns first excerpt + match count per skill.',
-  providers: 'Usage: lazyclaw providers <list | info <name> | test <name> [--model X] [--prompt T] | test [--all] [--prompt T]>\n  list/info — static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.\n  test — send a 1-token "ping" through the provider and report ok/error + duration.\n         Useful after configuring an API key to verify it works before relying on it.\n         No name OR --all: tests every registered provider in parallel; exits 0 only when ALL pass.',
+  providers: 'Usage: lazyclaw providers <list [--filter <substr>] [--limit <N>] | info <name> | test <name> [--model X] [--prompt T] | test [--all] [--prompt T]>\n  list — registered providers (--filter case-insensitive name substring; --limit caps post-filter count).\n  info — static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.\n  test — send a 1-token "ping" through the provider and report ok/error + duration.\n         Useful after configuring an API key to verify it works before relying on it.\n         No name OR --all: tests every registered provider in parallel; exits 0 only when ALL pass.',
   daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>] [--shutdown-timeout-ms <N>] [--cost-cap-<currency> <N> ...] [--workflow-state-dir <dir>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).\n  --shutdown-timeout-ms <N> caps graceful drain on SIGINT/SIGTERM (default 10000). Second signal forces immediate exit.\n  --cost-cap-usd 100 (or any currency code in lowercase) rejects POST /agent + /chat with 402 once cumulative cost reaches the cap.\n  --workflow-state-dir <dir> backs GET /workflows + GET /workflows/<id> (default .workflow-state, also reads $LAZYCLAW_WORKFLOW_STATE_DIR).',
   version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
@@ -1861,7 +1861,9 @@ async function cmdProviders(sub, positional, flags = {}) {
     case 'list': {
       // Defensive: if metadata is missing for a registered provider, fall back
       // to a minimal shape so this never crashes the CLI even mid-refactor.
-      const out = Object.keys(_registryMod.PROVIDERS).map(name => {
+      // --filter / --limit pattern matches v3.33-v3.46 across the other
+      // list surfaces. Filter on provider name, case-insensitive.
+      let out = Object.keys(_registryMod.PROVIDERS).map(name => {
         const meta = _registryMod.PROVIDER_INFO[name] || { name, requiresApiKey: false, docs: '' };
         return {
           name,
@@ -1870,6 +1872,14 @@ async function cmdProviders(sub, positional, flags = {}) {
           suggestedModels: meta.suggestedModels || [],
         };
       });
+      if (flags.filter) {
+        const f = String(flags.filter).toLowerCase();
+        out = out.filter(p => p.name.toLowerCase().includes(f));
+      }
+      if (flags.limit !== undefined) {
+        const n = parseInt(flags.limit, 10);
+        if (Number.isFinite(n) && n > 0) out = out.slice(0, n);
+      }
       console.log(JSON.stringify(out, null, 2));
       return;
     }

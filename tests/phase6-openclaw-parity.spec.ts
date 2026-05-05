@@ -820,6 +820,36 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r.stderr).toMatch(/validate:/);
   });
 
+  test('providers list --filter / --limit (CLI + daemon parity)', async () => {
+    const dir = tmpConfigDir();
+
+    // CLI: --filter
+    const r1 = runCli(['providers', 'list', '--filter', 'anthropic'], dir);
+    expect(r1.status).toBe(0);
+    const ids1 = JSON.parse(r1.stdout).map((p: any) => p.name);
+    expect(ids1).toEqual(['anthropic']);
+
+    // CLI: --limit
+    const r2 = runCli(['providers', 'list', '--limit', '2'], dir);
+    expect(JSON.parse(r2.stdout)).toHaveLength(2);
+
+    // CLI: --filter + --limit composition
+    const r3 = runCli(['providers', 'list', '--filter', 'a', '--limit', '1'], dir);
+    expect(JSON.parse(r3.stdout)).toHaveLength(1);
+
+    // Daemon: ?filter=&limit= produces the same shape
+    const d = await startDaemonProc(dir);
+    try {
+      const list = await fetch(`${d.url}/providers?filter=mock`).then(x => x.json());
+      expect(list.map((p: any) => p.name)).toEqual(['mock']);
+      const limited = await fetch(`${d.url}/providers?limit=1`).then(x => x.json());
+      expect(limited).toHaveLength(1);
+      // No flags = baseline (every registered provider).
+      const all = await fetch(`${d.url}/providers`).then(x => x.json());
+      expect(all.length).toBeGreaterThanOrEqual(2);
+    } finally { await d.kill(); }
+  });
+
   test('lazyclaw providers test: mock provider returns ok with reply length and duration', () => {
     const dir = tmpConfigDir();
     const r = runCli(['providers', 'test', 'mock'], dir);

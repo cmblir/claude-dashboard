@@ -10,6 +10,38 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.58.0] — 2026-05-05
+
+**`lazyclaw providers list --filter / --limit` (CLI + daemon).**
+
+Final list-flag holdout to get the v3.33–v3.36 pair. Sessions,
+skills, workflows, rates, and now providers all support the
+same filter+limit semantics across both CLI and daemon.
+
+### List-flag rollout — fully complete
+
+| Surface | CLI | Daemon |
+|---------|-----|--------|
+| sessions | v3.33 | v3.34 |
+| skills | v3.35 | v3.35 |
+| workflows | v3.36 | v3.36 |
+| rates | v3.46 | v3.46 |
+| **providers** | **v3.58** | **v3.58** |
+
+Every list endpoint in the project now supports the same filter +
+limit semantics. A dashboard rendering side-by-side panels gets
+uniform paging UX across all five surfaces; power users get the
+same shell-pipeline pattern (`--filter X --limit N`) regardless
+of which list they're querying.
+
+### Tests
+1 new phase 6 spec covering CLI `--filter` + `--limit` +
+composition + daemon `?filter=&limit=` parity in one end-to-end
+run.
+
+Suite: 389 → 390 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.57.0] — 2026-05-05
 
 **Daemon `GET /providers/<name>` — per-provider metadata.**
