@@ -232,7 +232,53 @@ export function topologicalLevels(nodes) {
  *   retry?: { max: number, baseDelayMs?: number },
  *   timeoutMs?: number,
  * }>} nodes
- * @param {{ initialInput?: unknown, signal?: AbortSignal }} [opts]
+/**
+ * Bounded concurrency helper. Schedules an async mapper across an
+ * iterable, running at most `limit` tasks concurrently, returning
+ * a Promise.allSettled-shaped array preserving input order.
+ *
+ * Implementation: maintain `inflight` = active count + a sliding
+ * window of pending promises; each finished slot pulls the next
+ * input. Order preservation is via index-keyed slots.
+ *
+ * Exported so callers (workflow nodes that fan out internally,
+ * test helpers, ad-hoc scripts) can use the same primitive.
+ *
+ * @template T, R
+ * @param {Iterable<T>} items
+ * @param {(item: T, index: number) => Promise<R>} mapper
+ * @param {number} limit  // 0 / non-finite → unbounded (Promise.all-style)
+ * @returns {Promise<Array<{ status: 'fulfilled', value: R } | { status: 'rejected', reason: unknown }>>}
+ */
+export async function settleWithConcurrency(items, mapper, limit) {
+  const arr = Array.from(items);
+  const out = new Array(arr.length);
+  if (!Number.isFinite(limit) || limit <= 0 || limit >= arr.length) {
+    // Fast path: no cap (or cap >= work). Identical to Promise.allSettled.
+    return Promise.allSettled(arr.map((it, i) => mapper(it, i)));
+  }
+  let cursor = 0;
+  // Worker drains the cursor until items run out. We launch `limit`
+  // workers; each handles one slot at a time.
+  const worker = async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= arr.length) return;
+      try {
+        const value = await mapper(arr[i], i);
+        out[i] = { status: 'fulfilled', value };
+      } catch (reason) {
+        out[i] = { status: 'rejected', reason };
+      }
+    }
+  };
+  const workers = Array.from({ length: limit }, () => worker());
+  await Promise.all(workers);
+  return out;
+}
+
+/**
+ * @param {{ initialInput?: unknown, signal?: AbortSignal, concurrency?: number }} [opts]
  * @returns {Promise<RunResult>}
  */
 export async function runParallel(nodes, opts = {}) {
@@ -263,7 +309,10 @@ export async function runParallel(nodes, opts = {}) {
     }
     // Build the input record for each node in the level: each node sees
     // a `{ depId: depOutput }` map, or `initialInput` when it has no deps.
-    const settled = await Promise.allSettled(level.map(async (id) => {
+    // opts.concurrency caps how many nodes within a single level run at
+    // the same time. 0/missing/non-finite → unbounded (default behavior,
+    // every level node runs in parallel via Promise.allSettled).
+    const settled = await settleWithConcurrency(level, async (id) => {
       const node = idToNode.get(id);
       started.push(node);
       const deps = node.deps || [];
@@ -282,7 +331,7 @@ export async function runParallel(nodes, opts = {}) {
         const duration = performance.now() - t0;
         return { ok: false, record: { id, duration, output: undefined, status: /** @type {'failed'} */('failed') }, err };
       }
-    }));
+    }, opts.concurrency);
     let firstFailure = null;
     for (const s of settled) {
       // Promise.allSettled never rejects; the inner async function caught.

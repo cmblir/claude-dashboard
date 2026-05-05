@@ -402,6 +402,31 @@ test.describe('Phase 2 — Auto-resume', () => {
     expect(s2.nodes.slow.output).toBe('done');
   });
 
+  test('runPersistentDag: opts.concurrency caps in-flight nodes within a level', async () => {
+    const dir = tmpDir('pdag-conc');
+    const sid = 'conc-1';
+    let inFlight = 0;
+    let peakInFlight = 0;
+    // Single fan-out level with 6 independent nodes; cap=2.
+    const nodes = Array.from({ length: 6 }, (_, i) => ({
+      id: `n${i}`,
+      deps: [],
+      async execute() {
+        inFlight++;
+        if (inFlight > peakInFlight) peakInFlight = inFlight;
+        await new Promise(r => setTimeout(r, 30));
+        inFlight--;
+        return i;
+      },
+    }));
+    const r = await runPersistentDag(nodes, { sessionId: sid, dir, concurrency: 2 });
+    expect(r.success).toBe(true);
+    expect(peakInFlight).toBeLessThanOrEqual(2);
+    // All 6 outputs landed on disk despite the concurrency cap.
+    const state = loadState(sid, dir)!;
+    for (let i = 0; i < 6; i++) expect(state.nodes[`n${i}`].status).toBe('success');
+  });
+
   test('runPersistentDag: signal aborted between levels → ABORT, downstream level skipped, success outputs preserved', async () => {
     const dir = tmpDir('pdag-abort-level');
     const sid = 'abort-dag-1';

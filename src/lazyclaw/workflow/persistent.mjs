@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { topologicalLevels, retryWithBackoff, runWithTimeout } from './executor.mjs';
+import { topologicalLevels, retryWithBackoff, runWithTimeout, settleWithConcurrency } from './executor.mjs';
 
 const DEFAULT_DIR = '.workflow-state';
 
@@ -217,6 +217,7 @@ export async function runPersistent(nodes, opts) {
  *   dir?: string,
  *   timeoutMs?: number,
  *   signal?: AbortSignal,
+ *   concurrency?: number,
  * }} opts
  */
 export async function runPersistentDag(nodes, opts) {
@@ -292,7 +293,10 @@ export async function runPersistentDag(nodes, opts) {
     // We collect both success outputs and the first failure; on failure we
     // stop scheduling future levels (same as runParallel) but persist the
     // success outputs from the level that *did* finish before the throw.
-    const tasks = levelIds.map(async (id) => {
+    // opts.concurrency caps how many nodes within a single level run
+    // at the same time — same semantic as runParallel. Default
+    // unbounded (every level node runs in parallel).
+    const settled = (await settleWithConcurrency(levelIds, async (id) => {
       const ns = state.nodes[id] ?? { status: 'pending' };
       if (ns.status === 'success') return { id, ok: true, skipped: true };
 
@@ -342,8 +346,7 @@ export async function runPersistentDag(nodes, opts) {
         saveState(state, dir);
         return { id, ok: false, error: msg };
       }
-    });
-    const settled = await Promise.all(tasks);
+    }, opts.concurrency)).map(s => s.status === 'fulfilled' ? s.value : { id: 'unknown', ok: false, error: String(s.reason) });
     let firstFailure = null;
     let firstAbort = null;
     for (const r of settled) {

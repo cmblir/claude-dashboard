@@ -89,7 +89,7 @@ async function cmdRun(sessionId, file, opts = {}) {
       // file shape as the sequential path so a session id collision is
       // observable, not silently corrupting.
       const { runPersistentDag } = await loadEngine();
-      const r = await runPersistentDag(nodes, { sessionId, dir, timeoutMs: opts.timeoutMs, signal: sig.signal });
+      const r = await runPersistentDag(nodes, { sessionId, dir, timeoutMs: opts.timeoutMs, signal: sig.signal, concurrency: opts.concurrency });
       console.log(JSON.stringify({
         success: r.success,
         executedNodes: r.executedNodes || [],
@@ -106,7 +106,7 @@ async function cmdRun(sessionId, file, opts = {}) {
       // runPersistentDag. failedAt + executedNodes are derived from results
       // so the JSON shape stays compatible with the sequential path.
       const { runParallel } = await import('./workflow/executor.mjs');
-      const r = await runParallel(nodes, { signal: sig.signal });
+      const r = await runParallel(nodes, { signal: sig.signal, concurrency: opts.concurrency });
       const executedNodes = r.results.filter(x => x.status === 'success').map(x => x.id);
       console.log(JSON.stringify({
         success: r.success,
@@ -692,7 +692,7 @@ const HELP_SUMMARIES = {
 // Detailed usage per subcommand for `lazyclaw help <name>`. Kept as flat
 // strings so the help output is identical in every terminal.
 const HELP_DETAILS = {
-  run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
+  run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent] [--concurrency <N>]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  --concurrency <N>: cap in-flight nodes within a level (DAG modes only). 0/missing → unbounded.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
   inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
@@ -1506,11 +1506,18 @@ async function main() {
   switch (cmd) {
     case 'run': {
       const [sessionId, file] = rest.positional;
-      if (!sessionId || !file) { console.error('Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent]'); process.exit(2); }
+      if (!sessionId || !file) { console.error('Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent] [--concurrency <N>]'); process.exit(2); }
+      // --concurrency caps in-flight nodes within a single level for
+      // both --parallel and --parallel-persistent. Sequential mode
+      // ignores it (only one node runs at a time anyway).
+      const concurrency = rest.flags.concurrency !== undefined
+        ? Math.max(0, parseInt(rest.flags.concurrency, 10) || 0)
+        : undefined;
       await cmdRun(sessionId, file, {
         dir: rest.flags.dir,
         parallel: !!rest.flags.parallel,
         'parallel-persistent': !!rest.flags['parallel-persistent'],
+        concurrency,
       });
       break;
     }

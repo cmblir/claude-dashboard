@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { runSequential, runParallel, topologicalLevels, retryWithBackoff, runWithTimeout } from '../src/lazyclaw/workflow/executor.mjs';
+import { runSequential, runParallel, topologicalLevels, retryWithBackoff, runWithTimeout, settleWithConcurrency } from '../src/lazyclaw/workflow/executor.mjs';
 
 interface WorkflowNode {
   id: string;
@@ -361,6 +361,62 @@ test.describe('Phase 1 — Workflow Engine Core', () => {
     expect(r.success).toBe(false);
     expect((r.error as any)?.code).toBe('ABORT');
     expect(level2Ran).toBe(false);
+  });
+
+  test('runParallel: opts.concurrency caps how many level nodes run at once', async () => {
+    // 6-wide fan-out where each node logs its enter/exit. With
+    // concurrency=2, at most 2 nodes should be in-flight at any time.
+    let inFlight = 0;
+    let peakInFlight = 0;
+    const nodes = Array.from({ length: 6 }, (_, i) => ({
+      id: `n${i}`,
+      type: 'test',
+      deps: [],
+      async execute() {
+        inFlight++;
+        if (inFlight > peakInFlight) peakInFlight = inFlight;
+        await new Promise(r => setTimeout(r, 30));
+        inFlight--;
+        return i;
+      },
+    }));
+    const r = await runParallel(nodes as any, { concurrency: 2 });
+    expect(r.success).toBe(true);
+    expect(peakInFlight).toBeLessThanOrEqual(2);
+    expect(r.results.filter(x => x.status === 'success')).toHaveLength(6);
+  });
+
+  test('runParallel: opts.concurrency=0 / undefined preserves unbounded fast path', async () => {
+    let peakInFlight = 0;
+    let inFlight = 0;
+    const nodes = Array.from({ length: 4 }, (_, i) => ({
+      id: `n${i}`, type: 'test', deps: [],
+      async execute() {
+        inFlight++;
+        if (inFlight > peakInFlight) peakInFlight = inFlight;
+        await new Promise(r => setTimeout(r, 20));
+        inFlight--;
+        return i;
+      },
+    }));
+    // Default: no concurrency cap → all 4 nodes fan out at once.
+    const r = await runParallel(nodes as any);
+    expect(r.success).toBe(true);
+    expect(peakInFlight).toBe(4);
+  });
+
+  test('settleWithConcurrency: preserves input order regardless of completion order', async () => {
+    // Items finish in reverse: [200ms, 100ms, 0ms]. With concurrency=2
+    // the last (fast) finishes first but the OUTPUT must remain in
+    // input order.
+    const items = [200, 100, 0];
+    const out = await settleWithConcurrency(items, async (ms, i) => {
+      await new Promise(r => setTimeout(r, ms));
+      return `item-${i}-${ms}`;
+    }, 2);
+    expect(out.map(s => s.status === 'fulfilled' ? s.value : null)).toEqual([
+      'item-0-200', 'item-1-100', 'item-2-0',
+    ]);
   });
 
   test('runParallel: detects cycles and refuses to run', async () => {

@@ -10,6 +10,57 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.18.0] — 2026-05-05
+
+**Workflow: bounded concurrency for parallel engines.**
+
+A 100-wide fan-out level previously launched all 100 nodes at
+once. With `opts.concurrency: N`, both `runParallel` and
+`runPersistentDag` cap in-flight nodes per level — useful for fan-
+outs that touch a rate-limited API or want to bound resident
+memory.
+
+```js
+// Run at most 5 nodes concurrently per level
+const r = await runParallel(nodes, { concurrency: 5 });
+
+// Or persistent DAG version
+const r = await runPersistentDag(nodes, { sessionId, dir, concurrency: 5 });
+```
+
+```bash
+$ lazyclaw run my-job ./flow.mjs --parallel-persistent --concurrency 5
+```
+
+### Implementation
+A new exported helper `settleWithConcurrency(items, mapper, limit)`
+schedules an async map over an iterable with at most `limit`
+workers. Output preserves input order regardless of completion
+order. The fast path (`limit ≤ 0` or `limit ≥ items.length`)
+collapses to plain `Promise.allSettled`, so default behavior is
+identical to v3.17 — no overhead when concurrency isn't requested.
+
+The semaphore is implemented as N persistent workers each pulling
+from a shared cursor. No event-emitter churn, no priority queue,
+no async iterator overhead — the shape mirrors what
+`p-map`/`p-limit` does in their fast paths.
+
+### Tests
+4 new specs:
+- `runParallel` `concurrency: 2` over 6-node fan-out → peak in-
+  flight ≤ 2
+- `runParallel` `concurrency: 0/undefined` → fast-path peak in-
+  flight equals fan-out width (default unchanged)
+- `settleWithConcurrency` preserves input order regardless of
+  completion order (reverse-order finish test)
+- `runPersistentDag` `concurrency: 2` over 6-node fan-out → peak
+  in-flight ≤ 2 AND all 6 outputs land on disk
+
+CLI exposes `--concurrency <N>` for `lazyclaw run` (DAG modes).
+
+Suite: 294 → 298 (+4); `tsc --noEmit` clean.
+
+---
 ## [3.17.0] — 2026-05-05
 
 **`lazyclaw inspect --summary` — concise mode for single-session inspection.**
