@@ -16,7 +16,7 @@ const REPO_ROOT = process.cwd();
 interface PNode {
   id: string;
   type: string;
-  execute(input: unknown): Promise<unknown>;
+  execute(input: unknown, opts?: { signal?: AbortSignal }): Promise<unknown>;
 }
 
 function tmpDir(prefix: string): string {
@@ -325,5 +325,149 @@ test.describe('Phase 2 — Auto-resume', () => {
     expect(r.executedNodes).toEqual(['b']);   // a skipped, b retried
     const s = loadState(sid, dir)!;
     expect(s.nodes.b.output).toBe('B:A');
+  });
+
+  // ───── AbortSignal propagation (v3.8) ─────
+  // The persistent engines treat abort as RESUMABLE: aborted nodes
+  // are demoted back to 'pending', not 'failed'. A future
+  // runPersistent()/runPersistentDag() call with the same sessionId
+  // picks up where the aborted run stopped — same shape as
+  // resume-from-crash, just driven by an explicit AbortController.
+
+  test('runPersistent: signal aborted between nodes → ABORT, current node stays pending, resume completes the run', async () => {
+    const dir = tmpDir('persist-abort-seq');
+    const sid = 'abort-seq-1';
+    const ac = new AbortController();
+    const order: string[] = [];
+    const nodes: PNode[] = [
+      { id: 'a', type: 'test', async execute() { order.push('a'); return 'A'; } },
+      { id: 'b', type: 'test', async execute() { order.push('b'); ac.abort(); return 'B'; } },
+      { id: 'c', type: 'test', async execute() { order.push('c'); return 'C'; } },
+    ];
+    const r1 = await runPersistent(nodes, { sessionId: sid, dir, signal: ac.signal });
+    expect(r1.success).toBe(false);
+    expect((r1 as any).code).toBe('ABORT');
+    expect(r1.failedAt).toBe('c');
+    expect(order).toEqual(['a', 'b']);
+
+    // Disk state: a=success, b=success, c=pending. Resume picks up at c only.
+    const s1 = loadState(sid, dir)!;
+    expect(s1.nodes.a.status).toBe('success');
+    expect(s1.nodes.b.status).toBe('success');
+    expect(s1.nodes.c.status).toBe('pending');
+
+    const order2: string[] = [];
+    const nodes2: PNode[] = nodes.map(n => ({
+      ...n,
+      async execute() { order2.push(n.id); return n.id.toUpperCase(); },
+    }));
+    const r2 = await runPersistent(nodes2, { sessionId: sid, dir });
+    expect(r2.success).toBe(true);
+    expect(order2).toEqual(['c']);   // a/b skipped — only c re-ran
+  });
+
+  test('runPersistent: signal aborted DURING execute() (forwarded) → node stays pending, resume re-runs it', async () => {
+    const dir = tmpDir('persist-abort-during');
+    const sid = 'abort-during-1';
+    const ac = new AbortController();
+    let attempts = 0;
+    const nodes: PNode[] = [
+      {
+        id: 'slow',
+        type: 'test',
+        async execute(_, opts) {
+          attempts++;
+          if (attempts === 1) {
+            // Simulate a node that subscribes to signal and aborts itself.
+            ac.abort();
+            const e: any = new Error('aborted');
+            e.code = 'ABORT';
+            throw e;
+          }
+          return 'done';
+        },
+      },
+    ];
+    const r1 = await runPersistent(nodes, { sessionId: sid, dir, signal: ac.signal });
+    expect(r1.success).toBe(false);
+    expect((r1 as any).code).toBe('ABORT');
+    const s1 = loadState(sid, dir)!;
+    expect(s1.nodes.slow.status).toBe('pending');   // NOT 'failed'
+
+    // Resume without a signal — the node retries and succeeds.
+    const r2 = await runPersistent(nodes, { sessionId: sid, dir });
+    expect(r2.success).toBe(true);
+    const s2 = loadState(sid, dir)!;
+    expect(s2.nodes.slow.status).toBe('success');
+    expect(s2.nodes.slow.output).toBe('done');
+  });
+
+  test('runPersistentDag: signal aborted between levels → ABORT, downstream level skipped, success outputs preserved', async () => {
+    const dir = tmpDir('pdag-abort-level');
+    const sid = 'abort-dag-1';
+    const ac = new AbortController();
+    const order: string[] = [];
+    const nodes = [
+      { id: 'a', deps: [],    async execute() { order.push('a'); return 'A'; } },
+      { id: 'b', deps: ['a'], async execute() { order.push('b'); ac.abort(); return 'B'; } },
+      { id: 'c', deps: ['b'], async execute() { order.push('c'); return 'C'; } },
+    ];
+    const r1 = await runPersistentDag(nodes, { sessionId: sid, dir, signal: ac.signal });
+    expect(r1.success).toBe(false);
+    expect((r1 as any).code).toBe('ABORT');
+    expect(r1.failedAt).toBe('c');
+    expect(order).toEqual(['a', 'b']);   // c never scheduled
+
+    // Disk: a=success, b=success, c=pending.
+    const s1 = loadState(sid, dir)!;
+    expect(s1.nodes.a.status).toBe('success');
+    expect(s1.nodes.b.status).toBe('success');
+    expect(s1.nodes.c.status).toBe('pending');
+
+    // Resume runs only c — fan-in input from b is preserved.
+    const order2: string[] = [];
+    const nodes2 = nodes.map(n => ({
+      ...n,
+      async execute(input: any) { order2.push(n.id); return n.id === 'c' ? `C:${input?.b}` : n.id.toUpperCase(); },
+    }));
+    const r2 = await runPersistentDag(nodes2, { sessionId: sid, dir });
+    expect(r2.success).toBe(true);
+    expect(order2).toEqual(['c']);
+    const s2 = loadState(sid, dir)!;
+    expect(s2.nodes.c.output).toBe('C:B');
+  });
+
+  test('runPersistentDag: in-flight node aborted via signal demotes back to pending (not failed) — resumable', async () => {
+    const dir = tmpDir('pdag-abort-during');
+    const sid = 'abort-dag-2';
+    const ac = new AbortController();
+    let attempts = 0;
+    const nodes = [
+      {
+        id: 'only',
+        deps: [],
+        async execute(_input: any, opts: any) {
+          attempts++;
+          if (attempts === 1) {
+            ac.abort();
+            const e: any = new Error('aborted');
+            e.code = 'ABORT';
+            throw e;
+          }
+          return 'recovered';
+        },
+      },
+    ];
+    const r1 = await runPersistentDag(nodes, { sessionId: sid, dir, signal: ac.signal });
+    expect(r1.success).toBe(false);
+    expect((r1 as any).code).toBe('ABORT');
+    const s1 = loadState(sid, dir)!;
+    expect(s1.nodes.only.status).toBe('pending');   // demoted, not failed
+
+    const r2 = await runPersistentDag(nodes, { sessionId: sid, dir });
+    expect(r2.success).toBe(true);
+    const s2 = loadState(sid, dir)!;
+    expect(s2.nodes.only.status).toBe('success');
+    expect(s2.nodes.only.output).toBe('recovered');
   });
 });

@@ -10,6 +10,58 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.8.0] — 2026-05-05
+
+**Workflow: AbortSignal across resumable engines too.**
+
+`runPersistent` and `runPersistentDag` now accept `opts.signal` —
+matching the v3.7 contract on `runSequential` / `runParallel`.
+The signal is checked between nodes/levels and forwarded into each
+`node.execute(input, { signal })`.
+
+### The resumable-abort semantic
+**An aborted node is *resumable*, not failed.** When a persistent
+engine aborts (either between nodes or because `execute()` threw
+ABORT), the node that was running gets demoted back to `pending`
+on disk — same teardown path as a process killed by SIGKILL. A
+future call to `runPersistent`/`runPersistentDag` with the same
+`sessionId` picks up exactly where the aborted run stopped. So
+abort-driven resume and crash-driven resume converge on the same
+state-file shape.
+
+```js
+const ac = new AbortController();
+setTimeout(() => ac.abort(), 100);
+const r1 = await runPersistent(nodes, { sessionId: 'job', dir, signal: ac.signal });
+// r1 = { success: false, code: 'ABORT', failedAt: <next-node>, ... }
+// On disk: completed nodes are 'success', current node is 'pending'.
+
+// Later, in a different process or after retrying:
+const r2 = await runPersistent(nodes, { sessionId: 'job', dir });
+// r2 picks up at the pending node, runs it and the rest, returns success.
+```
+
+### `failedAt` on level-boundary abort (`runPersistentDag`)
+If the signal flips after a level finished cleanly but before the
+next was scheduled, `failedAt` is the **first node of the next
+level** (the one that won't run), not the level that already
+finished. If a node aborted from inside `execute()`, `failedAt`
+is that specific node id.
+
+### Tests
+4 new phase 2 specs:
+- `runPersistent`: signal aborted between nodes → ABORT, in-flight
+  node stays `pending`, resume completes the run with no rework
+- `runPersistent`: signal aborted DURING `execute()` (subscribed
+  via `opts.signal`) → demote-to-pending, resume re-runs the node
+- `runPersistentDag`: signal aborted between levels stops
+  downstream scheduling and preserves success outputs for fan-in
+- `runPersistentDag`: in-flight node aborted via signal demotes
+  back to `pending` (not `failed`) — same shape as a SIGKILL'd run
+
+Suite: 269 → 273 (+4); `tsc --noEmit` clean.
+
+---
 ## [3.7.0] — 2026-05-05
 
 **Workflow: end-to-end `AbortSignal` propagation.**

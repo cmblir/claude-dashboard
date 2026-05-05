@@ -94,6 +94,7 @@ function isTimeout(err) {
  *   baseDelayMs?: number,
  *   timeoutMs?: number,
  *   sleep?: (ms: number) => Promise<void>,
+ *   signal?: AbortSignal,
  * }} opts
  */
 export async function runPersistent(nodes, opts) {
@@ -101,6 +102,7 @@ export async function runPersistent(nodes, opts) {
   const maxRetries = opts.maxRetries ?? 3;
   const baseDelay = opts.baseDelayMs ?? 100;
   const sleep = opts.sleep ?? (ms => new Promise(r => setTimeout(r, ms)));
+  const signal = opts.signal;
 
   let state = loadState(opts.sessionId, dir);
   if (!state) {
@@ -120,7 +122,29 @@ export async function runPersistent(nodes, opts) {
   const executedNodes = [];
   let input = null;
 
+  // Aborted state is *resumable*, not failed: leave the current
+  // node as 'pending' (decrementing attempts so resume retries it)
+  // and let a future runPersistent() call pick up where this one
+  // stopped. That's the same teardown path as a SIGKILL'd run, so
+  // resume-by-abort and resume-by-crash converge to the same shape.
+  const buildAbortReturn = (currentNodeId, attempts) => {
+    if (currentNodeId) {
+      state.nodes[currentNodeId] = { status: 'pending', attempts: Math.max(0, (attempts ?? 1) - 1) };
+      saveState(state, dir);
+    }
+    return {
+      success: false,
+      state,
+      failedAt: currentNodeId,
+      error: 'aborted',
+      code: 'ABORT',
+      retryDelays,
+      executedNodes,
+    };
+  };
+
   for (const node of nodes) {
+    if (signal?.aborted) return buildAbortReturn(node.id, 0);
     const ns = state.nodes[node.id] ?? { status: 'pending' };
     if (ns.status === 'success') {
       input = ns.output;
@@ -128,12 +152,13 @@ export async function runPersistent(nodes, opts) {
     }
     let attempts = ns.attempts ?? 0;
     while (true) {
+      if (signal?.aborted) return buildAbortReturn(node.id, attempts);
       attempts++;
       state.nodes[node.id] = { status: 'running', attempts };
       saveState(state, dir);
       const t0 = performance.now();
       try {
-        const output = await runWithTimeout(() => node.execute(input), opts.timeoutMs);
+        const output = await runWithTimeout(() => node.execute(input, { signal }), opts.timeoutMs);
         const durationMs = performance.now() - t0;
         state.nodes[node.id] = { status: 'success', output, attempts, durationMs };
         saveState(state, dir);
@@ -141,6 +166,12 @@ export async function runPersistent(nodes, opts) {
         input = output;
         break;
       } catch (err) {
+        // An abort surfaced through execute() (e.g. fetch with signal)
+        // is treated like the cross-node check above: roll back to
+        // 'pending' so resume retries this node, return ABORT.
+        if (signal?.aborted || err?.code === 'ABORT') {
+          return buildAbortReturn(node.id, attempts);
+        }
         const msg = err instanceof Error ? err.message : String(err);
         if (isTimeout(err) && attempts < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempts - 1);
@@ -176,17 +207,21 @@ export async function runPersistent(nodes, opts) {
  * @param {Array<{
  *   id: string,
  *   deps?: string[],
- *   execute: (input: Record<string, unknown> | null) => Promise<unknown>,
+ *   execute: (input: Record<string, unknown> | null, opts?: { signal?: AbortSignal }) => Promise<unknown>,
  *   cleanup?: () => (Promise<void>|void),
+ *   retry?: { max: number, baseDelayMs?: number },
+ *   timeoutMs?: number,
  * }>} nodes
  * @param {{
  *   sessionId: string,
  *   dir?: string,
  *   timeoutMs?: number,
+ *   signal?: AbortSignal,
  * }} opts
  */
 export async function runPersistentDag(nodes, opts) {
   const dir = opts.dir ?? DEFAULT_DIR;
+  const signal = opts.signal;
 
   // Compute topological levels at start. (Static import at module top
   // — a dynamic `import()` here trips the tsx loader's CJS conversion
@@ -223,7 +258,36 @@ export async function runPersistentDag(nodes, opts) {
   const idToNode = new Map(nodes.map(n => [n.id, n]));
   const executedNodes = [];
 
-  for (const levelIds of levels) {
+  // Shared abort handler — same demote-to-pending semantic as
+  // runPersistent: aborted nodes are *resumable*, not failed. After
+  // an abort, demote anything still 'running' back to 'pending' so a
+  // future runPersistentDag() picks them up. Returns the result shape.
+  const buildAbortReturn = (failedAtId) => {
+    for (const id of Object.keys(state.nodes)) {
+      const ns = state.nodes[id];
+      if (ns && ns.status === 'running') {
+        state.nodes[id] = { status: 'pending', attempts: ns.attempts ?? 0 };
+      }
+    }
+    saveState(state, dir);
+    return {
+      success: false,
+      state,
+      failedAt: failedAtId,
+      error: 'aborted',
+      code: 'ABORT',
+      executedNodes,
+    };
+  };
+
+  for (let levelIdx = 0; levelIdx < levels.length; levelIdx++) {
+    const levelIds = levels[levelIdx];
+    // failedAt for an abort = first node of the next level we'd
+    // schedule. If we're already past the last level, use the
+    // current level's first id (the abort caught us between final
+    // level and "all done").
+    const nextLevelFirstId = () => levels[levelIdx + 1]?.[0] ?? levelIds[0];
+    if (signal?.aborted) return buildAbortReturn(levelIds[0]);
     // Each node in the level is independent of its peers — run concurrently.
     // We collect both success outputs and the first failure; on failure we
     // stop scheduling future levels (same as runParallel) but persist the
@@ -256,7 +320,7 @@ export async function runPersistentDag(nodes, opts) {
       // (workflow-wide default) so a fast node with a tight cap doesn't
       // inherit a slower node's lenient cap.
       const effectiveTimeout = Number.isFinite(node.timeoutMs) ? node.timeoutMs : opts.timeoutMs;
-      const fn = () => runWithTimeout(() => node.execute(input), effectiveTimeout);
+      const fn = () => runWithTimeout(() => node.execute(input, { signal }), effectiveTimeout);
       try {
         const output = node.retry && Number.isFinite(node.retry.max) && node.retry.max > 0
           ? await retryWithBackoff(fn, node.retry)
@@ -266,6 +330,12 @@ export async function runPersistentDag(nodes, opts) {
         saveState(state, dir);
         return { id, ok: true };
       } catch (err) {
+        // An abort surfaced through execute() flips the node back to
+        // pending so resume can retry it. We re-raise via aborted=true
+        // so the level loop below knows to short-circuit.
+        if (signal?.aborted || err?.code === 'ABORT') {
+          return { id, aborted: true };
+        }
         const msg = err instanceof Error ? err.message : String(err);
         const durationMs = performance.now() - t0;
         state.nodes[id] = { status: 'failed', error: msg, attempts: state.nodes[id].attempts, durationMs };
@@ -275,9 +345,17 @@ export async function runPersistentDag(nodes, opts) {
     });
     const settled = await Promise.all(tasks);
     let firstFailure = null;
+    let firstAbort = null;
     for (const r of settled) {
+      if (r.aborted) { if (!firstAbort) firstAbort = r; continue; }
       if (r.ok && !r.skipped) executedNodes.push(r.id);
       if (!r.ok && !firstFailure) firstFailure = r;
+    }
+    if (firstAbort || signal?.aborted) {
+      // If a node aborted from inside execute(), failedAt = that node.
+      // If the signal flipped after this level finished cleanly, the
+      // next level was the one that won't run — point failedAt there.
+      return buildAbortReturn(firstAbort?.id ?? nextLevelFirstId());
     }
     if (firstFailure) {
       return { success: false, state, failedAt: firstFailure.id, error: firstFailure.error, executedNodes };
