@@ -402,6 +402,39 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(fs.existsSync(outside)).toBe(true);
   });
 
+  test('lazyclaw inspect --status filters list mode by lifecycle bucket', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    // 3 sessions: done, resumable (partial), failed.
+    const mk = (id: string, nodes: any) => {
+      fs.writeFileSync(path.join(stateDir, `${id}.json`), JSON.stringify({
+        sessionId: id, order: Object.keys(nodes), nodes,
+        startedAt: 1, updatedAt: 100,
+      }));
+    };
+    mk('done', { a: { status: 'success', attempts: 1 } });
+    mk('partial', { a: { status: 'success', attempts: 1 }, b: { status: 'pending', attempts: 0 } });
+    mk('broken', { a: { status: 'success', attempts: 1 }, b: { status: 'failed', error: 'boom', attempts: 3 } });
+
+    const r1 = runCli(['inspect', '--dir', stateDir, '--status', 'done'], dir);
+    expect(r1.status).toBe(0);
+    expect(JSON.parse(r1.stdout).sessions.map((s: any) => s.sessionId)).toEqual(['done']);
+
+    const r2 = runCli(['inspect', '--dir', stateDir, '--status', 'resumable'], dir);
+    expect(r2.status).toBe(0);
+    expect(JSON.parse(r2.stdout).sessions.map((s: any) => s.sessionId)).toEqual(['partial']);
+
+    const r3 = runCli(['inspect', '--dir', stateDir, '--status', 'failed'], dir);
+    expect(r3.status).toBe(0);
+    expect(JSON.parse(r3.stdout).sessions.map((s: any) => s.sessionId)).toEqual(['broken']);
+
+    // Unknown status → exit 2 with helpful stderr.
+    const r4 = runCli(['inspect', '--dir', stateDir, '--status', 'bogus'], dir);
+    expect(r4.status).toBe(2);
+    expect(r4.stderr).toMatch(/invalid --status/);
+  });
+
   test('lazyclaw inspect (no arg): missing state dir → exit 2', () => {
     const dir = tmpConfigDir();
     const r = runCli(['inspect', '--dir', path.join(dir, 'no-such-dir')], dir);

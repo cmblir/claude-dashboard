@@ -160,6 +160,11 @@ async function cmdInspect(sessionId, opts = {}) {
   // List mode — no sessionId given. Walks the state directory and
   // emits a summary per session. Per-node `nodes` map is omitted —
   // run with a session id for full detail.
+  //
+  // --status filters the listing by lifecycle: done, resumable,
+  // failed, or running. Mutually exclusive — passing more than one
+  // is an error rather than silent overlap so a script can rely on
+  // the predicate it asked for.
   if (!sessionId) {
     let sessions;
     try {
@@ -171,7 +176,22 @@ async function cmdInspect(sessionId, opts = {}) {
       }
       throw e;
     }
-    console.log(JSON.stringify({ dir, sessions }, null, 2));
+    const status = opts.status;
+    if (status) {
+      const valid = new Set(['done', 'resumable', 'failed', 'running']);
+      if (!valid.has(status)) {
+        console.error(`invalid --status: ${status} (expected one of: ${[...valid].join(', ')})`);
+        process.exit(2);
+      }
+      sessions = sessions.filter(s => {
+        if (status === 'done')      return s.summary.done;
+        if (status === 'resumable') return s.summary.resumable;
+        if (status === 'failed')    return s.summary.failed > 0;
+        if (status === 'running')   return s.summary.running > 0;
+        return true;
+      });
+    }
+    console.log(JSON.stringify({ dir, status: status || null, sessions }, null, 2));
     process.exit(0);
   }
 
@@ -659,7 +679,7 @@ const HELP_SUMMARIES = {
 const HELP_DETAILS = {
   run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
-  inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
+  inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
   config: 'Usage: lazyclaw config <get|set|list|delete|path|edit> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
@@ -1489,7 +1509,7 @@ async function main() {
       // Pass the empty positional through; cmdInspect's list mode
       // handles it.
       const [sessionId] = rest.positional;
-      await cmdInspect(sessionId, { dir: rest.flags.dir });
+      await cmdInspect(sessionId, { dir: rest.flags.dir, status: rest.flags.status });
       break;
     }
     case 'clear': {

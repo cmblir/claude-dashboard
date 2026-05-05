@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.15.0] — 2026-05-05
+
+**`lazyclaw inspect --status` — filter list mode by lifecycle bucket.**
+
+Production ops want answers like "show me only the failed runs"
+or "which workflows are mid-flight." Adds a single algorithmic
+flag — no per-bucket aliases, just a generic predicate over the
+existing summary.
+
+```
+$ lazyclaw inspect --status failed
+{"dir":".workflow-state","status":"failed","sessions":[<only failed runs>]}
+
+$ lazyclaw inspect --status resumable
+{"dir":".workflow-state","status":"resumable","sessions":[<only resumable>]}
+```
+
+### Buckets
+- `done`      — `summary.done === true` (every node succeeded)
+- `resumable` — `summary.resumable === true` (no failed node, at
+                least one non-success — runs queue to resume)
+- `failed`    — `summary.failed > 0` (terminal failure; user must
+                fix before resume)
+- `running`   — `summary.running > 0` (a process was alive last
+                anyone saw — the engine demotes these to pending
+                on next load)
+
+### Validation
+Unknown `--status` value → exit 2 with helpful stderr. Buckets are
+mutually exclusive — passing more than one (which the parser
+collapses to the last) doesn't silently overlap; you get exactly
+the predicate you named.
+
+### Tests
+1 new phase 6 spec covering all 4 valid buckets + the unknown-bucket
+exit 2 path.
+
+Suite: 291 → 292 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.14.0] — 2026-05-05
 
 **`lazyclaw clear <session-id>` — CLI counterpart to `DELETE /workflows/<id>`.**
