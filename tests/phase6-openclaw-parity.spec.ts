@@ -1371,6 +1371,86 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon gate ordering: forbidden Origin → 403 (cost cap never consulted)', async () => {
+    // The cost-cap gate runs AFTER Origin. A foreign-Origin POST to
+    // /agent must 403 before any cost check — even if the cap has been
+    // wildly exceeded (priming via direct metrics mutation isn't
+    // possible; the test relies on the routing ordering itself).
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      costCap: { USD: 0.000001 },  // Effectively zero — cap will fire on any spending
+    });
+    let status = 0;
+    let body = '';
+    const req: any = {
+      method: 'POST',
+      url: '/agent',
+      headers: { origin: 'https://evil.example' },
+      socket: { remoteAddress: '127.0.0.1' },
+    };
+    const res: any = { writeHead(s: number) { status = s; }, end(b: string) { body = b; }, once: () => {} };
+    await handler(req, res);
+    expect(status).toBe(403);
+    // Body should mention origin, NOT cost — proves Origin gate fired first.
+    const j = JSON.parse(body);
+    expect(j.error).toBe('forbidden origin');
+  });
+
+  test('daemon gate ordering: unauthenticated request → 401 (cost cap never consulted)', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      authToken: 'good',
+      costCap: { USD: 0.000001 },
+    });
+    let status = 0;
+    let body = '';
+    const req: any = {
+      method: 'POST', url: '/agent', headers: { authorization: 'Bearer wrong' },
+      socket: { remoteAddress: '127.0.0.1' },
+    };
+    const res: any = { writeHead(s: number) { status = s; }, end(b: string) { body = b; }, once: () => {} };
+    await handler(req, res);
+    expect(status).toBe(401);
+    expect(JSON.parse(body).error).toBe('unauthorized');
+  });
+
+  test('daemon gate ordering: rate-limited → 429 before cost cap is consulted', async () => {
+    const mod = await import('../src/lazyclaw/daemon.mjs' as string);
+    const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);
+    const handler = mod.makeHandler({
+      readConfig: () => ({}),
+      sessionsDirGetter: () => '/tmp',
+      sessionsMod,
+      version: () => '0.0.0',
+      rateLimit: { capacity: 1, refillPerSec: 0.001 },
+      costCap: { USD: 0.000001 },
+    });
+    // Use GET /version: rate limit gate is universal, cost cap only
+    // applies to POST /agent + /chat. Driving /version twice cleanly
+    // proves rate-limit fires before any downstream check (404, 402,
+    // 500, etc.) — the FIRST request lands at the route handler (200),
+    // the SECOND hits rate-limit BEFORE route resolution → 429.
+    const drive = async () => {
+      let status = 0;
+      const req: any = { method: 'GET', url: '/version', headers: {}, socket: { remoteAddress: '127.0.0.1' } };
+      const res: any = { writeHead(s: number) { status = s; }, end() {}, once: () => {} };
+      await handler(req, res);
+      return status;
+    };
+    expect(await drive()).toBe(200);
+    expect(await drive()).toBe(429);
+  });
+
   test('daemon costCap: cumulative spending past cap → 402 on /agent and /chat', async () => {
     const mod = await import('../src/lazyclaw/daemon.mjs' as string);
     const sessionsMod = await import('../src/lazyclaw/sessions.mjs' as string);

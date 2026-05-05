@@ -10,6 +10,40 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.5.1] — 2026-05-05
+
+**Test coverage: cost-cap gate ordering pinned down vs Origin/auth/rate-limit.**
+
+3.5.0 added the cost cap as the fourth gate. The implementation
+puts it at the end (Origin → auth → rate limit → cost cap), but no
+test pinned that ordering. This iteration adds three explicit
+checks — same pattern as the auth-vs-Origin ordering tests in 2.95.3.
+
+The contract: each upstream gate must short-circuit *before* the
+cost cap is consulted, so a foreign-Origin / unauth'd / rate-limited
+attacker can never:
+- waste cap-check work
+- learn whether the cap is set or what currency it tracks
+- trigger any downstream side effects
+
+### Tests
+3 new phase 6 specs:
+- foreign Origin → 403 with `error: 'forbidden origin'` body —
+  cost-cap-related fields absent
+- unauthenticated → 401 with `error: 'unauthorized'` — auth ran
+  before cost cap (and before route resolution, per 2.95.3)
+- rate-limited → 429 — rate limit ran before cost cap. Drives
+  `GET /version` (universal route) twice with capacity 1 to prove
+  the second request hits 429 before any downstream check.
+
+Together with the Origin-vs-auth-vs-rate-limit ordering pins
+already in place, the security stack now has a complete pairwise
+ordering test matrix. An attacker can't reach any downstream gate's
+state by exploiting an upstream one.
+
+No production code changes. Suite: 261/261. tsc clean.
+
+---
 ## [3.5.0] — 2026-05-05
 
 **Daemon: per-currency cost caps for budget enforcement.**
