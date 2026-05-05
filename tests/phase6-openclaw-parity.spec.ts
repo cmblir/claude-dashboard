@@ -846,6 +846,84 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r4.stderr).toMatch(/No node "never-existed"/);
   });
 
+  test('lazyclaw inspect --slowest <N> returns top N nodes by durationMs', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job',
+      order: ['fast', 'slow', 'medium', 'slowest', 'instant'],
+      nodes: {
+        fast:    { status: 'success', attempts: 1, durationMs: 100 },
+        slow:    { status: 'success', attempts: 1, durationMs: 800 },
+        medium:  { status: 'success', attempts: 1, durationMs: 400 },
+        slowest: { status: 'success', attempts: 1, durationMs: 1500 },
+        instant: { status: 'success', attempts: 1, durationMs: 5 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['inspect', 'job', '--dir', stateDir, '--slowest', '3'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.sessionId).toBe('job');
+    expect(out.top).toHaveLength(3);
+    expect(out.top.map((n: any) => n.id)).toEqual(['slowest', 'slow', 'medium']);
+    expect(out.top[0].durationMs).toBe(1500);
+  });
+
+  test('lazyclaw inspect --slowest with N larger than node count returns all nodes', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job',
+      order: ['a', 'b'],
+      nodes: {
+        a: { status: 'success', durationMs: 10 },
+        b: { status: 'success', durationMs: 20 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['inspect', 'job', '--dir', stateDir, '--slowest', '999'], dir);
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout).top).toHaveLength(2);
+  });
+
+  test('lazyclaw inspect --slowest 0 / negative / non-numeric → exit 2', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job', order: ['a'], nodes: { a: { status: 'success' } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    for (const bad of ['0', '-3', 'abc']) {
+      const r = runCli(['inspect', 'job', '--dir', stateDir, '--slowest', bad], dir);
+      expect(r.status).toBe(2);
+      expect(r.stderr).toMatch(/--slowest must be a positive integer/);
+    }
+  });
+
+  test('lazyclaw inspect --slowest: missing durationMs treated as 0 in sort', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job',
+      order: ['nodur', 'withdur'],
+      nodes: {
+        nodur:   { status: 'pending' },                      // no durationMs
+        withdur: { status: 'success', durationMs: 50 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['inspect', 'job', '--dir', stateDir, '--slowest', '5'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.top.map((n: any) => n.id)).toEqual(['withdur', 'nodur']);
+    expect(out.top[1].durationMs).toBe(0);   // missing → 0
+  });
+
   test('lazyclaw inspect --critical-path computes the longest weighted path', () => {
     const dir = tmpConfigDir();
     const wfPath = path.join(dir, 'flow.mjs');

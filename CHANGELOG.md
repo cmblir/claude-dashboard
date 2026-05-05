@@ -10,6 +10,58 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.44.0] — 2026-05-05
+
+**`lazyclaw inspect <session> --slowest <N>` — top N nodes by duration.**
+
+Companion to v3.43's `--critical-path`. Critical-path tells you
+"the longest path"; `--slowest` tells you "the heaviest individual
+nodes" — useful when the critical path runs through a single fat
+node and you want a global ranking, or when you don't have the
+workflow file handy (`--slowest` works on state alone).
+
+```
+$ lazyclaw inspect my-job --slowest 3
+{
+  "sessionId": "my-job",
+  "top": [
+    { "id": "embed",    "status": "success", "durationMs": 4150, "attempts": 1 },
+    { "id": "classify", "status": "success", "durationMs": 2100, "attempts": 1 },
+    { "id": "tag",      "status": "success", "durationMs": 1900, "attempts": 1 }
+  ]
+}
+```
+
+### Sort + tie-break
+Descending by `durationMs`, then ascending by `id` for
+deterministic output. Missing `durationMs` is treated as `0` so
+pending/running nodes sort last but still appear when `N >=
+nodeCount`.
+
+### `--slowest` vs `--critical-path`
+- `--slowest <N>` — answers: "which individual nodes take the
+  longest?" Ignores deps. State file only.
+- `--critical-path` — answers: "what's the longest dep chain?"
+  Considers parallel branches. Needs the workflow file.
+
+A user diagnosing a slow run typically uses both: critical-path
+to see the bound, slowest to find quick wins.
+
+### Validation
+- `--slowest 0` / `-3` / `abc` → exit 2 with helpful stderr
+- `--slowest N` where N exceeds node count → returns all nodes
+  (no separate "too large" error)
+
+### Tests
+4 new phase 6 specs:
+- top-N ranking with mixed durations
+- N larger than node count → returns all nodes
+- 0 / negative / non-numeric N → exit 2
+- missing durationMs treated as 0 in the sort
+
+Suite: 361 → 365 (+4); `tsc --noEmit` clean.
+
+---
 ## [3.43.0] — 2026-05-05
 
 **`lazyclaw inspect <session> --critical-path <workflow.mjs>` — bottleneck finder.**
