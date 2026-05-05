@@ -133,6 +133,64 @@ async function cmdRun(sessionId, file, opts = {}) {
   }
 }
 
+// Pure transformation over a persisted state file — no execution.
+// The shape mirrors the on-disk state plus a derived `summary` block
+// so a script can decide "should I resume?" without parsing per-node
+// statuses itself.
+//
+// Exit codes:
+//   0 — state found and printed
+//   1 — workflow completed (all nodes success, no work left to resume)
+//   2 — state file not found
+//   3 — workflow failed and is NOT resumable as-is (terminal failure
+//       with retries exhausted; user must edit the workflow or state)
+async function cmdInspect(sessionId, opts = {}) {
+  const dir = opts.dir || '.workflow-state';
+  const { loadState } = await loadEngine();
+  const state = loadState(sessionId, dir);
+  if (!state) {
+    console.error(`No state for session ${sessionId} in ${dir}`);
+    process.exit(2);
+  }
+  const counts = { pending: 0, running: 0, success: 0, failed: 0 };
+  const failedNodes = [];
+  let totalDurationMs = 0;
+  for (const id of Object.keys(state.nodes)) {
+    const n = state.nodes[id];
+    const status = n?.status || 'pending';
+    if (counts[status] !== undefined) counts[status]++;
+    if (status === 'failed') failedNodes.push({ id, error: n.error, attempts: n.attempts });
+    if (typeof n?.durationMs === 'number') totalDurationMs += n.durationMs;
+  }
+  const total = Object.keys(state.nodes).length;
+  const allDone = total > 0 && counts.success === total;
+  const hasFailure = counts.failed > 0;
+  // "Resumable" = there's at least one non-success node AND no terminal
+  // failure. Running/pending nodes from a prior interrupted run will be
+  // demoted by the engine on next load — they count as resumable work.
+  const resumable = !allDone && !hasFailure;
+  const out = {
+    sessionId: state.sessionId,
+    dir,
+    summary: {
+      total,
+      ...counts,
+      done: allDone,
+      resumable,
+      durationMs: totalDurationMs,
+    },
+    failedNodes,
+    order: state.order,
+    nodes: state.nodes,
+    startedAt: state.startedAt,
+    updatedAt: state.updatedAt,
+  };
+  console.log(JSON.stringify(out, null, 2));
+  if (allDone) process.exit(1);
+  if (hasFailure) process.exit(3);
+  process.exit(0);
+}
+
 async function cmdResume(sessionId, file, opts = {}) {
   const { runPersistent, loadState } = await loadEngine();
   const dir = opts.dir || '.workflow-state';
@@ -335,7 +393,7 @@ async function cmdVersion() {
 // truth so adding a subcommand updates the completion script too. The
 // dispatcher in main() is the runtime authority; this list mirrors it.
 const SUBCOMMANDS = [
-  'run', 'resume',
+  'run', 'resume', 'inspect',
   'config', 'chat', 'agent',
   'doctor', 'status', 'onboard',
   'sessions', 'skills', 'providers',
@@ -559,6 +617,7 @@ const HELP_SUMMARIES = {
   export:     'Dump config + skills (+ optional sessions) as a JSON bundle',
   import:     'Apply a JSON bundle from stdin or --from <path>',
   rates:      'Manage cost rate-cards in config (rates list|set <provider/model>|delete|shape)',
+  inspect:    'Print persisted workflow state without executing',
 };
 
 // Detailed usage per subcommand for `lazyclaw help <name>`. Kept as flat
@@ -566,6 +625,7 @@ const HELP_SUMMARIES = {
 const HELP_DETAILS = {
   run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
+  inspect: 'Usage: lazyclaw inspect <session-id> [--dir <state-dir>]\n  Print persisted workflow state without executing. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   config: 'Usage: lazyclaw config <get|set|list|delete|path|edit> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
   agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage] [--cost]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, ...} to stderr after the response.\n  --cost adds a cost line on stderr when config.rates has a card for the active provider/model.',
@@ -1379,6 +1439,12 @@ async function main() {
       const [sessionId, file] = rest.positional;
       if (!sessionId || !file) { console.error('Usage: lazyclaw resume <session-id> <workflow.mjs>'); process.exit(2); }
       await cmdResume(sessionId, file, { dir: rest.flags.dir });
+      break;
+    }
+    case 'inspect': {
+      const [sessionId] = rest.positional;
+      if (!sessionId) { console.error('Usage: lazyclaw inspect <session-id> [--dir <state-dir>]'); process.exit(2); }
+      await cmdInspect(sessionId, { dir: rest.flags.dir });
       break;
     }
     case 'config': {

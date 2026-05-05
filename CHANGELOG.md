@@ -10,6 +10,59 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.10.0] — 2026-05-05
+
+**`lazyclaw inspect <session-id>` — read-only workflow state inspector.**
+
+Pure transformation over the on-disk state file. Lets you check
+"what's done, what's pending, what failed" without committing to a
+re-run. Useful for production debugging and shell pipelines.
+
+```
+$ lazyclaw inspect my-job --dir .workflow-state
+{
+  "sessionId": "my-job",
+  "summary": {
+    "total": 5, "pending": 2, "running": 0,
+    "success": 3, "failed": 0,
+    "done": false, "resumable": true,
+    "durationMs": 412.3
+  },
+  "failedNodes": [],
+  "order": ["fetch", "embed", "classify", "tag", "merge"],
+  "nodes": { "fetch": { ... }, ... }
+}
+```
+
+### Exit codes — script-friendly
+- `0` — partial state, **resumable** (run `lazyclaw resume`)
+- `1` — fully completed; nothing to resume
+- `2` — no state file for this session id
+- `3` — terminal failure; `failedNodes` populated; user must edit
+  the workflow or hand-edit state before resume
+
+This lets a CI script branch cleanly:
+
+```bash
+lazyclaw inspect my-job >/tmp/state.json
+case $? in
+  0) lazyclaw resume my-job ./flow.mjs ;;
+  1) echo "already done" ;;
+  2) lazyclaw run my-job ./flow.mjs ;;
+  3) jq .failedNodes /tmp/state.json ; exit 1 ;;
+esac
+```
+
+### Tests
+4 new phase 6 specs:
+- missing state file → exit 2 with helpful stderr
+- fully completed workflow → exit 1 with `summary.done=true`
+- terminal failure → exit 3 with `failedNodes` populated
+- partially completed (resumable) → exit 0 with summary counts
+
+Suite: 275 → 279 (+4); `tsc --noEmit` clean.
+
+---
 ## [3.9.0] — 2026-05-05
 
 **CLI: Ctrl+C aborts a running workflow cleanly via the new signal contract.**

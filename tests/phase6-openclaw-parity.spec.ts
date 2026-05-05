@@ -272,6 +272,87 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(out.executedNodes).toEqual([]);
   });
 
+  test('lazyclaw inspect: missing state file → exit 2 with helpful stderr', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['inspect', 'nope', '--dir', path.join(dir, 'st')], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/No state for session/);
+  });
+
+  test('lazyclaw inspect: fully completed workflow → exit 1 with summary.done=true', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'tiny.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a', type: 't', async execute() { return 'A'; } },
+         { id: 'b', type: 't', async execute(input) { return input + '+B'; } },
+       ];`,
+    );
+    const stateDir = path.join(dir, 'st');
+    const r1 = runCli(['run', 'done-job', wfPath, '--dir', stateDir], dir);
+    expect(r1.status).toBe(0);
+    const r2 = runCli(['inspect', 'done-job', '--dir', stateDir], dir);
+    expect(r2.status).toBe(1);   // 1 = fully done, no resumable work
+    const out = JSON.parse(r2.stdout);
+    expect(out.summary.total).toBe(2);
+    expect(out.summary.success).toBe(2);
+    expect(out.summary.done).toBe(true);
+    expect(out.summary.resumable).toBe(false);
+    expect(out.failedNodes).toEqual([]);
+    expect(typeof out.summary.durationMs).toBe('number');
+  });
+
+  test('lazyclaw inspect: terminal failure → exit 3 with failedNodes populated', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'broken.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a', type: 't', async execute() { return 'A'; } },
+         { id: 'b', type: 't', async execute() { throw new Error('boom'); } },
+         { id: 'c', type: 't', async execute() { return 'C'; } },
+       ];`,
+    );
+    const stateDir = path.join(dir, 'st');
+    runCli(['run', 'fail-job', wfPath, '--dir', stateDir], dir);   // exit 1 expected
+    const r = runCli(['inspect', 'fail-job', '--dir', stateDir], dir);
+    expect(r.status).toBe(3);   // 3 = terminal failure
+    const out = JSON.parse(r.stdout);
+    expect(out.summary.failed).toBe(1);
+    expect(out.summary.success).toBe(1);
+    expect(out.summary.done).toBe(false);
+    expect(out.summary.resumable).toBe(false);   // failed nodes block auto-resume
+    expect(out.failedNodes).toHaveLength(1);
+    expect(out.failedNodes[0].id).toBe('b');
+    expect(out.failedNodes[0].error).toMatch(/boom/);
+  });
+
+  test('lazyclaw inspect: partially completed (resumable) → exit 0', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    // Hand-craft a state file mimicking a SIGINT'd run: one success, one
+    // pending. inspect should report exit 0 (resumable) without running
+    // any code.
+    const state = {
+      sessionId: 'partial-job',
+      order: ['a', 'b'],
+      nodes: {
+        a: { status: 'success', output: 'A', attempts: 1, durationMs: 12 },
+        b: { status: 'pending', attempts: 0 },
+      },
+      startedAt: 1, updatedAt: 2,
+    };
+    fs.writeFileSync(path.join(stateDir, 'partial-job.json'), JSON.stringify(state));
+    const r = runCli(['inspect', 'partial-job', '--dir', stateDir], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.summary.pending).toBe(1);
+    expect(out.summary.success).toBe(1);
+    expect(out.summary.resumable).toBe(true);
+    expect(out.summary.done).toBe(false);
+    expect(out.summary.durationMs).toBe(12);
+  });
+
   test('lazyclaw run SIGINT mid-flow exits 130 with aborted:true and state stays resumable', async () => {
     const dir = tmpConfigDir();
     const wfPath = path.join(dir, 'long.mjs');
