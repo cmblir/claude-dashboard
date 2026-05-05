@@ -1890,6 +1890,43 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /providers/<name> returns per-provider metadata; 404 on unknown', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      // mock is always registered.
+      const r = await fetch(`${d.url}/providers/mock`).then(x => x.json());
+      expect(r.name).toBe('mock');
+      expect(r.requiresApiKey).toBe(false);
+      expect(typeof r.docs).toBe('string');
+
+      // anthropic should also be registered with key prefix metadata.
+      const r2 = await fetch(`${d.url}/providers/anthropic`).then(x => x.json());
+      expect(r2.requiresApiKey).toBe(true);
+      expect(r2.keyPrefix).toBe('sk-ant-');
+
+      // Unknown provider → 404 with knownProviders.
+      const bad = await fetch(`${d.url}/providers/never-heard-of`);
+      expect(bad.status).toBe(404);
+      const badBody = await bad.json();
+      expect(badBody.knownProviders).toEqual(expect.arrayContaining(['mock', 'anthropic']));
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /providers/test (literal route) is not shadowed by /providers/<name>', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      // /providers/test must reach the parallel-batch handler, not
+      // the per-provider info handler (which would 404 since 'test'
+      // is not a registered provider name).
+      const r = await fetch(`${d.url}/providers/test`);
+      expect([200, 503]).toContain(r.status);
+      const body = await r.json();
+      expect(body.results).toBeDefined();   // parallel-batch shape
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /providers/test mirrors CLI parallel batch; status reflects ok/all-fail', async () => {
     const dir = tmpConfigDir();
     const d = await startDaemonProc(dir);

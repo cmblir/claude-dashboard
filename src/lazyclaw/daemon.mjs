@@ -372,6 +372,7 @@ export function makeHandler(ctx) {
       const url = new URL(req.url || '/', 'http://localhost');
       const route = `${req.method} ${url.pathname}`;
       const sessionMatch = url.pathname.match(/^\/sessions\/([^/]+)$/);
+      const providerMatch = url.pathname.match(/^\/providers\/([^/]+)$/);
       const sessionExportMatch = url.pathname.match(/^\/sessions\/([^/]+)\/export$/);
       const skillMatch = url.pathname.match(/^\/skills\/([^/]+)$/);
       const workflowMatch = url.pathname.match(/^\/workflows\/([^/]+)$/);
@@ -460,6 +461,25 @@ export function makeHandler(ctx) {
             const meta = PROVIDER_INFO[name] || { name };
             return { name, requiresApiKey: !!meta.requiresApiKey, defaultModel: meta.defaultModel || null, suggestedModels: meta.suggestedModels || [] };
           }));
+        case req.method === 'GET' && !!providerMatch && providerMatch[1] !== 'test': {
+          // GET /providers/<name> — full per-provider metadata
+          // (mirrors CLI `lazyclaw providers info <name>`).
+          // The `name !== 'test'` guard keeps `/providers/test`
+          // (parallel batch endpoint) from being intercepted here;
+          // switch-case order ensures the literal `GET /providers/test`
+          // case runs first anyway, but the guard makes the intent
+          // explicit for future readers.
+          const name = providerMatch[1];
+          const meta = PROVIDER_INFO[name];
+          if (!meta) {
+            return writeJson(res, 404, {
+              error: 'unknown provider',
+              name,
+              knownProviders: Object.keys(PROVIDERS),
+            });
+          }
+          return writeJson(res, 200, meta);
+        }
         case route === 'GET /providers/test': {
           // Mirror of CLI v3.55 `lazyclaw providers test` (no name).
           // A dashboard's "key validity" badge calls this once and

@@ -10,6 +10,53 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.57.0] — 2026-05-05
+
+**Daemon `GET /providers/<name>` — per-provider metadata.**
+
+Mirrors CLI `lazyclaw providers info <name>`. Returns the same
+metadata block (`{ name, requiresApiKey, defaultModel,
+suggestedModels, endpoint, docs, ... }`) over HTTP for symmetry
+with `/sessions/<id>` / `/skills/<name>` / `/workflows/<id>`.
+
+```
+GET /providers/anthropic
+→ 200 {
+    "name": "anthropic", "requiresApiKey": true, "keyPrefix": "sk-ant-",
+    "defaultModel": "claude-opus-4-7", ...
+  }
+
+GET /providers/never-heard-of
+→ 404 {
+    "error": "unknown provider", "name": "never-heard-of",
+    "knownProviders": ["mock", "anthropic", "openai", ...]
+  }
+```
+
+### Route precedence
+The literal `GET /providers/test` (parallel-batch endpoint from
+v3.56) is registered *before* the regex matcher, AND the regex
+case has an explicit `name !== 'test'` guard — belt + suspenders
+to keep `/providers/test` from being shadowed even if a future
+refactor reorders cases.
+
+### `knownProviders` on 404
+Same self-describing pattern as v3.42's `/workflows/<id>?node=`
+and v3.53's `/workflows/aggregate?node=`: the 404 body lists
+every registered provider name so a UI can offer
+"did you mean ...?" without a second request.
+
+### Tests
+2 new phase 6 specs:
+- `GET /providers/mock` and `/providers/anthropic` return
+  full metadata with the expected requiresApiKey + keyPrefix
+  fields; unknown provider returns 404 with knownProviders
+- `GET /providers/test` is NOT shadowed by the per-provider
+  handler (regression guard for the route-precedence concern)
+
+Suite: 387 → 389 (+2); `tsc --noEmit` clean.
+
+---
 ## [3.56.0] — 2026-05-05
 
 **Daemon `GET /providers/test` mirrors CLI v3.55 parallel batch.**
