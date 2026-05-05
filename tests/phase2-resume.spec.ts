@@ -252,6 +252,52 @@ test.describe('Phase 2 — Auto-resume', () => {
     expect(executed).toBe(false);  // refused before scheduling
   });
 
+  test('runPersistentDag: per-node retry recovers from a flaky execute() within a single run', async () => {
+    const dir = tmpDir('pdag-retry');
+    const sid = 'retry-1';
+    let bAttempt = 0;
+    const nodes = [
+      { id: 'a', deps: [],    async execute() { return 'A'; } },
+      {
+        id: 'b',
+        deps: ['a'],
+        retry: { max: 2, baseDelayMs: 1 },
+        async execute(input: any) {
+          bAttempt += 1;
+          if (bAttempt < 2) throw new Error('flaky-attempt-' + bAttempt);
+          return `B:${input.a}`;
+        },
+      },
+    ];
+    const r = await runPersistentDag(nodes, { sessionId: sid, dir });
+    expect(r.success).toBe(true);
+    expect(bAttempt).toBe(2);   // 1 fail + 1 success — retry recovered
+    const s = loadState(sid, dir)!;
+    expect(s.nodes.b.status).toBe('success');
+    expect(s.nodes.b.output).toBe('B:A');
+  });
+
+  test('runPersistentDag: per-node retry exhaustion still marks failed and is resumable', async () => {
+    const dir = tmpDir('pdag-retry-exhaust');
+    const sid = 'exhaust-1';
+    const nodes = [
+      {
+        id: 'b',
+        deps: [],
+        retry: { max: 2, baseDelayMs: 1 },
+        async execute() { throw new Error('always-fails'); },
+      },
+    ];
+    const r = await runPersistentDag(nodes, { sessionId: sid, dir });
+    expect(r.success).toBe(false);
+    expect(r.failedAt).toBe('b');
+    expect(r.error).toMatch(/always-fails/);
+    // State persisted as 'failed' so a second runPersistentDag call retries
+    // the node from scratch (resume-level retry, separate from node.retry).
+    const s = loadState(sid, dir)!;
+    expect(s.nodes.b.status).toBe('failed');
+  });
+
   test('runPersistentDag: state file demotes "running" → "pending" on resume so an interrupted level retries', async () => {
     const dir = tmpDir('pdag-interrupted');
     const sid = 'crash-1';

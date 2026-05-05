@@ -10,6 +10,37 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.4.1] — 2026-05-05
+
+**`runPersistentDag` honors `node.retry` too.**
+
+3.4.0 added per-node retry to `runSequential` and `runParallel`.
+This extends the same `node.retry: { max, baseDelayMs }` field to
+the persistent DAG engine — so resumable workflows get both retry
+modes:
+
+- **`node.retry`** — recover transient faults *within* one run
+  (network blip, sub-process race) without flipping disk state to
+  failed
+- **Resume** — recover catastrophic faults *across* runs (process
+  killed mid-level, host rebooted) by re-invoking `runPersistentDag`
+  with the same session id
+
+The two compose: a node with `retry: {max: 3}` that fails all 3
+attempts is persisted as `failed`. A future invocation re-runs it
+from scratch with another fresh `retry` budget.
+
+### Tests
+2 new phase 2 specs:
+- per-node retry recovers within one run: 1 fail + 1 success →
+  `r.success: true`, state.b.status = success, b.output flows to
+  downstream nodes
+- retry exhaustion: 3 attempts all throw → state.b.status = failed,
+  failedAt: 'b', error message preserved — resumable on a future call
+
+Suite: 255/255. tsc clean.
+
+---
 ## [3.4.0] — 2026-05-05
 
 **Workflow: per-node retry policy with exponential backoff.**

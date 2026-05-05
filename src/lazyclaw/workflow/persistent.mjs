@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { topologicalLevels } from './executor.mjs';
+import { topologicalLevels, retryWithBackoff } from './executor.mjs';
 
 const DEFAULT_DIR = '.workflow-state';
 
@@ -255,8 +255,19 @@ export async function runPersistentDag(nodes, opts) {
       state.nodes[id] = { status: 'running', attempts: (ns.attempts ?? 0) + 1 };
       saveState(state, dir);
       const t0 = performance.now();
+      // Wrap each execute() in retryWithBackoff when node.retry is set.
+      // The retry budget lives entirely *inside* this attempt — outer
+      // resume semantics are unchanged: a level failure still flips
+      // node status to 'failed' on disk, and a future runPersistentDag
+      // call retries it from scratch (resume-level retry, separate from
+      // node.retry). This composition gives users two distinct knobs:
+      //   - node.retry  → recover transient faults within one run
+      //   - resume      → recover catastrophic faults across runs
+      const fn = () => runWithTimeout(() => node.execute(input), opts.timeoutMs);
       try {
-        const output = await runWithTimeout(() => node.execute(input), opts.timeoutMs);
+        const output = node.retry && Number.isFinite(node.retry.max) && node.retry.max > 0
+          ? await retryWithBackoff(fn, node.retry)
+          : await fn();
         const durationMs = performance.now() - t0;
         state.nodes[id] = { status: 'success', output, attempts: state.nodes[id].attempts, durationMs };
         saveState(state, dir);
