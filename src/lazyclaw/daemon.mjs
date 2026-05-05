@@ -135,6 +135,19 @@ function writeJson(res, status, obj, extraHeaders = {}) {
   res.end(body);
 }
 
+// Has the cumulative cost in any capped currency reached the cap?
+// Returns the offending currency + amount + cap so the caller can
+// surface it cleanly, or null when no cap is breached.
+function checkCostCap(metrics, costCap) {
+  if (!costCap) return null;
+  for (const [cur, cap] of Object.entries(costCap)) {
+    if (!Number.isFinite(cap) || cap <= 0) continue;
+    const spent = metrics.costsByCurrency[cur] || 0;
+    if (spent >= cap) return { currency: cur, spent: Math.round(spent * 1_000_000) / 1_000_000, cap };
+  }
+  return null;
+}
+
 // Bump per-handler metrics from a single request's cost+usage. Keys
 // cost by currency so heterogeneous fleets (USD-priced anthropic, EUR
 // regional contracts) don't silently sum mismatched numbers. Tokens
@@ -237,6 +250,7 @@ function isOriginAllowed(req, allowedOrigins) {
  *   rateLimit?: { capacity?: number, refillPerSec?: number } | null,
  *   responseCache?: { maxEntries?: number, ttlMs?: number } | true | null,
  *   logger?: ReturnType<typeof createLogger> | null,
+ *   costCap?: Record<string, number> | null,
  * }} ctx
  */
 export function makeHandler(ctx) {
@@ -250,6 +264,12 @@ export function makeHandler(ctx) {
         refillPerSec: ctx.rateLimit.refillPerSec,
       })
     : null;
+  // Cost cap: ctx.costCap = { USD: 1.50, EUR: 0.80, ... }. When the
+  // cumulative cost in any listed currency reaches its cap, /chat and
+  // /agent reject with 402 Payment Required. Other routes (/version,
+  // /metrics, etc.) stay reachable so monitoring still works after the
+  // cap fires. Empty/missing → unlimited (the historical default).
+  const costCap = ctx.costCap && typeof ctx.costCap === 'object' ? ctx.costCap : null;
   // Per-handler cache map — populated lazily as requests opt in via
   // body.cache. Shared across requests so the second identical call
   // actually hits. We attach the configured opts so the lazy init
@@ -527,6 +547,18 @@ export function makeHandler(ctx) {
           }
         }
         case route === 'POST /chat': {
+          // Cost-cap gate: short-circuit before parsing the body so the
+          // 402 fires fast and we don't pay for body buffering on a
+          // request we're refusing.
+          const breach = checkCostCap(metrics, costCap);
+          if (breach) {
+            return writeJson(res, 402, {
+              error: 'cost cap exceeded',
+              currency: breach.currency,
+              spent: breach.spent,
+              cap: breach.cap,
+            });
+          }
           // Full message-array input, single response (or stream). Useful when
           // the caller already has a message history and doesn't want to use
           // the disk-persisted session model.
@@ -601,6 +633,15 @@ export function makeHandler(ctx) {
           }
         }
         case route === 'POST /agent': {
+          const breach = checkCostCap(metrics, costCap);
+          if (breach) {
+            return writeJson(res, 402, {
+              error: 'cost cap exceeded',
+              currency: breach.currency,
+              spent: breach.spent,
+              cap: breach.cap,
+            });
+          }
           const body = await readJson(req);
           const cfg = ctx.readConfig();
           const provName = body.provider || cfg.provider || 'mock';
@@ -771,6 +812,7 @@ export function gracefulShutdown(server, timeoutMs) {
  *   rateLimit?: { capacity?: number, refillPerSec?: number } | null,
  *   responseCache?: { maxEntries?: number, ttlMs?: number } | true | null,
  *   logger?: ReturnType<typeof createLogger> | null,
+ *   costCap?: Record<string, number> | null,
  * }} opts
  * @returns {Promise<{ port: number, server: http.Server, close: () => Promise<void> }>}
  */

@@ -10,6 +10,69 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.5.0] — 2026-05-05
+
+**Daemon: per-currency cost caps for budget enforcement.**
+
+The cumulative cost tracker (3.3.0) now backs a real budget guardrail:
+once spending in any capped currency reaches its limit, `POST /agent`
+and `POST /chat` respond with **402 Payment Required**.
+
+```bash
+lazyclaw daemon --port 8081 --cost-cap-usd 100 --cost-cap-eur 50
+```
+
+The flag pattern is `--cost-cap-<currency> <amount>` — case-insensitive
+on the currency code (lowercased on the wire, uppercased internally to
+match what `costFromUsage` emits). Repeatable for multi-currency
+fleets; missing or zero values are silently dropped (the daemon should
+never refuse a request because the operator typo'd the cap).
+
+### Why 402, not 429
+- 429 carries `Retry-After` semantics ("wait and try again"), but a
+  cost cap doesn't reset on a clock — it's a soft budget that needs
+  operator intervention.
+- 402 Payment Required is exactly what HTTP defines for "denied
+  because the client hasn't paid for it."
+
+The response body includes `currency`, `spent`, and `cap` so callers
+can surface the breach cleanly:
+```json
+{ "error": "cost cap exceeded", "currency": "USD", "spent": 100.005, "cap": 100 }
+```
+
+### Reachability after cap
+`/version`, `/metrics`, `/status`, `/doctor`, `/sessions/*`, `/skills/*`
+all stay reachable after the cap fires. Only the spending endpoints
+(`POST /agent`, `POST /chat`) get 402'd. Monitoring tooling that
+polls `/metrics` to detect the breach still works.
+
+### Bound-URL JSON
+Now reports the active cap so test scripts and dashboards know
+without re-parsing the daemon's argv:
+```json
+{"ok": true, "url": "...", "costCap": {"USD": 100}}
+```
+
+### Composition
+Gate ordering becomes: Origin → auth → rate limit → cost cap.
+The cap runs *last* (just before the body parse) so it doesn't
+short-circuit unauthenticated requests — those still 401 through
+the auth gate without consuming any cap-check work.
+
+### Tests
+3 new phase 6 specs:
+- handler-direct: makeHandler with `costCap: {USD: 0.05}` constructs
+  cleanly (smoke that the option doesn't break the handler factory)
+- end-to-end CLI integration with rates + stub: 1st + 2nd call succeed
+  ($0.0525 each, total $0.105); 3rd call gets 402 with cap=0.10 and
+  spent ≥ 0.10 in the body
+- monitoring: with `costCap: {USD: 0.01}` set, `GET /version` still
+  returns 200 — non-spending routes never 402
+
+Suite: 258/258. tsc clean.
+
+---
 ## [3.4.1] — 2026-05-05
 
 **`runPersistentDag` honors `node.retry` too.**

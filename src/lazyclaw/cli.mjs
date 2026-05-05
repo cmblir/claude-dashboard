@@ -510,7 +510,7 @@ const HELP_DETAILS = {
   sessions: 'Usage: lazyclaw sessions <list|show <id>|clear <id>|export <id>>\n  list — recent sessions by mtime; export — render as Markdown for sharing.',
   skills: 'Usage: lazyclaw skills <list|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>>\n  --from-url fetches over HTTPS only; 1 MiB body cap.',
   providers: 'Usage: lazyclaw providers <list|info <name>>\n  Static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.',
-  daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>] [--shutdown-timeout-ms <N>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).\n  --shutdown-timeout-ms <N> caps graceful drain on SIGINT/SIGTERM (default 10000). Second signal forces immediate exit.',
+  daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>] [--shutdown-timeout-ms <N>] [--cost-cap-<currency> <N> ...]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).\n  --shutdown-timeout-ms <N> caps graceful drain on SIGINT/SIGTERM (default 10000). Second signal forces immediate exit.\n  --cost-cap-usd 100 (or any currency code in lowercase) rejects POST /agent + /chat with 402 once cumulative cost reaches the cap.',
   version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
   export: 'Usage: lazyclaw export [--include-secrets] [--include-sessions] > bundle.json\n  --include-secrets keeps the raw api-key in the bundle (default redacts it).\n  --include-sessions adds full turn content (default keeps metadata only).',
@@ -950,6 +950,19 @@ async function cmdDaemon(flags) {
   const logLevel = flags.log || process.env.LAZYCLAW_LOG_LEVEL || null;
   const { createLogger } = await import('./logger.mjs');
   const logger = logLevel ? createLogger({ level: logLevel }) : null;
+  // Cost cap parsing: any --cost-cap-<currency> <amount> flag pair
+  // contributes one entry to the costCap map. Currency codes are upper-
+  // cased to match what costFromUsage's rate cards produce. Bad/zero
+  // values are silently skipped — the daemon should never reject a
+  // request because the operator typo'd the limit.
+  const costCap = {};
+  for (const [k, v] of Object.entries(flags)) {
+    if (!k.startsWith('cost-cap-')) continue;
+    const cur = k.slice('cost-cap-'.length).toUpperCase();
+    const amt = Number(v);
+    if (Number.isFinite(amt) && amt > 0) costCap[cur] = amt;
+  }
+  const costCapOrNull = Object.keys(costCap).length > 0 ? costCap : null;
   const cfgDir = path.dirname(configPath());
   const d = await startDaemon({
     port: Number.isFinite(port) ? port : 0,
@@ -963,6 +976,7 @@ async function cmdDaemon(flags) {
     rateLimit,
     responseCache,
     logger,
+    costCap: costCapOrNull,
   });
   // Print the bound port immediately so test/script callers can pick it up
   // even when we asked for port 0. Indicate auth presence (not the token)
@@ -975,6 +989,7 @@ async function cmdDaemon(flags) {
     rateLimit: rateLimit ? { capacity: rateLimit.capacity, refillPerSec: rateLimit.refillPerSec } : null,
     responseCache: !!responseCache,
     log: logLevel || null,
+    costCap: costCapOrNull,
   }) + '\n');
   if (!once) {
     // Forward SIGINT/SIGTERM to a graceful shutdown with a hard timeout
