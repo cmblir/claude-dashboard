@@ -556,16 +556,33 @@ export function makeHandler(ctx) {
           }
           if (!state) return writeJson(res, 404, { error: 'workflow not found', sessionId: sid });
           const { summary, failedNodes } = summarizeState(state);
-          return writeJson(res, 200, {
-            sessionId: state.sessionId,
-            dir: stateDir,
-            summary,
-            failedNodes,
-            order: state.order,
-            nodes: state.nodes,
-            startedAt: state.startedAt,
-            updatedAt: state.updatedAt,
-          });
+          // ?summary=true trims the per-node `nodes` map and `order`
+          // array, matching v3.17's CLI `inspect --summary` shape and
+          // the per-session shape that list-mode produces. A UI fetching
+          // this endpoint to render a status badge doesn't want the
+          // full per-node payload — `?summary=true` keeps the wire
+          // small for high-frequency polls.
+          const compact = url.searchParams.get('summary') === 'true';
+          const body = compact
+            ? {
+                sessionId: state.sessionId,
+                dir: stateDir,
+                summary,
+                failedNodes,
+                startedAt: state.startedAt,
+                updatedAt: state.updatedAt,
+              }
+            : {
+                sessionId: state.sessionId,
+                dir: stateDir,
+                summary,
+                failedNodes,
+                order: state.order,
+                nodes: state.nodes,
+                startedAt: state.startedAt,
+                updatedAt: state.updatedAt,
+              };
+          return writeJson(res, 200, body);
         }
         case route === 'GET /skills': {
           // List installed skills with their first-line summary so a UI

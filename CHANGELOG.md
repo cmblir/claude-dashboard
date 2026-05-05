@@ -10,6 +10,33 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.22.0] — 2026-05-05
+
+**Daemon `GET /workflows/<id>?summary=true` mirrors CLI `--summary`.**
+
+Same trimming as v3.17's CLI flag: a UI fetching this endpoint to
+render a status badge doesn't want the per-node payload. The
+trimmed shape matches the per-session shape that list-mode
+already produces, so a single client renderer handles both.
+
+```
+GET /workflows/my-job              → full state (nodes + order included)
+GET /workflows/my-job?summary=true → summary + failedNodes + timestamps only
+```
+
+### Strict literal opt-in
+The flip happens only on `?summary=true` (exact string). `?summary=1`,
+`?summary=yes`, `?summary=on` keep the full payload — no implicit
+truthy coercion. Same conservative pattern as the rest of the API
+so a UI's encoding bug can't silently drop fields.
+
+### Tests
+1 new phase 6 spec covering the trim, preservation of summary +
+failedNodes + timestamps, and the literal-only opt-in.
+
+Suite: 307 → 308 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.21.0] — 2026-05-05
 
 **`lazyclaw validate <workflow.mjs>` — static check before run.**

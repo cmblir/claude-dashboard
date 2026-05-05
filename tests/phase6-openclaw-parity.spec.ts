@@ -1220,6 +1220,45 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /workflows/<id>?summary=true trims per-node detail (mirrors CLI --summary)', async () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'wf-comp');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job',
+      order: ['a', 'b', 'c'],
+      nodes: {
+        a: { status: 'success', output: 'A', attempts: 1, durationMs: 5 },
+        b: { status: 'success', output: 'B', attempts: 1, durationMs: 7 },
+        c: { status: 'pending', attempts: 0 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const d = await startDaemonProc(dir, ['--workflow-state-dir', stateDir]);
+    try {
+      // Default: full payload includes nodes + order.
+      const full = await fetch(`${d.url}/workflows/job`).then(x => x.json());
+      expect(full.nodes).toBeDefined();
+      expect(full.order).toEqual(['a', 'b', 'c']);
+
+      // ?summary=true trims them; summary + failedNodes + timestamps preserved.
+      const compact = await fetch(`${d.url}/workflows/job?summary=true`).then(x => x.json());
+      expect(compact.nodes).toBeUndefined();
+      expect(compact.order).toBeUndefined();
+      expect(compact.summary.total).toBe(3);
+      expect(compact.summary.success).toBe(2);
+      expect(compact.summary.pending).toBe(1);
+      expect(compact.failedNodes).toEqual([]);
+      expect(compact.startedAt).toBe(1);
+      expect(compact.updatedAt).toBe(2);
+
+      // Anything other than literal 'true' = full payload (only the
+      // exact string flips it; ?summary=1 / yes / on stay full).
+      const r1 = await fetch(`${d.url}/workflows/job?summary=1`).then(x => x.json());
+      expect(r1.nodes).toBeDefined();
+    } finally { await d.kill(); }
+  });
+
   test('daemon DELETE /workflows/<id> is idempotent (200 on existing AND missing)', async () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'wf-del');
