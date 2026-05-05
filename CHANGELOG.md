@@ -10,6 +10,61 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.54.0] — 2026-05-05
+
+**Aggregate adds p50 / p95 / p99 percentiles per node.**
+
+`avg` is the wrong metric for diagnosing slow nodes — a single 30-
+second outlier can drag a 100-call average that's actually fast on
+the other 99 calls. Tail percentiles tell the real story:
+
+```
+$ lazyclaw inspect --aggregate
+{
+  "nodeStats": {
+    "embed": {
+      "count": 1000,
+      "avgDurationMs": 412.5,        ← skewed by tail
+      "minDurationMs": 80,
+      "maxDurationMs": 30000,
+      "p50DurationMs": 240,           ← typical run
+      "p95DurationMs": 1850,          ← occasional slow
+      "p99DurationMs": 12500,         ← tail (the problem)
+      "totalDurationMs": 412500
+    }
+  }
+}
+```
+
+A user diagnosing "embed feels slow" can now see: typical run is
+240 ms, but 1% of runs take 12 seconds. That's a tail-latency
+problem, not an average-latency problem — different fix.
+
+### Algorithm — nearest-rank percentile
+Standard "nearest-rank method" (Wikipedia: Percentile / nearest-
+rank): `idx = ceil(p * n) - 1` over a sorted ascending array.
+Empty array returns 0.
+
+This is the same definition used by Prometheus, ELK, and most
+ops tooling — so a user piping these numbers into Grafana sees
+consistent values.
+
+### Both surfaces
+The CLI `lazyclaw inspect --aggregate` and daemon
+`GET /workflows/aggregate` both gain the new fields with no
+schema break (additive). The shared `aggregateNodeStats` function
+in `workflow/summary.mjs` is the single source of truth.
+
+### Tests
+3 new phase 6 specs:
+- 100-session distribution: p50/p95/p99 land at 500/950/990 over
+  10–1000 ms range (verifies algorithm correctness)
+- single-value population: all percentiles equal that value
+- pending-only nodes (no duration recorded): all percentiles are 0
+
+Suite: 379 → 382 (+3); `tsc --noEmit` clean.
+
+---
 ## [3.53.0] — 2026-05-05
 
 **Daemon `GET /workflows/aggregate?node=<id>` mirrors CLI v3.52.**

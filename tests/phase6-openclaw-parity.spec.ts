@@ -496,6 +496,71 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(out.failedNodes[0].error).toMatch(/boom/);
   });
 
+  test('lazyclaw inspect --aggregate: percentiles (p50/p95/p99) reflect distribution', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    // 100 sessions with the same node — durations 10, 20, 30, ..., 1000.
+    // p50 = ~500, p95 = ~950, p99 = ~990.
+    for (let i = 1; i <= 100; i++) {
+      fs.writeFileSync(path.join(stateDir, `r${i}.json`), JSON.stringify({
+        sessionId: `r${i}`, order: ['fetch'],
+        nodes: { fetch: { status: 'success', durationMs: i * 10 } },
+        startedAt: 1, updatedAt: 2,
+      }));
+    }
+    const r = runCli(['inspect', '--dir', stateDir, '--aggregate'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.sessionCount).toBe(100);
+    const fetch = out.nodeStats.fetch;
+    expect(fetch.count).toBe(100);
+    expect(fetch.minDurationMs).toBe(10);
+    expect(fetch.maxDurationMs).toBe(1000);
+    expect(fetch.avgDurationMs).toBe(505);             // (10+1000)/2
+    // Nearest-rank percentile: p50 = ceil(0.5*100) = 50th value = 500.
+    expect(fetch.p50DurationMs).toBe(500);
+    expect(fetch.p95DurationMs).toBe(950);
+    expect(fetch.p99DurationMs).toBe(990);
+  });
+
+  test('lazyclaw inspect --aggregate: percentiles on a single value all equal that value', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'r1.json'), JSON.stringify({
+      sessionId: 'r1', order: ['fetch'],
+      nodes: { fetch: { status: 'success', durationMs: 42 } },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['inspect', '--dir', stateDir, '--aggregate'], dir);
+    const fetch = JSON.parse(r.stdout).nodeStats.fetch;
+    expect(fetch.minDurationMs).toBe(42);
+    expect(fetch.maxDurationMs).toBe(42);
+    expect(fetch.p50DurationMs).toBe(42);
+    expect(fetch.p95DurationMs).toBe(42);
+    expect(fetch.p99DurationMs).toBe(42);
+  });
+
+  test('lazyclaw inspect --aggregate: nodes with no recorded durations get 0 across percentiles', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'r1.json'), JSON.stringify({
+      sessionId: 'r1', order: ['pending-only'],
+      nodes: { 'pending-only': { status: 'pending' } },     // no durationMs
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['inspect', '--dir', stateDir, '--aggregate'], dir);
+    const stat = JSON.parse(r.stdout).nodeStats['pending-only'];
+    expect(stat.count).toBe(1);
+    expect(stat.pendingCount).toBe(1);
+    expect(stat.minDurationMs).toBe(0);
+    expect(stat.p50DurationMs).toBe(0);
+    expect(stat.p95DurationMs).toBe(0);
+    expect(stat.p99DurationMs).toBe(0);
+  });
+
   test('lazyclaw inspect --aggregate: per-node stats across every session', () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'st');

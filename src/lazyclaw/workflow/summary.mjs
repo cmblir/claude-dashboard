@@ -96,6 +96,9 @@ export function summarizeState(state) {
  *   minDurationMs: number,
  *   maxDurationMs: number,
  *   avgDurationMs: number,
+ *   p50DurationMs: number,
+ *   p95DurationMs: number,
+ *   p99DurationMs: number,
  *   totalDurationMs: number,
  * }> }}
  */
@@ -135,20 +138,34 @@ export function aggregateNodeStats(dir, opts = {}) {
   }
   /** @type {Record<string, ReturnType<typeof aggregateNodeStats>['nodeStats'][string]>} */
   const nodeStats = {};
+  // Nearest-rank percentile: ceil(p * n) gives the 1-indexed
+  // position; subtract 1 for 0-indexed array access. Standard
+  // definition (cf. Wikipedia "Percentile / Nearest-rank method").
+  // Empty array → 0 by convention.
+  const percentile = (sorted, p) => {
+    if (sorted.length === 0) return 0;
+    const idx = Math.max(0, Math.ceil(p * sorted.length) - 1);
+    return sorted[Math.min(idx, sorted.length - 1)];
+  };
   for (const id of Object.keys(accumulator)) {
     const slot = accumulator[id];
     const durations = slot.durations;
+    const sorted = [...durations].sort((a, b) => a - b);
     const total = durations.reduce((s, x) => s + x, 0);
+    const r2 = (n) => Math.round(n * 100) / 100;
     nodeStats[id] = {
       count: slot.count,
       successCount: slot.successCount,
       failedCount: slot.failedCount,
       pendingCount: slot.pendingCount,
       runningCount: slot.runningCount,
-      minDurationMs: durations.length ? Math.min(...durations) : 0,
-      maxDurationMs: durations.length ? Math.max(...durations) : 0,
-      avgDurationMs: durations.length ? Math.round((total / durations.length) * 100) / 100 : 0,
-      totalDurationMs: Math.round(total * 100) / 100,
+      minDurationMs: sorted.length ? sorted[0] : 0,
+      maxDurationMs: sorted.length ? sorted[sorted.length - 1] : 0,
+      avgDurationMs: sorted.length ? r2(total / sorted.length) : 0,
+      p50DurationMs: r2(percentile(sorted, 0.5)),
+      p95DurationMs: r2(percentile(sorted, 0.95)),
+      p99DurationMs: r2(percentile(sorted, 0.99)),
+      totalDurationMs: r2(total),
     };
   }
   return { sessionCount, nodeStats };
