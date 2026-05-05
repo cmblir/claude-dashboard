@@ -357,10 +357,44 @@ function toast(msg, kind='info') {
   div.className = `lc-toast lc-toast-${kind}`;
   // v2.33.5 — err/warn 토스트는 📋 복사 버튼 + 긴 표시 시간 (디버깅 편의)
   const isFailure = kind === 'err' || kind === 'warn';
+  // QQ223 — Bug: the previous version embedded JSON.stringify(msg)
+  // directly into a double-quoted onclick attribute, so the JSON's
+  // own double quotes terminated the attribute mid-statement. The
+  // browser then parsed the rest as broken HTML attributes —
+  // "b.textContent", "1200", etc. — so the click handler never
+  // ran and the visible attribute value showed the wreckage. Fix:
+  // HTML-encode every double quote in the embedded JSON literal so
+  // it stays inside the attribute value. Also keep the click bound
+  // imperatively (data-msg + addEventListener via _bindCopyBtn) as
+  // an extra layer of safety against future quoting regressions.
+  const msgAttr = JSON.stringify(String(msg))
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;');
   const copyBtn = isFailure
-    ? `<button class="btn-ghost btn text-[11px] px-2 py-0.5 ml-2" onclick="(function(b){try{navigator.clipboard.writeText(${JSON.stringify(String(msg))});b.textContent='✓';setTimeout(()=>b.textContent='📋',1200);}catch{}})(this)" title="${t('복사')}" aria-label="${t('복사')}">📋</button>`
+    ? `<button class="btn-ghost btn text-[11px] px-2 py-0.5 ml-2" data-toast-copy="${msgAttr}" title="${t('복사')}" aria-label="${t('복사')}">📋</button>`
     : '';
   div.innerHTML = `<span>${({info:'ℹ️', ok:'✅', err:'❌', warn:'⚠️'})[kind]||'ℹ️'}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(msg)}</span>${copyBtn}`;
+  // QQ223 — bind copy handler imperatively. data-toast-copy holds
+  // the JSON-encoded message; we parse it back at click time so
+  // arbitrary quotes/backticks survive without poisoning HTML.
+  if (isFailure) {
+    const cb = div.querySelector('button[data-toast-copy]');
+    if (cb) {
+      cb.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        let raw;
+        try { raw = JSON.parse(cb.getAttribute('data-toast-copy') || '""'); }
+        catch (_) { raw = ''; }
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(raw);
+          }
+          cb.textContent = '✓';
+          setTimeout(() => { try { cb.textContent = '📋'; } catch (_) {} }, 1200);
+        } catch (_) { /* best-effort */ }
+      });
+    }
+  }
   _translateDOM(div);
   document.getElementById('toast').appendChild(div);
   const holdMs = isFailure ? 6000 : 2600;
@@ -373,6 +407,27 @@ const _ESC_HTML_MAP = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => _ESC_HTML_MAP[ch]);
+}
+
+// QQ223 — embed a JS expression value into an inline HTML attribute
+// (e.g. onclick="...") safely. JSON.stringify gives us a valid JS
+// literal; HTML-entity-encode the resulting quotes so they stay
+// inside the attribute regardless of whether the attribute is
+// wrapped in `"` or `'`. We also escape `<` so a `</script>` inside
+// the literal can't terminate the parent script context if this is
+// ever rendered inside a <script> block instead of an attribute.
+//
+// Use this anywhere you previously wrote `${JSON.stringify(x)}`
+// inside an onclick / oninput / etc. attribute. The toast copy
+// button (line ~360) was the canonical bug: JSON's outer `"`s
+// terminated the onclick attribute, leaving `b.textContent=", 1200"`
+// as visible HTML wreckage in the user's browser.
+function _jsAttr(v) {
+  return JSON.stringify(v)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;');
 }
 
 // O1 (v2.66.0) — render an email with the local part redacted by default.
@@ -5328,7 +5383,7 @@ async function _wfRunSingleNode(nid) {
         </div>
         <pre style="background:var(--code-bg);border:1px solid var(--border);padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto;">${escapeHtml(String(out))}</pre>
         <div class="flex gap-2 mt-3">
-          <button class="btn text-xs" onclick="navigator.clipboard.writeText(${JSON.stringify(String(out))}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
+          <button class="btn text-xs" onclick="navigator.clipboard.writeText(${JSON.stringify(String(out)).replace(/"/g,'&quot;')}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
         </div>
       </div>
     </div>`;
@@ -5363,7 +5418,7 @@ window._wfShowNodeOutputModal = function _wfShowNodeOutputModal(nid) {
         </div>
         <pre style="background:var(--code-bg);border:1px solid var(--border);padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;${isErr?'color:#fca5a5;':''}">${escapeHtml(outText)}</pre>
         <div class="flex gap-2 mt-3">
-          <button class="btn text-xs" onclick="navigator.clipboard.writeText(${JSON.stringify(outText)}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
+          <button class="btn text-xs" onclick="navigator.clipboard.writeText(${JSON.stringify(outText).replace(/"/g,'&quot;')}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
           <span class="text-[10px] text-[var(--text-dim)] self-center">${outText.length.toLocaleString()} ${t('자')}</span>
         </div>
       </div>
@@ -6283,7 +6338,7 @@ function _wfRenderInspector(opts) {
             <summary class="text-[10px] cursor-pointer select-none" style="color:var(--text-dim);user-select:none;">📄 ${t('출력')} · ${outText.length.toLocaleString()} ${t('자')}</summary>
             <pre class="text-[10px] mt-1 max-h-32 overflow-auto" style="white-space:pre-wrap;word-break:break-word;${outColor}">${escapeHtml(outPreview)}${outOverflow ? '…' : ''}</pre>
             <div class="flex gap-1 mt-1">
-              <button class="btn text-[10px]" onclick="navigator.clipboard.writeText(${JSON.stringify(outText)}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
+              <button class="btn text-[10px]" onclick="navigator.clipboard.writeText(${JSON.stringify(outText).replace(/"/g,'&quot;')}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
               ${outOverflow ? `<button class="btn text-[10px]" onclick="_wfShowNodeOutputModal('${n.id}')">⬆ ${t('전체 보기')}</button>` : ''}
             </div>
           </details>` : '';
@@ -16642,7 +16697,7 @@ async function openRalphRecommend(cwd) {
       </div>
       <textarea id="ralphRecPrompt" rows="14" class="input text-xs" style="font-family:ui-monospace,monospace;">${escapeHtml(rec.promptMd || '')}</textarea>
       <div class="flex items-center gap-2 mt-3">
-        <label class="text-[11px]"><input type="checkbox" id="ralphRecPolish" ${state.data._ralphPolish?'checked':''} onclick="state.data._ralphPolish=this.checked;openRalphRecommend(${JSON.stringify(cwd)})"> ${t('LLM 다듬기')}</label>
+        <label class="text-[11px]"><input type="checkbox" id="ralphRecPolish" ${state.data._ralphPolish?'checked':''} onclick="state.data._ralphPolish=this.checked;openRalphRecommend(${JSON.stringify(cwd).replace(/"/g,'&quot;')})"> ${t('LLM 다듬기')}</label>
         <label class="text-[11px] flex-1">${t('Max iter')}
           <input id="ralphRecMax" type="number" value="25" min="1" max="200" class="input text-xs" style="width:72px;">
         </label>
@@ -16650,7 +16705,7 @@ async function openRalphRecommend(cwd) {
           <input id="ralphRecBudget" type="number" value="5" min="0.01" max="100" step="0.5" class="input text-xs" style="width:72px;">
         </label>
         <button class="chip text-[10px]" onclick="closeModal()">${t('취소')}</button>
-        <button class="chip text-[10px]" onclick="_ralphRecStart(${JSON.stringify(cwd)})">🚀 ${t('Ralph 시작')}</button>
+        <button class="chip text-[10px]" onclick="_ralphRecStart(${JSON.stringify(cwd).replace(/"/g,'&quot;')})">🚀 ${t('Ralph 시작')}</button>
       </div>
     `, { title: '' });
   } catch (e) {
@@ -16826,9 +16881,9 @@ function renderProjectDetail(d) {
         <h2 class="text-xl font-bold truncate">${escapeHtml(d.name)}</h2>
         <div class="text-xs mono text-[var(--text-mute)] truncate mt-1">${escapeHtml(d.cwd)}</div>
         <div class="flex flex-wrap gap-2 mt-3">
-          <button class="chip cursor-pointer hover:brightness-125" style="background:${scoreColor(st.avgScore)}22; color:${scoreColor(st.avgScore)}" onclick="openScoreDetail({cwd: ${JSON.stringify(d.cwd)}})" title="점수 계산식 상세">★ 평균 ${st.avgScore}</button>
+          <button class="chip cursor-pointer hover:brightness-125" style="background:${scoreColor(st.avgScore)}22; color:${scoreColor(st.avgScore)}" onclick="openScoreDetail({cwd: ${JSON.stringify(d.cwd).replace(/"/g,'&quot;')}})" title="점수 계산식 상세">★ 평균 ${st.avgScore}</button>
           <button class="chip cursor-pointer hover:brightness-125" onclick="scrollToSessions()" title="세션 리스트로 스크롤">📊 세션 ${st.sessionCount}</button>
-          <button class="chip cursor-pointer hover:brightness-125" onclick='openToolBreakdown(${JSON.stringify(d.cwd)})' title="도구 사용 드릴다운">🛠 도구 ${st.totalTools}</button>
+          <button class="chip cursor-pointer hover:brightness-125" onclick='openToolBreakdown(${JSON.stringify(d.cwd).replace(/'/g,"&#39;")})' title="도구 사용 드릴다운">🛠 도구 ${st.totalTools}</button>
           <span class="chip" title="프로젝트에 정의된 .claude/agents/*.md 파일 수">📂 정의 에이전트 ${(r.agents||[]).length}</span>
           <button class="chip chip-accent cursor-pointer hover:brightness-125" onclick='openAgentBreakdown(${JSON.stringify(d.cwd)})' title="세션에서 Agent 도구로 위임된 총 횟수 (통계 탭 참고)">🤝 위임 호출 ${st.totalAgents}</button>
           ${st.totalErrors ? `<span class="chip chip-err">❌ ${st.totalErrors}</span>`:''}
@@ -23170,7 +23225,7 @@ function _ccrRenderAlias() {
         ${present ? `<span class="ml-2" style="color:var(--ok);">✓ ${t('이미 적용됨')}</span>` : `<span class="ml-2" style="color:var(--text-mute);">${t('아직 적용되지 않음')}</span>`}
       </div>
       <pre class="mono text-xs p-3 rounded whitespace-pre-wrap" style="background:var(--code-bg);">${_ccrEsc(snippet)}</pre>
-      <button class="btn text-xs mt-2" onclick="_ccrCopy(${JSON.stringify(snippet)}, this)">📋 ${t('복사')}</button>
+      <button class="btn text-xs mt-2" onclick="_ccrCopy(${JSON.stringify(snippet).replace(/"/g,'&quot;')}, this)">📋 ${t('복사')}</button>
       <div class="text-[11px] text-[var(--text-mute)] mt-3">${t('위 블록을 RC 파일에 추가한 뒤 새 터미널을 여세요.')}</div>
       <div class="text-[11px] text-[var(--text-mute)] mt-2">${t('다른 옵션')}: <code class="mono">${_ccrEsc(alt)}</code></div>
     </div>`;

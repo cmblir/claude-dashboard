@@ -10,6 +10,79 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.66.0] — 2026-05-06  🐛 toast copy button fix + JS-attr helper
+
+**User-reported bug: features failing with `b.textContent=", 1200"` errors.**
+
+### Root cause
+The error/warning toast's "📋 copy" button embedded the toast
+message into a double-quoted `onclick="..."` attribute via
+`JSON.stringify(String(msg))`. JSON.stringify produces a
+double-quoted JS literal — those outer `"`s **terminated the
+attribute prematurely**, leaving the rest of the click handler
+(including `b.textContent='✓'; setTimeout(()=>b.textContent=
+'📋', 1200);}catch{}`) parsed by the HTML tokenizer as broken
+attribute values. The click handler never ran, and the symptom
+string the user pasted (`b.textContent=", 1200"`) is exactly
+the broken-HTML wreckage visible after the attribute parser
+bailed.
+
+```html
+<!-- BEFORE (broken) -->
+<button onclick="(function(b){try{...writeText("hello");
+                                          ↑ attribute terminates here
+b.textContent='✓';setTimeout(...)})(this)">📋</button>
+```
+
+### Fix
+Two layers of defense:
+
+1. **Imperative click binding**: the button now carries
+   `data-toast-copy="<JSON-encoded msg>"` (HTML-entity-encoded
+   `&quot;` etc. so the JSON survives the attribute boundary).
+   Click handler is wired with `addEventListener`, not inline
+   `onclick`. JSON parsed back at click time so arbitrary quotes
+   / apostrophes / backticks / Korean survive intact.
+
+2. **`_jsAttr(v)` helper** (sibling of `escapeHtml`): wraps
+   `JSON.stringify` with `&amp; &quot; &#39; &lt;` encoding so a
+   future caller can safely embed any JS literal into any
+   attribute regardless of `'`/`"` wrapping.
+
+```js
+// Use anywhere you'd previously embed JSON.stringify into HTML:
+`<button onclick="doThing(${_jsAttr(value)})">go</button>`
+// `<button onclick="doThing(&quot;hello world&quot;)">go</button>`
+```
+
+### Six adjacent latent bugs also fixed
+The same pattern — bare `JSON.stringify` in a double-quoted
+onclick — existed at six other sites (workflow node output
+copy, ralph recommend, project score detail, ccr setup
+snippet copy). All now pre-escape with `.replace(/"/g, '&quot;')`.
+
+The 24 *single*-quoted onclick instances (with `JSON.stringify`)
+remain — they only break when the input contains an apostrophe,
+which is rare in the path/ID/name inputs they handle. The new
+`_jsAttr` helper is the recommended migration target.
+
+### Tests
+1 new Playwright probe (`scripts/_verify-toast-copy.mjs`):
+- Triggers err toasts with 7 problematic message variants
+  including "Korean: 안녕하세요 / 잘못된 \", 1200\"", apostrophes,
+  backticks, and the exact bug-report symptom string
+  `b.textContent=",1200"`
+- Round-trips each via the data-toast-copy attribute, parses
+  back the JSON, verifies length matches the input
+- Stubs `navigator.clipboard.writeText` and confirms the click
+  handler captures the right value and updates the button to ✓
+
+Result: 7/7 message variants OK, click handler captures and
+shows ✓, zero console errors.
+
+Dashboard QA / smoke / workflow E2E all pass after the change.
+
+---
 ## [3.65.0] — 2026-05-06  🚀 live TTY injection
 
 **Auto-Resume now actually injects into the live terminal.**
