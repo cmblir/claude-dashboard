@@ -1371,6 +1371,80 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon /metrics accumulates tokens + costs across requests with body.cost', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'anthropic'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-ant-x'], dir);
+    runCli(['config', 'set', 'model', 'claude-opus-4-7'], dir);
+    runCli([
+      'rates', 'set', 'anthropic/claude-opus-4-7',
+      '--input', '15', '--output', '75', '--currency', 'USD',
+    ], dir);
+    // Stub anthropic so each call emits known usage.
+    const preload = path.join(dir, 'preload.mjs');
+    fs.writeFileSync(preload,
+      `import('${path.resolve('src/lazyclaw/providers/registry.mjs')}').then(reg => {
+        reg.PROVIDERS.anthropic = {
+          name: 'anthropic',
+          async *sendMessage(_msgs, opts) {
+            yield 'r';
+            opts.onUsage?.({ inputTokens: 1000, outputTokens: 500 });
+          },
+        };
+      });`,
+    );
+    const child = spawn(process.execPath, ['--import', preload, CLI, 'daemon', '--port', '0'], {
+      env: { ...process.env, LAZYCLAW_CONFIG_DIR: dir },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const url: string = await new Promise((resolve, reject) => {
+      let buf = '';
+      child.stdout.on('data', d => {
+        buf += d.toString();
+        const nl = buf.indexOf('\n');
+        if (nl < 0) return;
+        try { resolve(JSON.parse(buf.slice(0, nl)).url); } catch (e) { reject(e); }
+      });
+      setTimeout(() => reject(new Error('boot')), 5000);
+    });
+    try {
+      // Three requests with body.usage + body.cost.
+      for (let i = 0; i < 3; i++) {
+        await fetch(`${url}/agent`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ prompt: 'q', usage: true, cost: true }),
+        });
+      }
+      const r = await fetch(`${url}/metrics`);
+      const m = await r.json();
+      // 3 × (1000 in + 500 out) = (3000, 1500)
+      expect(m.tokensTotal).toEqual({ inputTokens: 3000, outputTokens: 1500 });
+      // 3 × $0.0525 = $0.1575
+      expect(m.costsByCurrency.USD).toBe(0.1575);
+    } finally {
+      await new Promise<void>(r => { child.once('close', () => r()); child.kill('SIGTERM'); });
+    }
+  });
+
+  test('daemon /metrics tokensTotal/costsByCurrency stay zero / empty without body.usage', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      // Drive a request without usage/cost opt-in.
+      await fetch(`${d.url}/agent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'q' }),
+      });
+      const r = await fetch(`${d.url}/metrics`);
+      const m = await r.json();
+      expect(m.tokensTotal).toEqual({ inputTokens: 0, outputTokens: 0 });
+      expect(m.costsByCurrency).toEqual({});
+    } finally { await d.kill(); }
+  });
+
   test('daemon /metrics surfaces cache hits/misses when --response-cache is on', async () => {
     const dir = tmpConfigDir();
     runCli(['config', 'set', 'provider', 'mock'], dir);

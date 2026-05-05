@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.3.0] — 2026-05-05
+
+**Daemon `/metrics`: cumulative `tokensTotal` and `costsByCurrency`.**
+
+The metrics endpoint counted requests/cache; now it also accumulates
+the token and money totals from every request that opted in to
+`body.cost`:
+
+```json
+{
+  "uptimeMs": 12345,
+  "requestsTotal": 42,
+  "requestsByStatus": { "200": 38, "404": 3, "429": 1 },
+  "rateLimitDenied": 1,
+  "cache": { "hits": 5, "misses": 8, "size": 8 },
+  "tokensTotal": { "inputTokens": 12000, "outputTokens": 4500 },
+  "costsByCurrency": { "USD": 0.0525, "EUR": 0.012 },
+  "timestamp": "..."
+}
+```
+
+### Per-currency keys (anti-silent-mix)
+Heterogeneous fleets — USD-priced anthropic + EUR regional contracts —
+shouldn't silently sum into a single number that's neither correct.
+Costs are always keyed by currency, which means `costsByCurrency.USD`
+is what costs USD totalled, not "all costs interpreted as USD."
+
+### Fields always present (stable schema)
+`tokensTotal` is `{inputTokens: 0, outputTokens: 0}` and
+`costsByCurrency` is `{}` when no request has provided the data —
+never null/undefined. Monitoring tooling sees a stable shape
+regardless of which optional features the daemon has on.
+
+### Six-decimal rounding
+Same rounding as `costFromUsage` so a single per-request cost and
+the cumulative total share precision. No drift from IEEE-754 over
+many small additions.
+
+### Tests
+2 new phase 6 specs:
+- 3 requests × (1000 in, 500 out) at $15/$75 per million → `tokensTotal`
+  exactly `{3000, 1500}` and `costsByCurrency.USD` exactly `0.1575`
+- request without body.usage/body.cost → `tokensTotal` stays
+  `{0, 0}` and `costsByCurrency` stays `{}`
+
+Suite: 249/249. tsc clean. Dashboard QA still 0/66.
+
+---
 ## [3.2.0] — 2026-05-05
 
 **`lazyclaw rates` subcommand for managing cost-card config.**

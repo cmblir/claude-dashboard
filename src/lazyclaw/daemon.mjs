@@ -135,6 +135,21 @@ function writeJson(res, status, obj, extraHeaders = {}) {
   res.end(body);
 }
 
+// Bump per-handler metrics from a single request's cost+usage. Keys
+// cost by currency so heterogeneous fleets (USD-priced anthropic, EUR
+// regional contracts) don't silently sum mismatched numbers. Tokens
+// are unit-free → single counter.
+function accumulateMetricsFromCost(metrics, usage, cost) {
+  if (cost && Number.isFinite(cost.cost)) {
+    const cur = cost.currency || 'USD';
+    metrics.costsByCurrency[cur] = (metrics.costsByCurrency[cur] || 0) + cost.cost;
+  }
+  if (usage) {
+    if (Number.isFinite(usage.inputTokens)) metrics.tokensTotal.inputTokens += usage.inputTokens;
+    if (Number.isFinite(usage.outputTokens)) metrics.tokensTotal.outputTokens += usage.outputTokens;
+  }
+}
+
 // Map provider error codes to HTTP statuses so clients can branch on
 // res.status instead of parsing error messages. Returns
 // { status, headers? } so 429 can attach a Retry-After.
@@ -250,6 +265,12 @@ export function makeHandler(ctx) {
     requestsTotal: 0,
     requestsByStatus: /** @type {Record<string, number>} */({}),
     rateLimitDenied: 0,
+    // Cumulative cost across all requests that produced a `cost` block.
+    // Keyed by currency so a heterogeneous fleet (USD-priced anthropic,
+    // EUR-priced regional contract) doesn't silently sum mismatched
+    // numbers. Tokens are unit-free so we keep them in a single counter.
+    costsByCurrency: /** @type {Record<string, number>} */({}),
+    tokensTotal: { inputTokens: 0, outputTokens: 0 },
   };
   return async function handler(req, res) {
     // Capture method+path before any handler logic runs; req.url survives
@@ -341,12 +362,25 @@ export function makeHandler(ctx) {
               }
             }
           }
+          // Cumulative tokens / cost — meaningful only when callers used
+          // body.usage / body.cost. The fields are always present (zero
+          // by default) so monitoring tooling sees a stable schema.
+          const tokensTotal = { ...metrics.tokensTotal };
+          const costs = {};
+          for (const [cur, n] of Object.entries(metrics.costsByCurrency)) {
+            // Round to six decimals here too, matching costFromUsage's
+            // precision so monitoring deltas line up with per-request
+            // breakdowns.
+            costs[cur] = Math.round(n * 1_000_000) / 1_000_000;
+          }
           return writeJson(res, 200, {
             uptimeMs: Date.now() - metrics.startedAtMs,
             requestsTotal: metrics.requestsTotal,
             requestsByStatus: metrics.requestsByStatus,
             rateLimitDenied: metrics.rateLimitDenied,
             cache: cachedByName ? { hits: cacheHits, misses: cacheMisses, size: cacheSize } : null,
+            tokensTotal,
+            costsByCurrency: costs,
             timestamp: new Date().toISOString(),
           });
         }
@@ -524,10 +558,12 @@ export function makeHandler(ctx) {
           const computeCost = () => {
             if (!body.cost || !captured || !cfg.rates) return null;
             try {
-              return costFromUsage(
+              const c = costFromUsage(
                 { provider: provName, model: body.model || cfg.model, usage: captured },
                 cfg.rates,
               );
+              if (c) accumulateMetricsFromCost(metrics, captured, c);
+              return c;
             } catch { return null; }
           };
           if (body.stream === true) {
@@ -610,10 +646,12 @@ export function makeHandler(ctx) {
           const computeAgentCost = () => {
             if (!body.cost || !agentCaptured || !cfg.rates) return null;
             try {
-              return costFromUsage(
+              const c = costFromUsage(
                 { provider: provName, model, usage: agentCaptured },
                 cfg.rates,
               );
+              if (c) accumulateMetricsFromCost(metrics, agentCaptured, c);
+              return c;
             } catch { return null; }
           };
 
