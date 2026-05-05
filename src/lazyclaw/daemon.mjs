@@ -370,6 +370,7 @@ export function makeHandler(ctx) {
       const url = new URL(req.url || '/', 'http://localhost');
       const route = `${req.method} ${url.pathname}`;
       const sessionMatch = url.pathname.match(/^\/sessions\/([^/]+)$/);
+      const sessionExportMatch = url.pathname.match(/^\/sessions\/([^/]+)\/export$/);
       const skillMatch = url.pathname.match(/^\/skills\/([^/]+)$/);
       const workflowMatch = url.pathname.match(/^\/workflows\/([^/]+)$/);
       switch (true) {
@@ -530,6 +531,42 @@ export function makeHandler(ctx) {
             }
           }
           return writeJson(res, 200, { query: q, regex: useRegex, matches });
+        }
+        case req.method === 'GET' && !!sessionExportMatch: {
+          // GET /sessions/<id>/export?format=md|json|text — same body
+          // the CLI's `lazyclaw sessions export <id> --format ...`
+          // produces, with the appropriate content-type. The dashboard
+          // can offer a "download as ..." button without spawning the
+          // CLI.
+          const id = sessionExportMatch[1];
+          try {
+            const cfgDir = ctx.sessionsDirGetter();
+            const file = ctx.sessionsMod.sessionPath(id, cfgDir);
+            if (!(await fileExists(file))) return writeJson(res, 404, { error: 'session not found', id });
+            const fmt = (url.searchParams.get('format') || 'md').toLowerCase();
+            const FORMATS = {
+              md:       { fn: ctx.sessionsMod.exportMarkdown, mime: 'text/markdown; charset=utf-8' },
+              markdown: { fn: ctx.sessionsMod.exportMarkdown, mime: 'text/markdown; charset=utf-8' },
+              json:     { fn: ctx.sessionsMod.exportJson,     mime: 'application/json; charset=utf-8' },
+              text:     { fn: ctx.sessionsMod.exportText,     mime: 'text/plain; charset=utf-8' },
+              txt:      { fn: ctx.sessionsMod.exportText,     mime: 'text/plain; charset=utf-8' },
+            };
+            const f = FORMATS[fmt];
+            if (!f) {
+              return writeJson(res, 400, {
+                error: `unknown format: ${fmt}`,
+                expected: ['md', 'json', 'text'],
+              });
+            }
+            const body = f.fn(id, cfgDir);
+            res.writeHead(200, {
+              'content-type': f.mime,
+              'content-length': Buffer.byteLength(body),
+            });
+            return res.end(body);
+          } catch (err) {
+            return writeJson(res, 400, { error: err?.message || String(err) });
+          }
         }
         case req.method === 'GET' && !!sessionMatch: {
           // GET /sessions/<id> — full turn log. Returns 404 when missing

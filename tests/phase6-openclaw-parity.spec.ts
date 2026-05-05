@@ -1431,6 +1431,49 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /sessions/<id>/export?format=... mirrors CLI exporter (md/json/text)', async () => {
+    const dir = tmpConfigDir();
+    fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sessions', 'demo.jsonl'),
+      JSON.stringify({ role: 'user', content: 'hello', ts: 1234567890000 }) + '\n' +
+      JSON.stringify({ role: 'assistant', content: 'hi there', ts: 1234567891000 }) + '\n');
+
+    const d = await startDaemonProc(dir);
+    try {
+      // Default format = markdown.
+      const r1 = await fetch(`${d.url}/sessions/demo/export`);
+      expect(r1.status).toBe(200);
+      expect(r1.headers.get('content-type')).toMatch(/text\/markdown/);
+      expect(await r1.text()).toContain('# Session: demo');
+
+      // JSON format.
+      const r2 = await fetch(`${d.url}/sessions/demo/export?format=json`);
+      expect(r2.status).toBe(200);
+      expect(r2.headers.get('content-type')).toMatch(/application\/json/);
+      const body = await r2.json();
+      expect(body.id).toBe('demo');
+      expect(body.turnCount).toBe(2);
+
+      // Text format.
+      const r3 = await fetch(`${d.url}/sessions/demo/export?format=text`);
+      expect(r3.status).toBe(200);
+      expect(r3.headers.get('content-type')).toMatch(/text\/plain/);
+      const text = await r3.text();
+      expect(text).toContain('USER:');
+      expect(text).not.toContain('# Session');   // not markdown
+
+      // Unknown format → 400 with expected list.
+      const r4 = await fetch(`${d.url}/sessions/demo/export?format=pdf`);
+      expect(r4.status).toBe(400);
+      const r4body = await r4.json();
+      expect(r4body.expected).toEqual(['md', 'json', 'text']);
+
+      // Missing session → 404.
+      const r5 = await fetch(`${d.url}/sessions/never-existed/export`);
+      expect(r5.status).toBe(404);
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /sessions/search mirrors CLI sessions search', async () => {
     const dir = tmpConfigDir();
     fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });

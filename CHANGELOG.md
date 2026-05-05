@@ -10,6 +10,43 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.32.0] — 2026-05-05
+
+**Daemon `GET /sessions/<id>/export?format=md|json|text` mirrors CLI.**
+
+Same three formats as v3.31's CLI flag, with appropriate
+content-type headers so a dashboard's "download as ..." button
+works without a CLI shell-out.
+
+```
+GET /sessions/demo/export                  → text/markdown
+GET /sessions/demo/export?format=json      → application/json
+GET /sessions/demo/export?format=text      → text/plain
+GET /sessions/demo/export?format=pdf       → 400 with expected: [md, json, text]
+GET /sessions/never-existed/export         → 404
+```
+
+### Content-type per format
+- `md` / `markdown` → `text/markdown; charset=utf-8`
+- `json` → `application/json; charset=utf-8`
+- `text` / `txt` → `text/plain; charset=utf-8`
+
+A browser fetch can plug the response body straight into the right
+viewer or a download blob with the correct MIME — no client-side
+content-type guess needed.
+
+### Validation
+Unknown format → `400` with `expected: [md, json, text]` so a UI
+can surface "the server doesn't know that format" without
+silently falling back. Missing session → `404` with `id`.
+
+### Tests
+1 new phase 6 spec covering all three formats with content-type
+verification + 400/404 paths in a single end-to-end run.
+
+Suite: 336 → 337 (+1); `tsc --noEmit` clean.
+
+---
 ## [3.31.0] — 2026-05-05
 
 **`lazyclaw sessions export --format md|json|text`.**
