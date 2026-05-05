@@ -10,6 +10,45 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.38.0] — 2026-05-05
+
+**Daemon `GET /rates` — read-only view of configured rate cards.**
+
+A dashboard's cost panel can now render the configured rate
+cards without shelling to the CLI. Read-only by design — rate-
+card edits go through the CLI (`lazyclaw rates set/copy/...`)
+because they're operator-curated and deliberate, not the kind of
+thing that should be editable from a browser at the same trust
+boundary as a chat message.
+
+```
+GET /rates
+→ 200 {
+    "anthropic/claude-opus-4-7": { "inputPer1M": 15, "outputPer1M": 75, ... },
+    "openai/gpt-4.1": { "inputPer1M": 2, "outputPer1M": 8, "currency": "USD" }
+  }
+
+GET /rates                          # no rates configured
+→ 200 {}                            # not 404 — empty config is a valid state
+```
+
+### Why GET only
+The daemon is local-loopback by default but can be exposed
+behind auth + Origin gates. Even there, rate-card edits are a
+high-trust operation that shouldn't be a single bearer-token away
+— the CLI keeps that surface honest. A future change can add
+write endpoints once we have signed admin tokens, but for now
+read-only is the principled default.
+
+### Tests
+2 new phase 6 specs:
+- `GET /rates` returns the configured rate cards (round-trip
+  with CLI `rates set`)
+- `GET /rates` with no rates configured returns `{}` (not 404)
+
+Suite: 348 → **350** (+2); `tsc --noEmit` clean.
+
+---
 ## [3.37.0] — 2026-05-05
 
 **`lazyclaw rates copy <src> <dst> [--force]`.**

@@ -446,6 +446,15 @@ export function makeHandler(ctx) {
             const meta = PROVIDER_INFO[name] || { name };
             return { name, requiresApiKey: !!meta.requiresApiKey, defaultModel: meta.defaultModel || null, suggestedModels: meta.suggestedModels || [] };
           }));
+        case route === 'GET /rates': {
+          // Read-only view of cfg.rates so a dashboard's cost panel
+          // can render the configured cards without shelling to the
+          // CLI. No write surface exposed — rate-card edits go
+          // through the CLI (operator-curated, deliberate).
+          const cfg = ctx.readConfig();
+          const rates = cfg.rates && typeof cfg.rates === 'object' ? cfg.rates : {};
+          return writeJson(res, 200, rates);
+        }
         case route === 'GET /status': {
           const cfg = ctx.readConfig();
           return writeJson(res, 200, {

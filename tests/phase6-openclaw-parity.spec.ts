@@ -1469,6 +1469,29 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d.kill(); }
   });
 
+  test('daemon GET /rates returns the configured rate cards (read-only)', async () => {
+    const dir = tmpConfigDir();
+    runCli(['rates', 'set', 'anthropic/claude-opus-4-7', '--input', '15', '--output', '75'], dir);
+    runCli(['rates', 'set', 'openai/gpt-4.1', '--input', '2', '--output', '8'], dir);
+
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/rates`).then(x => x.json());
+      expect(r['anthropic/claude-opus-4-7']).toMatchObject({ inputPer1M: 15, outputPer1M: 75 });
+      expect(r['openai/gpt-4.1']).toMatchObject({ inputPer1M: 2, outputPer1M: 8 });
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /rates with no rates configured returns {} (not 404)', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/rates`);
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({});
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /sessions?filter=&limit= mirrors CLI sessions list flags', async () => {
     const dir = tmpConfigDir();
     fs.mkdirSync(path.join(dir, 'sessions'), { recursive: true });
