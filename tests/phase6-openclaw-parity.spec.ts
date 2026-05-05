@@ -270,6 +270,62 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(state.nodes.merge.output).toBe('B:A+C:A');
   });
 
+  test('lazyclaw resume --parallel-persistent picks up a failed DAG run from state', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'flaky.mjs');
+    // Sentinel file: first attempt at b throws; second attempt succeeds.
+    const sentinel = path.join(dir, 'attempt');
+    fs.writeFileSync(wfPath,
+      `import fs from 'node:fs';
+       export const nodes = [
+         { id: 'a', deps: [],    async execute() { return 'A'; } },
+         { id: 'b', deps: ['a'], async execute(input) {
+             const n = (() => { try { return parseInt(fs.readFileSync(${JSON.stringify(sentinel)}, 'utf8'), 10) || 0; } catch { return 0; } })();
+             fs.writeFileSync(${JSON.stringify(sentinel)}, String(n + 1));
+             if (n === 0) throw new Error('flaky-first-attempt');
+             return 'B:' + input.a;
+         } },
+         { id: 'c', deps: ['b'], async execute(input) { return 'C:' + input.b; } },
+       ];`,
+    );
+    const stateDir = path.join(dir, 'st');
+
+    // Initial run with --parallel-persistent fails at b.
+    const r1 = runCli(['run', 'flaky', wfPath, '--parallel-persistent', '--dir', stateDir], dir);
+    expect(r1.status).toBe(1);
+    const o1 = JSON.parse(r1.stdout);
+    expect(o1.failedAt).toBe('b');
+
+    // Resume with --parallel-persistent → DAG engine picks up state,
+    // skips a (success), retries b (now passes), runs c.
+    const r2 = runCli(['resume', 'flaky', wfPath, '--parallel-persistent', '--dir', stateDir], dir);
+    expect(r2.status).toBe(0);
+    const o2 = JSON.parse(r2.stdout);
+    expect(o2.success).toBe(true);
+    expect(o2.mode).toBe('parallel-persistent');
+    expect(o2.resumed).toBe(true);
+    expect(o2.executedNodes.sort()).toEqual(['b', 'c']);
+  });
+
+  test('lazyclaw resume (no flag) defaults to sequential — backward-compatible behavior', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'flow.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a', type: 't', async execute() { return 'A'; } },
+         { id: 'b', type: 't', async execute(input) { return input + '+B'; } },
+       ];`,
+    );
+    const stateDir = path.join(dir, 'st');
+    // Initial sequential run completes. State file written.
+    runCli(['run', 'seq', wfPath, '--dir', stateDir], dir);
+    const r = runCli(['resume', 'seq', wfPath, '--dir', stateDir], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.mode).toBe('sequential');
+    expect(out.resumed).toBe(true);
+  });
+
   test('lazyclaw run --parallel-persistent resumes after a flaky failure', () => {
     const dir = tmpConfigDir();
     const wfPath = path.join(dir, 'flaky.mjs');

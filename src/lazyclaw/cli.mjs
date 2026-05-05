@@ -397,7 +397,7 @@ async function cmdGraph(file, opts = {}) {
 }
 
 async function cmdResume(sessionId, file, opts = {}) {
-  const { runPersistent, loadState } = await loadEngine();
+  const { runPersistent, runPersistentDag, loadState } = await loadEngine();
   const dir = opts.dir || '.workflow-state';
   const prior = loadState(sessionId, dir);
   if (!prior) {
@@ -407,12 +407,34 @@ async function cmdResume(sessionId, file, opts = {}) {
   const nodes = await importWorkflow(file);
   const sig = makeRunSignal();
   try {
+    // --parallel-persistent picks the DAG engine. Sequential by default
+    // — same flag the run command uses, so the resume invocation
+    // mirrors the original run invocation. (We can't auto-detect the
+    // engine from the state file alone; both engines write the same
+    // shape. The user knows which mode they originally ran.)
+    if (opts['parallel-persistent']) {
+      const r = await runPersistentDag(nodes, {
+        sessionId, dir, timeoutMs: opts.timeoutMs,
+        signal: sig.signal, concurrency: opts.concurrency,
+      });
+      console.log(JSON.stringify({
+        success: r.success,
+        executedNodes: r.executedNodes || [],
+        failedAt: r.failedAt || null,
+        resumed: true,
+        mode: 'parallel-persistent',
+        aborted: r.code === 'ABORT' || sig.wasAborted() || undefined,
+        error: r.error || null,
+      }));
+      process.exit(exitCodeFor(r, sig));
+    }
     const r = await runPersistent(nodes, { sessionId, dir, maxRetries: opts.maxRetries ?? 3, signal: sig.signal });
     console.log(JSON.stringify({
       success: r.success,
       executedNodes: r.executedNodes,
       failedAt: r.failedAt,
       resumed: true,
+      mode: 'sequential',
       aborted: r.code === 'ABORT' || sig.wasAborted() || undefined,
     }));
     process.exit(exitCodeFor(r, sig));
@@ -864,7 +886,7 @@ const HELP_SUMMARIES = {
 // strings so the help output is identical in every terminal.
 const HELP_DETAILS = {
   run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent] [--concurrency <N>]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  --concurrency <N>: cap in-flight nodes within a level (DAG modes only). 0/missing → unbounded.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
-  resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
+  resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs> [--parallel-persistent] [--concurrency <N>]\n  Re-enters a previously persisted run; succeeds nodes are skipped.\n  Pass --parallel-persistent to resume a DAG run (must match the original run\'s mode).\n  --concurrency <N>: cap in-flight nodes per level (DAG mode only).',
   inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
   validate: 'Usage: lazyclaw validate <workflow.mjs>\n  Static check: load + shape + dep + cycle + parallelism estimate.\n  Exit 0 valid · 1 hard failure (issues populated) · 2 file/import error.',
@@ -1823,8 +1845,15 @@ async function main() {
     }
     case 'resume': {
       const [sessionId, file] = rest.positional;
-      if (!sessionId || !file) { console.error('Usage: lazyclaw resume <session-id> <workflow.mjs>'); process.exit(2); }
-      await cmdResume(sessionId, file, { dir: rest.flags.dir });
+      if (!sessionId || !file) { console.error('Usage: lazyclaw resume <session-id> <workflow.mjs> [--parallel-persistent] [--concurrency <N>]'); process.exit(2); }
+      const concurrency = rest.flags.concurrency !== undefined
+        ? Math.max(0, parseInt(rest.flags.concurrency, 10) || 0)
+        : undefined;
+      await cmdResume(sessionId, file, {
+        dir: rest.flags.dir,
+        'parallel-persistent': !!rest.flags['parallel-persistent'],
+        concurrency,
+      });
       break;
     }
     case 'inspect': {

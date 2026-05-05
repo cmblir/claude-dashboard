@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.27.0] — 2026-05-05
+
+**`lazyclaw resume --parallel-persistent` — DAG resume parity.**
+
+Bug fix: `cmdResume` previously always called the sequential
+`runPersistent` engine, even for state files that had been written
+by `runPersistentDag`. With a multi-level DAG that failed mid-run,
+sequential resume would re-run nodes in array order — potentially
+violating dep semantics if downstream nodes depended on
+intermediate state.
+
+Now `lazyclaw resume <session> <flow.mjs> --parallel-persistent`
+dispatches to `runPersistentDag`, picking up the same DAG state
+the original run wrote. The flag mirrors the original `run`
+invocation — the user knows which mode they ran with, and the
+engines write the same on-disk shape so detection from state
+alone isn't possible.
+
+```
+$ lazyclaw run flaky-job ./flow.mjs --parallel-persistent
+{"success":false,"failedAt":"b","executedNodes":["a"],"mode":"parallel-persistent"}
+
+$ lazyclaw resume flaky-job ./flow.mjs --parallel-persistent
+{"success":true,"executedNodes":["b","c"],"resumed":true,"mode":"parallel-persistent"}
+```
+
+### Sequential resume unchanged
+Without the flag, resume defaults to `runPersistent` — same
+behavior as v3.26 and earlier. Backward-compatible.
+
+### `--concurrency` honored
+`--concurrency <N>` is forwarded to the DAG resume just like the
+initial run command. So a fan-out workflow that wants to bound
+in-flight nodes during resume can do so the same way.
+
+### Output shape
+Adds a `mode` field to the resume output (`'sequential'` or
+`'parallel-persistent'`) so a script that calls both can branch.
+
+### Tests
+2 new phase 6 specs:
+- `--parallel-persistent` resume picks up a failed DAG run, skips
+  succeeded nodes, retries the flaky one, completes downstream
+- no-flag resume continues to use sequential (backward-compat)
+
+Suite: 320 → 322 (+2); `tsc --noEmit` clean.
+
+---
 ## [3.26.0] — 2026-05-05
 
 **`lazyclaw providers test <name>` — smoke-test a provider.**
