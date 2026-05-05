@@ -4,6 +4,9 @@ Thumbs.db
 *.swp
 *~
 
+# Local-only tooling state (per-machine; should never be committed)
+.claude/ralph-loop.local.md
+
 # Python
 __pycache__/
 *.pyc
