@@ -10,6 +10,52 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.37.0] — 2026-05-05
+
+**`lazyclaw rates copy <src> <dst> [--force]`.**
+
+Clone an existing rate card to a new key. Useful when a new model
+launches at the same price as an existing one — type the rates
+once, copy to other variants. Refuses to overwrite an existing
+destination unless `--force` is passed (rate cards are operator-
+curated; silent overwrite is exactly the wrong default).
+
+```
+$ lazyclaw rates copy anthropic/claude-opus-4-7 anthropic/claude-opus-4-8
+{"ok":true,"src":"anthropic/claude-opus-4-7","dst":"anthropic/claude-opus-4-8",
+ "card":{"inputPer1M":15,"outputPer1M":75,"cacheReadPer1M":1.5,"currency":"USD"}}
+
+$ lazyclaw rates copy anthropic/claude-opus-4-7 existing/key
+rates copy: destination "existing/key" already exists (pass --force to overwrite)
+[exit 1]
+
+$ lazyclaw rates copy a/b nokey            # missing slash
+Usage: lazyclaw rates copy <src-provider/model> <dst-provider/model> [--force]
+[exit 2]
+```
+
+### Implementation
+Deep clone via `JSON.parse(JSON.stringify(...))` — small object,
+clear "no shared references after copy" semantic. So a later
+`rates set` on the source doesn't accidentally mutate the
+destination through prototype sharing.
+
+### Exit codes
+- `0` clone succeeded
+- `1` source missing OR destination exists without `--force`
+- `2` malformed key shape (no slash) on either argument
+
+### Tests
+5 new phase 6 specs:
+- happy path: clone produces matching rates, source unchanged
+- destination exists → exit 1 (no `--force`)
+- `--force` overwrites correctly
+- missing source → exit 1 with helpful stderr
+- malformed key (no slash) → exit 2 with usage line
+
+Suite: 343 → 348 (+5); `tsc --noEmit` clean.
+
+---
 ## [3.36.0] — 2026-05-05
 
 **`lazyclaw inspect --filter / --limit` (CLI + daemon).**

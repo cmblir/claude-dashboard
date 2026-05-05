@@ -721,7 +721,7 @@ const SUBCOMMAND_SUBS = {
   sessions:  ['list', 'show', 'clear', 'export', 'search'],
   skills:    ['list', 'show', 'install', 'remove', 'search'],
   providers: ['list', 'info', 'test'],
-  rates:     ['list', 'set', 'delete', 'shape', 'validate'],
+  rates:     ['list', 'set', 'delete', 'shape', 'validate', 'copy'],
   completion: ['bash', 'zsh'],
 };
 
@@ -960,7 +960,7 @@ const HELP_DETAILS = {
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
   export: 'Usage: lazyclaw export [--include-secrets] [--include-sessions] > bundle.json\n  --include-secrets keeps the raw api-key in the bundle (default redacts it).\n  --include-sessions adds full turn content (default keeps metadata only).',
   import: 'Usage: lazyclaw import [--from <path>] [--overwrite-skills] [--no-overwrite-config] [--import-sessions]\n  Reads JSON from stdin (or --from <path>). Sessions are NEVER overwritten.\n  Redacted api-keys (***REDACTED***) are dropped, never written.',
-  rates: 'Usage: lazyclaw rates <list | set <provider/model> --input <N> --output <N> [--cache-read <N>] [--cache-create <N>] [--currency USD] | delete <key> | shape | validate>\n  Rates are per million tokens. costFromUsage uses cfg.rates to compute the cost block in /usage and body.cost.\n  `shape` prints the reference template (zero-filled) you can copy into config.\n  `validate` checks the cfg.rates shape: required fields, non-negative numbers, known providers (warn-only).',
+  rates: 'Usage: lazyclaw rates <list | set <provider/model> --input <N> --output <N> [--cache-read <N>] [--cache-create <N>] [--currency USD] | delete <key> | shape | validate | copy <src> <dst> [--force]>\n  Rates are per million tokens. costFromUsage uses cfg.rates to compute the cost block in /usage and body.cost.\n  `shape` prints the reference template (zero-filled) you can copy into config.\n  `validate` checks the cfg.rates shape: required fields, non-negative numbers, known providers (warn-only).\n  `copy` clones an existing card to a new key (use when a new model launches at the same price as an old one).',
 };
 
 function cmdHelp(name) {
@@ -1524,6 +1524,38 @@ async function cmdRates(sub, positional, flags = {}) {
       console.log(JSON.stringify(mod.RATE_CARD_SHAPE, null, 2));
       return;
     }
+    case 'copy': {
+      // Clone a rate card from <src/model> to <dst/model>. Useful when
+      // a new model launches at the same price as a known one and you
+      // don't want to retype every field.
+      //
+      // Refuses to overwrite an existing destination unless --force is
+      // passed (a rate card is operator-curated; silent overwrite is
+      // exactly the wrong default).
+      const src = positional[0];
+      const dst = positional[1];
+      if (!src || !dst || !src.includes('/') || !dst.includes('/')) {
+        console.error('Usage: lazyclaw rates copy <src-provider/model> <dst-provider/model> [--force]');
+        process.exit(2);
+      }
+      const cfg = readConfig();
+      const rates = cfg.rates && typeof cfg.rates === 'object' ? cfg.rates : {};
+      if (!rates[src]) {
+        console.error(`rates copy: source key "${src}" not found in cfg.rates`);
+        process.exit(1);
+      }
+      if (rates[dst] && !flags.force) {
+        console.error(`rates copy: destination "${dst}" already exists (pass --force to overwrite)`);
+        process.exit(1);
+      }
+      // Deep clone (small object) so a later edit to one doesn't
+      // mutate the other.
+      cfg.rates = rates;
+      cfg.rates[dst] = JSON.parse(JSON.stringify(rates[src]));
+      writeConfig(cfg);
+      console.log(JSON.stringify({ ok: true, src, dst, card: cfg.rates[dst] }));
+      return;
+    }
     case 'validate': {
       // Check the shape of cfg.rates without trying to use it. Reports:
       //   - keys that don't match 'provider/model' shape
@@ -2006,6 +2038,7 @@ const BOOLEAN_FLAGS = new Set([
   'summary',      // inspect: trim per-node detail
   'regex',        // sessions search: treat query as a regex
   'lr',           // graph: emit Mermaid `graph LR` (left-right)
+  'force',        // rates copy: overwrite existing destination
 ]);
 
 function parseArgs(argv) {

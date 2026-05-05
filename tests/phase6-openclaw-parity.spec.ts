@@ -3135,6 +3135,59 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(JSON.parse(r2.stdout).removed).toBe(false);
   });
 
+  test('rates copy clones a card to a new key', () => {
+    const dir = tmpConfigDir();
+    runCli(['rates', 'set', 'anthropic/claude-opus-4-7', '--input', '15', '--output', '75', '--cache-read', '1.5'], dir);
+    const r = runCli(['rates', 'copy', 'anthropic/claude-opus-4-7', 'anthropic/claude-opus-4-8'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.dst).toBe('anthropic/claude-opus-4-8');
+    expect(out.card).toMatchObject({ inputPer1M: 15, outputPer1M: 75, cacheReadPer1M: 1.5 });
+
+    // Verify on disk via list.
+    const list = JSON.parse(runCli(['rates', 'list'], dir).stdout);
+    expect(list['anthropic/claude-opus-4-8']).toMatchObject({ inputPer1M: 15, outputPer1M: 75 });
+    // Source unchanged (deep clone, not reference share).
+    expect(list['anthropic/claude-opus-4-7']).toBeDefined();
+  });
+
+  test('rates copy refuses to overwrite without --force', () => {
+    const dir = tmpConfigDir();
+    runCli(['rates', 'set', 'a/old', '--input', '1', '--output', '2'], dir);
+    runCli(['rates', 'set', 'a/new', '--input', '99', '--output', '99'], dir);
+    const r = runCli(['rates', 'copy', 'a/old', 'a/new'], dir);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/already exists.*--force/);
+    // Destination unchanged.
+    const list = JSON.parse(runCli(['rates', 'list'], dir).stdout);
+    expect(list['a/new']).toMatchObject({ inputPer1M: 99 });
+  });
+
+  test('rates copy --force overwrites the destination', () => {
+    const dir = tmpConfigDir();
+    runCli(['rates', 'set', 'a/old', '--input', '1', '--output', '2'], dir);
+    runCli(['rates', 'set', 'a/new', '--input', '99', '--output', '99'], dir);
+    const r = runCli(['rates', 'copy', 'a/old', 'a/new', '--force'], dir);
+    expect(r.status).toBe(0);
+    const list = JSON.parse(runCli(['rates', 'list'], dir).stdout);
+    expect(list['a/new']).toMatchObject({ inputPer1M: 1, outputPer1M: 2 });   // overwritten with src values
+  });
+
+  test('rates copy: missing source → exit 1', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['rates', 'copy', 'no/such', 'a/b'], dir);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/source key.*not found/);
+  });
+
+  test('rates copy: invalid key shape → exit 2', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['rates', 'copy', 'noslash', 'a/b'], dir);
+    expect(r.status).toBe(2);
+    const r2 = runCli(['rates', 'copy', 'a/b', 'noslash'], dir);
+    expect(r2.status).toBe(2);
+  });
+
   test('rates validate: well-formed cfg.rates → exit 0 with no issues', () => {
     const dir = tmpConfigDir();
     runCli(['rates', 'set', 'anthropic/claude-opus-4-7', '--input', '15', '--output', '75', '--cache-read', '1.5', '--cache-create', '18.75'], dir);
