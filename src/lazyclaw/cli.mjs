@@ -717,7 +717,7 @@ const SUBCOMMANDS = [
 ];
 
 const SUBCOMMAND_SUBS = {
-  config:    ['get', 'set', 'list', 'delete', 'unset', 'path', 'edit'],
+  config:    ['get', 'set', 'list', 'delete', 'unset', 'path', 'edit', 'validate'],
   sessions:  ['list', 'show', 'clear', 'export', 'search'],
   skills:    ['list', 'show', 'install', 'remove', 'search'],
   providers: ['list', 'info', 'test'],
@@ -946,7 +946,7 @@ const HELP_DETAILS = {
   clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
   validate: 'Usage: lazyclaw validate <workflow.mjs>\n  Static check: load + shape + dep + cycle + parallelism estimate.\n  Exit 0 valid · 1 hard failure (issues populated) · 2 file/import error.',
   graph: 'Usage: lazyclaw graph <workflow.mjs> [--lr] [--state <session-id>] [--dir <state-dir>]\n  Emit the workflow DAG as Mermaid syntax (graph TD by default; --lr for left-right).\n  --state overlays a persisted run\'s status (success ✓ / running ⏳ / failed ✗ / pending) with classDef styling.\n  Output is paste-ready for GitHub markdown / Notion / Obsidian.',
-  config: 'Usage: lazyclaw config <get|set|list|delete|path|edit> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.',
+  config: 'Usage: lazyclaw config <get|set|list|delete|path|edit|validate> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.\n  `validate` checks the structural integrity of the whole config file (typed values, known providers, rate-card shape).',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
   agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage] [--cost]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, ...} to stderr after the response.\n  --cost adds a cost line on stderr when config.rates has a card for the active provider/model.',
   doctor: 'Usage: lazyclaw doctor\n  Validates configuration and registered providers. Exits 0 only when no issues.',
@@ -2014,6 +2014,80 @@ function cmdConfigGet(key) {
   else console.log(JSON.stringify(cfg));
 }
 
+// Structural integrity check across the whole config. Distinct from
+// `lazyclaw doctor` (runtime checks: provider available, key present
+// for the active provider). Validate is purely about *shape* — does
+// every value have the right type, is `provider` known, are rates
+// well-formed.
+//
+// Hard issues exit 1; unknown top-level keys produce warnings (kept
+// exit 0 so a forward-compatible config from a newer CLI doesn't
+// fail validate on an older CLI).
+async function cmdConfigValidate() {
+  const cfg = readConfig();
+  await ensureRegistry();
+  const issues = [];
+  const warnings = [];
+  // Known top-level keys. Anything else → warning.
+  const KNOWN_KEYS = new Set([
+    'provider', 'model', 'api-key', 'rates',
+    // Custom providers can add their own keys; user-added keys
+    // shouldn't fail validation, just get reported.
+  ]);
+  // provider: optional but if present must be in PROVIDERS.
+  if (cfg.provider !== undefined) {
+    if (typeof cfg.provider !== 'string') {
+      issues.push(`config.provider must be a string (got ${typeof cfg.provider})`);
+    } else if (!Object.prototype.hasOwnProperty.call(_registryMod.PROVIDERS, cfg.provider)) {
+      issues.push(`config.provider "${cfg.provider}" is not in registered providers (registered: ${Object.keys(_registryMod.PROVIDERS).join(', ')})`);
+    }
+  }
+  if (cfg.model !== undefined && typeof cfg.model !== 'string') {
+    issues.push(`config.model must be a string (got ${typeof cfg.model})`);
+  }
+  if (cfg['api-key'] !== undefined && typeof cfg['api-key'] !== 'string') {
+    issues.push(`config['api-key'] must be a string (got ${typeof cfg['api-key']})`);
+  }
+  // rates: reuse the same shape check `rates validate` runs. Inlined
+  // here so config validate is self-contained (no need to also run a
+  // second command).
+  if (cfg.rates !== undefined) {
+    if (typeof cfg.rates !== 'object' || cfg.rates === null || Array.isArray(cfg.rates)) {
+      issues.push(`config.rates must be an object (got ${Array.isArray(cfg.rates) ? 'array' : typeof cfg.rates})`);
+    } else {
+      for (const key of Object.keys(cfg.rates)) {
+        if (!key.includes('/')) {
+          issues.push(`config.rates["${key}"]: expected "provider/model" shape (slash required)`);
+          continue;
+        }
+        const card = cfg.rates[key];
+        if (!card || typeof card !== 'object') {
+          issues.push(`config.rates["${key}"]: value must be an object`);
+          continue;
+        }
+        for (const required of ['inputPer1M', 'outputPer1M']) {
+          const v = card[required];
+          if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
+            issues.push(`config.rates["${key}"].${required} must be a non-negative finite number (got ${JSON.stringify(v)})`);
+          }
+        }
+      }
+    }
+  }
+  for (const key of Object.keys(cfg)) {
+    if (!KNOWN_KEYS.has(key)) warnings.push(`unknown top-level key: ${key} (allowed: ${[...KNOWN_KEYS].join(', ')})`);
+  }
+  const ok = issues.length === 0;
+  console.log(JSON.stringify({
+    ok,
+    configPath: configPath(),
+    keys: Object.keys(cfg),
+    issues,
+    warnings,
+  }, null, 2));
+  process.exit(ok ? 0 : 1);
+}
+
 // Flags whose presence is the signal — they don't consume the next arg
 // even when one is available. Without this allow-list,
 // `lazyclaw run --parallel demo wf.mjs` would set `flags.parallel='demo'`
@@ -2161,8 +2235,10 @@ async function main() {
         console.log(configPath());
       } else if (sub === 'edit') {
         await cmdConfigEdit();
+      } else if (sub === 'validate') {
+        await cmdConfigValidate();
       } else {
-        console.error('Usage: lazyclaw config set|get|list|delete|path|edit <key> [value]'); process.exit(2);
+        console.error('Usage: lazyclaw config set|get|list|delete|path|edit|validate <key> [value]'); process.exit(2);
       }
       break;
     }

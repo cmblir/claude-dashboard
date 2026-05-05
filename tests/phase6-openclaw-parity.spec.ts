@@ -85,6 +85,72 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(out.workflows.running).toBe(1);
   });
 
+  test('config validate: well-formed config → exit 0 with no issues', () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    runCli(['config', 'set', 'model', 'claude-opus-4-7'], dir);
+    runCli(['rates', 'set', 'anthropic/opus', '--input', '15', '--output', '75'], dir);
+    const r = runCli(['config', 'validate'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(true);
+    expect(out.issues).toEqual([]);
+    expect(out.warnings).toEqual([]);
+  });
+
+  test('config validate: unknown provider → exit 1 with helpful issue', () => {
+    const dir = tmpConfigDir();
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
+      provider: 'never-heard-of-it',
+    }, null, 2));
+    const r = runCli(['config', 'validate'], dir);
+    expect(r.status).toBe(1);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(false);
+    expect(out.issues.some((m: string) => m.includes('not in registered providers'))).toBe(true);
+  });
+
+  test('config validate: malformed rates → exit 1 with issues', () => {
+    const dir = tmpConfigDir();
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
+      provider: 'mock',
+      rates: {
+        'anthropic/opus': { inputPer1M: -5, outputPer1M: 75 },   // negative
+        'noslashkey':     { inputPer1M: 1, outputPer1M: 1 },      // no slash
+      },
+    }, null, 2));
+    const r = runCli(['config', 'validate'], dir);
+    expect(r.status).toBe(1);
+    const out = JSON.parse(r.stdout);
+    expect(out.issues.some((m: string) => m.includes('non-negative'))).toBe(true);
+    expect(out.issues.some((m: string) => m.includes('provider/model'))).toBe(true);
+  });
+
+  test('config validate: unknown top-level key → warning, exit 0', () => {
+    const dir = tmpConfigDir();
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
+      provider: 'mock',
+      'some-future-key': true,
+    }, null, 2));
+    const r = runCli(['config', 'validate'], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.warnings.some((m: string) => m.includes('some-future-key'))).toBe(true);
+  });
+
+  test('config validate: wrong-type value → exit 1', () => {
+    const dir = tmpConfigDir();
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
+      provider: 42,                  // number, not string
+      'api-key': { not: 'a string' },
+    }, null, 2));
+    const r = runCli(['config', 'validate'], dir);
+    expect(r.status).toBe(1);
+    const out = JSON.parse(r.stdout);
+    expect(out.issues.some((m: string) => m.includes('config.provider must be a string'))).toBe(true);
+    expect(out.issues.some((m: string) => m.includes("config['api-key'] must be a string"))).toBe(true);
+  });
+
   test('doctor flags missing config as not ok', () => {
     const dir = tmpConfigDir();
     const r = runCli(['doctor'], dir);

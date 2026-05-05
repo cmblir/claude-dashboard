@@ -10,6 +10,60 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.39.0] — 2026-05-05
+
+**`lazyclaw config validate` — structural integrity check.**
+
+Distinct from `lazyclaw doctor` (runtime checks: provider available,
+key present for the active provider). `config validate` is purely
+about *shape*: every value has the right type, `provider` is in
+the registered set, rates are well-formed.
+
+Useful after hand-editing `config.json` or copying a bundle from
+another machine.
+
+```
+$ lazyclaw config validate
+{
+  "ok": true, "configPath": "...",
+  "keys": ["provider", "model", "api-key", "rates"],
+  "issues": [], "warnings": []
+}
+```
+
+### Hard issues (exit 1)
+- `config.provider` not a string OR not in registered providers
+- `config.model` not a string when set
+- `config['api-key']` not a string when set
+- `config.rates` not an object when set
+- Per-card: missing required fields, negative numbers, key without
+  slash (same checks as `lazyclaw rates validate`)
+
+### Warnings (exit 0)
+- Unknown top-level keys → reported but not a failure. So a
+  forward-compatible config from a newer CLI doesn't break
+  validate on an older CLI.
+
+### Why both validate and doctor
+- `validate` answers: "is the config file well-formed?" — fast,
+  no network, no provider probe, just types.
+- `doctor` answers: "is the runtime healthy?" — checks API keys,
+  workflow state directory, etc.
+
+A CI gate uses validate; a status dashboard polls doctor.
+
+### Tests
+5 new phase 6 specs:
+- well-formed config → exit 0, no issues, no warnings
+- unknown provider → exit 1 with "not in registered providers"
+- malformed rates (negative, no-slash) → exit 1 with multiple issues
+- unknown top-level key → warning, exit 0
+- wrong-type values (number provider, object api-key) → exit 1
+  with type-specific issues
+
+Suite: 350 → 355 (+5); `tsc --noEmit` clean.
+
+---
 ## [3.38.0] — 2026-05-05
 
 **Daemon `GET /rates` — read-only view of configured rate cards.**
