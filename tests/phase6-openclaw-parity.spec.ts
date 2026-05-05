@@ -2225,6 +2225,81 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     } finally { await d2.kill(); }
   });
 
+  test('daemon GET /config returns all config keys with api-key masked (mirrors lazyclaw config list)', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'anthropic'], dir);
+    runCli(['config', 'set', 'model', 'claude-opus-4-7'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-ant-test-key-1234567890abcdef'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/config`);
+      expect(r.status).toBe(200);
+      const body = await r.json();
+      expect(body.provider).toBe('anthropic');
+      expect(body.model).toBe('claude-opus-4-7');
+      // api-key must be present but masked (never the raw secret)
+      expect(body['api-key']).toBeTruthy();
+      expect(body['api-key']).not.toBe('sk-ant-test-key-1234567890abcdef');
+      expect(body['api-key']).toContain('*');
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /config returns {} for empty config', async () => {
+    const dir = tmpConfigDir();
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/config`);
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({});
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /config/<key> returns specific value; 404 for unknown key', async () => {
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    runCli(['config', 'set', 'api-key', 'sk-ant-test-key-abcdef'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      // known key — plain value
+      const r1 = await fetch(`${d.url}/config/provider`);
+      expect(r1.status).toBe(200);
+      const b1 = await r1.json();
+      expect(b1.key).toBe('provider');
+      expect(b1.value).toBe('mock');
+
+      // api-key — masked
+      const r2 = await fetch(`${d.url}/config/api-key`);
+      expect(r2.status).toBe(200);
+      const b2 = await r2.json();
+      expect(b2.key).toBe('api-key');
+      expect(b2.value).not.toBe('sk-ant-test-key-abcdef');
+      expect(b2.value).toContain('*');
+
+      // unknown key — 404
+      const r3 = await fetch(`${d.url}/config/no-such-key`);
+      expect(r3.status).toBe(404);
+      const b3 = await r3.json();
+      expect(b3.error).toBe('key not found');
+      expect(b3.key).toBe('no-such-key');
+    } finally { await d.kill(); }
+  });
+
+  test('daemon GET /config/validate is not shadowed by GET /config/<key> dynamic handler', async () => {
+    // Regression guard: the dynamic configKeyMatch handler must not intercept /config/validate.
+    const dir = tmpConfigDir();
+    runCli(['config', 'set', 'provider', 'mock'], dir);
+    const d = await startDaemonProc(dir);
+    try {
+      const r = await fetch(`${d.url}/config/validate`);
+      expect(r.status).toBe(200);
+      const body = await r.json();
+      expect(body.ok).toBe(true);
+      // validate response shape — must not look like the /config/<key> shape
+      expect(body.issues).toBeDefined();
+      expect(body.value).toBeUndefined();
+    } finally { await d.kill(); }
+  });
+
   test('daemon GET /rates/validate mirrors CLI; 200 ok, 422 issues', async () => {
     const dir = tmpConfigDir();
     runCli(['rates', 'set', 'anthropic/opus', '--input', '15', '--output', '75'], dir);

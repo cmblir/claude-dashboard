@@ -10,6 +10,29 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.64.0] — 2026-05-06  daemon: GET /config + GET /config/<key>
+
+Adds two new daemon read endpoints that mirror `lazyclaw config list` and
+`lazyclaw config get <key>`:
+
+- **`GET /config`** — returns all stored config keys as a JSON object.
+  The `api-key` value is automatically masked (same masking as `/status`)
+  so dashboards can inspect the active configuration without ever
+  seeing the raw secret.
+- **`GET /config/<key>`** — returns `{ key, value }` for a single config
+  key; `api-key` is masked. Responds 404 `{ error, key }` when the key
+  is absent.
+- The dynamic `GET /config/<key>` handler guards against shadowing the
+  pre-existing `GET /config/validate` literal route.
+
+### Tests
+- 4 new specs verifying: list (masked api-key), empty config (→ `{}`),
+  per-key get + 404 for unknown, and regression guard for
+  `/config/validate` not being intercepted.
+
+Suite: 394 → 398 (+4). `tsc --noEmit` clean.
+
+---
 ## [3.63.0] — 2026-05-05  🐛 user bug reports
 
 **세 가지 사용자 보고 수정.**

@@ -376,6 +376,7 @@ export function makeHandler(ctx) {
       const sessionExportMatch = url.pathname.match(/^\/sessions\/([^/]+)\/export$/);
       const skillMatch = url.pathname.match(/^\/skills\/([^/]+)$/);
       const workflowMatch = url.pathname.match(/^\/workflows\/([^/]+)$/);
+      const configKeyMatch = url.pathname.match(/^\/config\/([^/]+)$/);
       switch (true) {
         case route === 'GET /version':
           return writeJson(res, 200, { version: ctx.version(), nodeVersion: process.version, platform: `${process.platform}-${process.arch}` });
@@ -602,6 +603,28 @@ export function makeHandler(ctx) {
             issues,
             warnings,
           });
+        }
+        case route === 'GET /config': {
+          // Mirror of `lazyclaw config list`. Returns every stored key
+          // with the api-key value masked — lets a dashboard or script
+          // inspect the active configuration without shelling to the CLI.
+          const cfg = ctx.readConfig();
+          const safe = { ...cfg };
+          if (safe['api-key']) safe['api-key'] = maskApiKey(safe['api-key']);
+          return writeJson(res, 200, safe);
+        }
+        case req.method === 'GET' && !!configKeyMatch && configKeyMatch[1] !== 'validate': {
+          // Mirror of `lazyclaw config get <key>`. The `!== 'validate'`
+          // guard ensures the literal GET /config/validate case (above)
+          // is never shadowed by this dynamic handler.
+          const key = configKeyMatch[1];
+          const cfg = ctx.readConfig();
+          if (!(key in cfg)) {
+            return writeJson(res, 404, { error: 'key not found', key });
+          }
+          const raw = cfg[key];
+          const value = key === 'api-key' ? maskApiKey(raw) : raw;
+          return writeJson(res, 200, { key, value });
         }
         case route === 'GET /doctor': {
           // Mirror the CLI doctor output — same field set so any tool that
