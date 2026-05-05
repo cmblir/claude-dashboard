@@ -133,52 +133,109 @@ async function cmdRun(sessionId, file, opts = {}) {
   }
 }
 
-// Pure transformation over a persisted state file — no execution.
-// The shape mirrors the on-disk state plus a derived `summary` block
-// so a script can decide "should I resume?" without parsing per-node
-// statuses itself.
-//
-// Exit codes:
-//   0 — state found and printed
-//   1 — workflow completed (all nodes success, no work left to resume)
-//   2 — state file not found
-//   3 — workflow failed and is NOT resumable as-is (terminal failure
-//       with retries exhausted; user must edit the workflow or state)
-async function cmdInspect(sessionId, opts = {}) {
-  const dir = opts.dir || '.workflow-state';
-  const { loadState } = await loadEngine();
-  const state = loadState(sessionId, dir);
-  if (!state) {
-    console.error(`No state for session ${sessionId} in ${dir}`);
-    process.exit(2);
-  }
+// Compute the summary block from a raw state object. Lifted out of
+// cmdInspect so the list-mode path can reuse the same shape per
+// session without duplicating logic. Returns
+//   { summary, failedNodes }
+// where `summary` matches the per-session shape exactly.
+function summarizeState(state) {
   const counts = { pending: 0, running: 0, success: 0, failed: 0 };
   const failedNodes = [];
   let totalDurationMs = 0;
-  for (const id of Object.keys(state.nodes)) {
+  for (const id of Object.keys(state.nodes || {})) {
     const n = state.nodes[id];
     const status = n?.status || 'pending';
     if (counts[status] !== undefined) counts[status]++;
     if (status === 'failed') failedNodes.push({ id, error: n.error, attempts: n.attempts });
     if (typeof n?.durationMs === 'number') totalDurationMs += n.durationMs;
   }
-  const total = Object.keys(state.nodes).length;
+  const total = Object.keys(state.nodes || {}).length;
   const allDone = total > 0 && counts.success === total;
   const hasFailure = counts.failed > 0;
-  // "Resumable" = there's at least one non-success node AND no terminal
-  // failure. Running/pending nodes from a prior interrupted run will be
-  // demoted by the engine on next load — they count as resumable work.
-  const resumable = !allDone && !hasFailure;
-  const out = {
-    sessionId: state.sessionId,
-    dir,
+  return {
     summary: {
       total,
       ...counts,
       done: allDone,
-      resumable,
+      resumable: !allDone && !hasFailure,
       durationMs: totalDurationMs,
     },
+    failedNodes,
+  };
+}
+
+// Pure transformation over a persisted state file — no execution.
+// The shape mirrors the on-disk state plus a derived `summary` block
+// so a script can decide "should I resume?" without parsing per-node
+// statuses itself.
+//
+// With no sessionId, lists every state file in `dir` with a summary
+// block per session — sorted by updatedAt descending so the most
+// recently touched run sits at the top.
+//
+// Exit codes (single-session mode):
+//   0 — state found and printed
+//   1 — workflow completed (all nodes success, no work left to resume)
+//   2 — state file not found
+//   3 — workflow failed and is NOT resumable as-is (terminal failure
+//       with retries exhausted; user must edit the workflow or state)
+//
+// Exit codes (list mode):
+//   0 — listing produced (even if empty — empty dir is valid state)
+//   2 — `dir` does not exist
+async function cmdInspect(sessionId, opts = {}) {
+  const dir = opts.dir || '.workflow-state';
+  const { loadState } = await loadEngine();
+
+  // List mode — no sessionId given. Walks the state directory and
+  // emits a summary per session. We deliberately don't include the
+  // per-node `nodes` map here (the per-session inspect call still
+  // gives that detail), keeping the listing scannable for >100
+  // sessions.
+  if (!sessionId) {
+    if (!fs.existsSync(dir)) {
+      console.error(`State directory ${dir} does not exist`);
+      process.exit(2);
+    }
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+    const sessions = [];
+    for (const f of files) {
+      try {
+        const raw = fs.readFileSync(path.join(dir, f), 'utf8');
+        const state = JSON.parse(raw);
+        if (!state?.sessionId) continue;
+        const { summary, failedNodes } = summarizeState(state);
+        sessions.push({
+          sessionId: state.sessionId,
+          summary,
+          failedNodes,
+          startedAt: state.startedAt,
+          updatedAt: state.updatedAt,
+        });
+      } catch {
+        // Skip files that aren't valid state JSON. We don't crash on
+        // a stray file (e.g. a `.tmp` left over from a crashed write
+        // — saveState's atomic-rename normally cleans those up).
+      }
+    }
+    // Newest activity first. Stable secondary sort by sessionId so
+    // sessions that share an updatedAt (rare but possible during
+    // batch ops) order deterministically.
+    sessions.sort((a, b) => (b.updatedAt - a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
+    console.log(JSON.stringify({ dir, sessions }, null, 2));
+    process.exit(0);
+  }
+
+  const state = loadState(sessionId, dir);
+  if (!state) {
+    console.error(`No state for session ${sessionId} in ${dir}`);
+    process.exit(2);
+  }
+  const { summary, failedNodes } = summarizeState(state);
+  const out = {
+    sessionId: state.sessionId,
+    dir,
+    summary,
     failedNodes,
     order: state.order,
     nodes: state.nodes,
@@ -186,8 +243,8 @@ async function cmdInspect(sessionId, opts = {}) {
     updatedAt: state.updatedAt,
   };
   console.log(JSON.stringify(out, null, 2));
-  if (allDone) process.exit(1);
-  if (hasFailure) process.exit(3);
+  if (summary.done) process.exit(1);
+  if (summary.failed > 0) process.exit(3);
   process.exit(0);
 }
 
@@ -625,7 +682,7 @@ const HELP_SUMMARIES = {
 const HELP_DETAILS = {
   run: 'Usage: lazyclaw run <session-id> <workflow.mjs> [--parallel | --parallel-persistent]\n  Default: runPersistent — sequential, persists state, resumable via `lazyclaw resume`.\n  --parallel: runParallel — topological-level DAG, in-memory only, NOT resumable.\n  --parallel-persistent: runPersistentDag — DAG + checkpoint + resume.\n  Workflow file exports `nodes`; deps: string[] declares dependencies for both DAG modes.',
   resume: 'Usage: lazyclaw resume <session-id> <workflow.mjs>\n  Re-enters a previously persisted run; succeeds nodes are skipped.',
-  inspect: 'Usage: lazyclaw inspect <session-id> [--dir <state-dir>]\n  Print persisted workflow state without executing. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
+  inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   config: 'Usage: lazyclaw config <get|set|list|delete|path|edit> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
   agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage] [--cost]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, ...} to stderr after the response.\n  --cost adds a cost line on stderr when config.rates has a card for the active provider/model.',
@@ -1442,8 +1499,10 @@ async function main() {
       break;
     }
     case 'inspect': {
+      // No-arg form lists every persisted session in the state dir.
+      // Pass the empty positional through; cmdInspect's list mode
+      // handles it.
       const [sessionId] = rest.positional;
-      if (!sessionId) { console.error('Usage: lazyclaw inspect <session-id> [--dir <state-dir>]'); process.exit(2); }
       await cmdInspect(sessionId, { dir: rest.flags.dir });
       break;
     }

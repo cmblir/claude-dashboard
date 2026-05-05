@@ -10,6 +10,60 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.11.0] — 2026-05-05
+
+**`lazyclaw inspect` (no-arg) — list every persisted workflow session.**
+
+Builds on v3.10's per-session inspect by adding a list mode. Run
+`lazyclaw inspect` with no session id to scan the state directory
+and emit one summary block per persisted session.
+
+```
+$ lazyclaw inspect --dir .workflow-state
+{
+  "dir": ".workflow-state",
+  "sessions": [
+    { "sessionId": "ingest-2026-05-05",
+      "summary": { "total": 5, "success": 5, "done": true, "resumable": false, ... },
+      "failedNodes": [],
+      "startedAt": ..., "updatedAt": ... },
+    { "sessionId": "embed-batch-7",
+      "summary": { "total": 12, "pending": 4, "success": 8, "resumable": true, ... },
+      ...
+    },
+    ...
+  ]
+}
+```
+
+### What's in the listing
+- **Sorted newest-first** by `updatedAt` (deterministic secondary
+  sort by `sessionId` so ties are stable).
+- **Per-session summary** matches the per-session inspect shape
+  exactly — `total / pending / running / success / failed`,
+  `done`, `resumable`, `durationMs`. So a tool can use the same
+  reducer regardless of mode.
+- **Per-session `nodes` map is omitted** in list mode to keep
+  output scannable for >100 sessions. Run
+  `lazyclaw inspect <session-id>` for the full per-node detail.
+- **Stray non-JSON files and corrupt state files are silently
+  skipped** — a left-over `.tmp` from a crashed write doesn't
+  break the listing.
+
+### Exit codes (list mode)
+- `0` — listing produced (even if `sessions: []`)
+- `2` — state directory does not exist
+
+### Tests
+3 new phase 6 specs (in addition to the 4 from v3.10):
+- list mode sorts by `updatedAt` desc, ignoring stray files
+  (`README.txt`, malformed JSON)
+- missing state dir → exit 2 with helpful stderr
+- empty state dir → exit 0 with `sessions: []`
+
+Suite: 279 → 282 (+3); `tsc --noEmit` clean.
+
+---
 ## [3.10.0] — 2026-05-05
 
 **`lazyclaw inspect <session-id>` — read-only workflow state inspector.**

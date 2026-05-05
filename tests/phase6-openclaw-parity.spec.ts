@@ -326,6 +326,54 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(out.failedNodes[0].error).toMatch(/boom/);
   });
 
+  test('lazyclaw inspect (no arg): lists every session sorted by recency', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    // Three sessions with explicit timestamps so the sort order is
+    // deterministic regardless of file mtime granularity.
+    const mk = (id: string, updatedAt: number) => {
+      fs.writeFileSync(path.join(stateDir, `${id}.json`), JSON.stringify({
+        sessionId: id,
+        order: ['x'],
+        nodes: { x: { status: 'success', output: id, attempts: 1, durationMs: 1 } },
+        startedAt: 0, updatedAt,
+      }));
+    };
+    mk('older', 100);
+    mk('newest', 300);
+    mk('middle', 200);
+    // Drop a stray non-state file to confirm we ignore it.
+    fs.writeFileSync(path.join(stateDir, 'README.txt'), 'not state');
+    fs.writeFileSync(path.join(stateDir, 'invalid.json'), '{ corrupt');
+
+    const r = runCli(['inspect', '--dir', stateDir], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.dir).toBe(stateDir);
+    expect(out.sessions.map((s: any) => s.sessionId)).toEqual(['newest', 'middle', 'older']);
+    expect(out.sessions[0].summary.done).toBe(true);
+    // No per-session `nodes` map in list mode — keeps output scannable.
+    expect(out.sessions[0].nodes).toBeUndefined();
+  });
+
+  test('lazyclaw inspect (no arg): missing state dir → exit 2', () => {
+    const dir = tmpConfigDir();
+    const r = runCli(['inspect', '--dir', path.join(dir, 'no-such-dir')], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/does not exist/);
+  });
+
+  test('lazyclaw inspect (no arg): empty state dir → exit 0 with empty sessions array', () => {
+    const dir = tmpConfigDir();
+    const stateDir = path.join(dir, 'empty-state');
+    fs.mkdirSync(stateDir, { recursive: true });
+    const r = runCli(['inspect', '--dir', stateDir], dir);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.sessions).toEqual([]);
+  });
+
   test('lazyclaw inspect: partially completed (resumable) → exit 0', () => {
     const dir = tmpConfigDir();
     const stateDir = path.join(dir, 'st');
