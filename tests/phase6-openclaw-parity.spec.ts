@@ -637,6 +637,59 @@ test.describe('Phase 6 — OpenClaw parity', () => {
     expect(r.stdout).toContain('n_2nd_step --> final_merge');
   });
 
+  test('lazyclaw graph --state overlays run status with glyphs and classDef styling', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'flow.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [
+         { id: 'a', deps: [],     async execute() {} },
+         { id: 'b', deps: ['a'],  async execute() {} },
+         { id: 'c', deps: ['a'],  async execute() {} },
+         { id: 'd', deps: ['b','c'], async execute() {} },
+       ];`,
+    );
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'job.json'), JSON.stringify({
+      sessionId: 'job',
+      order: ['a', 'b', 'c', 'd'],
+      nodes: {
+        a: { status: 'success', output: 'A', attempts: 1 },
+        b: { status: 'failed', error: 'boom', attempts: 3 },
+        c: { status: 'running', attempts: 1 },
+        d: { status: 'pending', attempts: 0 },
+      },
+      startedAt: 1, updatedAt: 2,
+    }));
+    const r = runCli(['graph', wfPath, '--state', 'job', '--dir', stateDir], dir);
+    expect(r.status).toBe(0);
+    // Each node label gets its status glyph (or empty for pending).
+    expect(r.stdout).toContain('a[a ✓]');
+    expect(r.stdout).toContain('b[b ✗]');
+    expect(r.stdout).toContain('c[c ⏳]');
+    expect(r.stdout).toContain('d[d]');     // pending: no glyph
+    // classDef declarations land in the output.
+    expect(r.stdout).toContain('classDef success');
+    expect(r.stdout).toContain('classDef failed');
+    // Per-class assignments group nodes correctly.
+    expect(r.stdout).toContain('class a success');
+    expect(r.stdout).toContain('class b failed');
+    expect(r.stdout).toContain('class c running');
+    expect(r.stdout).toContain('class d pending');
+  });
+
+  test('lazyclaw graph --state with missing session → exit 2', () => {
+    const dir = tmpConfigDir();
+    const wfPath = path.join(dir, 'flow.mjs');
+    fs.writeFileSync(wfPath,
+      `export const nodes = [{ id: 'a', deps: [], async execute() {} }];`);
+    const stateDir = path.join(dir, 'st');
+    fs.mkdirSync(stateDir, { recursive: true });
+    const r = runCli(['graph', wfPath, '--state', 'no-such', '--dir', stateDir], dir);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/no state for session/);
+  });
+
   test('lazyclaw graph: missing file → exit 2 with helpful stderr', () => {
     const dir = tmpConfigDir();
     const r = runCli(['graph', path.join(dir, 'no-such.mjs')], dir);

@@ -356,13 +356,29 @@ async function cmdValidate(file) {
 // `fetch_data[fetch-data]` in the output — Mermaid's id rules are
 // stricter than ours.
 async function cmdGraph(file, opts = {}) {
-  if (!file) { console.error('Usage: lazyclaw graph <workflow.mjs> [--lr]'); process.exit(2); }
+  if (!file) { console.error('Usage: lazyclaw graph <workflow.mjs> [--lr] [--state <session-id>] [--dir <state-dir>]'); process.exit(2); }
   let nodes;
   try {
     nodes = await importWorkflow(file);
   } catch (e) {
     console.error(`graph: ${e?.message || e}`);
     process.exit(2);
+  }
+  // --state <session-id> overlays current run status onto each node
+  // (success/running/failed/pending). Without a state, every node
+  // gets a neutral declaration. With state, nodes are tagged with a
+  // CSS class via Mermaid's classDef + class syntax — paste-able
+  // straight into a render, and renders that don't support classDef
+  // (rare) just ignore the styling and show the raw graph.
+  let state = null;
+  if (opts.state) {
+    const dir = opts.dir || '.workflow-state';
+    const { loadState } = await loadEngine();
+    state = loadState(opts.state, dir);
+    if (!state) {
+      console.error(`graph: no state for session ${opts.state} in ${dir}`);
+      process.exit(2);
+    }
   }
   const direction = opts.lr ? 'LR' : 'TD';
   const lines = [`graph ${direction}`];
@@ -374,15 +390,29 @@ async function cmdGraph(file, opts = {}) {
     const s = String(id).replace(/[^a-zA-Z0-9_]/g, '_');
     return /^[a-zA-Z]/.test(s) ? s : `n_${s}`;
   };
-  // First emit a node declaration for every id (so isolated nodes
-  // still appear in the rendered graph). Then emit edges in dep order.
-  // Use a Set to dedupe even though the workflow shouldn't have dupes
-  // — defensive against malformed input. Validate-then-graph is the
-  // recommended pipeline.
+  // Per-status visual cues. Unicode glyph in the label + classDef
+  // class for color. The glyph alone works in plain markdown
+  // viewers; the classDef adds color for Mermaid renders.
+  const statusGlyph = {
+    success: ' ✓',
+    running: ' ⏳',
+    failed:  ' ✗',
+    pending: '',
+  };
   const declared = new Set();
+  const classedNodes = { success: [], running: [], failed: [], pending: [] };
   const declare = (id) => {
     if (declared.has(id)) return;
-    lines.push(`  ${safeId(id)}[${id}]`);
+    let label = id;
+    let cls = null;
+    if (state) {
+      const ns = state.nodes?.[id];
+      const st = ns?.status || 'pending';
+      label = id + (statusGlyph[st] || '');
+      cls = st;
+      classedNodes[st]?.push(safeId(id));
+    }
+    lines.push(`  ${safeId(id)}[${label}]`);
     declared.add(id);
   };
   for (const n of nodes) declare(n.id);
@@ -390,6 +420,19 @@ async function cmdGraph(file, opts = {}) {
     for (const d of n.deps || []) {
       // Edge: dep → node. Mermaid syntax `a --> b`.
       lines.push(`  ${safeId(d)} --> ${safeId(n.id)}`);
+    }
+  }
+  if (state) {
+    // GitHub's Mermaid theme renders these well in both light/dark
+    // mode. Operators rendering in their own theme can override.
+    lines.push('  classDef success fill:#9f6,stroke:#363,stroke-width:1px;');
+    lines.push('  classDef running fill:#fc6,stroke:#963,stroke-width:1px;');
+    lines.push('  classDef failed  fill:#f66,stroke:#933,stroke-width:1px;');
+    lines.push('  classDef pending fill:#ddd,stroke:#666,stroke-width:1px;');
+    for (const [cls, ids] of Object.entries(classedNodes)) {
+      if (ids.length === 0) continue;
+      // `class id1,id2,id3 className` — Mermaid syntax for batch class assignment.
+      lines.push(`  class ${ids.join(',')} ${cls};`);
     }
   }
   console.log(lines.join('\n'));
@@ -890,7 +933,7 @@ const HELP_DETAILS = {
   inspect: 'Usage: lazyclaw inspect [<session-id>] [--dir <state-dir>] [--status done|resumable|failed|running] [--summary]\n  With no session-id: list every persisted session in the state dir, sorted by recency.\n  --status filters the listing to a single lifecycle bucket.\n  --summary trims per-node detail in single-session mode (matches list-mode shape).\n  With a session-id: print full state. Exit code: 0=resumable, 1=fully done, 2=no state, 3=terminal failure.',
   clear: 'Usage: lazyclaw clear <session-id> [--dir <state-dir>]\n  Delete the state file for <session-id>. Idempotent — exits 0 whether the file existed or not.\n  Refuses sessionIds that resolve outside <state-dir>. Mirrors DELETE /workflows/<id> on the daemon.',
   validate: 'Usage: lazyclaw validate <workflow.mjs>\n  Static check: load + shape + dep + cycle + parallelism estimate.\n  Exit 0 valid · 1 hard failure (issues populated) · 2 file/import error.',
-  graph: 'Usage: lazyclaw graph <workflow.mjs> [--lr]\n  Emit the workflow DAG as Mermaid syntax (graph TD by default; --lr for left-right).\n  Output is paste-ready for GitHub markdown / Notion / Obsidian.',
+  graph: 'Usage: lazyclaw graph <workflow.mjs> [--lr] [--state <session-id>] [--dir <state-dir>]\n  Emit the workflow DAG as Mermaid syntax (graph TD by default; --lr for left-right).\n  --state overlays a persisted run\'s status (success ✓ / running ⏳ / failed ✗ / pending) with classDef styling.\n  Output is paste-ready for GitHub markdown / Notion / Obsidian.',
   config: 'Usage: lazyclaw config <get|set|list|delete|path|edit> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.',
   chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
   agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage] [--cost]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, ...} to stderr after the response.\n  --cost adds a cost line on stderr when config.rates has a card for the active provider/model.',
@@ -1947,7 +1990,11 @@ async function main() {
     }
     case 'graph': {
       const [file] = rest.positional;
-      await cmdGraph(file, { lr: !!rest.flags.lr });
+      await cmdGraph(file, {
+        lr: !!rest.flags.lr,
+        state: rest.flags.state,
+        dir: rest.flags.dir,
+      });
       break;
     }
     case 'config': {

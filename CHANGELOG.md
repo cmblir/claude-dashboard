@@ -10,6 +10,58 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.29.0] — 2026-05-05
+
+**`lazyclaw graph --state <session-id>` — overlay run status on the DAG.**
+
+Builds on v3.25's Mermaid output by overlaying a persisted run's
+node statuses with status glyphs (`✓ ⏳ ✗`) and per-status
+`classDef` styling. Useful for ops dashboards and incident
+postmortems — paste the output into GitHub markdown and you have
+a colored DAG showing exactly which nodes succeeded, which are
+running, and which failed.
+
+```
+$ lazyclaw graph ./flow.mjs --state my-job --dir .workflow-state
+graph TD
+  fetch[fetch ✓]
+  embed[embed ⏳]
+  classify[classify ✗]
+  merge[merge]
+  fetch --> embed
+  fetch --> classify
+  embed --> merge
+  classify --> merge
+  classDef success fill:#9f6,stroke:#363,stroke-width:1px;
+  classDef running fill:#fc6,stroke:#963,stroke-width:1px;
+  classDef failed  fill:#f66,stroke:#933,stroke-width:1px;
+  classDef pending fill:#ddd,stroke:#666,stroke-width:1px;
+  class fetch success;
+  class embed running;
+  class classify failed;
+  class merge pending;
+```
+
+### Glyph + classDef
+- **Glyph in the label**: works in plain markdown viewers that
+  don't render Mermaid (still readable as text).
+- **classDef + per-class assignments**: Mermaid renderers paint
+  the nodes with status colors. The four `classDef` decls use
+  GitHub-friendly colors that work in both light and dark themes.
+
+### Without `--state`
+Output is identical to v3.25 — bare nodes + edges, no styling.
+The `--state` flag is purely additive.
+
+### Tests
+2 new phase 6 specs:
+- 4-node DAG with mixed statuses → glyphs + classDef + per-node
+  class assignments all land correctly
+- `--state` with a missing session → exit 2 with helpful stderr
+
+Suite: 327 → 329 (+2); `tsc --noEmit` clean.
+
+---
 ## [3.28.0] — 2026-05-05
 
 **`lazyclaw skills search` (CLI + daemon) — content search for skill bodies.**
