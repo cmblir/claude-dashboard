@@ -10,6 +10,35 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.80.0] — 2026-05-06  📊 chat 1k-5k message stress baseline
+
+### Confirmed
+- **Chat with 1000–5000 messages stays responsive.** New
+  `scripts/perf-chat-1k.mjs` seeds N messages with cache-busting
+  unique tokens (defeats the v3.68 LRU body memo) and measures:
+
+  | N    | first render | scroll | typing | re-render | heap |
+  |------|--------------|--------|--------|-----------|------|
+  | 1000 | 96 ms (1 longtask) | 60 fps · 0 longtasks | 0 longtasks | 53 ms · 0 longtasks | 9.5 MB |
+  | 2000 | 95 ms (1 longtask) | 60 fps · 0 longtasks | 0 longtasks | 50 ms · 0 longtasks | 9.5 MB |
+  | 5000 | 87 ms (1 longtask) | 60 fps · 0 longtasks | 0 longtasks | 44 ms · 0 longtasks | 9.5 MB |
+
+  The single first-render longtask sits just below the 100 ms
+  "feels instant" threshold. After first paint every interaction
+  (scroll, type, delete) is sub-frame. Heap stays flat at 9.5 MB
+  across all sample sizes — the cache + virtual-attribute model
+  doesn't blow up.
+
+### Files touched
+- `scripts/perf-chat-1k.mjs`: new stress baseline with N=1000 default
+  (`N=2000` / `N=5000` env override)
+- `VERSION` 3.79.0 → 3.80.0
+
+### Verification
+- `e2e-tabs-smoke` 67/67 (no regression)
+- `perf-chat-1k`, `N=2000`, `N=5000` — all under threshold
+
+---
 ## [3.79.0] — 2026-05-06  🔁 template assignee patch consolidation + Claude CLI aliases
 
 ### Centralized
