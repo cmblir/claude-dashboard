@@ -10,6 +10,78 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.68.0] — 2026-05-06  🔌 5353 mDNS noise filter + provider error reasons + chat body cache
+
+**User report**: "5353 port가 엄청 열리는데, 이거 먼저 해결해줘."
+The Open Ports tab was surfacing every UDP socket lsof returned, including
+mDNSResponder's ~12 file descriptors on port 5353 plus identityservicesd /
+sharingd / configd UDP holds. On a normal macOS box that's 30+ noise rows
+that overshadow the user's actual listening sockets.
+
+### Fixed
+- **`/api/ports/list` collapses duplicate FDs and hides macOS system
+  noise by default.** UDP rows on well-known service-discovery ports
+  (5353 mDNS, 137/138 NetBIOS, 1900 SSDP, 5350/5351 NAT-PMP, 5355 LLMNR,
+  17500 Dropbox-LAN) are filtered unless the request opts in via
+  `?includeSystem=1`. Process names matching known macOS daemons
+  (mDNSRespo / identitys / sharingd / rapportd / configd / netbiosd /
+  discoveryd / remoted / trustd / configd / ...) are also suppressed.
+  Each remaining row is also deduped on `(pid, proto, port)` so a single
+  process holding multiple FDs on the same port shows up once.
+- **Default-model dropdown** continues to flow through the dedicated
+  `/api/ai-providers/default-model` endpoint (v3.67) — unchanged.
+
+### Added
+- **Provider unavailable rows now carry a structured reason.** Backend
+  `api_providers_list` infers `unavailableReason` / `unavailableFix` /
+  `unavailableReasonKey` from probe state: CLI providers report "CLI not
+  found on PATH" plus an install hint; API providers without a key
+  surface "API key not configured" plus the AI Providers tab pointer;
+  API providers with a key but unreachable endpoint say so explicitly.
+  The frontend `aiProviders` view renders this as an inline red panel
+  beneath the unavailable chip, replacing the binary "미설치/미설정"
+  label.
+- **Open Ports tab toggle.** "👁 시스템 포트 표시 / 숨기기" button
+  (persisted in `localStorage.cc.openPorts.includeSystem`) flips between
+  the noise-filtered default and the raw view; rows pulled in via the
+  toggle are dimmed and stamped with `serviceLabel` (e.g. "mDNS"). The
+  hidden-row count appears as a chip when noise is filtered.
+- **Memoised chat-message body cache.** `_lcMsgBody(m)` now goes through
+  a 400-entry LRU keyed on `(text + role)`. Switching sessions, deleting
+  a message, starring, branching — all the operations that re-render
+  the entire chat history — no longer re-run `marked.parse` on messages
+  whose content hasn't changed. Streaming bubbles (pending=true) bypass
+  the cache so live tokens still flow.
+
+### Performance
+- **Ollama hub model dropdowns**: replaced repeated `select.innerHTML +=`
+  inside hot loops (which re-parses the entire option list on each
+  iteration → quiet O(N²)) with a single string-join + assignment.
+  Affects `installedChat` and `installedEmbed` rendering on the Ollama
+  Model Hub.
+
+### Files touched
+- `dist/app.js`: provider unavailable row, openPorts toggle + dimming,
+  `_lcBodyCacheGet/Set` + memoised `_lcMsgBody`, ollama-hub option-build
+  fix
+- `server/ai_keys.py`: probe-error capture + structured unavailable
+  reason / fix / i18n key per provider
+- `server/process_monitor.py`: dedupe + system-noise filter +
+  well-known port labels + `?includeSystem=1`
+- `scripts/e2e-port-5353-verify.mjs`: focused Playwright proof
+- `scripts/perf-profile.mjs`: PerformanceObserver longtask sampler
+- `VERSION` 3.67.0 → 3.68.0
+
+### Verification
+- `e2e-tabs-smoke` — 67/67 tabs render without console errors
+- `e2e-chat-slash-smoke` / `e2e-terminal-builtins-smoke` — green
+- `e2e-port-5353-verify` (new) — backend default hides UDP 5353,
+  includeSystem flag round-trip works, Open Ports tab shows the
+  toggle, click flips the localStorage flag.
+- Synthetic lsof-row test (12 mDNS rows + 1 user dup) collapses to
+  the expected count and surfaces the right `systemNoise` flag.
+
+---
 ## [3.67.0] — 2026-05-06  🦞 LazyClaw dashboard + provider/chat/term parity wave
 
 ### Added

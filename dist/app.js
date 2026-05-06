@@ -17912,6 +17912,16 @@ VIEWS.aiProviders = async () => {
     const chip = avail
       ? '<span class="chip chip-ok" data-i18n="available">' + t('사용 가능') + '</span>'
       : '<span class="chip chip-err" data-i18n="unavailable">' + t('미설치/미설정') + '</span>';
+    // QQ225 — explicit reason row when the provider is unavailable. The
+    // backend infers reason / fix from probe state (CLI missing / API key
+    // absent / probe error); render an inline panel + remediation link
+    // instead of the binary "미설치/미설정" chip alone.
+    const unavailRow = !avail && p.unavailableReason
+      ? `<div class="card p-2 mt-2" style="background:rgba(248,113,113,0.08);border-color:rgba(248,113,113,0.3);">
+          <div class="text-xs"><span style="color:#fca5a5;font-weight:600;">⚠ ${t('사용 불가')}</span> · ${escapeHtml(p.unavailableReason)}</div>
+          ${p.unavailableFix ? `<div class="text-[10px] mt-1" style="color:var(--text-dim);">${escapeHtml(p.unavailableFix)}</div>` : ''}
+        </div>`
+      : '';
     const keyMasked = apiKeys[p.id] || '';
     const keyChip = keyMasked ? `<span class="chip" style="font-family:monospace">${escapeHtml(keyMasked)}</span>` : '';
     const models = (p.models || []).slice(0, 6);
@@ -17982,6 +17992,7 @@ VIEWS.aiProviders = async () => {
         </div>
       </div>
       ${p.homepage ? `<a href="${escapeHtml(p.homepage)}" target="_blank" class="text-xs" style="color:var(--cyan)">${escapeHtml(p.homepage)}</a>` : ''}
+      ${unavailRow}
       ${cliInstallBlock}
       <div class="mt-2 flex flex-wrap gap-1">
         <span class="text-xs" style="color:var(--text-dim)">${t('모델')}:</span> ${modelTags || '<span class="text-xs" style="color:var(--text-dim)">—</span>'}
@@ -19046,27 +19057,28 @@ async function _ollamaLoadSettings() {
     const embedSel = document.getElementById('ollamaEmbedModelSelect');
     if (!chatSel || !embedSel) return;
 
-    // 채팅 모델 옵션
-    chatSel.innerHTML = `<option value="">${t('자동 선택 (첫 번째 설치 모델)')}</option>`;
+    // Build option strings up-front and assign once. Repeated
+    // `select.innerHTML +=` re-parses the entire option list each time
+    // and was a quiet O(N²) hot spot on Ollama hubs with many models.
+    const chatOpts = [`<option value="">${t('자동 선택 (첫 번째 설치 모델)')}</option>`];
     for (const m of (s.installedChat || [])) {
       const sel = m.id === s.chatModel ? 'selected' : '';
-      chatSel.innerHTML += `<option value="${escapeHtml(m.id)}" ${sel}>${escapeHtml(m.label)}${m.note ? ' — ' + escapeHtml(t(m.note)) : ''}</option>`;
+      chatOpts.push(`<option value="${escapeHtml(m.id)}" ${sel}>${escapeHtml(m.label)}${m.note ? ' — ' + escapeHtml(t(m.note)) : ''}</option>`);
     }
+    if (!(s.installedChat || []).length) {
+      chatOpts.push(`<option disabled>${t('설치된 채팅 모델 없음 — 모델 허브에서 다운로드')}</option>`);
+    }
+    chatSel.innerHTML = chatOpts.join('');
 
-    // 임베딩 모델 옵션
-    embedSel.innerHTML = `<option value="">${t('자동 선택')}</option>`;
+    const embedOpts = [`<option value="">${t('자동 선택')}</option>`];
     for (const m of (s.installedEmbed || [])) {
       const sel = m.id === s.embedModel ? 'selected' : '';
-      embedSel.innerHTML += `<option value="${escapeHtml(m.id)}" ${sel}>${escapeHtml(m.label)}${m.note ? ' — ' + escapeHtml(t(m.note)) : ''}</option>`;
-    }
-
-    // 설치된 모델이 없으면 안내
-    if (!(s.installedChat || []).length) {
-      chatSel.innerHTML += `<option disabled>${t('설치된 채팅 모델 없음 — 모델 허브에서 다운로드')}</option>`;
+      embedOpts.push(`<option value="${escapeHtml(m.id)}" ${sel}>${escapeHtml(m.label)}${m.note ? ' — ' + escapeHtml(t(m.note)) : ''}</option>`);
     }
     if (!(s.installedEmbed || []).length) {
-      embedSel.innerHTML += `<option disabled>${t('설치된 임베딩 모델 없음 — bge-m3 권장')}</option>`;
+      embedOpts.push(`<option disabled>${t('설치된 임베딩 모델 없음 — bge-m3 권장')}</option>`);
     }
+    embedSel.innerHTML = embedOpts.join('');
   } catch(e) {
     // Ollama 미실행 시 무시
   }
@@ -22788,7 +22800,12 @@ async function _pmKillPid(pid, sigName) {
 }
 
 VIEWS.openPorts = async () => {
-  const r = await api('/api/ports/list');
+  // QQ226 — system-noise toggle. Default hides macOS service-discovery
+  // sockets (mDNSResponder/identitysd/sharingd/...) that flood the
+  // table with port 5353 and friends. Persist in localStorage.
+  let inc = false;
+  try { inc = localStorage.getItem('cc.openPorts.includeSystem') === '1'; } catch (_) {}
+  const r = await api('/api/ports/list' + (inc ? '?includeSystem=1' : ''));
   if (!r || !r.ok) {
     return `
       ${viewHeader('열린 포트 모니터', 'TCP/UDP listening 소켓 모니터링', 'openPorts')}
@@ -22797,10 +22814,21 @@ VIEWS.openPorts = async () => {
       </div>`;
   }
   const ports = r.ports || [];
+  const hidden = r.hiddenSystem || 0;
   return `
     ${viewHeader('열린 포트 모니터', 'TCP/UDP listening 소켓 모니터링', 'openPorts')}
     <div class="card p-5">
-      <h3 class="font-semibold text-sm mb-3">🔌 ${t('열린 포트')} (${ports.length})</h3>
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h3 class="font-semibold text-sm">🔌 ${t('열린 포트')} (${ports.length})</h3>
+        <div class="flex items-center gap-2">
+          ${hidden > 0 && !inc
+            ? `<span class="chip text-[10px]" style="color:var(--text-dim);">${t('시스템 노이즈 숨김')}: ${hidden}</span>`
+            : ''}
+          <button class="btn text-xs" onclick="_pmToggleSystem()" title="${t('mDNSResponder/identitysd 등 시스템 노이즈 표시 토글')}">
+            ${inc ? '👁 ' + t('시스템 포트 숨기기') : '👁 ' + t('시스템 포트 표시')}
+          </button>
+        </div>
+      </div>
       ${ports.length ? `
         <div style="overflow-x:auto;">
           <table class="data">
@@ -22810,22 +22838,35 @@ VIEWS.openPorts = async () => {
               <th class="text-right">${t('작업')}</th>
             </tr></thead>
             <tbody>
-              ${ports.map(p => `
-                <tr>
-                  <td class="mono text-xs">${escapeHtml(p.local_addr || '*')}:${p.local_port}</td>
+              ${ports.map(p => {
+                const sys = p.systemNoise ? ' style="opacity:0.55;"' : '';
+                const label = p.serviceLabel ? `<span class="chip text-[9px] ml-1" style="color:var(--text-dim);">${escapeHtml(p.serviceLabel)}</span>` : '';
+                return `
+                <tr${sys}>
+                  <td class="mono text-xs">${escapeHtml(p.local_addr || '*')}:${p.local_port}${label}</td>
                   <td class="text-xs"><span class="chip">${escapeHtml((p.proto || '').toUpperCase())}</span></td>
                   <td class="mono text-xs">${p.pid}</td>
                   <td class="text-xs">${escapeHtml(p.command || '')}</td>
                   <td class="text-xs text-[var(--text-mute)]">${escapeHtml(p.user || '')}</td>
                   <td class="text-xs text-[var(--text-mute)]">${escapeHtml(p.state || '')}</td>
                   <td class="text-right"><button class="btn text-xs" onclick="_pmKillPid(${p.pid}, 'SIGTERM')">${t('종료')}</button></td>
-                </tr>
-              `).join('')}
+                </tr>`;
+              }).join('')}
             </tbody>
           </table>
         </div>
       ` : `<div class="empty text-sm">${t('열린 포트가 없습니다')}</div>`}
     </div>`;
+};
+
+// QQ226 — toggle system-noise visibility, drop the cached /list response,
+// and re-render. Persisted across reloads via localStorage.
+window._pmToggleSystem = function () {
+  let cur = false;
+  try { cur = localStorage.getItem('cc.openPorts.includeSystem') === '1'; } catch (_) {}
+  try { localStorage.setItem('cc.openPorts.includeSystem', cur ? '0' : '1'); } catch (_) {}
+  _apiCacheInvalidate('/api/ports/list');
+  if (typeof renderView === 'function') renderView();
 };
 
 VIEWS.cliSessions = async () => {
@@ -28158,9 +28199,41 @@ function _lcChatSave(history) {
   _lcSaveHistory(_lcCurrentId(), history);
 }
 
+// Memoised marked.parse output. The chat tab re-renders the entire
+// history on most state mutations (delete, star, branch, regen…); for
+// long sessions the per-message marked.parse cost dominates. Caching
+// by content+role makes re-renders ~free for messages that haven't
+// changed. Bounded LRU via Map insertion order eviction.
+const _LC_BODY_CACHE = new Map();
+const _LC_BODY_CACHE_MAX = 400;
+function _lcBodyCacheGet(key) {
+  const v = _LC_BODY_CACHE.get(key);
+  if (v !== undefined) {
+    // Touch — promote to most-recently-used by re-inserting.
+    _LC_BODY_CACHE.delete(key);
+    _LC_BODY_CACHE.set(key, v);
+  }
+  return v;
+}
+function _lcBodyCacheSet(key, val) {
+  if (_LC_BODY_CACHE.size >= _LC_BODY_CACHE_MAX) {
+    const oldest = _LC_BODY_CACHE.keys().next().value;
+    if (oldest !== undefined) _LC_BODY_CACHE.delete(oldest);
+  }
+  _LC_BODY_CACHE.set(key, val);
+}
+
 function _lcMsgBody(m) {
   const isUser = m.role === 'user';
   const raw = m.text || '';
+  // Cache key — text + role uniquely determines the marked.parse output.
+  // Skip cache for streaming bubbles (pending=true) so the UI updates
+  // continuously while tokens arrive.
+  const cacheKey = m.pending ? null : (raw.length + ':' + (isUser ? 'u:' : 'a:') + raw);
+  if (cacheKey) {
+    const hit = _lcBodyCacheGet(cacheKey);
+    if (hit !== undefined) return hit;
+  }
   // QQ32 (v2.66.107) — collapse long messages to keep the scroll
   // manageable. ~1500 chars or ~30 lines triggers a "더보기" toggle.
   // Per-render id so multiple long messages on screen don't share state.
@@ -28179,17 +28252,28 @@ function _lcMsgBody(m) {
           + `</div>`;
       });
       const inner = `<div class="prose-claude" style="font-size:.875rem;line-height:1.6;margin-top:4px;">${html}</div>`;
-      if (!isLong) return inner;
-      return `<div id="${collapsedKey}" style="position:relative;max-height:300px;overflow:hidden;">
+      let out;
+      if (!isLong) {
+        out = inner;
+      } else {
+        out = `<div id="${collapsedKey}" style="position:relative;max-height:300px;overflow:hidden;">
         ${inner}
         <div style="position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(to bottom,transparent,var(--bg,#0f172a));pointer-events:none;"></div>
       </div>
       <button onclick="_lcToggleCollapse('${collapsedKey}',this)" style="margin-top:6px;font-size:11px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;color:var(--text-mute);">▾ ${t('더보기')} (${raw.length.toLocaleString()} ${t('자')})</button>`;
+      }
+      // Long-message bubbles include a per-render `collapsedKey` id; only
+      // the short, id-free path is safely cacheable.
+      if (cacheKey && !isLong) _lcBodyCacheSet(cacheKey, out);
+      return out;
     }
     catch (_) {}
   }
   const inner = `<pre style="font-size:.875rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;font-family:inherit;margin:4px 0 0;">${escapeHtml(raw)}</pre>`;
-  if (!isLong) return inner;
+  if (!isLong) {
+    if (cacheKey) _lcBodyCacheSet(cacheKey, inner);
+    return inner;
+  }
   return `<div id="${collapsedKey}" style="position:relative;max-height:300px;overflow:hidden;">
     ${inner}
     <div style="position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(to bottom,transparent,var(--bg,#0f172a));pointer-events:none;"></div>

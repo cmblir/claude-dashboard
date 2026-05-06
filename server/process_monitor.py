@@ -147,23 +147,86 @@ def _parse_lsof_line(line: str, proto: str) -> dict | None:
     }
 
 
-_PORTS_LIST_CACHE: dict = {"data": None, "ts": 0.0}
+_PORTS_LIST_CACHE: dict = {"data": None, "ts": 0.0, "key": ""}
 # QQ144 — lsof can take 50-150ms on a busy system; the Open Ports tab
 # lives behind a live ticker that re-fetches every couple of seconds.
 # 3s TTL feels live (port table changes are user-noticeable on the
 # scale of seconds, not ms) and coalesces back-to-back hits.
 _PORTS_LIST_TTL_S = 3.0
 
+# QQ226 — process names whose UDP sockets are pure macOS system noise
+# (multicast service discovery, identity / sharing daemons, configd).
+# Each of these typically holds 5–20 UDP FDs which pollute the Open Ports
+# table. We hide them by default; pass `?includeSystem=1` to opt in.
+# Names use lsof's 9-char truncation since `lsof +c0` isn't portable.
+_SYSTEM_NOISE_COMMANDS = {
+    "mDNSRespo",   # mDNSResponder — port 5353 + assorted ephemeral
+    "mDNSResponder",
+    "identitys",   # identityservicesd
+    "sharingd",
+    "rapportd",
+    "configd",
+    "netbiosd",
+    "discoveryd",
+    "wdc-helpe",   # WirelessDirectConnectionHelper
+    "remoted",
+    "trustd",
+    "syncdefau",   # syncdefaultsd
+    "cloudpaird",
+    "AirPlayXP",
+    "nsurlsess",
+    "apsd",        # Apple Push Service
+    "ControlCe",   # Control Center
+    "networkse",   # networkserviceproxy
+    "softwareu",   # softwareupdated
+}
+
+# Well-known UDP ports owned by macOS system services. Filtered by default
+# even when the holding process can't be name-matched (lsof under a normal
+# user can't see root-owned mDNSResponder, but it's still the source of
+# the user-reported '5353 spam' since other lsof variants do see it).
+_SYSTEM_NOISE_UDP_PORTS = {5353, 5350, 5351, 137, 138, 1900, 17500, 5355}
+
+
+def _well_known_label(port: int, proto: str) -> str:
+    """Tag well-known ports so the UI can show '5353 (mDNS)' etc. Empty
+    string when not a recognised service.
+    """
+    if proto != "udp":
+        return ""
+    return {
+        67: "DHCP-server", 68: "DHCP-client",
+        137: "NetBIOS-name", 138: "NetBIOS-dgm",
+        5353: "mDNS",
+        5350: "NAT-PMP", 5351: "NAT-PMP",
+        1900: "SSDP",
+        17500: "Dropbox-LAN",
+    }.get(port, "")
+
 
 def api_ports_list(query: dict | None = None) -> dict:
-    """GET /api/ports/list — listening TCP + all UDP bindings."""
+    """GET /api/ports/list — listening TCP + all UDP bindings.
+
+    QQ226 — collapse duplicate FDs (one process, one port, one proto =
+    one row) and filter macOS system-service noise unless
+    `?includeSystem=1` is passed. mDNSResponder alone holds ~12 UDP FDs
+    on port 5353 which previously flooded the Open Ports table.
+    """
     import time as _time
-    nc = (query or {}).get("nocache")
+    q = query or {}
+    nc = q.get("nocache")
     if isinstance(nc, list):
         nc = nc[0] if nc else None
+    inc_sys_raw = q.get("includeSystem")
+    if isinstance(inc_sys_raw, list):
+        inc_sys_raw = inc_sys_raw[0] if inc_sys_raw else None
+    include_system = inc_sys_raw in ("1", "true", "yes", True)
+    cache_key = "sys" if include_system else "user"
     if nc not in ("1", "true", "yes", True):
         cached = _PORTS_LIST_CACHE.get("data")
-        if cached is not None and (_time.time() - _PORTS_LIST_CACHE.get("ts", 0)) < _PORTS_LIST_TTL_S:
+        if (cached is not None
+                and _PORTS_LIST_CACHE.get("key") == cache_key
+                and (_time.time() - _PORTS_LIST_CACHE.get("ts", 0)) < _PORTS_LIST_TTL_S):
             return cached
     rows: list[dict] = []
     # Run TCP-listen and UDP lsof probes concurrently — they are independent.
@@ -183,10 +246,47 @@ def api_ports_list(query: dict | None = None) -> dict:
             row = _parse_lsof_line(line, "udp")
             if row:
                 rows.append(row)
-    rows.sort(key=lambda r: (r["proto"], r["local_port"]))
-    result = {"ok": True, "ports": rows}
+    # Dedupe (pid, proto, local_port) — multiple FDs on the same port show
+    # up as separate lsof rows. Prefer the row with a non-empty state.
+    seen: dict[tuple[int, str, int], dict] = {}
+    hidden_system = 0
+    for r in rows:
+        key = (r["pid"], r["proto"], r["local_port"])
+        prev = seen.get(key)
+        if prev is None or (not prev.get("state") and r.get("state")):
+            seen[key] = r
+    deduped = list(seen.values())
+    # Filter system noise unless the caller opted in. A row is "noise" if
+    # either the holding process matches a known macOS daemon, or the port
+    # is a well-known system UDP service (5353/137/138/1900/...). The
+    # second case catches lsof rows where the command name is opaque
+    # because the process is owned by another user.
+    final: list[dict] = []
+    for r in deduped:
+        cmd = (r.get("command") or "")
+        is_noise_cmd = cmd in _SYSTEM_NOISE_COMMANDS
+        is_noise_port = (r.get("proto") == "udp"
+                         and r.get("local_port") in _SYSTEM_NOISE_UDP_PORTS)
+        is_noise = is_noise_cmd or is_noise_port
+        if is_noise and not include_system:
+            hidden_system += 1
+            continue
+        label = _well_known_label(r["local_port"], r["proto"])
+        if label:
+            r["serviceLabel"] = label
+        if is_noise:
+            r["systemNoise"] = True
+        final.append(r)
+    final.sort(key=lambda r: (r["proto"], r["local_port"], r.get("pid", 0)))
+    result = {
+        "ok": True,
+        "ports": final,
+        "hiddenSystem": hidden_system,
+        "includeSystem": include_system,
+    }
     _PORTS_LIST_CACHE["data"] = result
     _PORTS_LIST_CACHE["ts"] = _time.time()
+    _PORTS_LIST_CACHE["key"] = cache_key
     return result
 
 

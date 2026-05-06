@@ -470,11 +470,13 @@ def api_providers_list() -> dict:
     all_p = list(reg.all_providers())
 
     def _probe(p):
+        probe_err = ""
         try:
             available = p.is_available()
             models = p.list_models() if available else []
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             available, models = False, []
+            probe_err = str(e)[:200]
         return {
             "id": p.provider_id,
             "name": p.provider_name,
@@ -485,6 +487,7 @@ def api_providers_list() -> dict:
             "capabilities": getattr(p, "capabilities", ["chat"]),
             "modelCount": len(models),
             "models": [m.to_dict() for m in models],
+            "_probeError": probe_err,
         }
 
     max_workers = min(16, max(4, len(all_p)))
@@ -506,6 +509,11 @@ def api_providers_list() -> dict:
     # second round-trip. The frontend checks `m.isDefault` (see app.js
     # `defaultModelSelect`).
     defaults = cfg.get("defaultModels", {}) or {}
+    # Each provider that fails `is_available` gets a structured reason +
+    # i18n key + suggested remediation so the UI can render an actionable
+    # row instead of a binary "미설치/미설정" chip. Reasons are inferred from
+    # provider_type and config state; richer per-provider error text
+    # (probeError) takes precedence when a probe actually threw.
     for prov in providers:
         dm = defaults.get(prov["id"])
         prov["defaultModel"] = dm or ""
@@ -513,6 +521,41 @@ def api_providers_list() -> dict:
             for m in prov["models"]:
                 if isinstance(m, dict) and m.get("id") == dm:
                     m["isDefault"] = True
+        # Infer unavailable reason.
+        if not prov.get("available"):
+            probe_err = prov.pop("_probeError", "") or ""
+            ptype = prov.get("type", "")
+            pid = prov.get("id", "")
+            if probe_err:
+                reason_key = "provider_probe_error"
+                reason = probe_err
+                fix = ""
+            elif ptype == "cli":
+                # CLI provider missing → bin not on PATH.
+                bin_hint = pid.replace("-cli", "") or pid
+                reason_key = "provider_cli_not_installed"
+                reason = f"`{bin_hint}` CLI not found on PATH"
+                fix = f"Install `{bin_hint}` or run the dashboard's CLI install button."
+            elif ptype == "api":
+                # API provider missing → key absent (or invalid baseUrl).
+                has_key = bool(masked_keys.get(pid))
+                if has_key:
+                    reason_key = "provider_api_unreachable"
+                    reason = "API key set but endpoint unreachable"
+                    fix = "Check network or override baseUrl in the AI Providers tab."
+                else:
+                    reason_key = "provider_api_key_missing"
+                    reason = "API key not configured"
+                    fix = "Add your API key in the AI Providers tab."
+            else:
+                reason_key = "provider_unavailable"
+                reason = "Provider unavailable"
+                fix = ""
+            prov["unavailableReason"] = reason
+            prov["unavailableReasonKey"] = reason_key
+            prov["unavailableFix"] = fix
+        else:
+            prov.pop("_probeError", None)
 
     return {
         "providers": providers,
