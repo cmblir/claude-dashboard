@@ -10,6 +10,50 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.75.0] — 2026-05-06  🧪 stress-tests confirm canvas, drop crew-wizard fake defaults
+
+### Performance baselines (no regressions)
+- `perf-canvas-drag` extended to N=100/200/300 nodes — every size
+  drags at **59.5–59.6 fps** with **1 longtask of 61–64 ms**. The
+  keyed-diff renderer scales linearly with the *changed* nodes (1
+  during a drag), so total node count is no longer a perf concern.
+- `perf-inspector` (new) — selecting 5 different session nodes runs
+  `_wfRenderInspector({ force: true })` in **0.2–0.8 ms** each, **0
+  longtasks** total. Inspector form is not a lag source.
+
+### Fixed
+- **Crew wizard pre-filled persona models that the user had never
+  installed.** `__cw.form.personas` was a static
+  `[claude:sonnet, gemini:gemini-2.5-pro, ollama:llama3.1]`. If the
+  user lacked any of those, the wizard happily generated a workflow
+  pinned to a model the runtime would reject at first execution.
+  Now, on first paint the wizard substitutes any of the known-static
+  defaults (the planner model + every persona) with the **first
+  available `provider:model`** read from `/api/ai-providers/list`.
+  User-edited values are preserved (only known-static placeholders
+  get rewritten).
+- **`+ Add persona` button** picks a real model the same way instead
+  of pinning `claude:sonnet`.
+
+### Added
+- `scripts/perf-inspector.mjs` — inspector render benchmark.
+- `scripts/e2e-crew-wizard-defaults.mjs` — verifies the QQ233 seed
+  runs (planner + 3 personas all swap to real models, add-persona
+  picks a real model).
+
+### Files touched
+- `dist/app.js`: `_seedRealisticDefaults` IIFE in crew wizard view +
+  add-persona model picker
+- `scripts/perf-inspector.mjs`, `scripts/e2e-crew-wizard-defaults.mjs`
+- `VERSION` 3.74.0 → 3.75.0
+
+### Verification
+- `e2e-tabs-smoke` — 67/67
+- `e2e-crew-wizard-defaults` (new) — 4/4
+- `perf-canvas-drag` at N=100/200/300 — all 60 fps
+- `perf-inspector` — 0 longtasks, sub-ms renders
+
+---
 ## [3.74.0] — 2026-05-06  ⚡ memory-tab content trim + mascot/ralph hidden-tab guards
 
 ### Performance

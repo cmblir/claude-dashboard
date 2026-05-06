@@ -2328,6 +2328,33 @@ VIEWS.crewWizard = async () => {
   let slack = { configured: false };
   try { slack = await api('/api/slack/config'); } catch(e) {}
   __cw.slackStatus = slack;
+  // QQ233 — replace hardcoded persona/planner defaults with the first
+  // *actually available* provider:model so the wizard doesn't preselect
+  // a model the user hasn't installed (the previous static list pinned
+  // ollama:llama3.1 etc.). Only patches values that haven't been edited
+  // yet — anything the user already typed wins.
+  (function _seedRealisticDefaults() {
+    const provs = ((__wfProviders || {}).providers || []).filter(p => p.available && (p.models || []).length);
+    if (!provs.length) return;
+    const realisticAssignees = [];
+    for (const p of provs) {
+      for (const m of (p.models || []).slice(0, 2)) {
+        realisticAssignees.push(`${p.id}:${m.id || m.name}`);
+        if (realisticAssignees.length >= 6) break;
+      }
+      if (realisticAssignees.length >= 6) break;
+    }
+    if (!realisticAssignees.length) return;
+    const isStaticDefault = (val) => /^claude:(opus|sonnet|haiku)$|^gemini:gemini-2\.5-pro$|^ollama:llama3\.1$/.test(val || '');
+    if (isStaticDefault(__cw.form.plannerModel)) {
+      __cw.form.plannerModel = realisticAssignees[0];
+    }
+    (__cw.form.personas || []).forEach((per, i) => {
+      if (isStaticDefault(per.model)) {
+        per.model = realisticAssignees[Math.min(i, realisticAssignees.length - 1)];
+      }
+    });
+  })();
   // First-visit auto-guide — shown once, then user can re-open via button.
   let firstVisit = false;
   try { firstVisit = !localStorage.getItem('cwGuideSeen'); } catch(_){}
@@ -2579,7 +2606,17 @@ function _cwBindStepInputs() {
     const add = get('cw_addPersona');
     if (add) add.onclick = () => {
       if (f.personas.length >= 8) { toast(t('최대 8명까지'), 'warn'); return; }
-      f.personas.push({ role: 'Specialist', model: 'claude:sonnet', focus: '' });
+      // QQ233 — same realistic-default heuristic as the initial seed:
+      // pick the first available provider:model so newly-added personas
+      // don't pin a model the user can't actually run.
+      const provs = ((__wfProviders || {}).providers || []).filter(p => p.available && (p.models || []).length);
+      let realModel = 'claude:sonnet';
+      if (provs.length) {
+        const p0 = provs[0];
+        const m0 = (p0.models || [])[0];
+        if (m0) realModel = `${p0.id}:${m0.id || m0.name}`;
+      }
+      f.personas.push({ role: 'Specialist', model: realModel, focus: '' });
       _cwRenderBody();
     };
   }
