@@ -3431,6 +3431,34 @@ async function _wfQuickAction(modeKey) {
     const orig = (planner.data.description || planner.data.subject || '').trim();
     planner.data.description = (orig ? orig + '\n\n# User goal\n' : '# User goal\n') + goal.trim();
   }
+  // QQ237 — sub in the user's actual available assignee for any session/
+  // subagent node whose template-default assignee isn't installed. The
+  // builtin templates were authored against claude-cli; without this fix
+  // running Autopilot/Ultrawork on an Ollama-only box would 100% fail at
+  // the first node.
+  await _wfLoadProviders();
+  const provs = ((__wfProviders || {}).providers || []).filter(p => p.available && (p.models || []).length);
+  if (provs.length) {
+    const p0 = provs[0];
+    const m0 = (p0.models || [])[0];
+    const realFallback = `${p0.id.replace('-cli', '').replace('-api', '')}:${m0.id || m0.name}`;
+    const availSet = new Set();
+    for (const p of provs) {
+      const alias = p.id.replace('-cli', '').replace('-api', '');
+      for (const m of (p.models || [])) {
+        availSet.add(`${alias}:${m.id || m.name}`);
+        availSet.add(`${alias}:${(m.id || '').split('-').pop()}`);  // short alias
+      }
+    }
+    for (const n of cloneNodes) {
+      if ((n.type === 'session' || n.type === 'subagent') && n.data) {
+        const cur = (n.data.assignee || '').trim();
+        if (cur && !availSet.has(cur) && !availSet.has(cur.replace(/^claude:/, 'claude-cli:'))) {
+          n.data.assignee = realFallback;
+        }
+      }
+    }
+  }
 
   const body = {
     name: `${meta.title} · ${goal.slice(0, 40)}${goal.length > 40 ? '…' : ''}`,
@@ -12614,6 +12642,16 @@ async function _cmdQuickRun(itemIdOrName, isEcc, cmdName) {
     // catalog is server-side. For non-ECC we open a workflow scaffold instead.
     toast(t('이 명령은 ECC가 아니라 즉시 실행 대신 워크플로우로 변환됩니다'), 'info');
     // Simulate the run-center "to-workflow" path with a 1-node session draft.
+    // QQ237 — pick the first available provider:model rather than pinning
+    // claude:sonnet so the generated workflow runs out-of-the-box on
+    // machines without the claude CLI installed.
+    const _firstReal = (() => {
+      const provs = ((__wfProviders || {}).providers || []).filter(p => p.available && (p.models || []).length);
+      if (!provs.length) return 'claude:sonnet';
+      const p0 = provs[0];
+      const m0 = (p0.models || [])[0];
+      return `${p0.id.replace('-cli', '').replace('-api', '')}:${m0.id || m0.name}`;
+    })();
     const draft = {
       name:        `Cmd · /${cmdName}`,
       description: `Quick run of /${cmdName} via Commands tab`,
@@ -12621,7 +12659,7 @@ async function _cmdQuickRun(itemIdOrName, isEcc, cmdName) {
         {id: 'n-rcs', type: 'start',   x: 80,  y: 200, title: 'Start',   data: {}},
         {id: 'n-rcr', type: 'session', x: 320, y: 200, title: '/' + cmdName,
          data: {subject: '/' + cmdName, description: t('Run the slash command') + ' /' + cmdName,
-                assignee: 'claude:sonnet', inputsMode: 'concat'}},
+                assignee: _firstReal, inputsMode: 'concat'}},
         {id: 'n-rco', type: 'output',  x: 560, y: 200, title: 'Output',  data: {exportTo:''}},
       ],
       edges: [

@@ -10,6 +10,40 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.78.0] — 2026-05-06  🧯 long-session leak probe + quick-action assignee swap
+
+### Confirmed
+- **No long-session memory leak.** New `scripts/perf-long-session.mjs`
+  walks every one of 67 tabs once, then ping-pongs across 5 heavy tabs
+  for 50 more navigations (117 navigations total). Result: heap stays
+  flat at **9.5 MB → 9.5 MB**, zero growth, with only 5 longtasks
+  totalling 545 ms across the whole session (~5 ms avg per
+  navigation). Every AFTER hook and timer cleanup is doing its job.
+
+### Fixed
+- **Quick Action templates (`Autopilot` / `Ralph` / `Ultrawork` /
+  `Deep Interview`) hardcoded `claude:sonnet`-class assignees** in
+  every session/subagent node. On a machine without claude-cli the
+  generated workflow would 100% fail at the first node. After
+  fetching the template, `_wfQuickAction` now substitutes any
+  unavailable assignee with the user's first-available
+  `provider:model` (read from cached `/api/ai-providers/list`).
+- **Commands tab "convert to workflow"** also pinned `claude:sonnet`.
+  Same first-real-assignee picker applied.
+
+### Files touched
+- `dist/app.js`: `_wfQuickAction` template-node assignee patch +
+  Commands-tab convert-to-workflow `_firstReal` helper
+- `scripts/perf-long-session.mjs`: new long-session probe (baseline)
+- `VERSION` 3.77.0 → 3.78.0
+
+### Verification
+- `e2e-tabs-smoke` 67/67
+- `e2e-workflow-run-e2e` 8/8
+- `perf-long-session` (new) — 0.0 MB heap growth over 117 navigations,
+  5 longtasks total
+
+---
 ## [3.77.0] — 2026-05-06  📱 mobile 320px chat layout + 2 more openclaw verbs
 
 ### Added
