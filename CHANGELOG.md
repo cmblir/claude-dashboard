@@ -10,6 +10,56 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.69.0] — 2026-05-06  ⚡ agents-tab lazy graph + 4 more terminal verbs
+
+### Performance
+- **`agents` tab vis-network init deferred to `requestIdleCallback`.**
+  The agent-relationship graph was the largest single longtask in the
+  agents view (169 ms longest task in profiling). It's now scheduled
+  past the first paint so the agent card grid + filter input feel
+  instant; the graph fills in afterward without blocking. Measured drop
+  longest ~169 ms → ~90 ms on a sample workload.
+- Workflow canvas drag confirmed steady at 60 fps with 30 nodes
+  (~276 frames over 4.6 s) — included as a regression baseline via
+  `scripts/perf-canvas-drag.mjs`.
+- Chat composer typing latency confirmed at 0 longtasks even with 120
+  history messages — the v3.68 `_lcMsgBody` LRU is doing its job.
+  Baseline captured via `scripts/perf-chat-typing.mjs`.
+
+### Added
+- **Four new terminal verbs**, mirroring more of the `lazyclaw` CLI:
+  - `lazyclaude providers [filter]` — alias of `keys`.
+  - `lazyclaude inspect <wfId|name>` — workflow snapshot (nodes/edges/
+    tags) + last 5 runs.
+  - `lazyclaude runs [filter]` — recent workflow runs across all
+    workflows.
+  - `lazyclaude rates` — cost-per-token table for every available
+    model.
+  Each goes through the existing JSON APIs (no shell whitelist round-
+  trip). Help-group, KNOWN_VERBS list, did-you-mean candidates, tab-
+  suggest list, and chat-side `/help` aliases all updated in lockstep.
+
+### Files touched
+- `dist/app.js`: agents `AFTER` lazy graph, four terminal verbs +
+  command-list propagation
+- `scripts/perf-canvas-drag.mjs`, `scripts/perf-chat-typing.mjs`: new
+  perf baselines
+- `scripts/e2e-v3-69-verify.mjs`: focused regression
+- `VERSION` 3.68.0 → 3.69.0
+
+### Verification
+- `e2e-tabs-smoke` — 67/67
+- `e2e-terminal-builtins-smoke` — green
+- `e2e-v3-69-verify` (new) — providers / runs / rates / inspect
+  resolve client-side without hitting the shell whitelist; the rates
+  card renders or gracefully reports empty; inspect surfaces a
+  not-found message; agents tab paints cleanly with the deferred
+  graph.
+- `perf-canvas-drag` — 30-node drag → 59.8 fps, 0 longtasks
+- `perf-chat-typing` — 80-char typing on a 120-message session → 0
+  longtasks
+
+---
 ## [3.68.0] — 2026-05-06  🔌 5353 mDNS noise filter + provider error reasons + chat body cache
 
 **User report**: "5353 port가 엄청 열리는데, 이거 먼저 해결해줘."

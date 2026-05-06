@@ -11478,7 +11478,16 @@ VIEWS.agents = async () => {
   `;
 };
 AFTER.agents = () => {
-  drawAgentGraph(state.data.agentsGraph || { nodes: [], edges: [] });
+  // Heavy: vis-network init can take 100-200ms with the lib's internal
+  // physics solver warmup. Defer it past the first paint so the agents
+  // card grid + filter input feel immediately responsive. requestIdleCallback
+  // when available; setTimeout fallback for environments that lack it.
+  const drawLater = () => drawAgentGraph(state.data.agentsGraph || { nodes: [], edges: [] });
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(drawLater, { timeout: 800 });
+  } else {
+    setTimeout(drawLater, 0);
+  }
   const qEl = document.getElementById('agentQ');
   if (qEl) {
     let d;
@@ -30363,6 +30372,7 @@ function _lcTermSuggest(prefix) {
     'lazyclaude refresh', 'lazyclaude reload',
     'lazyclaude usage', 'lazyclaude usage 7', 'lazyclaude usage 30',
     'lazyclaude agents', 'lazyclaude sessions', 'lazyclaude skills', 'lazyclaude doctor',
+    'lazyclaude providers', 'lazyclaude inspect ', 'lazyclaude runs', 'lazyclaude rates',
     'lazyclaude workflows', 'lazyclaude workflows ',
     'lazyclaude run ', 'lazyclaude cancel', 'lazyclaude cancel ',
     'lz get', 'lz set', 'lz help', 'lz version', 'lz status',
@@ -30489,7 +30499,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor'];
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor','providers','inspect','runs','rates'];
   const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
@@ -30507,7 +30517,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   if (verb === '__unknown__') {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
-    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor'];
+    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor','providers','inspect','runs','rates'];
     // QQ162 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     let best = null, bestScore = 99;
     for (const k of candidates) {
@@ -30544,12 +30554,15 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       ]],
       ['Provider / Status', [
         ['lazyclaude whoami',                  'Claude CLI login (email/plan/org)'],
-        ['lazyclaude keys',                    'list providers + api-key status (masked)'],
+        ['lazyclaude keys  (= providers)',     'list providers + api-key status (masked)'],
+        ['lazyclaude rates',                   'cost-per-token table for every available model'],
         ['lazyclaude status',                  'quick summary (version + theme + assignee)'],
         ['lazyclaude diag  (= doctor)',        're-run CLI health check (claude/ollama/gemini/...)'],
         ['lazyclaude agents [filter]',         'list registered Claude Code agents'],
         ['lazyclaude sessions [filter]',       'list recent indexed Claude Code sessions'],
         ['lazyclaude skills [filter]',         'list registered skills'],
+        ['lazyclaude inspect <wfId|name>',     'workflow snapshot + last 5 runs'],
+        ['lazyclaude runs [filter]',           'recent workflow runs across all workflows'],
       ]],
       ['Cost / Version', [
         ['lazyclaude usage [N]',               'cost summary across all sessions (default 7d)'],
@@ -31120,6 +31133,127 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       return;
     }
     log.push({ kind: 'err', text: '⚠ doctor handler unavailable', ts: Date.now() });
+    return;
+  }
+  if (verb === 'providers') {
+    // QQ227 — alias to `keys` (CLI verb name parity). Single source of
+    // truth in the keys block above; just forward.
+    return _lcTermHandleBuiltin('keys', rest, log);
+  }
+  if (verb === 'inspect') {
+    // QQ227 — `lazyclaude inspect <wfId>` — workflow snapshot summary
+    // (most-recent run + node count + edges) without leaving the terminal.
+    const id = (rest || '').trim();
+    if (!id) {
+      log.push({ kind: 'err', text: '⚠ ' + t('사용법') + ': lazyclaude inspect <wfId|name>', ts: Date.now() });
+      return;
+    }
+    try {
+      const list = await fetch('/api/workflows/list').then(r => r.json());
+      const all = (list && list.workflows) || [];
+      const lc = id.toLowerCase();
+      let wf = all.find(w => w.id === id) || all.find(w => (w.name || '').toLowerCase().includes(lc) || (w.id || '').toLowerCase().includes(lc));
+      if (!wf) {
+        log.push({ kind: 'err', text: '⚠ workflow not found: ' + id, ts: Date.now() });
+        return;
+      }
+      const runs = await fetch('/api/workflows/runs?workflowId=' + encodeURIComponent(wf.id) + '&limit=5').then(r => r.json()).catch(() => ({ runs: [] }));
+      const r5 = (runs && runs.runs) || [];
+      const lines = [
+        `Workflow  ${wf.id}`,
+        `name:     ${wf.name || '(unnamed)'}`,
+        `nodes:    ${(wf.nodes || []).length}`,
+        `edges:    ${(wf.edges || []).length}`,
+        `tags:     ${(wf.tags || []).join(', ') || '—'}`,
+        `runs (5): ${r5.length}`,
+      ];
+      if (r5.length) {
+        lines.push('');
+        for (const run of r5) {
+          const dur = run.finishedAt && run.startedAt ? ((run.finishedAt - run.startedAt) / 1000).toFixed(1) + 's' : '?';
+          lines.push(`  ${(run.runId || '').slice(0, 12).padEnd(13)} ${(run.status || '?').padEnd(8)} ${dur}`);
+        }
+      }
+      log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'runs') {
+    // QQ227 — list recent workflow runs across all workflows (mirrors
+    // CLI `lazyclaw inspect --recent`).
+    try {
+      const r = await fetch('/api/workflows/runs?limit=20').then(x => x.json());
+      const all = (r && r.runs) || [];
+      const q = (rest || '').trim().toLowerCase();
+      const matched = q ? all.filter(run =>
+        (run.workflowId || '').toLowerCase().includes(q) ||
+        (run.runId || '').toLowerCase().includes(q) ||
+        (run.status || '').toLowerCase().includes(q)
+      ) : all;
+      if (!all.length) {
+        log.push({ kind: 'out', text: '(no workflow runs yet)', ts: Date.now() });
+        return;
+      }
+      if (q && !matched.length) {
+        log.push({ kind: 'err', text: '⚠ no run match: ' + rest, ts: Date.now() });
+        return;
+      }
+      const lines = matched.slice(0, 20).map(run => {
+        const wid = (run.workflowId || '?').slice(0, 16);
+        const rid = (run.runId || '?').slice(0, 12);
+        const dur = run.finishedAt && run.startedAt ? ((run.finishedAt - run.startedAt) / 1000).toFixed(1) + 's' : '—';
+        return `  ${rid.padEnd(13)} ${wid.padEnd(18)} ${(run.status || '?').padEnd(8)} ${dur}`;
+      });
+      const header = q
+        ? `# ${matched.length}/${all.length} runs · "${rest}"`
+        : `# ${matched.length} of ${all.length} runs`;
+      log.push({ kind: 'out', text: header + '\n' + lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'rates') {
+    // QQ227 — print the cost-rate card for every available model across
+    // every provider (parity with CLI `lazyclaw rates list`). Reads from
+    // the existing /api/ai-providers/list response (model.priceIn /
+    // priceOut populated by ai_providers.py to_dict).
+    try {
+      const r = await fetch('/api/ai-providers/list').then(x => x.json());
+      const providers = (r && r.providers) || [];
+      const rows = [];
+      for (const p of providers) {
+        if (!p.available) continue;
+        for (const m of (p.models || [])) {
+          if (typeof m.priceIn !== 'number' && typeof m.priceOut !== 'number') continue;
+          rows.push({
+            id: `${p.id}:${m.id || m.name}`,
+            in: m.priceIn || 0,
+            out: m.priceOut || 0,
+          });
+        }
+      }
+      if (!rows.length) {
+        log.push({ kind: 'out', text: '(no rate-cards published — providers may not have pricing exposed)', ts: Date.now() });
+        return;
+      }
+      const lines = [
+        '# rate cards · USD per 1M tokens',
+        '  model'.padEnd(40) + '  in'.padEnd(10) + ' out',
+      ];
+      for (const r of rows.sort((a, b) => a.id.localeCompare(b.id)).slice(0, 80)) {
+        lines.push(
+          '  ' + r.id.padEnd(38) +
+          '  $' + r.in.toFixed(2).padEnd(8) +
+          '$' + r.out.toFixed(2)
+        );
+      }
+      log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
     return;
   }
   if (!prefs || !schema) {
