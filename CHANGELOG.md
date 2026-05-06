@@ -10,6 +10,43 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.76.0] — 2026-05-06  🎬 first-run CTA + multi-assignee real defaults
+
+### Fixed
+- **`_wfMultiAssigneeAdd` was hardcoded to `claude:opus / claude:sonnet
+  / ...`.** When the user clicked "+ assignee" on a multi-assignee
+  session node, the picker pre-filled the next row with the first
+  candidate the user *didn't* already have — but every candidate was
+  hardcoded. On a machine without claude/openai/gemini installed the
+  newly-added row pinned a useless model. Now reads
+  `__wfProviders.providers` (cached) and builds candidates from the
+  user's actually-available models. Hardcoded fallback only when the
+  provider list hasn't loaded yet.
+- **Run Center modal `_rcExecute` fell back to `'claude:sonnet'`** when
+  the `<select>` had no value. Replaced the literal with a
+  `_firstRealAssignee()` helper that walks the cached provider list.
+
+### Added
+- **First-run banner on the LazyClaw dashboard.** When `available.length
+  === 0` (no provider installed / configured), the dashboard now shows
+  a prominent "🎬 첫 프로바이더 설정으로 시작하세요" banner with a
+  primary "프로바이더 설정 →" button that jumps to the AI Providers
+  tab. Vanishes the instant any provider becomes available, so it
+  never gets in the way of returning users.
+
+### Verification
+- Empty-state probe (mocked `/api/ai-providers/list` with 0 providers)
+  — banner renders, button visible, no console errors.
+- `e2e-tabs-smoke` — 67/67 tabs render cleanly
+- `e2e-crew-wizard-defaults` — still 4/4 (no regression in the v3.75
+  realistic-default seeding)
+
+### Files touched
+- `dist/app.js`: multi-assignee picker, run-center execute fallback,
+  first-run banner
+- `VERSION` 3.75.0 → 3.76.0
+
+---
 ## [3.75.0] — 2026-05-06  🧪 stress-tests confirm canvas, drop crew-wizard fake defaults
 
 ### Performance baselines (no regressions)

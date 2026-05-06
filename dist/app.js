@@ -3184,7 +3184,18 @@ function _rcOpenItem(itemId) {
 
 async function _rcExecute(itemId) {
   const goal     = (document.getElementById('rcGoal')?.value || '').trim();
-  const assignee = document.getElementById('rcAssignee')?.value || 'claude:sonnet';
+  // QQ234 — fall back through cached providers if the dropdown has no
+  // value (which happens when 'claude:sonnet' wasn't in its options
+  // because the user lacks claude-cli). Prefer first-available real
+  // assignee over a hardcoded one the runtime might reject.
+  const _firstRealAssignee = () => {
+    const provs = ((__wfProviders || {}).providers || []).filter(p => p.available && (p.models || []).length);
+    if (!provs.length) return 'claude:sonnet';
+    const p0 = provs[0];
+    const m0 = (p0.models || [])[0];
+    return `${p0.id.replace('-cli', '').replace('-api', '')}:${m0.id || m0.name}`;
+  };
+  const assignee = document.getElementById('rcAssignee')?.value || _firstRealAssignee();
   const timeout  = +(document.getElementById('rcTimeout')?.value || 180);
   if (!goal) { toast(t('목표를 입력하세요'), 'warn'); return; }
 
@@ -7411,11 +7422,22 @@ function _wfMultiAssigneeAdd(nid) {
   n.data = n.data || {};
   const rows = _wfMultiAssigneeRows(n);
   if (rows.length >= 8) return; // matches execute_parallel pool cap
-  // Pick a default that isn't already present so the new row is meaningful.
-  const candidates = ['claude:opus', 'claude:sonnet', 'claude:haiku',
-                       'openai:gpt-4.1', 'gemini:2.5-pro'];
+  // QQ234 — pick the first available provider:model the user actually has,
+  // falling through the cached `__wfProviders` snapshot. The hardcoded
+  // `claude:opus` / `openai:gpt-4.1` / `gemini:2.5-pro` candidates were
+  // useless on machines without those exact installs.
+  const provs = ((__wfProviders || {}).providers || []).filter(p => p.available && (p.models || []).length);
+  const candidates = [];
+  for (const p of provs) {
+    for (const m of (p.models || []).slice(0, 3)) {
+      candidates.push(`${p.id.replace('-cli', '').replace('-api', '')}:${m.id || m.name}`);
+    }
+  }
+  // Last-ditch fallback for environments where the wizard fires before
+  // /api/ai-providers/list resolved.
+  if (!candidates.length) candidates.push('claude:opus');
   const already = new Set(rows);
-  const pick = candidates.find(c => !already.has(c)) || 'claude:opus';
+  const pick = candidates.find(c => !already.has(c)) || candidates[0];
   rows.push(pick);
   n.data.assignee = rows[0] || '';
   n.data.multiAssignee = rows.length >= 2 ? rows : [];
@@ -27735,9 +27757,27 @@ VIEWS.lazyclawDashboard = async () => {
     <td class="p-1" style="color:${r.ok ? 'var(--ok)' : '#fca5a5'};">${r.ok ? '✓' : '✗'}</td>
   </tr>`;
 
+  // QQ234 — first-run banner. When the user has zero available
+  // providers the dashboard's stats grid is meaningless; surface a
+  // direct CTA to the AI Providers tab instead so onboarding has a
+  // single, obvious next step.
+  const firstRunBanner = available.length === 0 ? `
+    <div class="card p-4 mb-4" style="background:linear-gradient(135deg,rgba(217,119,87,0.18),rgba(217,119,87,0.05));border-color:rgba(217,119,87,0.45);">
+      <div class="flex items-center gap-3 flex-wrap">
+        <div style="font-size:2rem;">🎬</div>
+        <div style="flex:1;min-width:260px;">
+          <div class="font-semibold text-sm">${t('첫 프로바이더 설정으로 시작하세요')}</div>
+          <div class="text-[11px]" style="color:var(--text-dim);">${t('Claude / OpenAI / Gemini / Ollama 중 하나라도 설정하면 AI 채팅·워크플로우·오케스트레이터가 모두 활성화됩니다.')}</div>
+        </div>
+        <button class="btn-primary btn text-sm" onclick="go('aiProviders')">${t('프로바이더 설정')} →</button>
+      </div>
+    </div>` : '';
+
   return `
     ${viewHeader('🦞 LazyClaw 대시보드',
       'LazyClaw 데몬·프로바이더·채팅·워크플로우 상태 한 눈에. 타일을 클릭해 빠른 진입.', 'lazyclawDashboard')}
+
+    ${firstRunBanner}
 
     <!-- Quick launch tiles -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
