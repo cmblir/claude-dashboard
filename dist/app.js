@@ -28543,31 +28543,98 @@ function _lcChatRender(opts) {
     return;
   }
   const wasAtBottom = log.scrollHeight - log.scrollTop <= log.clientHeight + 80;
-  log.innerHTML = history.map((m, i) => {
-    const isUser = m.role === 'user';
-    const bg = isUser ? 'rgba(217,119,87,0.1)' : 'rgba(255,255,255,0.04)';
-    const border = isUser ? '1px solid rgba(217,119,87,0.3)' : '1px solid var(--border)';
-    const label = isUser ? '🧑 ' + t('나') : '🤖 ' + escapeHtml(m.assignee || t('AI'));
-    const metaHtml = m.meta ? `<div style="font-size:10px;color:var(--text-dim);margin-top:4px;">${escapeHtml(m.meta)}</div>` : '';
-    const tokenHtml = (m.tokensIn || m.tokensOut) ? `<span style="font-size:9px;color:var(--text-dim);margin-left:6px;">↑${m.tokensIn||0} ↓${m.tokensOut||0}</span>` : '';
-    const sf = JSON.stringify(m.text || '').replace(/"/g, '&quot;');
-    const copyBtn = `<button onclick="_copyToClipboard(this,${sf})" title="${t('복사')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">📋</button>`;
-    const delBtn = `<button onclick="_lcDeleteMsg('${id}',${i})" title="${t('삭제')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:11px;opacity:0.4;color:var(--text-dim);line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">✕</button>`;
-    const regenBtn = (!isUser && i > 0) ? `<button onclick="_lcRegenerate(${i})" title="${t('재생성')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">🔄</button>` : '';
-    // QQ22 (v2.66.97) — edit user message + resubmit (OpenClaw parity).
-    const editBtn = isUser ? `<button onclick="_lcEditUserMsg('${id}',${i})" title="${t('편집 후 재전송')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">✏️</button>` : '';
-    // QQ23 (v2.66.98) — branch conversation from this message (ChatGPT parity).
-    const forkBtn = `<button onclick="_lcBranchFrom('${id}',${i})" title="${t('이 메시지에서 분기')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">🍴</button>`;
-    // QQ15 (v2.66.90) — star toggle. Persists in the message itself
-    // (m.starred boolean) so it travels with export / search results.
-    const starOn = !!m.starred;
-    const starBtn = `<button onclick="_lcToggleStar('${id}',${i})" title="${t('즐겨찾기')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:${starOn?0.95:0.4};color:${starOn?'#fbbf24':'var(--text-dim)'};line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=${starOn?0.95:0.4}">${starOn?'⭐':'☆'}</button>`;
-    return `<div data-lc-msg-idx="${i}" style="background:${bg};border:${border};border-radius:10px;padding:11px 14px;align-self:${isUser?'flex-end':'flex-start'};max-width:88%;min-width:100px;${starOn?'box-shadow:0 0 0 2px rgba(251,191,36,0.18);':''}">
-      <div style="display:flex;align-items:center;font-size:10px;color:var(--text-dim);">${label}${tokenHtml}<span style="flex:1;"></span>${starBtn}${editBtn}${forkBtn}${regenBtn}${copyBtn}${delBtn}</div>
-      <div class="lc-msg-body-host">${_lcMsgBody(m)}${metaHtml}</div>
-    </div>`;
-  }).join('');
+
+  // QQ239 — chunked render for huge sessions. We always do one
+  // synchronous innerHTML write because partial DOM in the chat log
+  // would break scroll-anchoring + the data-lc-msg-idx selectors used
+  // by the streaming patch. But we render only the *last* TAIL bubbles
+  // in the synchronous pass, then prepend the older ones in
+  // requestIdleCallback chunks. Visible viewport = bottom of the log,
+  // so users see latest messages immediately; older ones stream in
+  // while they read. Cancels any prior pending fill so rapid session
+  // switches don't pile up tasks.
+  if (window.__lcRestFillTimer) {
+    if (typeof cancelIdleCallback === 'function') {
+      cancelIdleCallback(window.__lcRestFillTimer);
+    } else {
+      clearTimeout(window.__lcRestFillTimer);
+    }
+    window.__lcRestFillTimer = null;
+  }
+  const TAIL = 120;
+  const total = history.length;
+  const tailStart = total > TAIL ? total - TAIL : 0;
+  const tailHtml = [];
+  for (let i = tailStart; i < total; i++) {
+    tailHtml.push(_lcRenderBubbleHtml(history[i], i, id));
+  }
+  log.innerHTML = tailHtml.join('');
   if (!opts || opts.keepScroll !== true || wasAtBottom) log.scrollTop = log.scrollHeight;
+
+  // Prepend the older messages in idle-time chunks (oldest-first into a
+  // fragment, then prepend in one DOM op so scroll position stays put).
+  if (tailStart > 0) {
+    const sessionAtStart = id;
+    const CHUNK = 80;
+    let cursor = tailStart;
+    const fillStep = () => {
+      // Bail if user navigated away or switched sessions mid-fill.
+      if (state.view !== 'lazyclawChat') return;
+      if (_lcCurrentId() !== sessionAtStart) return;
+      const log2 = document.getElementById('lcChatLog');
+      if (!log2) return;
+      const top = Math.max(0, cursor - CHUNK);
+      const chunk = [];
+      for (let i = top; i < cursor; i++) chunk.push(_lcRenderBubbleHtml(history[i], i, sessionAtStart));
+      const frag = document.createRange().createContextualFragment(chunk.join(''));
+      // Preserve scrollTop relative to bottom — when prepending, the
+      // browser's anchor preservation is unreliable so we measure
+      // before/after scrollHeight and fix up.
+      const prevBottom = log2.scrollHeight - log2.scrollTop;
+      log2.insertBefore(frag, log2.firstChild);
+      log2.scrollTop = log2.scrollHeight - prevBottom;
+      cursor = top;
+      if (cursor > 0) {
+        if (typeof requestIdleCallback === 'function') {
+          window.__lcRestFillTimer = requestIdleCallback(fillStep, { timeout: 600 });
+        } else {
+          window.__lcRestFillTimer = setTimeout(fillStep, 0);
+        }
+      } else {
+        window.__lcRestFillTimer = null;
+      }
+    };
+    if (typeof requestIdleCallback === 'function') {
+      window.__lcRestFillTimer = requestIdleCallback(fillStep, { timeout: 600 });
+    } else {
+      window.__lcRestFillTimer = setTimeout(fillStep, 0);
+    }
+  }
+}
+
+// QQ239 — single-bubble HTML helper extracted so both the
+// initial-tail render and the idle-time prepend pass use the same
+// markup. Keeps the data-lc-msg-idx attribute intact so the streaming
+// patch (_lcPatchStreamMsg) keeps working.
+function _lcRenderBubbleHtml(m, i, sessionId) {
+  const isUser = m.role === 'user';
+  const bg = isUser ? 'rgba(217,119,87,0.1)' : 'rgba(255,255,255,0.04)';
+  const border = isUser ? '1px solid rgba(217,119,87,0.3)' : '1px solid var(--border)';
+  const label = isUser ? '🧑 ' + t('나') : '🤖 ' + escapeHtml(m.assignee || t('AI'));
+  const metaHtml = m.meta ? `<div style="font-size:10px;color:var(--text-dim);margin-top:4px;">${escapeHtml(m.meta)}</div>` : '';
+  const tokenHtml = (m.tokensIn || m.tokensOut) ? `<span style="font-size:9px;color:var(--text-dim);margin-left:6px;">↑${m.tokensIn||0} ↓${m.tokensOut||0}</span>` : '';
+  const sf = JSON.stringify(m.text || '').replace(/"/g, '&quot;');
+  const copyBtn = `<button onclick="_copyToClipboard(this,${sf})" title="${t('복사')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">📋</button>`;
+  const delBtn = `<button onclick="_lcDeleteMsg('${sessionId}',${i})" title="${t('삭제')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:11px;opacity:0.4;color:var(--text-dim);line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">✕</button>`;
+  const regenBtn = (!isUser && i > 0) ? `<button onclick="_lcRegenerate(${i})" title="${t('재생성')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">🔄</button>` : '';
+  const editBtn = isUser ? `<button onclick="_lcEditUserMsg('${sessionId}',${i})" title="${t('편집 후 재전송')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">✏️</button>` : '';
+  const forkBtn = `<button onclick="_lcBranchFrom('${sessionId}',${i})" title="${t('이 메시지에서 분기')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:0.4;line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.4">🍴</button>`;
+  const starOn = !!m.starred;
+  const starBtn = `<button onclick="_lcToggleStar('${sessionId}',${i})" title="${t('즐겨찾기')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:${starOn?0.95:0.4};color:${starOn?'#fbbf24':'var(--text-dim)'};line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=${starOn?0.95:0.4}">${starOn?'⭐':'☆'}</button>`;
+  return `<div data-lc-msg-idx="${i}" style="background:${bg};border:${border};border-radius:10px;padding:11px 14px;align-self:${isUser?'flex-end':'flex-start'};max-width:88%;min-width:100px;${starOn?'box-shadow:0 0 0 2px rgba(251,191,36,0.18);':''}">
+    <div style="display:flex;align-items:center;font-size:10px;color:var(--text-dim);">${label}${tokenHtml}<span style="flex:1;"></span>${starBtn}${editBtn}${forkBtn}${regenBtn}${copyBtn}${delBtn}</div>
+    <div class="lc-msg-body-host">${_lcMsgBody(m)}${metaHtml}</div>
+  </div>`;
 }
 
 // Incremental streaming patch — updates only the body of the bubble whose

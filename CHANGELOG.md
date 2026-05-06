@@ -10,6 +10,52 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.81.0] — 2026-05-06  ⚡ chunked chat render — bounded first-paint cost
+
+### Performance
+- **`_lcChatRender` no longer writes the entire history in one
+  innerHTML pass.** When a session exceeds 120 messages, the
+  synchronous pass now renders only the last 120 bubbles (the user's
+  visible viewport — chat scrolls to bottom on open). Older bubbles
+  prepend in `requestIdleCallback` chunks of 80 while the user reads.
+  - **Bounded first-paint regardless of total messages.** Measured
+    longest-task is now constant ~80 ms whether the session has 1 000
+    or 5 000 messages — the v3.80 baseline grew slightly with N
+    because the whole history was rendered up-front.
+  - **`_lcDeleteMsg` re-render dropped from 50–53 ms → 28–35 ms** for
+    the same reason — fewer bubbles in the synchronous pass.
+  - Pending idle-time prepend cancels when the user navigates away or
+    switches sessions, so rapid session-switching doesn't pile up
+    work.
+  - Scroll position preserved across the prepend pass (saves
+    `scrollHeight - scrollTop` before insertion, restores after).
+- **Single-bubble renderer extracted to `_lcRenderBubbleHtml`** so
+  the sync tail render and the idle prepend pass share one markup
+  template — `data-lc-msg-idx` semantics intact, streaming patch
+  (`_lcPatchStreamMsg`) unchanged.
+
+### Measurements (perf-chat-1k.mjs after this cycle)
+| N    | first scripting | longest task | delete re-render |
+|------|-----------------|--------------|------------------|
+| 1000 | 89 ms           | 89 ms        | 35 ms            |
+| 2000 | 78 ms           | 78 ms        | 28 ms            |
+| 5000 | 79 ms           | 79 ms        | 29 ms            |
+
+Compare to v3.80 baseline: 96 / 95 / 87 ms first scripting respectively.
+
+### Files touched
+- `dist/app.js`: `_lcChatRender` chunked write, new
+  `_lcRenderBubbleHtml` helper
+- `VERSION` 3.80.0 → 3.81.0
+
+### Verification
+- `e2e-tabs-smoke` 67/67
+- `e2e-chat-slash-smoke` clean
+- `perf-long-session` 0.0 MB heap growth
+- `perf-chat-1k` (rerun on 1000/2000/5000): see table above —
+  first paint ≤ 89 ms across every sample size
+
+---
 ## [3.80.0] — 2026-05-06  📊 chat 1k-5k message stress baseline
 
 ### Confirmed
