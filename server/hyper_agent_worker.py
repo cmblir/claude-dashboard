@@ -200,14 +200,36 @@ def _tick_one(meta_key: str, agent_meta: dict, now_ms: int) -> None:
 def _loop() -> None:
     log.info("hyper-agent worker started (tick=%ds, prefs=%s)",
              _TICK_SECONDS, HYPER_AGENTS_PATH)
+    # QQ240 — start-up jitter (0–15 s) so this worker doesn't fire on
+    # the same second as the orchestrator sweeper, which also runs on
+    # a 60 s tick. Without jitter, both spawn ThreadPoolExecutors at
+    # exactly t=60 s / t=120 s / … — observable as a regular CPU
+    # spike from the dashboard's perspective.
+    import random as _random
+    initial_delay = _random.uniform(0, 15)
+    if _STOP.wait(initial_delay):
+        return
     while not _STOP.is_set():
         try:
             meta = load_meta()
-            now_ms = int(time.time() * 1000)
-            for key, entry in (meta.get("agents") or {}).items():
-                if _STOP.is_set():
-                    break
-                _tick_one(key, entry, now_ms)
+            agents = meta.get("agents") or {}
+            # QQ240 — fast-path: nothing to do, skip the JSONL scan + the
+            # `_tick_one` loop entirely. Cuts steady-state CPU when no
+            # hyper-agent is configured (the typical install).
+            if not agents:
+                pass
+            else:
+                # Same fast skip when no agent is enabled.
+                any_enabled = any(
+                    isinstance(v, dict) and v.get("enabled") and v.get("trigger") in (None, "interval", "cron", "any", "after_session")
+                    for v in agents.values()
+                )
+                if any_enabled:
+                    now_ms = int(time.time() * 1000)
+                    for key, entry in agents.items():
+                        if _STOP.is_set():
+                            break
+                        _tick_one(key, entry, now_ms)
         except Exception as e:
             log.exception("hyper-agent loop iteration failed: %s", e)
         _STOP.wait(_TICK_SECONDS)

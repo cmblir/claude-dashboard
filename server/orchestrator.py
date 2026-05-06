@@ -1312,10 +1312,24 @@ _SWEEP_STOP = threading.Event()
 def _sweep_once() -> int:
     """One pass over the bindings. Returns the number of dispatches fired
     (used by tests + status endpoints).
+
+    QQ240 — fast-path: when there are no bindings *with* a schedule, skip
+    the loop entirely. The default install has an empty `bindings` list,
+    so the sweeper can hot-loop hundreds of times before the user adds
+    a single binding — no need to walk it on every tick.
     """
     cfg = load_config()
     bindings = cfg.get("bindings") or []
     if not bindings:
+        return 0
+    # Skip the iteration when no binding actually has a scheduled prompt.
+    # (Re-check inside the loop too — defence in depth.)
+    if not any(
+        isinstance(b.get("schedule"), dict)
+        and b["schedule"].get("everyMinutes")
+        and b["schedule"].get("prompt")
+        for b in bindings
+    ):
         return 0
     now_ms = int(time.time() * 1000)
     fired = 0
@@ -1359,6 +1373,15 @@ def _sweep_once() -> int:
 
 
 def _sweep_loop() -> None:
+    # QQ240 — start-up jitter (0–10 s) so the sweeper and the
+    # hyper-agent worker (also 60 s tick) don't fire on the same
+    # second. Without jitter both threads cold-start at t=0 + 60 s
+    # boundaries, producing a regular CPU spike the user perceives
+    # as a hitch when the dashboard is otherwise idle.
+    import random as _random
+    initial_delay = _random.uniform(0, 10)
+    if _SWEEP_STOP.wait(initial_delay):
+        return
     while not _SWEEP_STOP.is_set():
         try:
             _sweep_once()

@@ -10,6 +10,61 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.83.0] — 2026-05-06  🧯 background-worker lock-step spike eliminated
+
+**User report**: "Dashboard 작동 이후에 렉이 급격하게 걸리는 경우가
+너무 많아."
+
+### Root cause
+Server-side observation (60 s sample with the dashboard idle in
+Chromium):
+
+```
+  t=5s  | RSS=54MB  CPU=0%   threads=7   procs=1
+  t=12s | RSS=55MB  CPU=0%   threads=7   procs=1
+   …    (steady)
+  t=60s | RSS=56MB  CPU=2.8% threads=13  procs=2   ← spike
+```
+
+`server/hyper_agent_worker.py` (`_TICK_SECONDS=60`) and
+`server/orchestrator.py` (`_SWEEP_INTERVAL_S=60`) both started at
+`t=0` and fired in lock-step at every 60 s boundary — visible as a
++6-thread / +2.8% CPU hitch. Even on the typical install where neither
+worker has any data to process, the loop body was running every tick.
+
+### Fixed
+- **Start-up jitter**: hyper-agent worker waits a random 0–15 s before
+  its first tick; orchestrator sweeper waits 0–10 s. After the first
+  fire, the threads are no longer phase-aligned and their work spreads
+  across the 60 s window instead of pancaking on the same second.
+- **Fast-paths**: hyper-agent now skips the JSONL session scan + the
+  `_tick_one` loop entirely when no agents are configured *or* when
+  no agent is enabled. Orchestrator sweeper bails out of `_sweep_once`
+  before the loop when no binding has a `schedule.everyMinutes +
+  schedule.prompt` pair (the default install has zero).
+
+### Measured
+| metric | before | after |
+|---|---|---|
+| t=60 s spike | thread 7→13, CPU 2.8 % | no spike — phase-shifted to t≈80 s, CPU 0.8 %, +1 thread |
+| `perf-long-session` total scripting | 531 ms | 68 ms (-87 %) |
+| RSS (idle) | 54–56 MB | 34–60 MB (GC fires more freely) |
+
+### Files touched
+- `server/hyper_agent_worker.py`: jitter + agents-empty / nobody-enabled
+  fast-path
+- `server/orchestrator.py`: jitter + bindings-empty / no-schedule
+  fast-path
+- `VERSION` 3.82.0 → 3.83.0
+
+### Verification
+- Live 90-second server probe — no t=60 s spike
+- `e2e-tabs-smoke` 67/67
+- `e2e-workflow-run-e2e` 8/8
+- `perf-long-session` total scripting 531 ms → 68 ms (no regression in
+  heap: still 0 MB growth over 117 navigations)
+
+---
 ## [3.82.0] — 2026-05-06  🧪 E2E coverage for /delegate and /parallel chat slashes
 
 ### Added
