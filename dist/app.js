@@ -229,7 +229,7 @@ function viewHeader(title, subtitle, viewId) {
         <h1 class="text-2xl font-bold leading-tight">${escapeHtml(t(title))}</h1>
         ${subtitle ? `<p class="text-sm text-[var(--text-mute)] mt-2" style="max-width:64ch;line-height:1.5;">${t(subtitle)}</p>` : ''}
       </div>
-      ${docUrl ? `<a class="btn text-xs" href="${docUrl}" target="_blank" rel="noopener">📖 ${t('공식 문서 ↗')}</a>` : ''}
+      ${docUrl ? `<a class="btn text-xs" href="${docUrl}" target="_blank" rel="noopener noreferrer">📖 ${t('공식 문서 ↗')}</a>` : ''}
     </div>`;
 }
 
@@ -1335,7 +1335,7 @@ VIEWS.features = async () => {
       </div>
       <div class="flex gap-2">
         <button class="btn text-xs" onclick="refreshFeatures()">📡 최신 정보 로딩</button>
-        <a class="btn text-xs" href="https://platform.claude.com/docs/en/release-notes/overview" target="_blank" rel="noopener">📖 전체 릴리즈 노트</a>
+        <a class="btn text-xs" href="https://platform.claude.com/docs/en/release-notes/overview" target="_blank" rel="noopener noreferrer">📖 전체 릴리즈 노트</a>
       </div>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1405,8 +1405,8 @@ function openFeatureWindow(feat) {
         <div class="text-sm">${escapeHtml(feat.summary||'')}</div>
       </div>
       <div class="flex gap-2 mb-4 flex-wrap">
-        ${feat.launchUrl ? `<a class="btn-primary btn text-xs" href="${escapeHtml(feat.launchUrl)}" target="_blank" rel="noopener">🚀 사용하기</a>` : ''}
-        ${feat.docUrl ? `<a class="btn text-xs" href="${escapeHtml(feat.docUrl)}" target="_blank" rel="noopener">📖 공식 문서 ↗</a>` : ''}
+        ${feat.launchUrl ? `<a class="btn-primary btn text-xs" href="${escapeHtml(feat.launchUrl)}" target="_blank" rel="noopener noreferrer">🚀 사용하기</a>` : ''}
+        ${feat.docUrl ? `<a class="btn text-xs" href="${escapeHtml(feat.docUrl)}" target="_blank" rel="noopener noreferrer">📖 공식 문서 ↗</a>` : ''}
       </div>
       ${feat.id === 'design' ? '<div id="feat-win-design-extras" class="mt-3 pt-3 border-t border-[var(--border)]"><div class="text-xs text-[var(--text-mute)]">로딩 중…</div></div>' : ''}
       ${feat.isDynamic ? '<div class="card p-3 text-[10px] mt-3" style="background:rgba(167,139,250,0.08);">🤖 AI 가 자동 발견한 항목 — 공식 문서 링크로 확인 권장</div>' : ''}
@@ -1597,7 +1597,7 @@ VIEWS.onboarding = async () => {
           ${s.hint ? `<div class="text-[11px] text-[var(--text-dim)] mb-2">💡 ${escapeHtml(s.hint)}</div>` : ''}
           <div class="flex gap-2 flex-wrap">
             ${s.navigate ? `<button class="btn text-[11px]" onclick="go('${s.navigate}')">→ ${t('해당 탭으로')}</button>` : ''}
-            ${s.doc ? `<a class="btn text-[11px]" href="${s.doc}" target="_blank" rel="noopener">📖 ${t('공식 문서')}</a>` : ''}
+            ${s.doc ? `<a class="btn text-[11px]" href="${s.doc}" target="_blank" rel="noopener noreferrer">📖 ${t('공식 문서')}</a>` : ''}
           </div>
         </div>
       `).join('')}
@@ -1778,7 +1778,7 @@ function _renderGuideToolkits(list) {
               <div class="text-sm text-[var(--text-mute)] mb-1">${escapeHtml(tk.subtitle||'')}</div>
               <div class="text-[11px] text-[var(--text-dim)]">${t('제작')}: ${escapeHtml(tk.author||'')}</div>
             </div>
-            <a class="btn text-xs" href="${escapeHtml(tk.repo)}" target="_blank" rel="noopener">↗ ${t('리포 열기')}</a>
+            <a class="btn text-xs" href="${escapeHtml(tk.repo)}" target="_blank" rel="noopener noreferrer">↗ ${t('리포 열기')}</a>
           </div>
 
           ${tk.highlights?.length ? `
@@ -1826,7 +1826,7 @@ function _renderGuideExternal(list) {
   return `
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
       ${list.map(tk => `
-        <a class="card p-4 hover-lift block no-underline" href="${escapeHtml(tk.repo)}" target="_blank" rel="noopener"
+        <a class="card p-4 hover-lift block no-underline" href="${escapeHtml(tk.repo)}" target="_blank" rel="noopener noreferrer"
            style="text-decoration:none; color:inherit;">
           <div class="text-3xl mb-2">${tk.id==='wikidocs-claude-code-guide'?'📖':(tk.id==='claude-code-best-practice'?'🎯':'🧰')}</div>
           <div class="font-semibold text-sm mb-1">${escapeHtml(tk.title)}</div>
@@ -10409,7 +10409,7 @@ VIEWS.analytics = async () => {
       </div>
       <div class="flex gap-2">
         <button class="btn" onclick="reindex(true)">🔄 전체 재인덱스</button>
-        <a class="btn text-xs" href="${DOCS_BASE}costs" target="_blank" rel="noopener">📖 공식 문서 ↗</a>
+        <a class="btn text-xs" href="${DOCS_BASE}costs" target="_blank" rel="noopener noreferrer">📖 공식 문서 ↗</a>
       </div>
     </div>
 
@@ -10559,7 +10559,7 @@ VIEWS.sessions = async () => {
       </div>
       <div class="flex gap-2">
         <input id="sessQ" class="input max-w-[300px]" placeholder="요청/프로젝트/세션ID 검색…" value="${escapeHtml(q.q)}" />
-        <a class="btn text-xs" href="${DOCS_BASE}interactive-mode" target="_blank" rel="noopener">📖</a>
+        <a class="btn text-xs" href="${DOCS_BASE}interactive-mode" target="_blank" rel="noopener noreferrer">📖</a>
         <select id="sessSort" class="input max-w-[150px]">
           <option value="recent" ${q.sort==='recent'?'selected':''}>최신순</option>
           <option value="score" ${q.sort==='score'?'selected':''}>스코어순</option>
@@ -11415,7 +11415,7 @@ VIEWS.agents = async () => {
       <div class="flex gap-2">
         <button class="btn text-xs" onclick="openCreateAgent()">＋ 전역 에이전트</button>
         ${_localizeBtnHtml('agent', agents)}
-        <a class="btn text-xs" href="${DOCS_BASE}sub-agents" target="_blank" rel="noopener">📖</a>
+        <a class="btn text-xs" href="${DOCS_BASE}sub-agents" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
     <div class="card p-3 mb-3 text-[11px] text-[var(--text-mute)] flex items-center gap-2">
@@ -12287,7 +12287,7 @@ VIEWS.skills = async () => {
           <input type="checkbox" id="skillOnlyEnabled" ${onlyEnabled?'checked':''}/> ${t('사용자 설정만')}
         </label>`}
         ${inProject ? `<button class="btn-primary btn text-xs" onclick="newProjectSkill()">＋ ${t('새 스킬')}</button>` : _localizeBtnHtml('skill', skills)}
-        <a class="btn text-xs" href="${DOCS_BASE}skills" target="_blank" rel="noopener">📖</a>
+        <a class="btn text-xs" href="${DOCS_BASE}skills" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
     ${groupOrder.map(g => (groups[g]||[]).length ? `
@@ -12477,7 +12477,7 @@ VIEWS.commands = async () => {
           <input type="checkbox" id="cmdOnlyUntr" ${onlyUntranslated?'checked':''}/> ${t('미번역만')}
         </label>
         ${_localizeBtnHtml('cmd', cmds)}`}
-        <a class="btn text-xs" href="${DOCS_BASE}slash-commands" target="_blank" rel="noopener">📖</a>
+        <a class="btn text-xs" href="${DOCS_BASE}slash-commands" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
     ${inProject ? '' : `<div class="card p-3 mb-4 flex flex-wrap gap-2">
@@ -14733,7 +14733,7 @@ VIEWS.claudeDocs = async () => {
       </div>
       <div class="text-[11px] text-[var(--text-mute)] flex-1">${escapeHtml(it.summary)}</div>
       <div class="flex items-center gap-2 mt-1">
-        <a href="${it.url}" target="_blank" class="btn btn-sm">🔗 ${t('외부 열기')}</a>
+        <a href="${it.url}" target="_blank" rel="noopener noreferrer" class="btn btn-sm">🔗 ${t('외부 열기')}</a>
         ${it.relatedTab ? `<button class="btn btn-sm" onclick="go('${it.relatedTab}')">→ ${t('관련 탭')}</button>` : ''}
       </div>
       <div class="text-[9px] text-[var(--text-dim)] font-mono truncate">${escapeHtml(it.url)}</div>
@@ -15232,7 +15232,7 @@ VIEWS.hooks = async () => {
         <button class="btn text-xs" onclick="startFeatureRecommend('hooks')">🤖 AI 추천</button>
         <button class="btn text-xs" onclick="_openHookPresets()">📚 ${t('프리셋')}</button>
         <button class="btn-primary btn" onclick="openHookEditor()">＋ 새 훅 추가</button>
-        <a class="btn text-xs" href="${DOCS_BASE}hooks" target="_blank" rel="noopener">📖</a>
+        <a class="btn text-xs" href="${DOCS_BASE}hooks" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
 
@@ -15844,7 +15844,7 @@ VIEWS.permissions = async () => {
       </div>
       <div class="flex gap-2">
         <button class="btn text-xs" onclick="startFeatureRecommend('permissions')">🤖 AI 추천</button>
-        <a class="btn text-xs" href="${DOCS_BASE}iam" target="_blank" rel="noopener">📖</a>
+        <a class="btn text-xs" href="${DOCS_BASE}iam" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
     ${issues.length ? `
@@ -15936,7 +15936,7 @@ VIEWS.mcp = async () => {
       </div>
       <div class="flex gap-2">
         <button class="btn-primary btn text-xs" onclick="aiRecommendList('mcp')">🤖 AI 추천</button>
-        <a class="btn text-xs" href="${DOCS_BASE}mcp" target="_blank" rel="noopener">📖</a>
+        <a class="btn text-xs" href="${DOCS_BASE}mcp" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
 
@@ -16198,7 +16198,7 @@ VIEWS.plugins = async () => {
       <div class="flex gap-2">
         <button class="btn-primary btn text-xs" onclick="aiRecommendList('plugins')">🤖 AI 추천</button>
         ${_localizeBtnHtml('plugin', browse.plugins)}
-        <a class="btn text-xs" href="${DOCS_BASE}plugins" target="_blank" rel="noopener">📖 공식 문서 ↗</a>
+        <a class="btn text-xs" href="${DOCS_BASE}plugins" target="_blank" rel="noopener noreferrer">📖 공식 문서 ↗</a>
       </div>
     </div>
 
@@ -16314,7 +16314,7 @@ VIEWS.settings = async () => {
       <div class="flex gap-2">
         <button class="btn" onclick="copySettings()">📋 ${t('복사')}</button>
         <button class="btn-primary btn" onclick="saveSettings()">💾 ${t('저장')}</button>
-        <a class="btn text-xs" href="${DOCS_BASE}settings" target="_blank" rel="noopener">📖 ${t('공식 문서')} ↗</a>
+        <a class="btn text-xs" href="${DOCS_BASE}settings" target="_blank" rel="noopener noreferrer">📖 ${t('공식 문서')} ↗</a>
       </div>
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -16583,7 +16583,7 @@ VIEWS.claudemd = async () => {
       <div class="flex gap-2">
         ${isProject ? '' : '<button class="btn" onclick="startGlobalClaudeMdRecommend()">🤖 AI 에게 추천</button>'}
         <button class="btn-primary btn" onclick="saveClaudeMd()">💾 ${t('저장')}</button>
-        <a class="btn text-xs" href="${DOCS_BASE}memory" target="_blank" rel="noopener">📖</a>
+        <a class="btn text-xs" href="${DOCS_BASE}memory" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
     ${isEmpty ? `
@@ -17482,7 +17482,7 @@ VIEWS.projectAgents = async () => {
       </div>
       <div class="flex gap-2 items-center">
         <select class="input max-w-[380px]" onchange="state.data.paCwd=this.value;renderView();">${projectOptions}</select>
-        <a class="btn text-xs" href="${DOCS_BASE}sub-agents" target="_blank" rel="noopener">📖</a>
+        <a class="btn text-xs" href="${DOCS_BASE}sub-agents" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
 
@@ -18000,7 +18000,7 @@ VIEWS.aiProviders = async () => {
           ${chip} ${keyChip} ${testBtn} ${chatBtn}
         </div>
       </div>
-      ${p.homepage ? `<a href="${escapeHtml(p.homepage)}" target="_blank" class="text-xs" style="color:var(--cyan)">${escapeHtml(p.homepage)}</a>` : ''}
+      ${p.homepage ? `<a href="${escapeHtml(p.homepage)}" target="_blank" rel="noopener noreferrer" class="text-xs" style="color:var(--cyan)">${escapeHtml(p.homepage)}</a>` : ''}
       ${unavailRow}
       ${cliInstallBlock}
       <div class="mt-2 flex flex-wrap gap-1">
@@ -18706,7 +18706,7 @@ window._wizardSelectProvider = (provider) => {
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('API 키')}</label>
       <input type="password" id="wizardApiKey" class="input w-full text-sm" placeholder="gsk_..." />
       <div class="text-[10px] mt-1 mb-2" style="color:var(--text-dim)">
-        ${t('발급')}: <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style="color:var(--accent);">console.groq.com/keys ↗</a>
+        ${t('발급')}: <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" style="color:var(--accent);">console.groq.com/keys ↗</a>
       </div>
       <button class="btn-primary btn text-xs mt-2" onclick="_wizardSaveApiKey('groq-api')">${t('API 키 저장')}</button>
     `,
@@ -18721,7 +18721,7 @@ window._wizardSelectProvider = (provider) => {
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('API 키')}</label>
       <input type="password" id="wizardApiKey" class="input w-full text-sm" placeholder="sk-..." />
       <div class="text-[10px] mt-1 mb-2" style="color:var(--text-dim)">
-        ${t('발급')}: <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener" style="color:var(--accent);">platform.deepseek.com ↗</a>
+        ${t('발급')}: <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer" style="color:var(--accent);">platform.deepseek.com ↗</a>
       </div>
       <button class="btn-primary btn text-xs mt-2" onclick="_wizardSaveApiKey('deepseek-api')">${t('API 키 저장')}</button>
     `,
@@ -18736,7 +18736,7 @@ window._wizardSelectProvider = (provider) => {
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('API 키')}</label>
       <input type="password" id="wizardApiKey" class="input w-full text-sm" placeholder="..." />
       <div class="text-[10px] mt-1 mb-2" style="color:var(--text-dim)">
-        ${t('발급')}: <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noopener" style="color:var(--accent);">console.mistral.ai ↗</a>
+        ${t('발급')}: <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noopener noreferrer" style="color:var(--accent);">console.mistral.ai ↗</a>
       </div>
       <button class="btn-primary btn text-xs mt-2" onclick="_wizardSaveApiKey('mistral-api')">${t('API 키 저장')}</button>
     `,
@@ -19926,7 +19926,7 @@ VIEWS.outputStyles = async () => {
       </div>
       <div class="flex gap-2">
         <button class="btn text-xs" onclick="startFeatureRecommend('output-styles')">🤖 AI 추천</button>
-        <a class="btn text-xs" href="${DOCS_BASE}output-styles" target="_blank" rel="noopener">📖</a>
+        <a class="btn text-xs" href="${DOCS_BASE}output-styles" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
     <div class="card p-4 mb-4" style="background: linear-gradient(135deg, rgba(217,119,87,0.06), transparent);">
@@ -20016,7 +20016,7 @@ VIEWS.statusline = async () => {
       </div>
       <div class="flex gap-2">
         <button class="btn text-xs" onclick="startFeatureRecommend('statusline')">🤖 AI 추천</button>
-        <a class="btn text-xs" href="${DOCS_BASE}statusline" target="_blank" rel="noopener">📖</a>
+        <a class="btn text-xs" href="${DOCS_BASE}statusline" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -20081,7 +20081,7 @@ VIEWS.metrics = async () => {
         <h1 class="text-2xl font-bold">토큰 메트릭 <span class="text-xs text-[var(--text-dim)]">(DB 기반)</span></h1>
         <p class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(d.note||'')} · 세션 ${t.n}개</p>
       </div>
-      <a class="btn text-xs" href="${DOCS_BASE}monitoring-usage" target="_blank" rel="noopener">📖</a>
+      <a class="btn text-xs" href="${DOCS_BASE}monitoring-usage" target="_blank" rel="noopener noreferrer">📖</a>
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
@@ -21697,8 +21697,8 @@ VIEWS.rtk = async () => {
       <div class="card p-4">
         <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${t('rtk_links_label', '참고')}</div>
         <div class="text-[11px] space-y-1">
-          <a href="${escapeHtml(d.homepage)}" target="_blank" rel="noopener" style="color:var(--accent);">📦 rtk-ai/rtk (GitHub)</a><br>
-          <a href="${escapeHtml(d.guide)}" target="_blank" rel="noopener" style="color:var(--accent);">📘 ${t('rtk_guide', '공식 가이드')}</a>
+          <a href="${escapeHtml(d.homepage)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);">📦 rtk-ai/rtk (GitHub)</a><br>
+          <a href="${escapeHtml(d.guide)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);">📘 ${t('rtk_guide', '공식 가이드')}</a>
         </div>
       </div>
     </div>
@@ -22197,7 +22197,7 @@ VIEWS.usage = async () => {
           DB 세션 토큰 + ${d.exists ? `cost-tracker.log ${d.parsedEvents}개 이벤트 (${fileMb}MB)` : 'cost-tracker.log 없음'}
         </p>
       </div>
-      <a class="btn text-xs" href="${DOCS_BASE}costs" target="_blank" rel="noopener">📖</a>
+      <a class="btn text-xs" href="${DOCS_BASE}costs" target="_blank" rel="noopener noreferrer">📖</a>
     </div>
 
     <!-- 토큰 요약 -->
@@ -22776,7 +22776,7 @@ VIEWS.team = async () => {
     </div>
     <div class="card p-4 mt-4 text-xs text-[var(--text-mute)]">
       <b>${t('참고')}:</b> ${escapeHtml(team.note||'')}<br>
-      ${t('팀 멤버 목록·사용량·결제는')} <a href="https://claude.ai/settings/organization" target="_blank" style="color:var(--accent); text-decoration:underline;">claude.ai/settings/organization</a> ${t('에서 직접 관리합니다')}.
+      ${t('팀 멤버 목록·사용량·결제는')} <a href="https://claude.ai/settings/organization" target="_blank" rel="noopener noreferrer" style="color:var(--accent); text-decoration:underline;">claude.ai/settings/organization</a> ${t('에서 직접 관리합니다')}.
     </div>
   `;
 };
@@ -25459,7 +25459,10 @@ function _qsRenderCurrentParams() {
       if (dr && dr.dataset.section === 'current') _qsRefreshSection('current');
     }).catch(() => {});
   } catch {}
-  const link = (path, label) => `<button class="btn btn-ghost" onclick="window.open('${path}', '_blank')">${label}</button>`;
+  // QQ230 — third arg `noopener,noreferrer` keeps the new tab from
+  // sharing a process with the dashboard (Chrome can recycle its
+  // renderer independently) and strips referrer headers.
+  const link = (path, label) => `<button class="btn btn-ghost" onclick="window.open('${path}', '_blank', 'noopener,noreferrer')">${label}</button>`;
   return `
     <div class="qs-section-desc" data-i18n="qs.section.current.desc">현재 적용 중인 모든 파라미터와 런타임 정보를 보여줍니다 (읽기 전용).</div>
     <h4 style="margin:0.6rem 0 0.3rem;font-size:0.85rem;" data-i18n="유효 파라미터">유효 파라미터</h4>

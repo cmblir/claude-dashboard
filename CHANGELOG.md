@@ -10,6 +10,49 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.71.0] — 2026-05-06  🌐 every external link gets noopener+noreferrer
+
+**User report**: "Google Chrome Helper (Renderer) 헬퍼도 엄청 켜지는 것
+같은데" — Chrome Helper (Renderer) processes accumulating.
+
+### Diagnosis
+- 23 Chrome Helper renderers under user's installed Chrome (`/Applications/
+  Google Chrome.app`, not Playwright). Site Isolation gives every distinct
+  origin its own renderer; extensions add more.
+- The dashboard contributed: 31 `<a target="_blank">` links plus one
+  `window.open(...)` call. 28 of the anchors had only `rel="noopener"`,
+  3 had no `rel` at all, and the `window.open` call passed no flags.
+- Without `noopener+noreferrer`, the new tab inherits a `window.opener`
+  reference; Chrome can't recycle that renderer independently of the
+  parent dashboard tab. Renderers therefore stayed alive even after the
+  user closed the spawned tab.
+
+### Fixed
+- Audited every external link path:
+  - 3 anchors that had no `rel` attribute now carry `rel="noopener
+    noreferrer"`.
+  - 28 anchors with `rel="noopener"` upgraded to `rel="noopener
+    noreferrer"`.
+  - 1 `window.open(path, '_blank')` call now passes `'noopener,
+    noreferrer'` as its third argument.
+- New `e2e-noopener-verify.mjs` walks 7 representative tabs (overview,
+  aiProviders, features, team, sessions, agents, workflows) and asserts
+  every rendered `<a target="_blank">` includes both `noopener` and
+  `noreferrer`. Catches regressions when new tabs are added.
+
+### Files touched
+- `dist/app.js`: 3 anchor fixes + 28 anchors bulk-upgraded + 1
+  `window.open` triplet
+- `scripts/e2e-noopener-verify.mjs`: new audit
+- `VERSION` 3.70.0 → 3.71.0
+
+### Verification
+- `e2e-tabs-smoke` — 67/67
+- `e2e-noopener-verify` (new) — 7 tabs, 0 offenders
+- All previously-published links still navigate correctly (rel only
+  affects opener relationship + referer header, not the target URL).
+
+---
 ## [3.70.0] — 2026-05-06  🛠 3 more terminal verbs + provider-test error_key
 
 ### Added
