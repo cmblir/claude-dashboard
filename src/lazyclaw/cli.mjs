@@ -1466,31 +1466,25 @@ function _printChatBanner(activeProvName, activeModel, version) {
 // when the user passes --pick. Falls back to plain stdin reads when
 // stdout isn't a TTY (CI/script callers should pass --non-interactive
 // equivalents instead).
-async function _pickProviderInteractive() {
-  const providers = Object.keys(_registryMod.PROVIDERS);
-  if (!providers.length) return { provider: 'mock', model: null };
-  const info = _registryMod.PROVIDER_INFO || {};
-  // Build one row per (provider, model) pair using the static
-  // PROVIDER_INFO.suggestedModels list (registry.mjs is the single
-  // source of truth). When a provider has no models (mock), we emit
-  // one row for the provider itself.
-  const items = [];
-  for (const name of providers) {
-    const meta = info[name] || {};
-    const models = (Array.isArray(meta.suggestedModels) && meta.suggestedModels.length)
-      ? meta.suggestedModels
-      : [null];
-    const keyTag = meta.requiresApiKey
-      ? '\x1b[38;5;245m[api key]\x1b[0m'
-      : (name === 'claude-cli' ? '\x1b[38;5;208m[subscription]\x1b[0m' : '\x1b[38;5;245m[no key]\x1b[0m');
-    for (const m of models) {
-      const label = m ? `${name.padEnd(11)}  ${m}` : `${name.padEnd(11)}  (no model)`;
-      items.push({ provider: name, model: m, label, keyTag });
-    }
-  }
+// Generic arrow-key menu used by the multi-step provider/model
+// picker below. Returns the picked item, or one of the sentinel
+// strings 'BACK' (Esc — caller should retry the previous step) or
+// 'CANCEL' (q — caller should bail entirely). Ctrl-C exits the
+// process directly, matching every other interactive prompt in the
+// CLI.
+//
+// `items` is an array of { id, label, desc, tag }. `tag` is an
+// optional pre-coloured pill (e.g. "[api key]") that lands on the
+// right side of the row. `defaultIdx` lets the caller pin where the
+// cursor lands; default 0.
+async function _arrowMenu({ title, subtitle, footer, items, defaultIdx = 0 }) {
   if (!process.stdout.isTTY || !process.stdin.isTTY) {
-    // Fall back to a single prompt — the picker UI is purely cosmetic.
-    process.stdout.write(`provider [${providers.join('|')}]: `);
+    // Non-TTY fallback: print the labels on stderr and read a single
+    // line of stdin. Used when somebody pipes input to `lazyclaw
+    // setup` — the wizard still works, just without arrows.
+    process.stderr.write(`${title}\n`);
+    items.forEach((it, i) => process.stderr.write(`  ${i + 1}. ${it.label}${it.desc ? ' — ' + it.desc : ''}\n`));
+    process.stderr.write('pick (number / id, blank for first): ');
     const ans = await new Promise((resolve) => {
       let buf = '';
       const onData = (chunk) => {
@@ -1499,38 +1493,47 @@ async function _pickProviderInteractive() {
       };
       process.stdin.on('data', onData);
     });
-    return { provider: ans || providers[0], model: null };
+    if (!ans) return items[0];
+    const byNum = parseInt(ans, 10);
+    if (Number.isFinite(byNum) && byNum >= 1 && byNum <= items.length) return items[byNum - 1];
+    const byId = items.find((it) => it.id === ans || it.label === ans);
+    return byId || items[0];
   }
-  // Default cursor: lands on item 0 (= the first row from PROVIDERS
-  // insertion order, which registry.mjs deliberately curates as the
-  // most user-familiar vendor — gemini at the time of writing).
-  let idx = 0;
 
   const readline = await import('node:readline');
   readline.emitKeypressEvents(process.stdin);
   if (process.stdin.setRawMode) process.stdin.setRawMode(true);
-  // Long lists need scrolling so the picker fits the terminal height.
-  // Reserve 6 rows for header + footer + breathing room.
+  let idx = Math.max(0, Math.min(items.length - 1, defaultIdx));
+  const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
+  const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
+  const bold   = (s) => `\x1b[1m${s}\x1b[0m`;
+
   const draw = () => {
-    process.stdout.write('\x1b[?25l');     // hide cursor
-    process.stdout.write('\x1b[2J\x1b[H'); // clear screen
-    process.stdout.write('\x1b[38;5;208mLazyClaw — pick a provider/model\x1b[0m\n');
-    process.stdout.write('\x1b[2m↑/↓ to move · Enter to confirm · q to quit\x1b[0m\n');
-    process.stdout.write('\x1b[2m[subscription] = uses `claude` login (no key)  ·  [api key] = needs sk-... key  ·  [no key] = local\x1b[0m\n\n');
-    const rows = Math.max(6, (process.stdout.rows || 24) - 6);
+    process.stdout.write('\x1b[?25l\x1b[2J\x1b[H');
+    process.stdout.write(accent(title) + '\n');
+    if (subtitle) process.stdout.write(dim(subtitle) + '\n');
+    process.stdout.write(dim('↑/↓ to move · Enter to confirm · Esc to back · q to quit') + '\n\n');
+    const rows = Math.max(6, (process.stdout.rows || 24) - 8);
     let from = Math.max(0, idx - Math.floor(rows / 2));
     if (from + rows > items.length) from = Math.max(0, items.length - rows);
     const to = Math.min(items.length, from + rows);
+    // Pre-compute label width so descriptions line up across rows.
+    const labelW = items.reduce((w, it) => Math.max(w, (it.label || '').length), 12);
     for (let i = from; i < to; i++) {
       const it = items[i];
-      const marker = i === idx ? '\x1b[38;5;208m❯\x1b[0m ' : '  ';
-      const text = i === idx ? `\x1b[1m${it.label}\x1b[0m` : it.label;
-      process.stdout.write(`${marker}${text}  ${it.keyTag}\n`);
+      const marker = i === idx ? accent('❯ ') : '  ';
+      const lbl = (it.label || '').padEnd(labelW);
+      const lblOut = i === idx ? bold(lbl) : lbl;
+      const desc = it.desc ? '  ' + dim(it.desc) : '';
+      const tag = it.tag ? '  ' + it.tag : '';
+      process.stdout.write(`${marker}${lblOut}${desc}${tag}\n`);
     }
     if (to < items.length) {
-      process.stdout.write(`\x1b[2m  …(${items.length - to} more)\x1b[0m\n`);
+      process.stdout.write(`${dim(`  …(${items.length - to} more)`)}\n`);
     }
+    if (footer) process.stdout.write('\n' + dim(footer) + '\n');
   };
+
   draw();
   return await new Promise((resolve) => {
     const onKey = (_str, key) => {
@@ -1543,16 +1546,143 @@ async function _pickProviderInteractive() {
       else if (key.name === 'end')  { idx = items.length - 1; draw(); }
       else if (key.name === 'return') { cleanup(); resolve(items[idx]); }
       else if (key.ctrl && key.name === 'c') { cleanup(); process.exit(130); }
-      else if (key.name === 'q' || key.name === 'escape') { cleanup(); resolve(items[idx]); }
+      else if (key.name === 'escape') { cleanup(); resolve('BACK'); }
+      else if (key.name === 'q')      { cleanup(); resolve('CANCEL'); }
     };
     const cleanup = () => {
       process.stdin.off('keypress', onKey);
       if (process.stdin.setRawMode) process.stdin.setRawMode(false);
-      process.stdout.write('\x1b[?25h');     // show cursor
-      process.stdout.write('\x1b[2J\x1b[H'); // clear screen
+      process.stdout.write('\x1b[?25h\x1b[2J\x1b[H');
     };
     process.stdin.on('keypress', onKey);
   });
+}
+
+// Bucket every registered provider into one of three auth-method
+// families. The picker's first step asks the user which family
+// they want before drilling into specific providers — much less
+// overwhelming than a flat 40-row list. Bucket assignment lives
+// here (rather than registry.mjs) because it's a UX concept, not
+// an intrinsic provider attribute.
+function _providerFamilies() {
+  const info = _registryMod.PROVIDER_INFO || {};
+  const all = Object.keys(_registryMod.PROVIDERS);
+  const buckets = {
+    api: { label: 'API key', desc: 'paste an sk-... key during setup',  tag: '\x1b[38;5;245m[needs key]\x1b[0m', members: [] },
+    cli: { label: 'CLI / Local', desc: 'keyless — uses an existing CLI login or a local daemon', tag: '\x1b[38;5;208m[no key]\x1b[0m', members: [] },
+    mock: { label: 'Mock', desc: 'offline echo, only useful for testing', tag: '\x1b[38;5;245m[test]\x1b[0m', members: [] },
+  };
+  for (const name of all) {
+    if (name === 'mock') buckets.mock.members.push(name);
+    else if ((info[name] || {}).requiresApiKey) buckets.api.members.push(name);
+    else buckets.cli.members.push(name);
+  }
+  return buckets;
+}
+
+// Multi-step provider / model picker — replaces the flat 40-row
+// list of v3.99.5 with a drill-in:
+//
+//   Step 1 — auth family (API key / CLI-Local / Mock)
+//   Step 2 — provider in that family (gemini / openai / claude-cli / …)
+//   Step 3 — model in that provider's suggestedModels
+//
+// Esc at any step goes back one. q or Ctrl-C cancels entirely.
+// Steps that have only one option auto-advance so the user doesn't
+// stare at a single-row menu (e.g. the Mock family has just `mock`).
+async function _pickProviderInteractive() {
+  const providers = Object.keys(_registryMod.PROVIDERS);
+  if (!providers.length) return { provider: 'mock', model: null };
+  const info = _registryMod.PROVIDER_INFO || {};
+  const families = _providerFamilies();
+
+  // Non-TTY fallback — single-prompt picker, identical to before.
+  if (!process.stdout.isTTY || !process.stdin.isTTY) {
+    process.stdout.write(`provider [${providers.join('|')}]: `);
+    const ans = await new Promise((resolve) => {
+      let buf = '';
+      const onData = (chunk) => {
+        buf += chunk.toString();
+        if (buf.includes('\n')) { process.stdin.off('data', onData); resolve(buf.trim()); }
+      };
+      process.stdin.on('data', onData);
+    });
+    return { provider: ans || providers[0], model: null };
+  }
+
+  // ── Step 1 — auth family ──────────────────────────────────────
+  let family = null;
+  while (!family) {
+    const familyItems = Object.entries(families)
+      .filter(([, b]) => b.members.length > 0)
+      .map(([id, b]) => ({
+        id,
+        label: b.label,
+        desc: `${b.desc}  ·  ${b.members.join(' / ')}`,
+        tag: b.tag,
+      }));
+    const picked = await _arrowMenu({
+      title: 'LazyClaw setup — Step 1 of 3:  pick how you want to auth',
+      subtitle: 'API: bring your own key  ·  CLI/Local: use what\'s already on this machine  ·  Mock: offline test',
+      items: familyItems,
+    });
+    if (picked === 'CANCEL' || picked === 'BACK') return null;
+    family = picked;
+  }
+
+  // ── Step 2 — provider in that family ──────────────────────────
+  let provider = null;
+  while (!provider) {
+    const memberNames = families[family.id].members;
+    if (memberNames.length === 1) {
+      // Auto-advance — no point making the user pick from a single
+      // row.
+      provider = { id: memberNames[0] };
+      break;
+    }
+    const provItems = memberNames.map((name) => {
+      const meta = info[name] || {};
+      const models = (meta.suggestedModels || []).slice(0, 4).join(' · ') || '(default)';
+      return {
+        id: name,
+        label: name,
+        desc: `models: ${models}`,
+        tag: meta.requiresApiKey ? '\x1b[38;5;245m[api key]\x1b[0m' : '\x1b[38;5;208m[no key]\x1b[0m',
+      };
+    });
+    const picked = await _arrowMenu({
+      title: `LazyClaw setup — Step 2 of 3:  pick a ${family.label} provider`,
+      subtitle: `Showing ${memberNames.length} ${family.label.toLowerCase()} provider(s).`,
+      items: provItems,
+    });
+    if (picked === 'CANCEL') return null;
+    if (picked === 'BACK')   { family = null; return _pickProviderInteractive(); }
+    provider = picked;
+  }
+
+  // ── Step 3 — model ────────────────────────────────────────────
+  const meta = info[provider.id] || {};
+  const models = Array.isArray(meta.suggestedModels) ? meta.suggestedModels : [];
+  if (!models.length) {
+    // Provider has no curated models (mock) — return without a
+    // model so the underlying call uses the provider default.
+    return { provider: provider.id, model: null };
+  }
+  while (true) {
+    const modelItems = models.map((m) => ({ id: m, label: m, desc: '' }));
+    // Pin the cursor to the provider's defaultModel so Enter without
+    // navigation picks the most-recommended one.
+    const defaultIdx = Math.max(0, models.indexOf(meta.defaultModel || models[0]));
+    const picked = await _arrowMenu({
+      title: `LazyClaw setup — Step 3 of 3:  pick a model for ${provider.id}`,
+      subtitle: `Showing ${models.length} suggested model(s). Type the model id directly later via /model in chat to use anything not listed here.`,
+      items: modelItems,
+      defaultIdx,
+    });
+    if (picked === 'CANCEL') return null;
+    if (picked === 'BACK')   return _pickProviderInteractive(); // back to step 1
+    return { provider: provider.id, model: picked.id };
+  }
 }
 
 async function cmdChat(flags = {}) {

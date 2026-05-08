@@ -10,6 +10,74 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.7] — 2026-05-09  🪜 picker — 3-step drill-in (auth → provider → model)
+
+User: "모델을 고를때 한꺼번에 많은 모델이 나오는게 아니라,
+예를 들어 API | CLI 이걸 고르게 한 다음 -> gemini, ollama,
+claude 이런식으로 고르고 상세 모델 고를 수 있게 해줘."
+
+The flat picker showed 40+ rows (every (provider, model) pair)
+which felt overwhelming — especially right after a fresh
+install. Replaced with a 3-step drill-in:
+
+```
+Step 1 of 3 — pick how you want to auth
+  ❯ API key       gemini · openai · anthropic        [needs key]
+    CLI / Local   claude-cli · ollama                [no key]
+    Mock          offline echo, testing only         [test]
+
+Step 2 of 3 — pick a CLI / Local provider
+  ❯ claude-cli    models: opus-4-7 · sonnet-4-6 · …  [no key]
+    ollama        models: llama3.1 · qwen3.5 · …     [no key]
+
+Step 3 of 3 — pick a model for claude-cli
+  ❯ claude-opus-4-7
+    claude-sonnet-4-6
+    claude-haiku-4-5
+    …
+```
+
+### Behaviour
+- **Esc** at any step → back one step.
+  - At step 1 → cancels the picker entirely (returns null).
+  - At step 2 / 3 → re-enters the previous step.
+- **q** → cancel the entire flow.
+- **Ctrl-C** → exit the process (130) — same as every other
+  interactive prompt in the CLI.
+- **Auto-advance**: a step with only one option skips
+  itself (e.g. the Mock family has just `mock`, so step 2
+  passes through). Avoids stare-at-single-row dead-time.
+- **Default cursor** at step 3 is pinned to the provider's
+  `defaultModel` so Enter without navigation picks the
+  most-recommended one.
+
+### Implementation
+- New `_arrowMenu({ title, subtitle, items, defaultIdx })`
+  generic primitive returning the picked item or sentinel
+  strings `'BACK'` / `'CANCEL'`. Both the original picker and
+  the future setup-wizard menus reuse it — no more
+  per-screen keypress duplication.
+- New `_providerFamilies()` buckets registered providers
+  into `api` / `cli` / `mock`. The bucket assignment is a
+  UX concern, so it lives in `cli.mjs` rather than
+  `registry.mjs` (which describes intrinsic provider
+  attributes).
+- Non-TTY fallback unchanged — single-prompt
+  `provider [a|b|c]:` works the same as before so
+  automation isn't surprised.
+
+### Verified
+- `lazyclaw onboard --non-interactive` writes config (regression).
+- `echo claude-cli | lazyclaw onboard --pick` (non-TTY)
+  routes through the single-prompt fallback unchanged.
+- Live TTY drill-in path can't be exercised offline; the
+  three-step UI is purely arrow-key driven and tested
+  manually in a real terminal.
+
+src/lazyclaw/package.json 3.99.6 → 3.99.7. Push triggers
+`publish-lazyclaw.yml`.
+
+---
 ## [3.99.6] — 2026-05-09  🎨 banner alignment + setup wizard + lazyclaw dashboard
 
 User report: three things in one breath:

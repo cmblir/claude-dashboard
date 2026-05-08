@@ -71,7 +71,7 @@ What you see on launch (TTY only):
   │  | |__ _ _____  _ _          │
   │  | / _` |_ / || | '_|         │
   │  |_\__,_/__\_, |_|            │
-  │  LazyClaw  |__/  3.99.6      │
+  │  LazyClaw  |__/  3.99.7      │
   ╰──────────────────────────────╯
 
   provider · anthropic
