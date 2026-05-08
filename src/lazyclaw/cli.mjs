@@ -3655,8 +3655,15 @@ async function cmdLauncher() {
   // Outer loop — each iteration is one menu render → pick →
   // dispatch round. Subcommand return drops back here and the menu
   // is redrawn. Quit / Esc / Ctrl-C breaks the loop and returns,
-  // which lets the calling main() exit naturally (no process.exit
-  // so the buffered writer / open file descriptors close cleanly).
+  // which lets the calling main() exit naturally.
+  //
+  // try/finally below is load-bearing: the loop body keeps stdin
+  // ref'd so the picker's keypress events fire. If we just `return`
+  // on Quit, stdin stays ref'd and Node's event loop never empties
+  // → the `lazyclaw` process hangs forever after the user picked
+  // Quit. The finally explicitly pauses + unrefs stdin so the
+  // process exits cleanly the moment the user picks Quit.
+  try {
   while (true) {
     // First-run / config-missing guard: a fresh install has no
     // `provider` set, so any menu pick that calls a provider would
@@ -3766,6 +3773,18 @@ async function cmdLauncher() {
       process.stdout.write('\n');
       await _quickPrompt(`  ${dim('Press Enter to return to the menu… ')}`);
     }
+  }
+  } finally {
+    // Drop the stdin holds we kept open while the menu was active.
+    // Without this, the Node event loop never empties on Quit and
+    // the `lazyclaw` process hangs at the shell prompt. Mirrors the
+    // cleanup path cmdChat installed in v3.92 for the same reason.
+    if (process.stdin.isTTY && process.stdin.setRawMode) {
+      try { process.stdin.setRawMode(false); } catch (_) {}
+    }
+    try { process.stdout.write('\x1b[?25h'); } catch (_) {} // restore cursor
+    try { process.stdin.pause(); } catch (_) {}
+    try { process.stdin.unref(); } catch (_) {}
   }
 }
 

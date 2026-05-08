@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.11] — 2026-05-09  🚪 launcher Quit — actually exit the process
+
+User: "Quit 했는데 터미널 종료가 안되고 있어."
+
+The v3.99.10 launcher kept stdin ref'd at the start of every
+loop iteration so the picker's keypress events would fire
+reliably (`process.stdin.resume() + .ref()`). On Quit the
+loop returns naturally, but those `.ref()` calls were never
+undone — Node's event loop sees stdin still attached and
+sits there forever waiting for it to close. The `lazyclaw`
+process hangs at the shell prompt instead of returning
+control.
+
+### Fix
+Wrap the entire loop body in `try / finally` and have the
+finally block:
+
+  - `setRawMode(false)` so the user's terminal isn't left in
+    raw mode if something explodes mid-loop.
+  - `\x1b[?25h` to restore the cursor (we hide it during
+    menu draws).
+  - `process.stdin.pause()` so no more data is pulled.
+  - `process.stdin.unref()` so the stdin handle no longer
+    keeps Node's event loop alive.
+
+Same shape `cmdChat`'s exit cleanup uses — it had the
+identical bug fixed in v3.92 ("instant /exit"). The
+launcher just hadn't gotten the same treatment.
+
+### Effect
+- Pick **Quit** / press **Esc** / press **q** / press
+  **Ctrl-C** in the menu → screen clears, process returns
+  control to the shell within ~1 frame.
+- All other paths (Setup, Doctor, Onboard, Chat, etc.)
+  unchanged — the finally only fires when the loop exits.
+
+### Verified
+- `lazyclaw version` reports 3.99.11.
+- Non-TTY no-arg call still prints the historical Usage
+  line.
+- Piped chat with Korean reply renders cleanly.
+- `time printf '/exit\n' | lazyclaw chat` → still ~50 ms
+  (regression check on v3.92's exit-perf fix).
+
+src/lazyclaw/package.json 3.99.10 → 3.99.11. Push triggers
+`publish-lazyclaw.yml`.
+
+---
 ## [3.99.10] — 2026-05-09  🧰 stdin handoff — _arrowMenu / _quickPrompt resume defensively
 
 User: "Setup하고 LazyClaw setup — Step 1 of 3 여기서 엔터누르면
