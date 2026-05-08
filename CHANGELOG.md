@@ -10,6 +10,77 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.98.0] — 2026-05-09  ⏰ cron — recurring agent runs
+
+OpenClaw lists `cron` as a first-class tool. We ship the same
+end-user shape: store the recurring command in lazyclaw's config
+and install a system scheduler entry that fires the lazyclaw CLI
+on each tick.
+
+```bash
+lazyclaw cron add daily-summary "0 9 * * 1-5" \
+  -- lazyclaw agent "Summarise today's TODOs"
+
+lazyclaw cron list
+lazyclaw cron show daily-summary
+lazyclaw cron run daily-summary    # one-shot, exec the command now
+lazyclaw cron remove daily-summary
+lazyclaw cron sync                 # re-install every cfg.cron entry
+```
+
+### Backends
+- **macOS**: launchd plist at
+  `~/Library/LaunchAgents/com.lazyclaw.<name>.plist`. The cron
+  spec is expanded into the cartesian product of
+  `StartCalendarInterval` dicts so launchd's per-fire-time format
+  faithfully represents 5-field cron.
+- **Linux / WSL**: appends a single `crontab` line tagged with
+  `# lazyclaw-cron:<name>` so list / remove can round-trip.
+
+`pickBackend()` selects automatically; the same `cron add`
+command works on either OS.
+
+### Cron spec
+Standard 5-field form (`min hour dom month dow`). Supports `*`,
+range `a-b`, list `a,b,c`, step `*/n` and `a-b/n`. Every field
+is range-checked at parse time so a typo lands as a clear
+"minute value 60 out of range 0–59" instead of a silent install
+that fires never.
+
+### Config is the source of truth
+`cfg.cron[<name>] = { schedule, command, addedAt, updatedAt }`.
+Survives uninstall / reinstall of the OS scheduler — `cron sync`
+reconciles. `cron list` / `cron show` always read from config.
+
+### Implementation
+- New `src/lazyclaw/cron.mjs` — pure ESM. Exports
+  `parseCronSpec()`, `expandField()`, `buildPlist()`,
+  `buildCrontabLine()`, `installLaunchdJob()`,
+  `installCrontabJob()`, `runJob()`, plus the config helpers.
+- `cli.mjs::cmdCron` handles list / add / remove / show / sync
+  / run. `add` failure rolls back the system-scheduler step but
+  keeps the config entry so the user can `cron sync` to retry.
+- **`parseArgs` POSIX `--` separator.** Required so `cron add
+  daily "0 9 * * *" -- lazyclaw agent "..."` doesn't mistake the
+  recurring command's flags for our own. The patch makes a
+  literal `--` end flag-parsing — same convention `git`, `npm`,
+  etc. use.
+
+### Verified end-to-end
+parseCronSpec / expandField / buildPlist / buildCrontabLine
+unit tests cover happy + error paths. CLI integration round-
+trips: empty list → add → list → show → run (one-shot
+exec — `echo hello world` → "hello world" on stdout) → remove,
+with the launchd plist actually loaded + unloaded between add
+and remove.
+
+### Tier-A complete
+This closes the v3.93–v3.98 OpenClaw-parity series. All Tier-A
+items from the comparison are now in the npm CLI:
+auth profiles · pairing · nodes · message · workspace ·
+browse · sandbox · skills install (remote) · cron.
+
+---
 ## [3.97.0] — 2026-05-09  📦 skills install user/repo[@ref][:path]
 
 OpenClaw ships a hosted "ClawHub" registry. We get the same

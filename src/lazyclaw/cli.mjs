@@ -875,8 +875,8 @@ const SUBCOMMANDS = [
   'daemon', 'version', 'completion', 'help',
   'export', 'import',
   'rates',
-  // OpenClaw-parity subsurfaces (v3.93–v3.95)
-  'auth', 'pairing', 'nodes', 'message', 'workspace', 'browse',
+  // OpenClaw-parity subsurfaces (v3.93–v3.98)
+  'auth', 'pairing', 'nodes', 'message', 'workspace', 'browse', 'cron',
 ];
 
 const SUBCOMMAND_SUBS = {
@@ -891,6 +891,7 @@ const SUBCOMMAND_SUBS = {
   nodes:     ['list', 'register', 'remove'],
   message:   ['list', 'add', 'remove', 'send'],
   workspace: ['list', 'init', 'show', 'remove', 'path'],
+  cron:      ['list', 'add', 'remove', 'show', 'sync', 'run'],
 };
 
 function bashCompletion() {
@@ -1105,6 +1106,7 @@ const HELP_SUMMARIES = {
   message:    'Outbound webhook messaging (message list|add|remove|send <name>)',
   workspace:  'AGENTS.md / SOUL.md / TOOLS.md system-prompt convention (workspace list|init|show|remove|path)',
   browse:     'Fetch a URL and emit Markdown on stdout (browse <url> [--max-bytes <N>])',
+  cron:       'Schedule recurring agent runs via launchd / crontab (cron list|add|remove|show|sync|run)',
   inspect:    'Print persisted workflow state without executing',
   clear:      'Delete a persisted workflow state file (idempotent)',
   validate:   'Static-check a workflow file: shape, deps, cycles, parallelism',
@@ -1141,6 +1143,7 @@ const HELP_DETAILS = {
   message: 'Usage: lazyclaw message <list | add <name> <webhook-url> [--kind slack|discord|generic] | remove <name> | send <name> <text>>\n  Outbound webhook messaging — Slack / Discord Incoming Webhooks. Auto-detects kind from the URL pattern.\n  send accepts a literal string, or `-` to read the body from stdin.',
   workspace: 'Usage: lazyclaw workspace <list | init <name> | show <name> [<file>] | remove <name> | path <name>>\n  Workspace = a directory under <configDir>/workspaces/<name>/ containing AGENTS.md, SOUL.md, TOOLS.md.\n  When `chat` or `agent` is invoked with --workspace <name>, the three files are stitched into a single system prompt at the head of the conversation. Missing files are skipped silently.\n  init scaffolds the three files with short stubs you replace.\n  show prints the composed prompt; show <name> AGENTS.md (etc) prints just one file.',
   browse: 'Usage: lazyclaw browse <url> [--max-bytes <N>] [--timeout-ms <N>] [--user-agent <ua>] [--meta]\n  Fetches the URL and emits Markdown on stdout. Pipes cleanly into `agent`:\n      lazyclaw browse https://example.com/docs | lazyclaw agent -\n  Strips <script>/<style>/<svg>/comments, prefers <main>/<article>, falls back to <body>.\n  --max-bytes caps the body read (default 2 MB) so a misconfigured upstream can\'t OOM the process.\n  --meta prints { url, title, bytes, truncated } as JSON to stderr alongside the markdown on stdout.',
+  cron: 'Usage: lazyclaw cron <list | add <name> "<cron-spec>" -- <cmd> ... | remove <name> | show <name> | sync | run <name>>\n  Schedule recurring agent runs. macOS uses launchd (~/Library/LaunchAgents/com.lazyclaw.<name>.plist); Linux / WSL uses the user crontab.\n  Cron spec is the standard 5-field form (minute hour dom month dow). Supports *, range a-b, list a,b,c, step */N.\n  add: pass the command after `--`. Typical use:\n      lazyclaw cron add daily-summary "0 9 * * 1-5" -- lazyclaw agent "Summarise today\'s TODOs"\n  list / show: read from cfg.cron[name] (config is the source of truth).\n  sync: re-installs every job in cfg.cron into the system scheduler — handy after a reinstall.\n  run: one-shot in-process execution of the named job; the OS scheduler does the same thing on its trigger.\n  Logs: ~/.lazyclaw/logs/cron-<name>.{out,err}.log (macOS launchd path).',
 };
 
 function cmdHelp(name) {
@@ -2376,6 +2379,100 @@ async function cmdBrowse(url, flags = {}) {
   }
 }
 
+async function cmdCron(sub, positional, flags = {}) {
+  const cron = await import('./cron.mjs');
+  const cfg = readConfig();
+  const backend = cron.pickBackend();
+  switch (sub) {
+    case undefined:
+    case 'list': {
+      const jobs = cron.listJobs(cfg);
+      console.log(JSON.stringify({ backend, jobs }, null, 2));
+      return;
+    }
+    case 'show': {
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw cron show <name>'); process.exit(2); }
+      const job = cron.getJob(cfg, name);
+      if (!job) { console.error(`error: no job "${name}"`); process.exit(1); }
+      console.log(JSON.stringify({ backend, name, ...job }, null, 2));
+      return;
+    }
+    case 'add': {
+      // Shape: lazyclaw cron add <name> "<cron-spec>" -- <cmd> [args...]
+      // The `--` separator was already consumed by parseArgs, but
+      // the spec is the second positional and the command is
+      // everything after it. parseArgs preserves order, so:
+      //   positional[0] = name
+      //   positional[1] = "0 9 * * *"
+      //   positional[2..] = cmd argv
+      const [name, schedule, ...cmd] = positional;
+      if (!name || !schedule || !cmd.length) {
+        console.error('Usage: lazyclaw cron add <name> "<cron-spec>" -- <cmd> ...');
+        process.exit(2);
+      }
+      try {
+        cron.upsertJob(cfg, name, schedule, cmd);
+      } catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      writeConfig(cfg);
+      // Install to system scheduler — failure here doesn't roll
+      // back the config write because the job is "scheduled in
+      // intent". `cron sync` reconciles.
+      try {
+        if (backend === 'launchd') cron.installLaunchdJob(name, schedule, cmd);
+        else                       cron.installCrontabJob(name, schedule, cmd);
+      } catch (e) {
+        console.error(`warn: backend install failed: ${e.message} — config saved; run \`cron sync\` to retry`);
+        process.exit(1);
+      }
+      console.log(JSON.stringify({ ok: true, backend, name, schedule, command: cmd }, null, 2));
+      return;
+    }
+    case 'remove': {
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw cron remove <name>'); process.exit(2); }
+      try { cron.removeJob(cfg, name); } catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      writeConfig(cfg);
+      try {
+        if (backend === 'launchd') cron.uninstallLaunchdJob(name);
+        else                       cron.uninstallCrontabJob(name);
+      } catch (e) {
+        console.error(`warn: backend uninstall failed: ${e.message}`);
+      }
+      console.log(JSON.stringify({ ok: true, backend, removed: name }));
+      return;
+    }
+    case 'sync': {
+      // Re-install every job in cfg.cron — useful after a fresh
+      // OS image where the launchd plists / crontab were wiped.
+      const out = [];
+      for (const [name, job] of Object.entries(cfg.cron || {})) {
+        try {
+          if (backend === 'launchd') cron.installLaunchdJob(name, job.schedule, job.command);
+          else                       cron.installCrontabJob(name, job.schedule, job.command);
+          out.push({ name, ok: true });
+        } catch (e) {
+          out.push({ name, ok: false, error: e.message });
+        }
+      }
+      console.log(JSON.stringify({ backend, results: out }, null, 2));
+      return;
+    }
+    case 'run': {
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw cron run <name>'); process.exit(2); }
+      try {
+        const code = cron.runJob(cfg, name);
+        process.exit(code || 0);
+      } catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      return;
+    }
+    default:
+      console.error('Usage: lazyclaw cron <list|add|remove|show|sync|run> ...');
+      process.exit(2);
+  }
+}
+
 async function cmdSkills(sub, positional, flags = {}) {
   const skillsMod = await import('./skills.mjs');
   const cfgDir = path.dirname(configPath());
@@ -2945,6 +3042,13 @@ function parseArgs(argv) {
   const out = { positional: [], flags: {} };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
+    // POSIX `--`: everything after is positional verbatim. Used by
+    // `cron add <name> "<spec>" -- <cmd> [args...]` so a recurring
+    // command with --flag of its own doesn't get parsed as our flag.
+    if (a === '--') {
+      for (let j = i + 1; j < argv.length; j++) out.positional.push(argv[j]);
+      break;
+    }
     if (a.startsWith('--')) {
       const eq = a.indexOf('=');
       if (eq >= 0) {
@@ -3123,6 +3227,11 @@ async function main() {
     }
     case 'browse': {
       await cmdBrowse(rest.positional[0], rest.flags);
+      break;
+    }
+    case 'cron': {
+      const sub = rest.positional[0];
+      await cmdCron(sub, rest.positional.slice(1), rest.flags);
       break;
     }
     case 'daemon': {
