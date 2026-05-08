@@ -875,8 +875,8 @@ const SUBCOMMANDS = [
   'daemon', 'version', 'completion', 'help',
   'export', 'import',
   'rates',
-  // OpenClaw-parity subsurfaces (v3.93)
-  'auth', 'pairing', 'nodes', 'message',
+  // OpenClaw-parity subsurfaces (v3.93–v3.94)
+  'auth', 'pairing', 'nodes', 'message', 'workspace',
 ];
 
 const SUBCOMMAND_SUBS = {
@@ -890,6 +890,7 @@ const SUBCOMMAND_SUBS = {
   pairing:   ['list', 'add', 'remove'],
   nodes:     ['list', 'register', 'remove'],
   message:   ['list', 'add', 'remove', 'send'],
+  workspace: ['list', 'init', 'show', 'remove', 'path'],
 };
 
 function bashCompletion() {
@@ -1102,6 +1103,7 @@ const HELP_SUMMARIES = {
   pairing:    'Sender allowlist for the messaging surface (pairing list|add|remove <id>)',
   nodes:      'Companion device registration (nodes list|register|remove <id>)',
   message:    'Outbound webhook messaging (message list|add|remove|send <name>)',
+  workspace:  'AGENTS.md / SOUL.md / TOOLS.md system-prompt convention (workspace list|init|show|remove|path)',
   inspect:    'Print persisted workflow state without executing',
   clear:      'Delete a persisted workflow state file (idempotent)',
   validate:   'Static-check a workflow file: shape, deps, cycles, parallelism',
@@ -1136,6 +1138,7 @@ const HELP_DETAILS = {
   pairing: 'Usage: lazyclaw pairing <list | add <id> [--label <name>] | remove <id>>\n  Sender allowlist for the messaging surface. Inbound senders not on this list are rejected.\n  Sender ids are opaque per-channel: Slack member id, Discord user id, phone number for SMS, etc.',
   nodes: 'Usage: lazyclaw nodes <list | register <id> [--platform macos|ios|android|web|cli] [--label <name>] | remove <id>>\n  Companion device registration table. CLI only — the actual mobile / menu-bar apps are out of scope here.\n  Platform is free-form lower-case; future surfaces (iOS / Android nodes) authenticate against the daemon using these ids.',
   message: 'Usage: lazyclaw message <list | add <name> <webhook-url> [--kind slack|discord|generic] | remove <name> | send <name> <text>>\n  Outbound webhook messaging — Slack / Discord Incoming Webhooks. Auto-detects kind from the URL pattern.\n  send accepts a literal string, or `-` to read the body from stdin.',
+  workspace: 'Usage: lazyclaw workspace <list | init <name> | show <name> [<file>] | remove <name> | path <name>>\n  Workspace = a directory under <configDir>/workspaces/<name>/ containing AGENTS.md, SOUL.md, TOOLS.md.\n  When `chat` or `agent` is invoked with --workspace <name>, the three files are stitched into a single system prompt at the head of the conversation. Missing files are skipped silently.\n  init scaffolds the three files with short stubs you replace.\n  show prints the composed prompt; show <name> AGENTS.md (etc) prints just one file.',
 };
 
 function cmdHelp(name) {
@@ -1199,11 +1202,27 @@ async function cmdAgent(prompt, flags) {
   // Defaults from config.skills (same shape) if --skill not passed.
   const skillNames = (flags.skill ? String(flags.skill) : (Array.isArray(cfg.skills) ? cfg.skills.join(',') : ''))
     .split(',').map(s => s.trim()).filter(Boolean);
-  let systemPrompt = null;
-  if (skillNames.length > 0) {
-    try { systemPrompt = skillsMod.composeSystemPrompt(skillNames, path.dirname(configPath())); }
-    catch (e) { console.error(`skill error: ${e.message}`); process.exit(2); }
+  // --workspace <name> stitches AGENTS.md / SOUL.md / TOOLS.md from
+  // <configDir>/workspaces/<name>/ at the head of the system prompt.
+  // Workspace + skill compose: workspace block first, skill block
+  // after — same order as `lazyclaw workspace show` so the user can
+  // preview exactly what the LLM will see.
+  const workspaceName = flags.workspace || cfg.workspace || '';
+  const promptParts = [];
+  if (workspaceName) {
+    try {
+      const ws = await import('./workspace.mjs');
+      const wsPrompt = ws.composeWorkspacePrompt(path.dirname(configPath()), workspaceName);
+      if (wsPrompt) promptParts.push(wsPrompt);
+    } catch (e) { console.error(`workspace error: ${e.message}`); process.exit(2); }
   }
+  if (skillNames.length > 0) {
+    try {
+      const skillPrompt = skillsMod.composeSystemPrompt(skillNames, path.dirname(configPath()));
+      if (skillPrompt) promptParts.push(skillPrompt);
+    } catch (e) { console.error(`skill error: ${e.message}`); process.exit(2); }
+  }
+  const systemPrompt = promptParts.length ? promptParts.join('\n\n---\n\n') : null;
 
   let text = prompt;
   if (text === '-' || text === undefined) {
@@ -1541,17 +1560,32 @@ async function cmdChat(flags = {}) {
   // double-prepend skills that the prior invocation already added).
   const skillNames = (flags.skill ? String(flags.skill) : (Array.isArray(cfg.skills) ? cfg.skills.join(',') : ''))
     .split(',').map(s => s.trim()).filter(Boolean);
+  // --workspace <name> sits at the head of the system prompt, then
+  // any --skill block. The two compose with the same `\n---\n`
+  // separator the agent path uses, so `lazyclaw workspace show` is
+  // a faithful preview.
+  const workspaceName = flags.workspace || cfg.workspace || '';
+  const sysParts = [];
+  if (workspaceName && !messages.some(m => m.role === 'system')) {
+    try {
+      const ws = await import('./workspace.mjs');
+      const wsPrompt = ws.composeWorkspacePrompt(cfgDir, workspaceName);
+      if (wsPrompt) sysParts.push(wsPrompt);
+    } catch (e) { console.error(`workspace error: ${e.message}`); process.exit(2); }
+  }
   if (skillNames.length > 0 && !messages.some(m => m.role === 'system')) {
     try {
       const sys = skillsMod.composeSystemPrompt(skillNames, cfgDir);
-      if (sys) {
-        messages.unshift({ role: 'system', content: sys });
-        if (sessionId) sessionsMod.appendTurn(sessionId, 'system', sys, cfgDir);
-      }
+      if (sys) sysParts.push(sys);
     } catch (e) {
       console.error(`skill error: ${e.message}`);
       process.exit(2);
     }
+  }
+  if (sysParts.length && !messages.some(m => m.role === 'system')) {
+    const merged = sysParts.join('\n\n---\n\n');
+    messages.unshift({ role: 'system', content: merged });
+    if (sessionId) sessionsMod.appendTurn(sessionId, 'system', merged, cfgDir);
   }
 
   let charsSent = messages.reduce((n, m) => n + (m.role === 'user' ? String(m.content || '').length : 0), 0);
@@ -2242,6 +2276,54 @@ async function cmdMessage(sub, positional, flags = {}) {
     }
     default:
       console.error('Usage: lazyclaw message <list|add|remove|send> ...');
+      process.exit(2);
+  }
+}
+
+async function cmdWorkspace(sub, positional, flags = {}) {
+  const ws = await import('./workspace.mjs');
+  const cfgDir = path.dirname(configPath());
+  switch (sub) {
+    case undefined:
+    case 'list': {
+      console.log(JSON.stringify(ws.listWorkspaces(cfgDir), null, 2));
+      return;
+    }
+    case 'init': {
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw workspace init <name>'); process.exit(2); }
+      try {
+        const dir = ws.initWorkspace(cfgDir, name);
+        console.log(JSON.stringify({ ok: true, name, dir, files: ws.WORKSPACE_FILES }));
+      } catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      return;
+    }
+    case 'show': {
+      const [name, fileName] = positional;
+      if (!name) { console.error('Usage: lazyclaw workspace show <name> [<file>]'); process.exit(2); }
+      try {
+        if (fileName) process.stdout.write(ws.readWorkspaceFile(cfgDir, name, fileName));
+        else          process.stdout.write(ws.composeWorkspacePrompt(cfgDir, name) + '\n');
+      } catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      return;
+    }
+    case 'remove': {
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw workspace remove <name>'); process.exit(2); }
+      try { ws.removeWorkspace(cfgDir, name); }
+      catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      console.log(JSON.stringify({ ok: true, removed: name }));
+      return;
+    }
+    case 'path': {
+      const name = positional[0];
+      if (!name) { console.log(ws.workspaceRoot(cfgDir)); return; }
+      try { console.log(ws.workspaceDir(cfgDir, name)); }
+      catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      return;
+    }
+    default:
+      console.error('Usage: lazyclaw workspace <list|init|show|remove|path> ...');
       process.exit(2);
   }
 }
@@ -2955,6 +3037,11 @@ async function main() {
     case 'message': {
       const sub = rest.positional[0];
       await cmdMessage(sub, rest.positional.slice(1), rest.flags);
+      break;
+    }
+    case 'workspace': {
+      const sub = rest.positional[0];
+      await cmdWorkspace(sub, rest.positional.slice(1), rest.flags);
       break;
     }
     case 'daemon': {

@@ -10,6 +10,49 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.94.0] — 2026-05-08  📁 workspace — AGENTS.md / SOUL.md / TOOLS.md
+
+OpenClaw-parity workspace convention. A workspace is a directory
+under `<configDir>/workspaces/<name>/` containing three files:
+
+- **AGENTS.md** — what the assistant should DO
+- **SOUL.md** — how it should BEHAVE
+- **TOOLS.md** — what it can reach for
+
+Three files instead of one giant SYSTEM.md so a teammate can edit
+the "what" without churning the "how" — same separation OpenClaw
+ships with.
+
+### CLI
+- `lazyclaw workspace init <name>` — scaffolds the three files
+  with short stubs the user replaces
+- `lazyclaw workspace list` — newest-modified first; per-file
+  bytes + mtime
+- `lazyclaw workspace show <name> [<file>]` — prints the composed
+  prompt (or just one file)
+- `lazyclaw workspace remove <name>`
+- `lazyclaw workspace path [<name>]`
+
+### `--workspace <name>` flag
+Both `chat` and `agent` accept it; the workspace block sits at
+the head of the system prompt, then any `--skill` block, joined
+by `\n---\n`. Same composition order as `workspace show` so the
+preview is faithful.
+
+### Implementation
+- New `src/lazyclaw/workspace.mjs` — pure file-keeper. Validates
+  workspace names against `[A-Za-z0-9_.-]+` so a malicious name
+  can't escape the workspaces root.
+- `cli.mjs`: `cmdWorkspace` handler, `workspace` subcommand wired
+  through SUBCOMMANDS / SUBCOMMAND_SUBS / HELP / HELP_DETAILS.
+- chat + agent system-prompt assembly refactored into a
+  `sysParts` array so workspace + skill compose cleanly.
+
+### Verified end-to-end
+init → list → show (composed + single file) → agent --workspace
+(mock provider) → duplicate-init error path → remove. All green.
+
+---
 ## [3.93.0] — 2026-05-08  🔑 OpenClaw parity — auth profiles, pairing, nodes, message send
 
 User: implement all Tier-A OpenClaw gaps in the npm CLI.
