@@ -877,6 +877,8 @@ const SUBCOMMANDS = [
   'rates',
   // OpenClaw-parity subsurfaces (v3.93–v3.98)
   'auth', 'pairing', 'nodes', 'message', 'workspace', 'browse', 'cron',
+  // v3.99.6 — multi-step setup wizard + lazyclaw-only dashboard
+  'setup', 'dashboard',
 ];
 
 const SUBCOMMAND_SUBS = {
@@ -1107,6 +1109,8 @@ const HELP_SUMMARIES = {
   workspace:  'AGENTS.md / SOUL.md / TOOLS.md system-prompt convention (workspace list|init|show|remove|path)',
   browse:     'Fetch a URL and emit Markdown on stdout (browse <url> [--max-bytes <N>])',
   cron:       'Schedule recurring agent runs via launchd / crontab (cron list|add|remove|show|sync|run)',
+  setup:      'OpenClaw-style multi-step first-run wizard (provider + workspace + skill + webhook + ping)',
+  dashboard:  'Launch the lazyclaw-only web UI (lighter than the full lazyclaude dashboard)',
   inspect:    'Print persisted workflow state without executing',
   clear:      'Delete a persisted workflow state file (idempotent)',
   validate:   'Static-check a workflow file: shape, deps, cycles, parallelism',
@@ -1144,6 +1148,8 @@ const HELP_DETAILS = {
   workspace: 'Usage: lazyclaw workspace <list | init <name> | show <name> [<file>] | remove <name> | path <name>>\n  Workspace = a directory under <configDir>/workspaces/<name>/ containing AGENTS.md, SOUL.md, TOOLS.md.\n  When `chat` or `agent` is invoked with --workspace <name>, the three files are stitched into a single system prompt at the head of the conversation. Missing files are skipped silently.\n  init scaffolds the three files with short stubs you replace.\n  show prints the composed prompt; show <name> AGENTS.md (etc) prints just one file.',
   browse: 'Usage: lazyclaw browse <url> [--max-bytes <N>] [--timeout-ms <N>] [--user-agent <ua>] [--meta]\n  Fetches the URL and emits Markdown on stdout. Pipes cleanly into `agent`:\n      lazyclaw browse https://example.com/docs | lazyclaw agent -\n  Strips <script>/<style>/<svg>/comments, prefers <main>/<article>, falls back to <body>.\n  --max-bytes caps the body read (default 2 MB) so a misconfigured upstream can\'t OOM the process.\n  --meta prints { url, title, bytes, truncated } as JSON to stderr alongside the markdown on stdout.',
   cron: 'Usage: lazyclaw cron <list | add <name> "<cron-spec>" -- <cmd> ... | remove <name> | show <name> | sync | run <name>>\n  Schedule recurring agent runs. macOS uses launchd (~/Library/LaunchAgents/com.lazyclaw.<name>.plist); Linux / WSL uses the user crontab.\n  Cron spec is the standard 5-field form (minute hour dom month dow). Supports *, range a-b, list a,b,c, step */N.\n  add: pass the command after `--`. Typical use:\n      lazyclaw cron add daily-summary "0 9 * * 1-5" -- lazyclaw agent "Summarise today\'s TODOs"\n  list / show: read from cfg.cron[name] (config is the source of truth).\n  sync: re-installs every job in cfg.cron into the system scheduler — handy after a reinstall.\n  run: one-shot in-process execution of the named job; the OS scheduler does the same thing on its trigger.\n  Logs: ~/.lazyclaw/logs/cron-<name>.{out,err}.log (macOS launchd path).',
+  setup: 'Usage: lazyclaw setup [--skip-test]\n  OpenClaw-style multi-step first-run wizard. Walks through:\n    1. Provider + model + api-key (delegates to onboard --pick)\n    2. Optional workspace init  (AGENTS.md / SOUL.md / TOOLS.md)\n    3. Optional skill bundle install from GitHub\n    4. Optional outbound webhook (Slack / Discord)\n    5. Reachability test against the picked provider\n  Each optional step takes Enter or "skip" to bypass. Re-runnable safely.\n  Also fires automatically on first run when `lazyclaw` is invoked with no config.',
+  dashboard: 'Usage: lazyclaw dashboard [--port <N>] [--no-open]\n  Launches the lazyclaw-only web UI on http://127.0.0.1:<port> (default 19600) and opens it in the default browser.\n  Wraps `lazyclaw daemon` + a static HTML; no Python / lazyclaude dashboard required.\n  Tabs: Chat · Sessions · Skills · Workspace · Providers · Status. Each tab calls existing daemon endpoints.\n  --no-open keeps the browser closed (handy for SSH / headless / dev). The bound URL is always printed to stdout.',
 };
 
 function cmdHelp(name) {
@@ -1394,20 +1400,58 @@ function _attachGhostAutocomplete(rl) {
 // session so users see the active provider/model before they start
 // typing. Plain ANSI; auto-skipped when stdout isn't a TTY (so piped
 // invocations stay clean for tests/scripts).
+// Single source of truth for the LazyClaw banner — used by the chat
+// REPL header, the no-arg launcher, and the first-run welcome panel.
+// Returns an array of pre-formatted lines (with ANSI colour) so the
+// caller can splice in additional rows without re-implementing the
+// alignment.
+//
+// Width-management rule: every inner line is forced through
+// `.padEnd(W)` so a stray width miscount can't punch the right
+// border off the box (which is exactly the bug v3.99.5 shipped:
+// two of the inner lines were 33 cols vs the others' 32, so the
+// ╮ rendered into the next line).
+function _renderBanner(version) {
+  const W = 30;
+  const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
+  const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
+  // Inner content of each banner row — DO NOT pad here, the wrapper
+  // does it. Backslashes are JS-escaped so each `\\` renders as one
+  // literal `\` in the output.
+  const inner = [
+    '   _',
+    '  | |__ _ _____  _ _',
+    "  | / _` |_ / || | '_|",
+    '  |_\\__,_/__\\_, |_|',
+    '  LazyClaw  |__/  ' + String(version || '?.?.?').padEnd(10).slice(0, 10),
+  ];
+  // Sleepy-cat mascot on the right, lined up with the busiest part
+  // of the wordmark. Three rows of ASCII art + "zz" trail. Plain
+  // ASCII (no box-drawing on the cat) so it lands well in any font.
+  const mascot = [
+    '',
+    '',
+    '   /\\_/\\',
+    '  ( -.- )  ' + dim('z z'),
+    '   > ^ <    ' + dim('z'),
+    '',
+    '',
+  ];
+  const banner = [
+    '╭' + '─'.repeat(W) + '╮',
+    ...inner.map((s) => '│' + s.padEnd(W).slice(0, W) + '│'),
+    '╰' + '─'.repeat(W) + '╯',
+  ];
+  return banner.map((l, i) => '  ' + accent(l) + (mascot[i] ? '  ' + mascot[i] : ''));
+}
+
 function _printChatBanner(activeProvName, activeModel, version) {
   if (!process.stdout.isTTY) return;
   const dim = (s) => `\x1b[2m${s}\x1b[0m`;
-  const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
   const ok = (s) => `\x1b[32m${s}\x1b[0m`;
   const lines = [
     '',
-    accent('  ╭──────────────────────────────╮'),
-    accent('  │   _                          │'),
-    accent('  │  | |__ _ _____  _ _          │'),
-    accent('  │  | / _` |_ / || | \'_|         │'),
-    accent('  │  |_\\__,_/__\\_, |_|            │'),
-    accent('  │  LazyClaw  |__/  ' + (version || '').padEnd(10) + '  │'),
-    accent('  ╰──────────────────────────────╯'),
+    ..._renderBanner(version),
     '',
     `  ${dim('provider ·')} ${ok(activeProvName)}`,
     `  ${dim('model    ·')} ${ok(activeModel || '(default)')}`,
@@ -1853,6 +1897,69 @@ async function cmdChat(flags = {}) {
     try { process.stdin.pause(); } catch (_) {}
     try { process.stdin.unref(); } catch (_) {}
   }
+}
+
+// Light wrapper around the daemon — meant for users who installed
+// via npm and don't want to remember `daemon` flags. Boots the
+// daemon on a fixed default port (override with --port), then opens
+// the dashboard URL in the user's default browser.
+//
+// Why a separate command: typing `lazyclaw daemon` works too, but
+// `dashboard` is the discoverable name and it auto-opens the browser
+// (which the bare daemon doesn't, since most daemon callers are
+// scripts).
+async function cmdDashboard(flags = {}) {
+  await ensureRegistry();
+  const sessionsMod = await import('./sessions.mjs');
+  const { startDaemon } = await import('./daemon.mjs');
+  const port = flags.port !== undefined ? parseInt(flags.port, 10) : 19600;
+  const cfgDir = path.dirname(configPath());
+  const d = await startDaemon({
+    port,
+    once: false,
+    readConfig,
+    sessionsDirGetter: () => cfgDir,
+    sessionsMod,
+    version: () => readVersionFromRepo(),
+    workflowStateDir: () => process.env.LAZYCLAW_WORKFLOW_STATE_DIR || '.workflow-state',
+    // No auth token by default — same loopback-only assumption the
+    // bare daemon uses. Users who want to expose the dashboard set
+    // LAZYCLAW_AUTH_TOKEN + --allow-origin via the daemon command.
+    authToken: undefined,
+    allowedOrigins: [],
+    rateLimit: null,
+    responseCache: null,
+    logger: null,
+    costCap: null,
+  });
+  const url = `http://127.0.0.1:${d.port}/dashboard`;
+  process.stdout.write(`🦞 LazyClaw dashboard listening at ${url}\n`);
+  if (!flags['no-open']) {
+    // macOS uses `open`; Linux generally `xdg-open`; Windows
+    // `cmd /c start`. Detect by platform; bail silently if the
+    // helper fails — the URL is already on stdout for fallback.
+    const { spawn } = await import('node:child_process');
+    let cmd, args;
+    if (process.platform === 'darwin')      { cmd = 'open';      args = [url]; }
+    else if (process.platform === 'win32')  { cmd = 'cmd';       args = ['/c', 'start', '""', url]; }
+    else                                    { cmd = 'xdg-open';  args = [url]; }
+    try {
+      spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
+    } catch (_) { /* user can click the URL above */ }
+  }
+  // Forward SIGINT/SIGTERM to a graceful shutdown so Ctrl-C doesn't
+  // strand a port-bound server. Same shape cmdDaemon uses.
+  const { gracefulShutdown } = await import('./daemon.mjs');
+  let shuttingDown = false;
+  const shutdown = async () => {
+    if (shuttingDown) return process.exit(1);
+    shuttingDown = true;
+    process.stdout.write('\n  shutting down…\n');
+    const result = await gracefulShutdown(d.server, 5_000);
+    process.exit(result.forced ? 1 : 0);
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
 
 async function cmdDaemon(flags) {
@@ -3082,6 +3189,144 @@ function parseArgs(argv) {
 // so chat / agent / etc. behave bit-identically to typing them
 // directly. Non-TTY (piped, scripted) callers still see the
 // classic "Usage: …" line so automation isn't surprised.
+// Multi-step setup wizard — OpenClaw-style first-run experience.
+// Provider/model/key + optional workspace + optional sample skill
+// + reachability ping. Each step can be skipped (Enter on prompt /
+// "n" on yes-no). Re-runnable safely: existing state is reused, not
+// clobbered, except when the user explicitly opts in.
+//
+// `lazyclaw setup` exposes this directly so users can re-run the
+// wizard any time. The first-run code path also funnels through it
+// so a fresh install sees the same flow whether they typed
+// `lazyclaw` or `lazyclaw setup`.
+async function cmdSetup(_sub, _positional, flags = {}) {
+  await ensureRegistry();
+  const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
+  const bold   = (s) => `\x1b[1m${s}\x1b[0m`;
+  const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
+  const ok     = (s) => `\x1b[32m${s}\x1b[0m`;
+  const warn   = (s) => `\x1b[33m${s}\x1b[0m`;
+
+  // Header.
+  if (process.stdout.isTTY) process.stdout.write('\x1b[2J\x1b[H');
+  _renderBanner(readVersionFromRepo()).forEach((l) => process.stdout.write(l + '\n'));
+  process.stdout.write('\n');
+  process.stdout.write(`  ${bold('🔧 Setup wizard')}\n`);
+  process.stdout.write(`  ${dim('Five short steps. Press Enter to accept the default; type "skip" or "n" to bypass an optional step.')}\n\n`);
+
+  const cfg = readConfig();
+  const cfgDir = path.dirname(configPath());
+
+  // ── Step 1: Provider + model (mandatory) ────────────────────
+  process.stdout.write(`  ${accent('Step 1/5 ·')} ${bold('Pick a provider + model')}\n`);
+  process.stdout.write(`  ${dim('Opens the arrow-key picker. The list leads with gemini / openai / claude-cli — pick the one you have an account or login for.')}\n\n`);
+  await _quickPrompt('  ▶ press Enter to open the picker ');
+  try {
+    await cmdOnboard({ pick: true });
+  } catch (e) {
+    process.stderr.write(`onboard error: ${e?.message || e}\n`);
+    process.exit(1);
+  }
+  // Re-read config after onboard wrote it. If the user aborted with
+  // no provider set, bail out early — the rest of the wizard depends
+  // on a provider being configured.
+  const cfgAfterOnboard = readConfig();
+  if (!cfgAfterOnboard.provider) {
+    process.stdout.write(`\n  ${warn('Setup aborted — no provider configured. Run `lazyclaw setup` again when ready.')}\n\n`);
+    process.exit(0);
+  }
+  process.stdout.write(`\n  ${ok('✓ provider:')} ${cfgAfterOnboard.provider}  ${dim('model:')} ${cfgAfterOnboard.model || '(default)'}\n\n`);
+
+  // ── Step 2: Optional workspace ──────────────────────────────
+  process.stdout.write(`  ${accent('Step 2/5 ·')} ${bold('Initialise a workspace?')} ${dim('(optional)')}\n`);
+  process.stdout.write(`  ${dim('A workspace is a folder of AGENTS.md / SOUL.md / TOOLS.md prompt files that auto-inject into chat / agent. Skip if you don\'t need project-specific personas yet.')}\n\n`);
+  const wsName = (await _quickPrompt('  workspace name (Enter to skip): ')).trim();
+  if (wsName && /^[A-Za-z0-9_.-]+$/.test(wsName)) {
+    try {
+      const ws = await import('./workspace.mjs');
+      const dir = ws.initWorkspace(cfgDir, wsName);
+      process.stdout.write(`  ${ok('✓ workspace created:')} ${dir}\n`);
+      process.stdout.write(`  ${dim('Edit AGENTS.md / SOUL.md / TOOLS.md any time. Use with: lazyclaw chat --workspace ' + wsName)}\n\n`);
+    } catch (e) {
+      process.stdout.write(`  ${warn('skipped:')} ${e?.message || e}\n\n`);
+    }
+  } else if (wsName) {
+    process.stdout.write(`  ${warn('skipped:')} workspace name must match [A-Za-z0-9_.-]+\n\n`);
+  } else {
+    process.stdout.write(`  ${dim('— skipped —')}\n\n`);
+  }
+
+  // ── Step 3: Optional skill bundle install ───────────────────
+  process.stdout.write(`  ${accent('Step 3/5 ·')} ${bold('Install a skill bundle from GitHub?')} ${dim('(optional)')}\n`);
+  process.stdout.write(`  ${dim('Format: <user>/<repo>[@<ref>]. Skills are .md prompt fragments that compose into the system prompt via --skill.')}\n\n`);
+  const skillSpec = (await _quickPrompt('  github spec (Enter to skip): ')).trim();
+  if (skillSpec) {
+    try {
+      const inst = await import('./skills_install.mjs');
+      const r = await inst.installFromGithub(skillSpec, cfgDir, { force: false });
+      process.stdout.write(`  ${ok('✓ installed')} ${r.installed.length} ${dim('skill(s) from')} ${skillSpec}\n`);
+      r.installed.forEach((s) => process.stdout.write(`    · ${s.name} ${dim(`(${s.bytes} bytes)`)}\n`));
+      if (r.skipped.length) {
+        process.stdout.write(`  ${dim('skipped (already installed):')} ${r.skipped.map((s) => s.name).join(', ')}\n`);
+      }
+      process.stdout.write('\n');
+    } catch (e) {
+      process.stdout.write(`  ${warn('skipped:')} ${e?.message || e}\n\n`);
+    }
+  } else {
+    process.stdout.write(`  ${dim('— skipped —')}\n\n`);
+  }
+
+  // ── Step 4: Optional outbound webhook ───────────────────────
+  process.stdout.write(`  ${accent('Step 4/5 ·')} ${bold('Add an outbound webhook?')} ${dim('(optional)')}\n`);
+  process.stdout.write(`  ${dim('Use with: lazyclaw message send <name> <text>. Slack / Discord Incoming Webhook URLs work as-is.')}\n\n`);
+  const hookName = (await _quickPrompt('  webhook name (Enter to skip): ')).trim();
+  if (hookName) {
+    const hookUrl = (await _quickPrompt('  webhook URL: ')).trim();
+    if (!hookUrl) {
+      process.stdout.write(`  ${warn('skipped:')} URL required\n\n`);
+    } else {
+      try {
+        const cf = await import('./config_features.mjs');
+        const fresh = readConfig();
+        cf.messageAdd(fresh, hookName, hookUrl);
+        writeConfig(fresh);
+        process.stdout.write(`  ${ok('✓ webhook saved:')} ${hookName}\n\n`);
+      } catch (e) {
+        process.stdout.write(`  ${warn('skipped:')} ${e?.message || e}\n\n`);
+      }
+    }
+  } else {
+    process.stdout.write(`  ${dim('— skipped —')}\n\n`);
+  }
+
+  // ── Step 5: Reachability check ──────────────────────────────
+  process.stdout.write(`  ${accent('Step 5/5 ·')} ${bold('Verify the picked provider responds')}\n`);
+  process.stdout.write(`  ${dim('Sends a 1-token "ping" via `lazyclaw providers test`. Confirms your key / subscription / local daemon is wired up.')}\n\n`);
+  const wantPing = !flags['skip-test'] && (await _quickPrompt('  test now? [Y/n] ')).trim().toLowerCase() !== 'n';
+  if (wantPing) {
+    try {
+      // Reuse the existing providers-test path so behaviour matches
+      // a manual `lazyclaw providers test`.
+      await cmdProviders('test', [cfgAfterOnboard.provider], {});
+    } catch (e) {
+      process.stdout.write(`  ${warn('test errored:')} ${e?.message || e}\n`);
+      process.stdout.write(`  ${dim('Setup still completed; you can retry with:')} lazyclaw providers test ${cfgAfterOnboard.provider}\n`);
+    }
+  } else {
+    process.stdout.write(`  ${dim('— skipped —')}\n`);
+  }
+
+  // ── Wrap up ─────────────────────────────────────────────────
+  process.stdout.write('\n');
+  process.stdout.write(`  ${ok(bold('🎉 Setup complete.'))}\n`);
+  process.stdout.write(`  ${dim('Run')} ${bold('lazyclaw')} ${dim('any time to open the menu, or jump in directly:')}\n`);
+  process.stdout.write(`    ${dim('•')} lazyclaw chat                ${dim('— REPL with the configured provider')}\n`);
+  process.stdout.write(`    ${dim('•')} lazyclaw agent "..."          ${dim('— one-shot prompt')}\n`);
+  process.stdout.write(`    ${dim('•')} lazyclaw doctor              ${dim('— diagnostic JSON')}\n`);
+  process.stdout.write(`    ${dim('•')} lazyclaw setup               ${dim('— re-run this wizard any time')}\n\n`);
+}
+
 // First-run welcome panel + delegated onboard. Drawn once before the
 // main launcher menu when the config has no provider yet. Walks the
 // user through the same arrow-key picker that `lazyclaw onboard`
@@ -3093,16 +3338,7 @@ async function _runFirstTimeOnboard() {
   const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
   const bold   = (s) => `\x1b[1m${s}\x1b[0m`;
   process.stdout.write('\x1b[2J\x1b[H');
-  const banner = [
-    accent('  ╭──────────────────────────────╮'),
-    accent('  │   _                          │'),
-    accent('  │  | |__ _ _____  _ _          │'),
-    accent('  │  | / _` |_ / || | \'_|         │'),
-    accent('  │  |_\\__,_/__\\_, |_|            │'),
-    accent('  │  LazyClaw  |__/  ' + (readVersionFromRepo() || '').padEnd(10) + '  │'),
-    accent('  ╰──────────────────────────────╯'),
-  ];
-  banner.forEach((l) => process.stdout.write(l + '\n'));
+  _renderBanner(readVersionFromRepo()).forEach((l) => process.stdout.write(l + '\n'));
   process.stdout.write('\n');
   process.stdout.write(`  ${bold('👋 Welcome — first-time setup')}\n\n`);
   process.stdout.write(`  ${dim('No provider configured yet at')} ${configPath()}\n`);
@@ -3134,13 +3370,14 @@ async function cmdLauncher() {
   // user through onboard before showing the menu — once they've
   // picked, re-read the config and continue normally.
   if (!cfg.provider) {
-    await _runFirstTimeOnboard();
+    // Delegate to the full setup wizard rather than the bare onboard
+    // picker — first-time users benefit from the workspace / skill /
+    // ping steps too. cmdSetup exits the process on abort, so the
+    // re-read below only fires when the wizard completed successfully.
+    await cmdSetup(undefined, [], {});
     cfg = readConfig();
-    // If they cancelled / aborted onboard we still don't have a
-    // provider — drop straight out instead of showing a menu where
-    // every item leads to the same error.
     if (!cfg.provider) {
-      process.stdout.write('\n  Setup not completed — exiting.\n  Run `lazyclaw onboard` when ready, then try `lazyclaw` again.\n\n');
+      process.stdout.write('\n  Setup not completed — exiting.\n  Run `lazyclaw setup` when ready, then try `lazyclaw` again.\n\n');
       process.exit(0);
     }
   }
@@ -3177,16 +3414,7 @@ async function cmdLauncher() {
 
   const draw = () => {
     process.stdout.write('\x1b[?25l\x1b[2J\x1b[H'); // hide cursor + clear
-    const banner = [
-      accent('  ╭──────────────────────────────╮'),
-      accent('  │   _                          │'),
-      accent('  │  | |__ _ _____  _ _          │'),
-      accent('  │  | / _` |_ / || | \'_|         │'),
-      accent('  │  |_\\__,_/__\\_, |_|            │'),
-      accent('  │  LazyClaw  |__/  ' + (readVersionFromRepo() || '').padEnd(10) + '  │'),
-      accent('  ╰──────────────────────────────╯'),
-    ];
-    banner.forEach((l) => process.stdout.write(l + '\n'));
+    _renderBanner(readVersionFromRepo()).forEach((l) => process.stdout.write(l + '\n'));
     process.stdout.write('\n');
     const provDisplay = provider === '(unset — pick during onboard)'
       ? warn(provider)
@@ -3442,6 +3670,14 @@ async function main() {
     case 'cron': {
       const sub = rest.positional[0];
       await cmdCron(sub, rest.positional.slice(1), rest.flags);
+      break;
+    }
+    case 'setup': {
+      await cmdSetup(undefined, rest.positional, rest.flags);
+      break;
+    }
+    case 'dashboard': {
+      await cmdDashboard(rest.flags);
       break;
     }
     case 'daemon': {

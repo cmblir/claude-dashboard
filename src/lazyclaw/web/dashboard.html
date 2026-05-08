@@ -1,0 +1,459 @@
+<!doctype html>
+<!--
+  lazyclaw dashboard — a single-file SPA served by `lazyclaw daemon`.
+  Deliberately framework-free: vanilla DOM, vanilla fetch, no build
+  step. The full lazyclaude dashboard is gigantic; this is the
+  lazyclaw-only slice (chat / sessions / skills / providers /
+  status), aimed at users who installed via `npm i -g lazyclaw` and
+  don't want to clone the whole monorepo just to see a UI.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LazyClaw</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --card: #14141c;
+      --border: #2a2a36;
+      --text: #e8e8ea;
+      --dim: #a8a8b8;
+      --accent: #d97757;
+      --ok: #4ade80;
+      --warn: #f59e0b;
+      --err: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .logo { font-weight: 700; font-size: 16px; color: var(--accent); }
+    .ver  { color: var(--dim); font-size: 11px; }
+    nav.tabs {
+      display: flex;
+      gap: 2px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    nav.tabs button {
+      background: none;
+      border: 0;
+      color: var(--dim);
+      padding: 12px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+    }
+    nav.tabs button:hover { color: var(--text); }
+    nav.tabs button.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    main {
+      flex: 1;
+      padding: 22px;
+      overflow-y: auto;
+    }
+    section { display: none; }
+    section.active { display: block; }
+    h2 { margin: 0 0 14px; font-size: 18px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .row { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+    .row + .row { border-top: 1px solid var(--border); }
+    .name { font-weight: 600; }
+    .dim { color: var(--dim); font-size: 12px; }
+    button.btn {
+      background: var(--accent);
+      color: #fff;
+      border: 0;
+      border-radius: 6px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    button.btn:hover { filter: brightness(1.1); }
+    button.btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    button.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .empty { color: var(--dim); padding: 24px; text-align: center; font-style: italic; }
+    pre {
+      background: #06060c;
+      padding: 12px 14px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 12px;
+      color: #cfcfd6;
+      border: 1px solid var(--border);
+    }
+    /* Chat */
+    #chat-stream {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      height: 50vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .msg { padding: 8px 12px; border-radius: 6px; max-width: 90%; white-space: pre-wrap; word-wrap: break-word; }
+    .msg.user { align-self: flex-end; background: rgba(217, 119, 87, 0.15); border: 1px solid rgba(217, 119, 87, 0.3); }
+    .msg.assistant { align-self: flex-start; background: rgba(74, 222, 128, 0.06); border: 1px solid rgba(74, 222, 128, 0.18); }
+    .msg.error { align-self: stretch; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #ffd3d3; }
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .input-row textarea {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: var(--text);
+      resize: vertical;
+      min-height: 60px;
+      font: inherit;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      background: var(--border);
+      color: var(--dim);
+      margin-left: 6px;
+    }
+    .pill.ok  { background: rgba(74, 222, 128, 0.15); color: var(--ok); }
+    .pill.warn { background: rgba(245, 158, 11, 0.15); color: var(--warn); }
+    .pill.err  { background: rgba(239, 68, 68, 0.15); color: var(--err); }
+    .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .toolbar select {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font: inherit;
+    }
+    footer {
+      padding: 10px 22px;
+      border-top: 1px solid var(--border);
+      color: var(--dim);
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">🦞 LazyClaw</div>
+    <div class="ver" id="version">…</div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="chat" class="active">Chat</button>
+    <button data-tab="sessions">Sessions</button>
+    <button data-tab="skills">Skills</button>
+    <button data-tab="providers">Providers</button>
+    <button data-tab="status">Status</button>
+  </nav>
+
+  <main>
+    <section id="tab-chat" class="active">
+      <h2>Chat</h2>
+      <div class="toolbar">
+        <select id="chat-assignee"><option value="">(loading…)</option></select>
+        <button class="btn btn-secondary" onclick="resetChat()">Clear</button>
+        <span class="dim" id="chat-meta"></span>
+      </div>
+      <div id="chat-stream"><div class="empty">Type below to start.</div></div>
+      <div class="input-row">
+        <textarea id="chat-input" placeholder="Send a message — Enter to send, Shift+Enter for newline."></textarea>
+        <button class="btn" onclick="sendChat()">Send</button>
+      </div>
+    </section>
+
+    <section id="tab-sessions">
+      <h2>Sessions</h2>
+      <div id="sessions-list"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section id="tab-skills">
+      <h2>Skills</h2>
+      <div id="skills-list"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section id="tab-providers">
+      <h2>Providers</h2>
+      <div id="providers-list"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section id="tab-status">
+      <h2>Status</h2>
+      <div id="status-card"><div class="empty">Loading…</div></div>
+    </section>
+  </main>
+
+  <footer>
+    <span>lazyclaw dashboard</span>
+    <span id="footer-url"></span>
+  </footer>
+
+  <script>
+    // Tab switching ────────────────────────────────────────────────
+    const tabs = document.querySelectorAll('nav.tabs button');
+    const sections = document.querySelectorAll('main section');
+    tabs.forEach((b) => b.addEventListener('click', () => {
+      tabs.forEach((x) => x.classList.toggle('active', x === b));
+      sections.forEach((s) => s.classList.toggle('active', s.id === 'tab-' + b.dataset.tab));
+      const loader = LOADERS[b.dataset.tab];
+      if (loader) loader();
+    }));
+
+    document.getElementById('footer-url').textContent = location.href;
+
+    // Tiny fetch helper that surfaces errors as toasts on the page.
+    async function api(path, opts = {}) {
+      const r = await fetch(path, opts);
+      if (!r.ok && r.status !== 200) {
+        let body = '';
+        try { body = JSON.stringify(await r.json()); } catch {}
+        throw new Error(`${r.status} ${r.statusText}${body ? ' — ' + body : ''}`);
+      }
+      return r.json();
+    }
+
+    // ── Status / version (always shown in header) ────────────────
+    api('/version').then((v) => {
+      document.getElementById('version').textContent = `v${v.version}`;
+    }).catch(() => {});
+
+    // ── Loaders per tab ──────────────────────────────────────────
+    const LOADERS = {};
+
+    LOADERS.chat = async function loadChat() {
+      try {
+        const r = await api('/providers');
+        const sel = document.getElementById('chat-assignee');
+        sel.innerHTML = '';
+        for (const p of r.providers || []) {
+          const ms = (p.suggestedModels || []);
+          if (!ms.length) {
+            const opt = document.createElement('option');
+            opt.value = p.name; opt.textContent = p.name;
+            sel.appendChild(opt);
+            continue;
+          }
+          for (const m of ms.slice(0, 6)) {
+            const opt = document.createElement('option');
+            opt.value = `${p.name}:${m}`;
+            opt.textContent = `${p.name}  ·  ${m}`;
+            sel.appendChild(opt);
+          }
+        }
+      } catch (e) {
+        document.getElementById('chat-meta').textContent = '⚠ ' + e.message;
+      }
+    };
+
+    LOADERS.sessions = async function loadSessions() {
+      const root = document.getElementById('sessions-list');
+      root.innerHTML = '<div class="empty">Loading…</div>';
+      try {
+        const r = await api('/sessions');
+        const arr = r.sessions || r;
+        if (!Array.isArray(arr) || arr.length === 0) {
+          root.innerHTML = '<div class="empty">No persisted sessions yet. Start one with <code>lazyclaw chat --session &lt;id&gt;</code>.</div>';
+          return;
+        }
+        root.innerHTML = '';
+        arr.forEach((s) => {
+          const div = document.createElement('div');
+          div.className = 'card row';
+          const id = s.id || s.sessionId || s.name || JSON.stringify(s);
+          const turns = s.turns ?? s.turnCount ?? '';
+          const updated = s.updatedAt || s.mtime || '';
+          div.innerHTML = `<div class="name">${id}</div>
+            <div class="dim">${turns ? turns + ' turns' : ''}</div>
+            <div class="dim" style="margin-left:auto;">${updated}</div>`;
+          root.appendChild(div);
+        });
+      } catch (e) {
+        root.innerHTML = `<div class="empty">⚠ ${e.message}</div>`;
+      }
+    };
+
+    LOADERS.skills = async function loadSkills() {
+      const root = document.getElementById('skills-list');
+      root.innerHTML = '<div class="empty">Loading…</div>';
+      try {
+        const r = await api('/skills');
+        const arr = r.skills || r;
+        if (!Array.isArray(arr) || arr.length === 0) {
+          root.innerHTML = '<div class="empty">No skills yet. Install one: <code>lazyclaw skills install &lt;user&gt;/&lt;repo&gt;</code>.</div>';
+          return;
+        }
+        root.innerHTML = '';
+        arr.forEach((s) => {
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = `<div class="row" style="border:0;padding:0;">
+              <div class="name">${s.name}</div>
+              <div class="dim" style="margin-left:auto;">${(s.bytes ?? '')} bytes</div>
+            </div>
+            <div class="dim" style="margin-top:6px;">${s.summary || ''}</div>`;
+          root.appendChild(div);
+        });
+      } catch (e) {
+        root.innerHTML = `<div class="empty">⚠ ${e.message}</div>`;
+      }
+    };
+
+    LOADERS.providers = async function loadProviders() {
+      const root = document.getElementById('providers-list');
+      root.innerHTML = '<div class="empty">Loading…</div>';
+      try {
+        const r = await api('/providers');
+        const arr = r.providers || r;
+        root.innerHTML = '';
+        arr.forEach((p) => {
+          const div = document.createElement('div');
+          div.className = 'card';
+          const tag = p.requiresApiKey
+            ? '<span class="pill warn">api key</span>'
+            : '<span class="pill ok">no key</span>';
+          const models = (p.suggestedModels || []).slice(0, 6).join(' · ') || '<span class="dim">(default)</span>';
+          div.innerHTML = `<div class="row" style="border:0;padding:0;">
+              <div class="name">${p.name}</div>${tag}
+              <div class="dim" style="margin-left:auto;">${p.endpoint || ''}</div>
+            </div>
+            <div class="dim" style="margin-top:6px;">${p.docs || ''}</div>
+            <div style="margin-top:8px;font-size:12px;">${models}</div>`;
+          root.appendChild(div);
+        });
+      } catch (e) {
+        root.innerHTML = `<div class="empty">⚠ ${e.message}</div>`;
+      }
+    };
+
+    LOADERS.status = async function loadStatus() {
+      const root = document.getElementById('status-card');
+      root.innerHTML = '<div class="empty">Loading…</div>';
+      try {
+        const r = await api('/status');
+        root.innerHTML = `<div class="card"><pre>${JSON.stringify(r, null, 2)}</pre></div>`;
+      } catch (e) {
+        root.innerHTML = `<div class="empty">⚠ ${e.message}</div>`;
+      }
+    };
+
+    // First load = chat tab.
+    LOADERS.chat();
+
+    // ── Chat send ─────────────────────────────────────────────────
+    let chatHistory = []; // [{role, text}]
+    function resetChat() {
+      chatHistory = [];
+      const stream = document.getElementById('chat-stream');
+      stream.innerHTML = '<div class="empty">Type below to start.</div>';
+      document.getElementById('chat-meta').textContent = '';
+    }
+    function appendMsg(role, text) {
+      const stream = document.getElementById('chat-stream');
+      // First message kicks the empty placeholder.
+      if (stream.querySelector('.empty')) stream.innerHTML = '';
+      const div = document.createElement('div');
+      div.className = 'msg ' + role;
+      div.textContent = text;
+      stream.appendChild(div);
+      stream.scrollTop = stream.scrollHeight;
+      return div;
+    }
+    document.getElementById('chat-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChat();
+      }
+    });
+    async function sendChat() {
+      const ta = document.getElementById('chat-input');
+      const text = ta.value.trim();
+      if (!text) return;
+      const assignee = document.getElementById('chat-assignee').value;
+      if (!assignee) {
+        appendMsg('error', 'No provider selected. Run `lazyclaw onboard` first.');
+        return;
+      }
+      ta.value = '';
+      appendMsg('user', text);
+      chatHistory.push({ role: 'user', text });
+      const meta = document.getElementById('chat-meta');
+      meta.textContent = '⏳ thinking…';
+      const t0 = Date.now();
+      try {
+        // Daemon's POST /agent: { prompt, provider, model, ... }
+        // Returns { text, provider, model, durationMs, ... }.
+        const [provName, modelName] = assignee.includes(':') ? assignee.split(':', 2) : [assignee, ''];
+        const body = { prompt: buildAgentPrompt(text), provider: provName };
+        if (modelName) body.model = modelName;
+        const r = await api('/agent', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const reply = r.text || r.output || '(empty)';
+        appendMsg('assistant', reply);
+        chatHistory.push({ role: 'assistant', text: reply });
+        const dur = ((Date.now() - t0) / 1000).toFixed(1);
+        meta.textContent = `${r.provider || provName} · ${r.model || modelName || '(default)'} · ${dur}s`;
+      } catch (e) {
+        appendMsg('error', '⚠ ' + (e.message || String(e)));
+        meta.textContent = '';
+      }
+    }
+    function buildAgentPrompt(latestUserText) {
+      // Flat conversation prompt: previous turns + the new user message.
+      // The daemon's /agent endpoint is one-shot, so we stuff prior
+      // turns into the prompt body. Keeps the dashboard stateless.
+      if (chatHistory.length <= 1) return latestUserText;
+      const lines = [];
+      for (const m of chatHistory.slice(-12, -1)) {
+        lines.push((m.role === 'user' ? 'User:' : 'Assistant:') + ' ' + m.text);
+      }
+      lines.push('User: ' + latestUserText);
+      lines.push('Assistant:');
+      return lines.join('\n\n');
+    }
+  </script>
+</body>
+</html>

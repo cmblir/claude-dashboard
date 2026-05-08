@@ -378,6 +378,34 @@ export function makeHandler(ctx) {
       const workflowMatch = url.pathname.match(/^\/workflows\/([^/]+)$/);
       const configKeyMatch = url.pathname.match(/^\/config\/([^/]+)$/);
       switch (true) {
+        case route === 'GET /' || route === 'GET /dashboard': {
+          // Serve the lazyclaw-only web dashboard (a single static
+          // HTML in src/lazyclaw/web/). Co-resident with the JSON
+          // API so a single port handles both — no CORS song and
+          // dance, no separate static server. Falls back to a
+          // helpful text response when the file is missing (someone
+          // ran the daemon out of a partial install).
+          try {
+            const fs = await import('node:fs');
+            const path = await import('node:path');
+            const url = await import('node:url');
+            const here = path.dirname(url.fileURLToPath(import.meta.url));
+            const htmlPath = path.join(here, 'web', 'dashboard.html');
+            const body = fs.readFileSync(htmlPath, 'utf8');
+            res.writeHead(200, {
+              'content-type': 'text/html; charset=utf-8',
+              'cache-control': 'no-cache',
+            });
+            return res.end(body);
+          } catch (e) {
+            res.writeHead(503, { 'content-type': 'text/plain; charset=utf-8' });
+            return res.end(
+              `lazyclaw daemon is up but the dashboard HTML wasn't found.\n` +
+              `Try \`lazyclaw version\` to confirm install integrity, or hit any /api endpoint directly.\n\n` +
+              `error: ${e?.message || e}\n`,
+            );
+          }
+        }
         case route === 'GET /version':
           return writeJson(res, 200, { version: ctx.version(), nodeVersion: process.version, platform: `${process.platform}-${process.arch}` });
         case route === 'GET /health':

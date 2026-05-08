@@ -10,6 +10,102 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.6] — 2026-05-09  🎨 banner alignment + setup wizard + lazyclaw dashboard
+
+User report: three things in one breath:
+
+> "지금 lazy 글자가 밀려서 나와. 마스코트도 나오게해줘.
+>  openclaw처럼 기본 세팅이 필요해. setup처럼 처음 설정하는
+>  것들. 그리고 openclaw처럼 대시보드를 띄우는데 lazyclaude의
+>  lazyclaw 부분만 띄워주면 돼. lazyclaude를 전부 띄우기에는
+>  너무 무거우니까."
+
+### 1. Banner alignment fix
+The launcher / chat-banner box was rendering with the right
+border `│` clipped on two of the inner rows (visible in the
+user's screenshot). Cause: those rows were 33 cols vs the
+others' 32, because the JS-escape count for `\\__` was off by
+one.
+
+Fixed by routing every inner row through `.padEnd(W).slice(0,
+W)` so width is mathematically guaranteed regardless of
+escape misreads. New helper `_renderBanner(version)` is the
+single source of truth — `_printChatBanner`,
+`cmdLauncher`, and `_runFirstTimeOnboard` all delegate to it
+instead of carrying their own copy.
+
+### 2. ASCII mascot
+Added a sleepy-cat mascot lined up with the busiest part of
+the wordmark:
+
+```
+  ╭──────────────────────────────╮
+  │   _                          │
+  │  | |__ _ _____  _ _          │     /\_/\
+  │  | / _` |_ / || | '_|        │    ( -.- )  z z
+  │  |_\__,_/__\_, |_|           │     > ^ <    z
+  │  LazyClaw  |__/  3.99.6      │
+  ╰──────────────────────────────╯
+```
+
+Plain ASCII (no box-drawing) so any monospace font renders
+it cleanly.
+
+### 3. `lazyclaw setup` — multi-step first-run wizard
+OpenClaw ships a guided setup; lazyclaw `onboard` was a single
+prompt set. New `cmdSetup` walks five steps, each skippable:
+
+  1. Provider + model + api-key  (delegates to onboard --pick)
+  2. Optional workspace init     (AGENTS.md / SOUL.md / TOOLS.md)
+  3. Optional skill bundle install from GitHub
+  4. Optional outbound webhook   (Slack / Discord)
+  5. Reachability ping against the picked provider
+
+The first-run launcher now routes through `cmdSetup` (was
+`_runFirstTimeOnboard`), so a fresh install gets the full
+guided experience instead of the bare picker. `lazyclaw setup`
+exposes the wizard at any time so users can re-run it.
+
+`--skip-test` skips step 5 for environments that can't reach
+the network at install time.
+
+### 4. `lazyclaw dashboard` — lazyclaw-only web UI
+The full lazyclaude dashboard (Python + dist/index.html ~50
+tabs) is deliberately heavy. This new command ships a focused,
+single-file SPA at `src/lazyclaw/web/dashboard.html` covering
+just the lazyclaw slice:
+
+  · Chat       — provider/model picker + send → /agent
+  · Sessions   — GET /sessions
+  · Skills     — GET /skills
+  · Providers  — GET /providers (with [api key] / [no key] tags)
+  · Status     — GET /status
+
+Vanilla HTML/JS, no framework, no build step — keeps the npm
+package install footprint flat. Co-resident with the JSON
+API on a single port (default 19600) so there's no CORS
+song. `daemon.mjs` gains a `GET /` and `GET /dashboard` case
+that reads + serves the static file.
+
+`cmdDashboard` boots the daemon, prints the URL, and
+auto-opens the user's default browser (`open` on macOS,
+`xdg-open` on Linux, `cmd /c start` on Windows). `--no-open`
+skips the browser launch for SSH / headless / CI use.
+
+### Verified end-to-end
+- Banner: every inner row 30 cols, box closes cleanly
+  (offline measurement of `_renderBanner('3.99.6')`).
+- Setup: --skip-test + non-interactive paths work via the
+  underlying onboard flow (regression check).
+- Dashboard: `lazyclaw dashboard --no-open --port 19600` →
+  `curl /version` returns JSON, `curl /dashboard` returns
+  the HTML, `curl /` falls through to the same HTML.
+
+### Auto-publish
+src/lazyclaw/package.json 3.99.5 → 3.99.6. Push triggers
+`publish-lazyclaw.yml`.
+
+---
 ## [3.99.5] — 2026-05-09  🆕 first-run onboard + reordered providers
 
 User: "처음 onboard할때 모델들 전체가 나오는게 아니라 일단
