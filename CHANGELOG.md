@@ -10,6 +10,44 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.87.0] — 2026-05-08  📚 README — full LazyClaw CLI usage guide
+
+User report: "터미널에서 사용하는 방법도 알려줘. readme 에도
+방법 추가해주고. lazyclaw 설치방법부터 등등."
+
+The previous LazyClaw CLI section in the README (en/ko/zh) was a
+six-line teaser. Replaced with a complete reference covering:
+
+- **Install** — three forms (direct invocation, `/usr/local/bin`
+  symlink, shell alias) with the Node 18+ requirement called out
+- **First-run onboarding** — `onboard` / `status` / `doctor`,
+  `~/.lazyclaw/config.json` location and the `LAZYCLAW_CONFIG_DIR`
+  override
+- **Interactive chat (v3.85)** — banner screenshot, the new
+  `--pick` arrow-key picker, slash commands table, → ghost-text
+  accept and Tab cycle, Ctrl-C semantics
+- **One-shot `agent`** — stdin form, `--provider/--model/--skill`,
+  `--usage` and `--cost`
+- **providers / sessions / skills** subcommands
+- **Workflows** — `run` (sequential / `--parallel` /
+  `--parallel-persistent`), `resume`, `inspect` (`--summary`,
+  `--critical-path`, `--slowest`)
+- **Daemon** — `--port`, `--auth-token`, `--rate-limit`,
+  `--once`
+- **Rate cards** — `rates list/set/copy/delete/validate` and how
+  `/usage` + `--cost` use them
+- **Config + bundles** — `config get/set/list/edit/validate`,
+  `export`, `import`
+- **Shell completion** — `lazyclaw completion bash|zsh`
+- **File locations** table — config, sessions, skills, workflow
+  state, plus the env-var overrides for each
+
+Version badge bumped from a stale v3.66 (ko) / v3.83 (en) to
+v3.86 across all three READMEs so the badge now matches `VERSION`.
+
+No code changes — README only.
+
+---
 ## [3.86.0] — 2026-05-08  ✅ E2E for chat connection gate
 
 End-to-end Playwright coverage for the v3.84 connection-gate flow

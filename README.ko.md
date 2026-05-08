@@ -12,7 +12,7 @@ _50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v3.66.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.86.0-green.svg)](./CHANGELOG.md)
 
 </div>
 
@@ -46,15 +46,190 @@ CLAUDE_HOME=/path/to/.claude python3 server.py
 
 대시보드와는 별개의 독립 Node CLI. 같은 프로바이더 / 세션 / 스킬 / 워크플로우 / 요금표를 빠른 터미널 인터페이스로 노출합니다.
 
+### 설치
+
+`npm install` 단계가 없습니다 — 저장소에 들어 있는 ESM 을 그대로 실행합니다. 편한 방법을 고르세요:
+
 ```bash
-# 저장소 루트에서
-node src/lazyclaw/cli.mjs onboard          # 최초 1회 프로바이더/키 설정
-node src/lazyclaw/cli.mjs chat             # 인터랙티브 REPL
-node src/lazyclaw/cli.mjs agent "summarize: $(cat file.md)"   # 1회성
-node src/lazyclaw/cli.mjs run my-job ./flow.mjs --parallel-persistent
-node src/lazyclaw/cli.mjs inspect my-job --critical-path ./flow.mjs
-node src/lazyclaw/cli.mjs daemon --port 0  # 로컬 HTTP 게이트웨이
+git clone https://github.com/cmblir/LazyClaude.git
+cd LazyClaude
+
+# 1. 그대로 실행 (설치 없음)
+node src/lazyclaw/cli.mjs <subcommand>
+
+# 2. 어디서든 `lazyclaw …` 로 부르고 싶으면 글로벌 래퍼
+sudo ln -s "$PWD/src/lazyclaw/cli.mjs" /usr/local/bin/lazyclaw
+sudo chmod +x /usr/local/bin/lazyclaw
+lazyclaw version
+
+# 3. 셸 프로파일(~/.zshrc / ~/.bashrc) 에 alias
+alias lazyclaw="node $HOME/path/to/LazyClaude/src/lazyclaw/cli.mjs"
 ```
+
+요구사항: Node 18+ (picker 와 슬래시 ghost-text 가 `node:readline` 의 keypress 이벤트를 사용). macOS / Linux / WSL 에서 동작. Windows 네이티브 PowerShell 도 대부분 동작하지만 ghost-text · ANSI 배너는 TTY 한정이라 일반 prompt 로 fallback 될 수 있음.
+
+### 첫 실행 — 인터랙티브 onboarding
+
+```bash
+lazyclaw onboard               # 가이드: provider / model / api-key
+lazyclaw status                # 현재 provider/model + 마스킹된 키
+lazyclaw doctor                # config 와 provider 레지스트리 검증
+```
+
+`onboard` 는 `~/.lazyclaw/config.json` 을 작성합니다. `LAZYCLAW_CONFIG_DIR=/path/to/dir` 로 위치를 바꿀 수 있어요. 자동화는 `--non-interactive --provider X --model Y --api-key Z` 사용.
+
+### 인터랙티브 채팅 (배너 + 슬래시 ghost-text, v3.85+)
+
+```bash
+lazyclaw chat                  # REPL 시작 — 배너 + 활성 provider/model 출력
+lazyclaw chat --pick           # prompt 진입 전 화살표 picker
+lazyclaw chat --session daily  # ~/.lazyclaw/sessions/daily.jsonl 에 turn 영구 저장
+lazyclaw chat --skill review,style  # 지정 skill 들을 system prompt 로 합성
+```
+
+시작 시 화면 (TTY 한정):
+
+```text
+  ╭──────────────────────────────╮
+  │   _                          │
+  │  | |__ _ _____  _ _          │
+  │  | / _` |_ / || | '_|         │
+  │  |_\__,_/__\_, |_|            │
+  │  LazyClaw  |__/  3.86.0      │
+  ╰──────────────────────────────╯
+
+  provider · anthropic
+  model    · claude-opus-4-7
+  slash    · /help · /model · /provider · /exit
+  hint     · → to accept the suggested command, Tab to cycle
+
+›
+```
+
+REPL 안에서:
+
+| Slash | 동작 |
+|---|---|
+| `/help`        | 슬래시 명령 목록 |
+| `/status`      | provider + model + 마스킹된 키 출력 |
+| `/provider X`  | 세션 도중 active provider 교체 (대화 유지) |
+| `/model X`     | 모델 교체. `provider/model` 통합 폼도 지원 |
+| `/skill a,b`   | system prompt 를 지정 skill 들의 합성으로 교체 |
+| `/usage`       | 메시지 수 + 글자 + 누적 토큰 (provider 가 보고할 때) |
+| `/new` / `/reset` | 대화 비우고 새로 시작 |
+| `/exit`        | 종료 |
+
+Cursor 식 ghost-text 자동완성: `/` 로 시작하는 입력에서 가장 긴 매칭 슬래시 명령의 나머지가 dim grey 로 커서 뒤에 미리 보입니다. **`→`** 로 수락, **`Tab`** 으로 cycle. 스트리밍 응답 중 **Ctrl-C** 는 그 turn 만 abort (프로세스는 유지); 빈 prompt 에서 **Ctrl-C** 는 정상 종료.
+
+### 1회성 호출 (REPL 없이)
+
+```bash
+lazyclaw agent "summarize: $(cat file.md)"
+lazyclaw agent - < prompt.txt                    # stdin 에서 읽기
+lazyclaw agent "..." --provider openai --model gpt-4.1
+lazyclaw agent "..." --skill review              # system prompt 합성
+lazyclaw agent "..." --usage                     # 토큰 수를 stderr 로 출력
+lazyclaw agent "..." --cost                      # rates 가 잡혀있으면 $ 출력
+```
+
+### 프로바이더 / 세션 / 스킬
+
+```bash
+lazyclaw providers list                          # 등록된 모든 provider
+lazyclaw providers info anthropic                # 단일 provider 상세
+lazyclaw providers test anthropic                # 1-token 도달성 프로브
+
+lazyclaw sessions list                           # 영구 저장된 채팅
+lazyclaw sessions show daily                     # 세션 turn 덤프
+lazyclaw sessions search "deploy"                # 전문 검색
+lazyclaw sessions export daily > daily.md
+lazyclaw sessions clear daily                    # 세션 1개 비우기
+
+lazyclaw skills list                             # 설치된 마크다운 skill 번들
+lazyclaw skills show review                      # skill 본문 출력
+lazyclaw skills install ./my-skill.md            # skill 추가
+lazyclaw skills remove review
+```
+
+### 워크플로우 (DAG / sequential / persistent)
+
+```bash
+# 순차, 재개 가능 (기본). 상태는 ./.workflow-state/<id>/
+lazyclaw run my-job ./flow.mjs
+
+# 토폴로지컬-레벨 DAG, 메모리만 (빠름, 재개 X)
+lazyclaw run my-job ./flow.mjs --parallel --concurrency 4
+
+# DAG + 체크포인트 + 재개
+lazyclaw run my-job ./flow.mjs --parallel-persistent
+
+# 직전에 중단된 run 재개
+lazyclaw resume my-job ./flow.mjs
+
+# 영구 상태 확인 (실행 X)
+lazyclaw inspect                                 # 모든 세션 list
+lazyclaw inspect my-job --summary
+lazyclaw inspect my-job --critical-path ./flow.mjs
+lazyclaw inspect my-job --slowest 5
+```
+
+### 로컬 HTTP 게이트웨이
+
+```bash
+lazyclaw daemon                                  # 빈 포트 바인딩 후 { port, url } 출력
+lazyclaw daemon --port 19600
+lazyclaw daemon --auth-token $(openssl rand -hex 16)
+lazyclaw daemon --rate-limit 60 --log info       # 60 req/min/IP, JSON access log
+lazyclaw daemon --once                           # 1 회 응답 후 종료
+```
+
+daemon 은 CLI 와 config / rate card 를 공유 — `lazyclaw agent` 와 daemon `POST /agent` 의 응답은 바이트 단위로 동일.
+
+### 비용 rate card
+
+```bash
+lazyclaw rates list                              # 현재 카드 출력
+lazyclaw rates set anthropic/claude-opus-4-7 \
+  --in 15 --out 75 --cache-read 1.5 --cache-create 18.75
+lazyclaw rates copy anthropic/claude-opus-4-7 \
+  anthropic/claude-opus-4-6                       # 카드 복제
+lazyclaw rates delete openai/gpt-3.5-turbo
+lazyclaw rates validate                          # 스키마 + 정합성 검사
+```
+
+`/usage` 와 `--cost` 는 이 카드를 사용해 USD 합계를 로컬에서 계산 — provider 추가 호출 없음.
+
+### Config + 번들
+
+```bash
+lazyclaw config path                             # → ~/.lazyclaw/config.json
+lazyclaw config get provider
+lazyclaw config set provider openai
+lazyclaw config list
+lazyclaw config edit                             # $EDITOR 로 열기
+lazyclaw config validate
+
+lazyclaw export > backup.json                    # config + skills (+ 옵션 sessions)
+lazyclaw import --from backup.json
+```
+
+### 셸 자동완성
+
+```bash
+lazyclaw completion bash >> ~/.bashrc
+lazyclaw completion zsh  >> ~/.zshrc
+```
+
+### 파일 위치
+
+| 경로 | 용도 |
+|---|---|
+| `~/.lazyclaw/config.json` | provider, model, api-key, skills, rates |
+| `~/.lazyclaw/sessions/*.jsonl` | 영구 저장된 채팅 세션 |
+| `~/.lazyclaw/skills/*.md` | 설치된 skill 번들 |
+| `./.workflow-state/<id>/` | 세션별 워크플로우 체크포인트 (cwd 기준) |
+
+`LAZYCLAW_CONFIG_DIR=/elsewhere` 로 앞 셋의 위치를, `LAZYCLAW_WORKFLOW_STATE_DIR=...` 로 마지막 위치를 옮길 수 있어요.
 
 `lazyclaw help` 로 모든 서브커맨드 확인. CLI 와 daemon 은 검증기(`config-validate.mjs`, `rates-validate.mjs`)와 분석기(`workflow/summary.mjs`)를 공유 — 두 surface 의 출력이 비트 단위로 동일.
 
