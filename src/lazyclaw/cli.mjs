@@ -3074,10 +3074,161 @@ function parseArgs(argv) {
   return out;
 }
 
+// Interactive launcher — fired when the user types `lazyclaw` with
+// no subcommand AND we're attached to a TTY. OpenClaw's launcher
+// pattern: ASCII banner + provider/model status + arrow-key menu of
+// every common action. Selecting a row drops the user into the
+// matching subcommand via process.argv mutation + main() re-entry,
+// so chat / agent / etc. behave bit-identically to typing them
+// directly. Non-TTY (piped, scripted) callers still see the
+// classic "Usage: …" line so automation isn't surprised.
+async function cmdLauncher() {
+  await ensureRegistry();
+  const cfg = readConfig();
+  const provider = cfg.provider || '(unset — pick during onboard)';
+  const model = cfg.model || '(default)';
+  const items = [
+    { id: 'chat',      label: 'Chat',          desc: 'interactive REPL with the configured provider', argv: ['chat'] },
+    { id: 'agent',     label: 'Agent',         desc: 'one-shot prompt — read text and exit',           argv: ['agent'], promptForBody: true },
+    { id: 'onboard',   label: 'Onboard',       desc: 'pick provider / model / api-key',                argv: ['onboard'] },
+    { id: 'workspace', label: 'Workspace',     desc: 'AGENTS.md / SOUL.md / TOOLS.md prompt bundles',  argv: ['workspace', 'list'] },
+    { id: 'browse',    label: 'Browse',        desc: 'fetch a URL → markdown',                         argv: ['browse'], promptForUrl: true },
+    { id: 'skills',    label: 'Skills',        desc: 'installed skill bundles',                        argv: ['skills', 'list'] },
+    { id: 'sessions',  label: 'Sessions',      desc: 'persisted chat sessions',                        argv: ['sessions', 'list'] },
+    { id: 'providers', label: 'Providers',     desc: 'registered providers + reachability',            argv: ['providers', 'list'] },
+    { id: 'cron',      label: 'Cron',          desc: 'recurring agent runs (launchd / crontab)',       argv: ['cron', 'list'] },
+    { id: 'doctor',    label: 'Doctor',        desc: 'diagnostic — config, providers, workflows',     argv: ['doctor'] },
+    { id: 'status',    label: 'Status',        desc: 'current provider / model / masked key',          argv: ['status'] },
+    { id: 'help',      label: 'Help',          desc: 'one-line summary of every subcommand',           argv: ['help'] },
+    { id: 'quit',      label: 'Quit',          desc: 'exit without doing anything',                    argv: null },
+  ];
+
+  const readline = await import('node:readline');
+  readline.emitKeypressEvents(process.stdin);
+  if (process.stdin.setRawMode) process.stdin.setRawMode(true);
+  let idx = 0;
+
+  // Pretty header — same accent palette as _printChatBanner so
+  // returning users recognise it.
+  const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
+  const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
+  const bold   = (s) => `\x1b[1m${s}\x1b[0m`;
+  const ok     = (s) => `\x1b[32m${s}\x1b[0m`;
+  const warn   = (s) => `\x1b[33m${s}\x1b[0m`;
+
+  const draw = () => {
+    process.stdout.write('\x1b[?25l\x1b[2J\x1b[H'); // hide cursor + clear
+    const banner = [
+      accent('  ╭──────────────────────────────╮'),
+      accent('  │   _                          │'),
+      accent('  │  | |__ _ _____  _ _          │'),
+      accent('  │  | / _` |_ / || | \'_|         │'),
+      accent('  │  |_\\__,_/__\\_, |_|            │'),
+      accent('  │  LazyClaw  |__/  ' + (readVersionFromRepo() || '').padEnd(10) + '  │'),
+      accent('  ╰──────────────────────────────╯'),
+    ];
+    banner.forEach((l) => process.stdout.write(l + '\n'));
+    process.stdout.write('\n');
+    const provDisplay = provider === '(unset — pick during onboard)'
+      ? warn(provider)
+      : ok(provider);
+    process.stdout.write(`  ${dim('provider ·')} ${provDisplay}\n`);
+    process.stdout.write(`  ${dim('model    ·')} ${ok(model)}\n`);
+    process.stdout.write(`  ${dim('config   ·')} ${dim(configPath())}\n`);
+    process.stdout.write('\n');
+    process.stdout.write(`  ${dim('↑/↓ to move · Enter to select · q or Esc to quit')}\n\n`);
+
+    // Trim list to terminal height so the menu still fits when
+    // someone shrinks the window or runs in a small split pane.
+    const rowsAvail = Math.max(items.length, (process.stdout.rows || 30) - 14);
+    const fromIdx = Math.max(0, Math.min(items.length - rowsAvail, idx - Math.floor(rowsAvail / 2)));
+    const toIdx = Math.min(items.length, fromIdx + rowsAvail);
+    for (let i = fromIdx; i < toIdx; i++) {
+      const it = items[i];
+      const marker = i === idx ? accent('❯ ') : '  ';
+      const lbl = i === idx ? bold(it.label.padEnd(11)) : it.label.padEnd(11);
+      process.stdout.write(`${marker}${lbl}  ${dim(it.desc)}\n`);
+    }
+    process.stdout.write('\n');
+  };
+
+  // Tear down raw mode + listeners cleanly so the next subcommand
+  // starts with a sane stdin (otherwise `chat` after launcher inherits
+  // the launcher's raw mode and behaves weirdly).
+  const teardown = (onKey) => {
+    if (onKey) process.stdin.off('keypress', onKey);
+    if (process.stdin.setRawMode) process.stdin.setRawMode(false);
+    process.stdout.write('\x1b[?25h'); // show cursor
+    process.stdout.write('\x1b[2J\x1b[H'); // clear screen
+  };
+
+  draw();
+  const picked = await new Promise((resolve) => {
+    const onKey = (_str, key) => {
+      if (!key) return;
+      if (key.name === 'up')        { idx = (idx - 1 + items.length) % items.length; draw(); }
+      else if (key.name === 'down') { idx = (idx + 1) % items.length; draw(); }
+      else if (key.name === 'home') { idx = 0; draw(); }
+      else if (key.name === 'end')  { idx = items.length - 1; draw(); }
+      else if (key.name === 'pageup')   { idx = Math.max(0, idx - 5); draw(); }
+      else if (key.name === 'pagedown') { idx = Math.min(items.length - 1, idx + 5); draw(); }
+      else if (key.name === 'return')   { teardown(onKey); resolve(items[idx]); }
+      else if (key.ctrl && key.name === 'c') { teardown(onKey); resolve({ id: 'quit', argv: null }); }
+      else if (key.name === 'escape' || key.name === 'q') { teardown(onKey); resolve({ id: 'quit', argv: null }); }
+    };
+    process.stdin.on('keypress', onKey);
+  });
+
+  if (!picked || !picked.argv) {
+    process.exit(0);
+  }
+  // Two surfaces need a follow-up question before they can run:
+  // - `agent`: needs a prompt body
+  // - `browse`: needs a URL
+  // Ask via a simple readline prompt so the launcher stays
+  // self-contained instead of forwarding into a half-typed argv.
+  if (picked.promptForBody) {
+    const body = await _quickPrompt('prompt: ');
+    if (!body) process.exit(0);
+    picked.argv = ['agent', body];
+  } else if (picked.promptForUrl) {
+    const url = await _quickPrompt('url: ');
+    if (!url) process.exit(0);
+    picked.argv = ['browse', url];
+  }
+  // Replace argv and re-enter main(). The chosen subcommand sees
+  // the same parser surface as if the user had typed it directly.
+  process.argv = [process.argv[0], process.argv[1], ...picked.argv];
+  await main();
+}
+
+async function _quickPrompt(label) {
+  const readline = await import('node:readline');
+  process.stdout.write('\n');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const ans = await new Promise((resolve) => rl.question(label, resolve));
+  rl.close();
+  return ans.trim();
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const cmd = argv[0];
   const rest = parseArgs(argv.slice(1));
+  // No subcommand at all: drop into the interactive launcher when we
+  // can render one (TTY both ways), otherwise fall through to the
+  // historical "Usage: ..." line so scripts / piped callers stay
+  // predictable.
+  if (cmd === undefined) {
+    if (process.stdin.isTTY && process.stdout.isTTY) {
+      await cmdLauncher();
+      return;
+    }
+    console.error('Usage: lazyclaw <' + SUBCOMMANDS.join('|') + '> ...');
+    console.error('Run `lazyclaw help` for a one-line summary of each subcommand.');
+    console.error('Tip: launch in an interactive terminal to get the arrow-key menu.');
+    process.exit(2);
+  }
   switch (cmd) {
     case 'run': {
       const [sessionId, file] = rest.positional;

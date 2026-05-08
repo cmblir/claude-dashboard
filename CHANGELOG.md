@@ -10,6 +10,90 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.1] — 2026-05-09  🎛 lazyclaw — interactive launcher on no-arg
+
+User report: "lazyclaw 를 누르면 여기서부터 마스코트랑 설정들이
+openclaw처럼 config할 수 있게해줘야해. 각각 명령어로 내가 직접
+lazyclaw chat 이렇게 하는게 아니라, lazyclaw 하면 밑에 선택할 수
+있게끔 ↑/↓로."
+
+(Note: also clarifies the user's adjacent report — `onboard`'s
+`provider [mock|anthropic]` line is **not** a current bug.
+v3.91+ already lists every registered provider via
+`Object.keys(_registryMod.PROVIDERS).join('|')`. The v3.88 npm
+artifact was the only published copy when the user ran
+`onboard`; once this bump pushes, auto-publish will land
+v3.99.0 on npm and `npm i -g lazyclaw@latest` resolves it.)
+
+### `lazyclaw` (no subcommand) on a TTY
+Drops into a launcher screen instead of printing the bare
+"Usage: …" line:
+
+```
+  ╭──────────────────────────────╮
+  │   _                          │
+  │  | |__ _ _____  _ _          │
+  │  | / _` |_ / || | '_|         │
+  │  |_\__,_/__\_, |_|            │
+  │  LazyClaw  |__/  3.99.0      │
+  ╰──────────────────────────────╯
+
+  provider · claude-cli
+  model    · claude-opus-4-7
+  config   · ~/.lazyclaw/config.json
+
+  ↑/↓ to move · Enter to select · q or Esc to quit
+
+❯ Chat         interactive REPL with the configured provider
+  Agent        one-shot prompt — read text and exit
+  Onboard      pick provider / model / api-key
+  Workspace    AGENTS.md / SOUL.md / TOOLS.md prompt bundles
+  Browse       fetch a URL → markdown
+  Skills       installed skill bundles
+  Sessions     persisted chat sessions
+  Providers    registered providers + reachability
+  Cron         recurring agent runs (launchd / crontab)
+  Doctor       diagnostic — config, providers, workflows
+  Status       current provider / model / masked key
+  Help         one-line summary of every subcommand
+  Quit         exit without doing anything
+```
+
+### Behaviour
+- ↑ / ↓ / Home / End / PageUp / PageDown for navigation, Enter to
+  pick, Esc / q / Ctrl-C to quit.
+- Selection dispatches by mutating `process.argv` and re-entering
+  `main()`, so the chosen subcommand sees the same parser surface
+  as if the user had typed it. Chat / agent / etc. behave bit-
+  identically.
+- Two surfaces ask a follow-up:
+  - **Agent** → "prompt: " (the body text)
+  - **Browse** → "url: "
+- Raw mode + cursor are restored before the chosen subcommand
+  runs so a `chat` REPL launched from the menu doesn't inherit
+  weird stdin state.
+- **Non-TTY (piped, scripted) callers keep the historical
+  "Usage: …" line** so existing automation isn't surprised. A
+  trailing tip line points at the menu.
+
+### Implementation
+- New `cmdLauncher()` + `_quickPrompt()` helpers in `cli.mjs`,
+  built on the same readline keypress + raw-mode pattern as
+  `_pickProviderInteractive()` (which we've already verified
+  works under a real TTY).
+- `main()` gains a no-arg branch: `if (cmd === undefined &&
+  process.stdin.isTTY && process.stdout.isTTY) return
+  cmdLauncher()`.
+
+### Version sync
+Also bumps `src/lazyclaw/package.json` 3.98 → 3.99 to catch up
+with the dashboard's v3.99 (the previous commit only bumped
+the dashboard `VERSION`, not the npm package). Pushing this
+will trigger `publish-lazyclaw.yml` and land 3.99.0 on npm,
+including v3.91-v3.98's CLI features that the registry didn't
+have yet.
+
+---
 ## [3.99.0] — 2026-05-09  🚪 default port 8080 → 19500 + explicit PWA id
 
 User report: "지금 lazyclaude가 다른 pc에서 앱으로 열기하면
