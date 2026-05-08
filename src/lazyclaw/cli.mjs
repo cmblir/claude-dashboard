@@ -28,6 +28,20 @@ function writeConfig(cfg) {
   fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
 }
 
+// Synchronous, dependency-free resolver for the api-key the
+// chat / agent flow sends. Mirrors config_features.resolveApiKey
+// without forcing the dynamic import on every hot-path call.
+//   1. cfg.authProfiles[provider] active label, if set
+//   2. first profile in the array
+//   3. legacy single `cfg["api-key"]` (pre-v3.93 configs)
+function _resolveAuthKey(cfg, provider) {
+  const arr = (cfg.authProfiles || {})[provider] || [];
+  const active = (cfg.authActiveProfile || {})[provider];
+  const hit = arr.find((p) => p && p.label === active) || arr[0];
+  if (hit?.key) return hit.key;
+  return cfg['api-key'] || '';
+}
+
 async function importWorkflow(file) {
   const abs = path.resolve(file);
   const url = pathToFileURL(abs).href;
@@ -861,6 +875,8 @@ const SUBCOMMANDS = [
   'daemon', 'version', 'completion', 'help',
   'export', 'import',
   'rates',
+  // OpenClaw-parity subsurfaces (v3.93)
+  'auth', 'pairing', 'nodes', 'message',
 ];
 
 const SUBCOMMAND_SUBS = {
@@ -870,6 +886,10 @@ const SUBCOMMAND_SUBS = {
   providers: ['list', 'info', 'test'],
   rates:     ['list', 'set', 'delete', 'shape', 'validate', 'copy'],
   completion: ['bash', 'zsh'],
+  auth:      ['list', 'add', 'remove', 'use', 'rotate'],
+  pairing:   ['list', 'add', 'remove'],
+  nodes:     ['list', 'register', 'remove'],
+  message:   ['list', 'add', 'remove', 'send'],
 };
 
 function bashCompletion() {
@@ -1078,6 +1098,10 @@ const HELP_SUMMARIES = {
   export:     'Dump config + skills (+ optional sessions) as a JSON bundle',
   import:     'Apply a JSON bundle from stdin or --from <path>',
   rates:      'Manage cost rate-cards in config (rates list|set <provider/model>|delete|shape)',
+  auth:       'Multiple keys per provider (auth list|add|remove|use|rotate <provider>)',
+  pairing:    'Sender allowlist for the messaging surface (pairing list|add|remove <id>)',
+  nodes:      'Companion device registration (nodes list|register|remove <id>)',
+  message:    'Outbound webhook messaging (message list|add|remove|send <name>)',
   inspect:    'Print persisted workflow state without executing',
   clear:      'Delete a persisted workflow state file (idempotent)',
   validate:   'Static-check a workflow file: shape, deps, cycles, parallelism',
@@ -1108,6 +1132,10 @@ const HELP_DETAILS = {
   export: 'Usage: lazyclaw export [--include-secrets] [--include-sessions] > bundle.json\n  --include-secrets keeps the raw api-key in the bundle (default redacts it).\n  --include-sessions adds full turn content (default keeps metadata only).',
   import: 'Usage: lazyclaw import [--from <path>] [--overwrite-skills] [--no-overwrite-config] [--import-sessions]\n  Reads JSON from stdin (or --from <path>). Sessions are NEVER overwritten.\n  Redacted api-keys (***REDACTED***) are dropped, never written.',
   rates: 'Usage: lazyclaw rates <list [--filter <substr>] [--limit <N>] | set <provider/model> --input <N> --output <N> [--cache-read <N>] [--cache-create <N>] [--currency USD] | delete <key> | shape | validate | copy <src> <dst> [--force]>\n  Rates are per million tokens. costFromUsage uses cfg.rates to compute the cost block in /usage and body.cost.\n  `list` accepts --filter (case-insensitive key substring) and --limit (post-filter cap), same shape sessions/skills/workflows lists use.\n  `shape` prints the reference template (zero-filled) you can copy into config.\n  `validate` checks the cfg.rates shape: required fields, non-negative numbers, known providers (warn-only).\n  `copy` clones an existing card to a new key (use when a new model launches at the same price as an old one).',
+  auth: 'Usage: lazyclaw auth <list <provider> | add <provider> <key> [--label <name>] | remove <provider> <label> | use <provider> <label> | rotate <provider>>\n  Multiple keys per provider for rate-limit rotation. The active label is sent on every chat / agent call.\n  `rotate` advances the cursor to the next label; pair with a 429 hook for auto-failover.',
+  pairing: 'Usage: lazyclaw pairing <list | add <id> [--label <name>] | remove <id>>\n  Sender allowlist for the messaging surface. Inbound senders not on this list are rejected.\n  Sender ids are opaque per-channel: Slack member id, Discord user id, phone number for SMS, etc.',
+  nodes: 'Usage: lazyclaw nodes <list | register <id> [--platform macos|ios|android|web|cli] [--label <name>] | remove <id>>\n  Companion device registration table. CLI only — the actual mobile / menu-bar apps are out of scope here.\n  Platform is free-form lower-case; future surfaces (iOS / Android nodes) authenticate against the daemon using these ids.',
+  message: 'Usage: lazyclaw message <list | add <name> <webhook-url> [--kind slack|discord|generic] | remove <name> | send <name> <text>>\n  Outbound webhook messaging — Slack / Discord Incoming Webhooks. Auto-detects kind from the URL pattern.\n  send accepts a literal string, or `-` to read the body from stdin.',
 };
 
 function cmdHelp(name) {
@@ -1215,7 +1243,7 @@ async function cmdAgent(prompt, flags) {
   }
   try {
     for await (const chunk of prov.sendMessage(messages, {
-      apiKey: cfg['api-key'],
+      apiKey: _resolveAuthKey(cfg, provName),
       model: flags.model || cfg.model,
       thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
       onThinking: showThinking ? t => process.stderr.write(t) : undefined,
@@ -1722,7 +1750,7 @@ async function cmdChat(flags = {}) {
     process.on('SIGINT', onSigint);
     try {
       for await (const chunk of prov.sendMessage(messages, {
-        apiKey: cfg['api-key'],
+        apiKey: _resolveAuthKey(cfg, activeProvName),
         model: activeModel,
         signal: turnAc.signal,
         onUsage: accumulateUsage,
@@ -1984,6 +2012,236 @@ async function cmdRates(sub, positional, flags = {}) {
     }
     default:
       console.error('Usage: lazyclaw rates <list|set <key>|delete <key>|shape|validate>');
+      process.exit(2);
+  }
+}
+
+// Loads on first use to avoid paying the import cost when the user
+// only ran `lazyclaw chat` or similar; cli.mjs is already a 2700-line
+// hot path and we don't need every helper paged in.
+let _configFeatures = null;
+async function _ensureConfigFeatures() {
+  if (!_configFeatures) _configFeatures = await import('./config_features.mjs');
+  return _configFeatures;
+}
+
+async function cmdAuth(sub, positional, flags = {}) {
+  const m = await _ensureConfigFeatures();
+  const cfg = readConfig();
+  switch (sub) {
+    case undefined:
+    case 'list': {
+      const provider = positional[0];
+      if (!provider) {
+        // No provider given → return the active-label map for every
+        // provider that has at least one profile so the user can see
+        // their full auth state at once.
+        const out = {};
+        for (const p of Object.keys(cfg.authProfiles || {})) {
+          out[p] = {
+            active: (cfg.authActiveProfile || {})[p] || null,
+            profiles: m.authList(cfg, p),
+          };
+        }
+        console.log(JSON.stringify(out, null, 2));
+        return;
+      }
+      const profiles = m.authList(cfg, provider);
+      console.log(JSON.stringify({
+        provider,
+        active: (cfg.authActiveProfile || {})[provider] || null,
+        profiles,
+      }, null, 2));
+      return;
+    }
+    case 'add': {
+      const [provider, key] = positional;
+      if (!provider || !key) {
+        console.error('Usage: lazyclaw auth add <provider> <key> [--label <name>]');
+        process.exit(2);
+      }
+      try {
+        const lbl = m.authAdd(cfg, provider, key, flags.label);
+        writeConfig(cfg);
+        console.log(JSON.stringify({ ok: true, provider, label: lbl }));
+      } catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      return;
+    }
+    case 'remove': {
+      const [provider, label] = positional;
+      if (!provider || !label) {
+        console.error('Usage: lazyclaw auth remove <provider> <label>');
+        process.exit(2);
+      }
+      try { m.authRemove(cfg, provider, label); writeConfig(cfg); }
+      catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      console.log(JSON.stringify({ ok: true, provider, removed: label }));
+      return;
+    }
+    case 'use': {
+      const [provider, label] = positional;
+      if (!provider || !label) {
+        console.error('Usage: lazyclaw auth use <provider> <label>');
+        process.exit(2);
+      }
+      try { m.authUse(cfg, provider, label); writeConfig(cfg); }
+      catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      console.log(JSON.stringify({ ok: true, provider, active: label }));
+      return;
+    }
+    case 'rotate': {
+      const provider = positional[0];
+      if (!provider) {
+        console.error('Usage: lazyclaw auth rotate <provider>');
+        process.exit(2);
+      }
+      const next = m.authRotate(cfg, provider);
+      if (!next) {
+        console.error(`error: need at least 2 profiles to rotate (provider "${provider}")`);
+        process.exit(1);
+      }
+      writeConfig(cfg);
+      console.log(JSON.stringify({ ok: true, provider, active: next }));
+      return;
+    }
+    default:
+      console.error('Usage: lazyclaw auth <list|add|remove|use|rotate> ...');
+      process.exit(2);
+  }
+}
+
+async function cmdPairing(sub, positional, flags = {}) {
+  const m = await _ensureConfigFeatures();
+  const cfg = readConfig();
+  switch (sub) {
+    case undefined:
+    case 'list':
+      console.log(JSON.stringify(m.pairingList(cfg), null, 2));
+      return;
+    case 'add': {
+      const id = positional[0];
+      if (!id) {
+        console.error('Usage: lazyclaw pairing add <id> [--label <name>]');
+        process.exit(2);
+      }
+      try { m.pairingAdd(cfg, id, flags.label); writeConfig(cfg); }
+      catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      console.log(JSON.stringify({ ok: true, id }));
+      return;
+    }
+    case 'remove': {
+      const id = positional[0];
+      if (!id) {
+        console.error('Usage: lazyclaw pairing remove <id>');
+        process.exit(2);
+      }
+      try { m.pairingRemove(cfg, id); writeConfig(cfg); }
+      catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      console.log(JSON.stringify({ ok: true, removed: id }));
+      return;
+    }
+    default:
+      console.error('Usage: lazyclaw pairing <list|add|remove> ...');
+      process.exit(2);
+  }
+}
+
+async function cmdNodes(sub, positional, flags = {}) {
+  const m = await _ensureConfigFeatures();
+  const cfg = readConfig();
+  switch (sub) {
+    case undefined:
+    case 'list':
+      console.log(JSON.stringify(m.nodesList(cfg), null, 2));
+      return;
+    case 'register': {
+      const id = positional[0];
+      if (!id) {
+        console.error('Usage: lazyclaw nodes register <id> [--platform macos|ios|android|web|cli] [--label <name>]');
+        process.exit(2);
+      }
+      try { m.nodesRegister(cfg, id, flags.platform || 'cli', flags.label || ''); writeConfig(cfg); }
+      catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      console.log(JSON.stringify({ ok: true, id, platform: flags.platform || 'cli' }));
+      return;
+    }
+    case 'remove': {
+      const id = positional[0];
+      if (!id) {
+        console.error('Usage: lazyclaw nodes remove <id>');
+        process.exit(2);
+      }
+      try { m.nodesRemove(cfg, id); writeConfig(cfg); }
+      catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      console.log(JSON.stringify({ ok: true, removed: id }));
+      return;
+    }
+    default:
+      console.error('Usage: lazyclaw nodes <list|register|remove> ...');
+      process.exit(2);
+  }
+}
+
+async function cmdMessage(sub, positional, flags = {}) {
+  const m = await _ensureConfigFeatures();
+  const cfg = readConfig();
+  switch (sub) {
+    case undefined:
+    case 'list':
+      console.log(JSON.stringify(m.messageList(cfg), null, 2));
+      return;
+    case 'add': {
+      const [name, url] = positional;
+      if (!name || !url) {
+        console.error('Usage: lazyclaw message add <name> <webhook-url> [--kind slack|discord|generic]');
+        process.exit(2);
+      }
+      try { m.messageAdd(cfg, name, url, flags.kind); writeConfig(cfg); }
+      catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      console.log(JSON.stringify({ ok: true, name }));
+      return;
+    }
+    case 'remove': {
+      const name = positional[0];
+      if (!name) {
+        console.error('Usage: lazyclaw message remove <name>');
+        process.exit(2);
+      }
+      try { m.messageRemove(cfg, name); writeConfig(cfg); }
+      catch (e) { console.error(`error: ${e.message}`); process.exit(1); }
+      console.log(JSON.stringify({ ok: true, removed: name }));
+      return;
+    }
+    case 'send': {
+      const [name, ...textParts] = positional;
+      if (!name) {
+        console.error('Usage: lazyclaw message send <name> <text|->');
+        process.exit(2);
+      }
+      let text = textParts.join(' ');
+      // `-` reads body from stdin so a long agent reply can be piped:
+      //   lazyclaw agent "summarize foo" | lazyclaw message send team -
+      if (text === '-' || (!text && !process.stdin.isTTY)) {
+        text = await new Promise((resolve) => {
+          let buf = '';
+          process.stdin.on('data', (c) => { buf += c; });
+          process.stdin.on('end', () => resolve(buf.trim()));
+        });
+      }
+      if (!text) {
+        console.error('error: empty message body');
+        process.exit(1);
+      }
+      try {
+        const r = await m.messageSend(cfg, name, text);
+        console.log(JSON.stringify(r));
+      } catch (e) {
+        console.error(`error: ${e.message}`); process.exit(1);
+      }
+      return;
+    }
+    default:
+      console.error('Usage: lazyclaw message <list|add|remove|send> ...');
       process.exit(2);
   }
 }
@@ -2677,6 +2935,26 @@ async function main() {
     case 'rates': {
       const sub = rest.positional[0];
       await cmdRates(sub, rest.positional.slice(1), rest.flags);
+      break;
+    }
+    case 'auth': {
+      const sub = rest.positional[0];
+      await cmdAuth(sub, rest.positional.slice(1), rest.flags);
+      break;
+    }
+    case 'pairing': {
+      const sub = rest.positional[0];
+      await cmdPairing(sub, rest.positional.slice(1), rest.flags);
+      break;
+    }
+    case 'nodes': {
+      const sub = rest.positional[0];
+      await cmdNodes(sub, rest.positional.slice(1), rest.flags);
+      break;
+    }
+    case 'message': {
+      const sub = rest.positional[0];
+      await cmdMessage(sub, rest.positional.slice(1), rest.flags);
       break;
     }
     case 'daemon': {

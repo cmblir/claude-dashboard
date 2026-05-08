@@ -10,6 +10,64 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.93.0] — 2026-05-08  🔑 OpenClaw parity — auth profiles, pairing, nodes, message send
+
+User: implement all Tier-A OpenClaw gaps in the npm CLI.
+
+First commit of the v3.93–v3.98 series. Four config-driven
+surfaces in one drop because they all share the readConfig /
+writeConfig record-keeper pattern and don't pull external
+dependencies.
+
+### `lazyclaw auth <list|add|remove|use|rotate>`
+Multiple keys per provider. Stored as
+`cfg.authProfiles[provider] = [{ key, label, addedAt }]` with
+the active label persisted in `cfg.authActiveProfile[provider]`.
+A new `_resolveAuthKey(cfg, provider)` helper at the top of
+cli.mjs replaces the bare `cfg["api-key"]` reads in the chat +
+agent hot paths so the rotation actually applies. Legacy
+single-key configs continue to work unchanged.
+
+### `lazyclaw pairing <list|add|remove>`
+Sender allowlist for the messaging surface — `cfg.pairing =
+[{ id, label, addedAt }]`. Sender ids are opaque per channel
+(Slack member id, Discord user id, phone number, etc.) so the
+shape stays the same as we add channels later.
+
+### `lazyclaw nodes <list|register|remove>`
+Companion device registration table. CLI only — the actual
+mobile / menu-bar apps remain out of scope, but the table lets
+a future surface authenticate against `lazyclaw daemon` using
+these ids. `--platform` is free-form lower-case.
+
+### `lazyclaw message <list|add|remove|send>`
+Outbound webhook messaging. `cfg.messaging.webhooks[name] =
+{ kind, url, addedAt }`. Auto-detects Slack / Discord from the
+URL pattern. `send name -` reads the body from stdin so a long
+agent reply pipes cleanly:
+
+  lazyclaw agent "summarize foo" | lazyclaw message send team -
+
+### Implementation
+- New `src/lazyclaw/config_features.mjs` — pure record-keeper,
+  no I/O of its own (CLI handles read/write through the
+  existing config helpers)
+- `cli.mjs`: 4 cmd handlers, lazy-imports the helper module so
+  cold-path users (`chat` only) don't pay the import cost
+- SUBCOMMANDS / SUBCOMMAND_SUBS / HELP / HELP_DETAILS extended
+
+### Verified end-to-end
+auth add/list/rotate/use/remove, pairing add/list, nodes
+register/list, message add/list, duplicate-add error path —
+all green.
+
+### Out of scope (decline-by-honesty per CLAUDE.md §1)
+Tier B items (Voice Wake / Talk Mode / Live Canvas / mobile
+companion apps / 24-channel inbox / ClawHub central registry)
+are separate-project scope; this CLI ships only the
+config-recordkeeper layer they would later plug into.
+
+---
 ## [3.92.0] — 2026-05-08  🚪 instant `/exit` from `lazyclaw chat`
 
 User report: "지금 exit 해도 너무 오래 걸려. 최적화해줘."
