@@ -12,7 +12,8 @@ _Don't memorize 50+ CLI commands. Just click._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v3.86.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.89.0-green.svg)](./CHANGELOG.md)
+[![npm](https://img.shields.io/npm/v/lazyclaw.svg?label=lazyclaw%20cli)](https://www.npmjs.com/package/lazyclaw)
 
 </div>
 
@@ -48,25 +49,34 @@ A standalone Node CLI (separate from the dashboard) that exposes the same provid
 
 ### Install
 
-There is no `npm install` — the CLI is plain ESM that runs against the repo. Pick the form that fits:
+```bash
+npm install -g lazyclaw
+lazyclaw version
+```
+
+Requirements: **Node 18+**. Works on macOS / Linux / WSL. Windows native PowerShell mostly works but the ghost-text + ANSI banner are TTY-gated and may fall back to plain prompts.
+
+<details>
+<summary>From source (for contributors)</summary>
 
 ```bash
 git clone https://github.com/cmblir/LazyClaude.git
 cd LazyClaude
 
-# 1. Run directly (no install)
+# Run directly (no install)
 node src/lazyclaw/cli.mjs <subcommand>
 
-# 2. Add a global wrapper so you can type `lazyclaw …` anywhere
+# Or symlink the bin into $PATH
 sudo ln -s "$PWD/src/lazyclaw/cli.mjs" /usr/local/bin/lazyclaw
 sudo chmod +x /usr/local/bin/lazyclaw
-lazyclaw version
 
-# 3. Or alias it in your shell profile (~/.zshrc / ~/.bashrc)
+# Or alias in your shell profile (~/.zshrc / ~/.bashrc)
 alias lazyclaw="node $HOME/path/to/LazyClaude/src/lazyclaw/cli.mjs"
 ```
 
-Requirements: Node 18+ (uses `node:readline` keypress events for the picker and slash ghost-text). Works on macOS / Linux / WSL. Windows native PowerShell mostly works but the ghost-text + ANSI banner are TTY-gated and may fall back to plain prompts.
+The npm-published `lazyclaw` is a snapshot of [`src/lazyclaw/`](./src/lazyclaw) — every commit on `main` that bumps `src/lazyclaw/package.json#version` triggers `.github/workflows/publish-lazyclaw.yml` and lands on npmjs.org automatically.
+
+</details>
 
 ### First run — interactive onboarding
 

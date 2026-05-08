@@ -12,7 +12,8 @@ _别再死记 50+ 个 CLI 命令。点一下就好。_
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v3.86.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.89.0-green.svg)](./CHANGELOG.md)
+[![npm](https://img.shields.io/npm/v/lazyclaw.svg?label=lazyclaw%20cli)](https://www.npmjs.com/package/lazyclaw)
 
 </div>
 
@@ -48,25 +49,34 @@ CLAUDE_HOME=/path/to/.claude python3 server.py
 
 ### 安装
 
-没有 `npm install` 步骤 — CLI 是直接在仓库中运行的纯 ESM。任选一种方式：
+```bash
+npm install -g lazyclaw
+lazyclaw version
+```
+
+要求：**Node 18+**。在 macOS / Linux / WSL 上工作。Windows 原生 PowerShell 大致可用，但 ghost-text 与 ANSI 横幅仅在 TTY 启用，否则回退到普通 prompt。
+
+<details>
+<summary>从源码安装（贡献者）</summary>
 
 ```bash
 git clone https://github.com/cmblir/LazyClaude.git
 cd LazyClaude
 
-# 1. 直接运行（无安装）
+# 直接运行（无安装）
 node src/lazyclaw/cli.mjs <subcommand>
 
-# 2. 添加全局包装器，随处使用 `lazyclaw …`
+# 或将 bin 链接到 $PATH
 sudo ln -s "$PWD/src/lazyclaw/cli.mjs" /usr/local/bin/lazyclaw
 sudo chmod +x /usr/local/bin/lazyclaw
-lazyclaw version
 
-# 3. 或在 shell profile（~/.zshrc / ~/.bashrc）中设置 alias
+# 或在 shell profile（~/.zshrc / ~/.bashrc）中设置 alias
 alias lazyclaw="node $HOME/path/to/LazyClaude/src/lazyclaw/cli.mjs"
 ```
 
-要求：Node 18+（picker 与斜杠 ghost-text 使用 `node:readline` 的 keypress 事件）。在 macOS / Linux / WSL 上工作。Windows 原生 PowerShell 大致可用，但 ghost-text 与 ANSI 横幅仅在 TTY 启用，否则回退到普通 prompt。
+发布到 npm 的 `lazyclaw` 是 [`src/lazyclaw/`](./src/lazyclaw) 的快照。`main` 上每次 push 如果 bump 了 `src/lazyclaw/package.json#version`，`.github/workflows/publish-lazyclaw.yml` 会自动发布到 npmjs.org。
+
+</details>
 
 ### 首次运行 — 交互式 onboarding
 

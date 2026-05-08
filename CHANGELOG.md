@@ -10,6 +10,44 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.90.0] — 2026-05-08  🤖 auto-publish lazyclaw on version bump
+
+User report: "오케이 올렸어. 이제 README 수정하고, 내가 매번
+github 에 푸시할때마다 npm 업데이트해줘."
+
+`lazyclaw@3.88.0` shipped to npm manually; from now on the
+publish should follow every version bump on `main` without the
+maintainer remembering `cd src/lazyclaw && npm publish OTP=…`.
+
+### Workflow — `.github/workflows/publish-lazyclaw.yml`
+- Triggered on `push` to `main` whose paths touch `src/lazyclaw/**`
+- Diffs `src/lazyclaw/package.json#version` between HEAD and HEAD~1
+  via `jq`. **No version change ⇒ no publish** (skip path,
+  green check). Avoids npm rejecting duplicate-version uploads on
+  every commit
+- Cross-checks `npm view lazyclaw@<new-version>` to refuse a
+  publish when that version already exists on the registry
+  (e.g. when a hotfix forgets to bump)
+- Publishes with `--access public --provenance`. The repo grants
+  `id-token: write` so npm stamps the tarball with a verifiable
+  link back to this exact workflow run
+- Required repo secret: **NPM_TOKEN** — granular access token
+  with "Bypass 2FA for publishing" enabled, scoped to the
+  `lazyclaw` package
+
+### README updates (en/ko/zh)
+- `npm install -g lazyclaw` is the primary install path; the
+  git-clone form moves under a collapsed `<details>` for
+  contributors
+- Added an `lazyclaw cli` npm version badge alongside the
+  existing license / Python / version badges
+
+### File touched
+- `.github/workflows/publish-lazyclaw.yml` (new)
+- `README.md`, `README.ko.md`, `README.zh.md` (install lead-in
+  rewritten + npm badge)
+
+---
 ## [3.89.0] — 2026-05-08  🛠 Makefile shortcuts for npm publish
 
 User report: `npm publish --dry-run` from the repo root crashed

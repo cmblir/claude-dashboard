@@ -12,7 +12,8 @@ _50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v3.86.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.89.0-green.svg)](./CHANGELOG.md)
+[![npm](https://img.shields.io/npm/v/lazyclaw.svg?label=lazyclaw%20cli)](https://www.npmjs.com/package/lazyclaw)
 
 </div>
 
@@ -48,25 +49,34 @@ CLAUDE_HOME=/path/to/.claude python3 server.py
 
 ### 설치
 
-`npm install` 단계가 없습니다 — 저장소에 들어 있는 ESM 을 그대로 실행합니다. 편한 방법을 고르세요:
+```bash
+npm install -g lazyclaw
+lazyclaw version
+```
+
+요구사항: **Node 18+**. macOS / Linux / WSL 에서 동작. Windows 네이티브 PowerShell 도 대부분 동작하지만 ghost-text · ANSI 배너는 TTY 한정이라 일반 prompt 로 fallback 될 수 있어요.
+
+<details>
+<summary>소스에서 직접 (기여자용)</summary>
 
 ```bash
 git clone https://github.com/cmblir/LazyClaude.git
 cd LazyClaude
 
-# 1. 그대로 실행 (설치 없음)
+# 그대로 실행 (설치 없음)
 node src/lazyclaw/cli.mjs <subcommand>
 
-# 2. 어디서든 `lazyclaw …` 로 부르고 싶으면 글로벌 래퍼
+# 또는 bin 을 $PATH 로 심볼릭 링크
 sudo ln -s "$PWD/src/lazyclaw/cli.mjs" /usr/local/bin/lazyclaw
 sudo chmod +x /usr/local/bin/lazyclaw
-lazyclaw version
 
-# 3. 셸 프로파일(~/.zshrc / ~/.bashrc) 에 alias
+# 또는 셸 프로파일(~/.zshrc / ~/.bashrc) 에 alias
 alias lazyclaw="node $HOME/path/to/LazyClaude/src/lazyclaw/cli.mjs"
 ```
 
-요구사항: Node 18+ (picker 와 슬래시 ghost-text 가 `node:readline` 의 keypress 이벤트를 사용). macOS / Linux / WSL 에서 동작. Windows 네이티브 PowerShell 도 대부분 동작하지만 ghost-text · ANSI 배너는 TTY 한정이라 일반 prompt 로 fallback 될 수 있음.
+npm 에 게시되는 `lazyclaw` 는 [`src/lazyclaw/`](./src/lazyclaw) 의 스냅샷입니다. `main` 에 푸시된 커밋이 `src/lazyclaw/package.json#version` 을 bump 하면 `.github/workflows/publish-lazyclaw.yml` 이 자동으로 npmjs.org 에 올립니다.
+
+</details>
 
 ### 첫 실행 — 인터랙티브 onboarding
 

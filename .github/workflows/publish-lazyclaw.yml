@@ -1,0 +1,81 @@
+name: Publish lazyclaw to npm
+
+# Auto-publishes the lazyclaw CLI to npmjs.org whenever the
+# `version` field in src/lazyclaw/package.json changes on main.
+# A push that doesn't bump the version is a no-op — npm rejects
+# duplicate versions anyway, so the version-change gate just
+# avoids surfacing a confusing failure on every commit.
+#
+# Required repo secret: NPM_TOKEN — granular access token with
+# "Bypass 2FA for publishing" enabled, scoped to the lazyclaw
+# package, since CI can't satisfy interactive 2FA.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/lazyclaw/**"
+
+permissions:
+  contents: read
+  # id-token: write is what `npm publish --provenance` needs so npm
+  # can stamp the published tarball with a verifiable link back to
+  # this exact workflow run. If provenance turns out to fail in your
+  # setup (e.g. a token without provenance support), drop the
+  # --provenance flag from the publish step below.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need the previous commit so we can diff package.json#version.
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Detect version change
+        id: detect
+        run: |
+          set -eu
+          PKG=src/lazyclaw/package.json
+          NEW=$(jq -r '.version' "$PKG")
+          # Previous version on main from HEAD~1. Empty string when the
+          # file didn't exist yet (first introduction = fresh publish).
+          OLD=$(git show "HEAD~1:$PKG" 2>/dev/null | jq -r '.version // ""' || echo "")
+          echo "old=$OLD" >> "$GITHUB_OUTPUT"
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          if [ "$OLD" = "$NEW" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ version unchanged ($NEW) — skip publish"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "✅ version $OLD → $NEW — will publish"
+          fi
+
+      - name: Verify the new version isn't already on npm
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          set -eu
+          NEW="${{ steps.detect.outputs.new }}"
+          # `npm view` exits 0 with the version printed when the version
+          # exists, exits non-zero (E404) when it doesn't.
+          if npm view "lazyclaw@$NEW" version >/dev/null 2>&1; then
+            echo "✗ lazyclaw@$NEW already published — bump the version"
+            exit 1
+          fi
+          echo "✓ lazyclaw@$NEW is unpublished — proceeding"
+
+      - name: Publish
+        if: steps.detect.outputs.changed == 'true'
+        working-directory: src/lazyclaw
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish --access public --provenance
+          echo "🚀 published lazyclaw@${{ steps.detect.outputs.new }}"
