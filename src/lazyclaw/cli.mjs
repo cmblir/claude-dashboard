@@ -875,8 +875,8 @@ const SUBCOMMANDS = [
   'daemon', 'version', 'completion', 'help',
   'export', 'import',
   'rates',
-  // OpenClaw-parity subsurfaces (v3.93–v3.94)
-  'auth', 'pairing', 'nodes', 'message', 'workspace',
+  // OpenClaw-parity subsurfaces (v3.93–v3.95)
+  'auth', 'pairing', 'nodes', 'message', 'workspace', 'browse',
 ];
 
 const SUBCOMMAND_SUBS = {
@@ -1104,6 +1104,7 @@ const HELP_SUMMARIES = {
   nodes:      'Companion device registration (nodes list|register|remove <id>)',
   message:    'Outbound webhook messaging (message list|add|remove|send <name>)',
   workspace:  'AGENTS.md / SOUL.md / TOOLS.md system-prompt convention (workspace list|init|show|remove|path)',
+  browse:     'Fetch a URL and emit Markdown on stdout (browse <url> [--max-bytes <N>])',
   inspect:    'Print persisted workflow state without executing',
   clear:      'Delete a persisted workflow state file (idempotent)',
   validate:   'Static-check a workflow file: shape, deps, cycles, parallelism',
@@ -1139,6 +1140,7 @@ const HELP_DETAILS = {
   nodes: 'Usage: lazyclaw nodes <list | register <id> [--platform macos|ios|android|web|cli] [--label <name>] | remove <id>>\n  Companion device registration table. CLI only — the actual mobile / menu-bar apps are out of scope here.\n  Platform is free-form lower-case; future surfaces (iOS / Android nodes) authenticate against the daemon using these ids.',
   message: 'Usage: lazyclaw message <list | add <name> <webhook-url> [--kind slack|discord|generic] | remove <name> | send <name> <text>>\n  Outbound webhook messaging — Slack / Discord Incoming Webhooks. Auto-detects kind from the URL pattern.\n  send accepts a literal string, or `-` to read the body from stdin.',
   workspace: 'Usage: lazyclaw workspace <list | init <name> | show <name> [<file>] | remove <name> | path <name>>\n  Workspace = a directory under <configDir>/workspaces/<name>/ containing AGENTS.md, SOUL.md, TOOLS.md.\n  When `chat` or `agent` is invoked with --workspace <name>, the three files are stitched into a single system prompt at the head of the conversation. Missing files are skipped silently.\n  init scaffolds the three files with short stubs you replace.\n  show prints the composed prompt; show <name> AGENTS.md (etc) prints just one file.',
+  browse: 'Usage: lazyclaw browse <url> [--max-bytes <N>] [--timeout-ms <N>] [--user-agent <ua>] [--meta]\n  Fetches the URL and emits Markdown on stdout. Pipes cleanly into `agent`:\n      lazyclaw browse https://example.com/docs | lazyclaw agent -\n  Strips <script>/<style>/<svg>/comments, prefers <main>/<article>, falls back to <body>.\n  --max-bytes caps the body read (default 2 MB) so a misconfigured upstream can\'t OOM the process.\n  --meta prints { url, title, bytes, truncated } as JSON to stderr alongside the markdown on stdout.',
 };
 
 function cmdHelp(name) {
@@ -2328,6 +2330,27 @@ async function cmdWorkspace(sub, positional, flags = {}) {
   }
 }
 
+async function cmdBrowse(url, flags = {}) {
+  if (!url) { console.error('Usage: lazyclaw browse <url> [--max-bytes <N>] [--timeout-ms <N>] [--meta]'); process.exit(2); }
+  const { browse } = await import('./browse.mjs');
+  const opts = {};
+  if (flags['max-bytes'] !== undefined) opts.maxBytes = parseInt(flags['max-bytes'], 10);
+  if (flags['timeout-ms'] !== undefined) opts.timeoutMs = parseInt(flags['timeout-ms'], 10);
+  if (flags['user-agent']) opts.userAgent = flags['user-agent'];
+  try {
+    const r = await browse(url, opts);
+    if (flags.meta) {
+      process.stderr.write(JSON.stringify({
+        url: r.url, title: r.title, bytes: r.bytes, truncated: r.truncated,
+      }) + '\n');
+    }
+    process.stdout.write(r.markdown);
+  } catch (e) {
+    console.error(`error: ${e?.message || e}`);
+    process.exit(1);
+  }
+}
+
 async function cmdSkills(sub, positional, flags = {}) {
   const skillsMod = await import('./skills.mjs');
   const cfgDir = path.dirname(configPath());
@@ -3042,6 +3065,10 @@ async function main() {
     case 'workspace': {
       const sub = rest.positional[0];
       await cmdWorkspace(sub, rest.positional.slice(1), rest.flags);
+      break;
+    }
+    case 'browse': {
+      await cmdBrowse(rest.positional[0], rest.flags);
       break;
     }
     case 'daemon': {

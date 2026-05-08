@@ -10,6 +10,49 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.95.0] — 2026-05-08  🌐 browse — fetch + markdown-ify a URL
+
+OpenClaw lists a `browser` first-class tool. We ship the LLM-
+useful slice of it: fetch a URL, return Markdown on stdout.
+
+```bash
+lazyclaw browse https://example.com/docs | lazyclaw agent -
+```
+
+### Why a regex-based converter (not jsdom)
+1. Zero dependencies — `npm i -g lazyclaw` stays single-file
+2. Output goes to an LLM, not a renderer; the model is
+   forgiving of slightly-off Markdown
+3. Small enough that anyone debugging "why did this page
+   come out weird" can read it end-to-end
+
+Handles: headers (h1–h6), paragraphs, line breaks, lists
+(ordered / unordered), tables, code blocks (`<pre><code>` and
+inline `<code>`), blockquotes, links, images, bold / italic /
+strike, hr.
+
+### CLI
+- `lazyclaw browse <url> [--max-bytes <N>] [--timeout-ms <N>]
+  [--user-agent <ua>] [--meta]`
+- `--meta` writes `{ url, title, bytes, truncated }` to stderr
+  alongside the markdown on stdout — handy when piping.
+
+### Safety
+- caps body read at 2 MB by default (`--max-bytes` to override)
+  so a misconfigured upstream can't OOM the process
+- 20 s default timeout via internal `AbortController`
+- only http/https URLs accepted
+
+### Implementation
+- New `src/lazyclaw/browse.mjs` — pure ESM, uses globalThis.fetch
+  (Node 18+); accepts `opts.fetch` so tests can stub
+- cli.mjs: `cmdBrowse` handler, `browse` subcommand wired
+  through SUBCOMMANDS / HELP / HELP_DETAILS
+- Verified end-to-end against a stubbed HTML page covering
+  headers / lists / table / code block / blockquote / image /
+  link round-trips.
+
+---
 ## [3.94.0] — 2026-05-08  📁 workspace — AGENTS.md / SOUL.md / TOOLS.md
 
 OpenClaw-parity workspace convention. A workspace is a directory
