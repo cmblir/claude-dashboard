@@ -10,6 +10,51 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.88.0] — 2026-05-08  📦 npm-publishable lazyclaw package
+
+User report: "npm 에 올려줘."
+
+Set up `src/lazyclaw/` as a publishable npm package without
+restructuring the monorepo. The dashboard's repo-root
+`package.json` stays `private: true`; the new
+`src/lazyclaw/package.json` is the only thing that ships.
+
+### Package shape
+- `name: lazyclaw` (npm registry confirmed available — no clash)
+- `bin.lazyclaw → cli.mjs`, `type: module`, `engines.node >=18`
+- `files` allowlist: `cli.mjs`, `daemon.mjs`, `sessions.mjs`,
+  `skills.mjs`, `logger.mjs`, `ratelimit.mjs`,
+  `config-validate.mjs`, `rates-validate.mjs`,
+  `providers/`, `workflow/`, `web/`, `README.md`, `LICENSE`
+- `repository.directory: src/lazyclaw` so npm shows the right
+  source path
+- `publishConfig.access: public` (so `@scope` mistakes don't
+  silently make it private)
+
+### Tarball (dry-run)
+- 24 files, 88.1 kB packed, 302.7 kB unpacked
+- LICENSE + a focused CLI-only README copied in alongside the
+  source so the npm package page shows the install + usage docs
+  without dragging in the dashboard tour
+
+### Code change for portability
+- `readVersionFromRepo()` in `cli.mjs` now also reads the
+  package's own `package.json#version` before falling back to
+  the monorepo's root `VERSION` file. An npm-installed copy has
+  no repo-root VERSION sibling — the new lookup keeps
+  `lazyclaw version` honest in both contexts.
+
+### Verified locally
+- `npm pack` → install tarball into a throwaway prefix → run
+  `lazyclaw version`, `lazyclaw doctor`, `lazyclaw onboard
+  --non-interactive --provider mock`, `lazyclaw chat` (mock
+  reply round-trip). Clean.
+
+### Not done in this commit
+- `npm login` / `npm publish` — left for the maintainer to run
+  after a final review of the package contents.
+
+---
 ## [3.87.0] — 2026-05-08  📚 README — full LazyClaw CLI usage guide
 
 User report: "터미널에서 사용하는 방법도 알려줘. readme 에도

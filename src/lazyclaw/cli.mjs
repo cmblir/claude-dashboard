@@ -781,16 +781,30 @@ const SLASH_COMMANDS = [
 ];
 
 function readVersionFromRepo() {
-  // VERSION lives at the repo root. From <repo>/src/lazyclaw/cli.mjs that is two levels up.
+  // Two source-of-truth lookups, in order:
+  //   1. The npm-published package's own package.json (sits next to
+  //      cli.mjs once installed via `npm i -g lazyclaw`).
+  //   2. The monorepo's VERSION file at the repo root (one or two
+  //      levels up depending on how the file is symlinked / copied).
+  // Either one wins on first hit. Falls back to '0.0.0' so the CLI
+  // never crashes on a stripped-down install.
   const here = path.dirname(new URL(import.meta.url).pathname);
   const candidates = [
-    path.resolve(here, '../../VERSION'),
-    path.resolve(here, '../../../VERSION'),
+    { kind: 'pkg',     path: path.resolve(here, './package.json') },
+    { kind: 'pkg',     path: path.resolve(here, '../package.json') },
+    { kind: 'version', path: path.resolve(here, '../../VERSION') },
+    { kind: 'version', path: path.resolve(here, '../../../VERSION') },
   ];
   for (const c of candidates) {
     try {
-      const v = fs.readFileSync(c, 'utf8').trim();
-      if (v) return v;
+      const raw = fs.readFileSync(c.path, 'utf8').trim();
+      if (!raw) continue;
+      if (c.kind === 'pkg') {
+        const v = JSON.parse(raw).version;
+        if (v) return v;
+      } else {
+        return raw;
+      }
     } catch { /* keep trying */ }
   }
   return '0.0.0';

@@ -1,0 +1,55 @@
+{
+  "name": "lazyclaw",
+  "version": "3.88.0",
+  "description": "Lazy, elegant terminal CLI for chatting with Claude / OpenAI / Gemini / Ollama and orchestrating multi-step LLM workflows. Banner-on-launch, slash-command ghost autocomplete, persistent sessions, local HTTP gateway.",
+  "keywords": [
+    "claude",
+    "anthropic",
+    "openai",
+    "gemini",
+    "ollama",
+    "llm",
+    "cli",
+    "repl",
+    "chatbot",
+    "workflow",
+    "agent"
+  ],
+  "homepage": "https://github.com/cmblir/LazyClaude",
+  "bugs": {
+    "url": "https://github.com/cmblir/LazyClaude/issues"
+  },
+  "license": "MIT",
+  "author": "cmblir",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cmblir/LazyClaude.git",
+    "directory": "src/lazyclaw"
+  },
+  "type": "module",
+  "main": "cli.mjs",
+  "bin": {
+    "lazyclaw": "cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "daemon.mjs",
+    "sessions.mjs",
+    "skills.mjs",
+    "logger.mjs",
+    "ratelimit.mjs",
+    "config-validate.mjs",
+    "rates-validate.mjs",
+    "providers/",
+    "workflow/",
+    "web/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
