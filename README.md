@@ -12,7 +12,7 @@ _Don't memorize 50+ CLI commands. Just click._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v3.89.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.91.0-green.svg)](./CHANGELOG.md)
 [![npm](https://img.shields.io/npm/v/lazyclaw.svg?label=lazyclaw%20cli)](https://www.npmjs.com/package/lazyclaw)
 
 </div>
@@ -81,12 +81,22 @@ The npm-published `lazyclaw` is a snapshot of [`src/lazyclaw/`](./src/lazyclaw) 
 ### First run — interactive onboarding
 
 ```bash
-lazyclaw onboard               # guided: provider, model, api-key
+lazyclaw onboard               # arrow-key picker — claude-cli (no key) is the default
 lazyclaw status                # show current provider/model + masked key
 lazyclaw doctor                # validate config + provider registry
 ```
 
-`onboard` writes `~/.lazyclaw/config.json`. Override the location with `LAZYCLAW_CONFIG_DIR=/path/to/dir`. For automation, pass `--non-interactive --provider X --model Y --api-key Z`.
+The picker labels each row so the auth model is obvious:
+
+| Tag | Meaning |
+|---|---|
+| `[subscription]` | Uses the local `claude` CLI's existing login (Pro / Max / Team). No API key needed. |
+| `[no key]` | Local-only providers (`ollama`, `mock`). |
+| `[api key]` | Direct provider API (`anthropic`, `openai`, `gemini`) — needs an `sk-...` key. |
+
+For automation: `lazyclaw onboard --non-interactive --provider X --model Y [--api-key Z]`. The `--api-key` flag is only consulted when the chosen provider's `requiresApiKey` is true, so subscription / local providers stay keyless.
+
+`onboard` writes `~/.lazyclaw/config.json`. Override the location with `LAZYCLAW_CONFIG_DIR=/path/to/dir`.
 
 ### Interactive chat (banner + slash ghost-text, v3.85+)
 

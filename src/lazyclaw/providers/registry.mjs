@@ -11,6 +11,7 @@ import { anthropicProvider } from './anthropic.mjs';
 import { openaiProvider } from './openai.mjs';
 import { ollamaProvider } from './ollama.mjs';
 import { geminiProvider } from './gemini.mjs';
+import { claudeCliProvider } from './claude_cli.mjs';
 
 /**
  * @typedef {{ role: 'user'|'assistant'|'system', content: string }} ChatMessage
@@ -47,14 +48,17 @@ export const mockProvider = {
   },
 };
 
-export { anthropicProvider, openaiProvider, ollamaProvider, geminiProvider };
+export { anthropicProvider, openaiProvider, ollamaProvider, geminiProvider, claudeCliProvider };
 
 export const PROVIDERS = {
   mock: mockProvider,
+  // claude-cli (subscription-backed, no API key) listed before
+  // anthropic so first-time onboarding surfaces it as the default.
+  'claude-cli': claudeCliProvider,
   anthropic: anthropicProvider,
   openai: openaiProvider,
-  ollama: ollamaProvider,
   gemini: geminiProvider,
+  ollama: ollamaProvider,
 };
 
 // Static metadata for `lazyclaw providers list/info`. Kept next to PROVIDERS
@@ -67,14 +71,37 @@ export const PROVIDER_INFO = {
     defaultModel: null,
     suggestedModels: [],
   },
+  'claude-cli': {
+    name: 'claude-cli',
+    requiresApiKey: false,
+    docs: 'Anthropic via the local `claude` CLI (Pro / Max subscription). No API key — auth flows through whatever account `claude` is logged in with. Requires Claude Code installed.',
+    endpoint: 'subprocess: claude -p',
+    defaultModel: 'claude-opus-4-7',
+    suggestedModels: [
+      'claude-opus-4-7',
+      'claude-sonnet-4-6',
+      'claude-haiku-4-5',
+      'opus',
+      'sonnet',
+      'haiku',
+    ],
+  },
   anthropic: {
     name: 'anthropic',
     requiresApiKey: true,
     keyPrefix: 'sk-ant-',
-    docs: 'Anthropic Messages API. Supports streaming + extended thinking.',
+    docs: 'Anthropic Messages API (pay-per-token, requires sk-ant- key). Supports streaming + extended thinking. For subscription billing, use the `claude-cli` provider instead.',
     endpoint: 'https://api.anthropic.com/v1/messages',
     defaultModel: 'claude-opus-4-7',
-    suggestedModels: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
+    suggestedModels: [
+      'claude-opus-4-7',
+      'claude-opus-4-6',
+      'claude-sonnet-4-6',
+      'claude-sonnet-4-5',
+      'claude-haiku-4-5',
+      'claude-3-5-sonnet-20241022',
+      'claude-3-5-haiku-20241022',
+    ],
   },
   openai: {
     name: 'openai',
@@ -83,23 +110,53 @@ export const PROVIDER_INFO = {
     docs: 'OpenAI Chat Completions API. Streaming via SSE with [DONE] terminator.',
     endpoint: 'https://api.openai.com/v1/chat/completions',
     defaultModel: 'gpt-4.1',
-    suggestedModels: ['gpt-4.1', 'gpt-4o', 'gpt-4o-mini'],
-  },
-  ollama: {
-    name: 'ollama',
-    requiresApiKey: false,
-    docs: 'Local Ollama daemon. Streams newline-delimited JSON from /api/chat. No auth — defaults to 127.0.0.1:11434, override via OLLAMA_HOST or opts.baseUrl.',
-    endpoint: 'http://127.0.0.1:11434/api/chat',
-    defaultModel: 'llama3.1',
-    suggestedModels: ['llama3.1', 'llama3.2', 'mistral', 'qwen2.5-coder'],
+    suggestedModels: [
+      'gpt-5',
+      'gpt-5-codex',
+      'gpt-4.1',
+      'gpt-4.1-mini',
+      'gpt-4o',
+      'gpt-4o-mini',
+      'o3-pro',
+      'o4-mini',
+      'o1',
+      'o1-mini',
+    ],
   },
   gemini: {
     name: 'gemini',
     requiresApiKey: true,
     docs: 'Google Generative Language API (Gemini). SSE streaming via :streamGenerateContent?alt=sse. Auth via ?key= query param.',
     endpoint: 'https://generativelanguage.googleapis.com/v1/models/{model}:streamGenerateContent',
-    defaultModel: 'gemini-1.5-pro',
-    suggestedModels: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash'],
+    defaultModel: 'gemini-2.5-pro',
+    suggestedModels: [
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-thinking-exp',
+      'gemini-1.5-pro',
+      'gemini-1.5-flash',
+    ],
+  },
+  ollama: {
+    name: 'ollama',
+    requiresApiKey: false,
+    docs: 'Local Ollama daemon. Streams newline-delimited JSON from /api/chat. No auth — defaults to 127.0.0.1:11434, override via OLLAMA_HOST or opts.baseUrl. Available models depend on what you have pulled locally (`ollama list`).',
+    endpoint: 'http://127.0.0.1:11434/api/chat',
+    defaultModel: 'llama3.1',
+    suggestedModels: [
+      'llama3.1',
+      'llama3.2',
+      'llama3.3',
+      'qwen2.5-coder',
+      'qwen3.5',
+      'mistral',
+      'mistral-nemo',
+      'codellama',
+      'deepseek-coder-v2',
+      'phi3',
+      'gemma2',
+    ],
   },
 };
 

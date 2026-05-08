@@ -12,7 +12,7 @@ _别再死记 50+ 个 CLI 命令。点一下就好。_
 [![한국어](https://img.shields.io/badge/🇰🇷_한국어-blue)](./README.ko.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v3.89.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.91.0-green.svg)](./CHANGELOG.md)
 [![npm](https://img.shields.io/npm/v/lazyclaw.svg?label=lazyclaw%20cli)](https://www.npmjs.com/package/lazyclaw)
 
 </div>
@@ -81,12 +81,22 @@ alias lazyclaw="node $HOME/path/to/LazyClaude/src/lazyclaw/cli.mjs"
 ### 首次运行 — 交互式 onboarding
 
 ```bash
-lazyclaw onboard               # 引导：provider / model / api-key
+lazyclaw onboard               # 方向键 picker — 默认 claude-cli（无需 API key）
 lazyclaw status                # 当前 provider/model + 掩码后的 key
 lazyclaw doctor                # 校验配置与 provider 注册表
 ```
 
-`onboard` 会写入 `~/.lazyclaw/config.json`。可通过 `LAZYCLAW_CONFIG_DIR=/path/to/dir` 改变位置。自动化场景请使用 `--non-interactive --provider X --model Y --api-key Z`。
+picker 的每一行都标注认证方式：
+
+| 标签 | 含义 |
+|---|---|
+| `[subscription]` | 使用本地 `claude` CLI 的现有登录（Pro / Max / Team）。无需 API key。 |
+| `[no key]` | 仅本地 provider（`ollama`, `mock`）。 |
+| `[api key]` | 直连 provider API（`anthropic`, `openai`, `gemini`）— 需要 `sk-...` key。 |
+
+自动化时：`lazyclaw onboard --non-interactive --provider X --model Y [--api-key Z]`。`--api-key` 仅在 provider 的 `requiresApiKey` 为 true 时被读取，因此 subscription / 本地 provider 保持无 key。
+
+`onboard` 会写入 `~/.lazyclaw/config.json`。可通过 `LAZYCLAW_CONFIG_DIR=/path/to/dir` 改变位置。
 
 ### 交互式聊天（横幅 + 斜杠 ghost-text，v3.85+）
 

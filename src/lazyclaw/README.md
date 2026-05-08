@@ -24,12 +24,35 @@ Requires **Node 18+**. Works on macOS / Linux / WSL. Windows native PowerShell m
 ## First run
 
 ```bash
-lazyclaw onboard         # guided: provider, model, api-key
+lazyclaw onboard         # arrow-key picker; defaults to claude-cli (no key)
 lazyclaw status          # current provider/model + masked key
 lazyclaw doctor          # validate config + provider registry
 ```
 
-`onboard` writes `~/.lazyclaw/config.json`. Move it with `LAZYCLAW_CONFIG_DIR=/elsewhere`. For automation: `--non-interactive --provider X --model Y --api-key Z`.
+`onboard` writes `~/.lazyclaw/config.json`. Move it with `LAZYCLAW_CONFIG_DIR=/elsewhere`. For automation: `--non-interactive --provider X --model Y [--api-key Z]`.
+
+### Subscription mode (no API key)
+
+If you already have **Claude Code** installed and signed in (Pro / Max / Team subscription), pick the **`claude-cli`** provider during onboard. lazyclaw shells out to the local `claude` binary, so requests bill against your existing subscription quota instead of pay-per-token API credit. No `sk-ant-` key needed.
+
+```bash
+lazyclaw onboard --non-interactive --provider claude-cli --model claude-opus-4-7
+lazyclaw status
+# → { provider: "claude-cli", model: "claude-opus-4-7", hasApiKey: false }
+```
+
+Same flow for `ollama` (local models, also keyless).
+
+### Pay-per-token mode (API key)
+
+Pick `anthropic` / `openai` / `gemini` and supply the matching key:
+
+```bash
+lazyclaw onboard --non-interactive --provider openai \
+  --model gpt-4.1 --api-key sk-...
+```
+
+`onboard` only prompts for an api-key when the picked provider's `requiresApiKey` is true (the picker labels each row `[subscription]` / `[api key]` / `[no key]` so the choice is explicit).
 
 ## Interactive chat
 
@@ -48,7 +71,7 @@ What you see on launch (TTY only):
   │  | |__ _ _____  _ _          │
   │  | / _` |_ / || | '_|         │
   │  |_\__,_/__\_, |_|            │
-  │  LazyClaw  |__/  3.88.0      │
+  │  LazyClaw  |__/  3.91.0      │
   ╰──────────────────────────────╯
 
   provider · anthropic

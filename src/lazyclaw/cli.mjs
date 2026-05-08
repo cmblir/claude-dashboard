@@ -678,12 +678,39 @@ async function cmdOnboard(flags) {
   if (!flags['non-interactive']) {
     // Interactive onboarding is a single guided prompt sequence — kept tiny.
     // For automation always use --non-interactive plus the value flags.
+    // Skip the prompts entirely when the user passed --pick (or no
+    // provider yet AND we're on a TTY) so they get the full picker.
+    const wantPicker = !!flags.pick;
+    if (wantPicker || (!flags.provider && process.stdin.isTTY)) {
+      const picked = await _pickProviderInteractive();
+      if (picked) {
+        flags.provider = flags.provider || picked.provider;
+        if (picked.model && !flags.model) flags.model = picked.model;
+      }
+    }
     const readline = await import('node:readline');
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const ask = q => new Promise(resolve => rl.question(q, resolve));
-    flags.provider = flags.provider || (await ask('provider [mock|anthropic]: ')).trim();
-    flags.model = flags.model || (await ask('model (or "anthropic/claude-opus-4-7"): ')).trim();
-    flags['api-key'] = flags['api-key'] || (await ask('api-key (leave blank for mock): ')).trim();
+    if (!flags.provider) {
+      const provs = Object.keys(_registryMod.PROVIDERS).join('|');
+      const noKeyHint = '\x1b[38;5;208mclaude-cli\x1b[0m (subscription, no key) is the default';
+      process.stdout.write(`hint: ${noKeyHint}\n`);
+      flags.provider = (await ask(`provider [${provs}]: `)).trim() || 'claude-cli';
+    }
+    if (!flags.model) {
+      const meta = (_registryMod.PROVIDER_INFO || {})[flags.provider] || {};
+      const sample = (meta.suggestedModels || []).slice(0, 4).join(' · ') || '(any)';
+      const dflt = meta.defaultModel || '';
+      flags.model = (await ask(`model (e.g. ${sample}) [${dflt}]: `)).trim() || dflt;
+    }
+    // Only ask for api-key when the picked provider actually needs one.
+    // claude-cli / ollama / mock all skip this — that's the whole point
+    // of supporting them.
+    const meta = (_registryMod.PROVIDER_INFO || {})[flags.provider] || {};
+    if (meta.requiresApiKey && !flags['api-key']) {
+      const prefix = meta.keyPrefix ? ` (starts with "${meta.keyPrefix}")` : '';
+      flags['api-key'] = (await ask(`api-key${prefix}: `)).trim();
+    }
     rl.close();
   }
   const next = applyOnboardConfig(readConfig(), flags);
@@ -697,7 +724,11 @@ async function cmdDoctor() {
   const cfg = readConfig();
   const issues = [];
   if (!cfg.provider) issues.push('config.provider is missing — run `lazyclaw onboard`');
-  if (cfg.provider && cfg.provider !== 'mock' && !cfg['api-key']) {
+  // Only flag a missing api-key when the picked provider actually
+  // requires one. claude-cli / ollama / mock all run keylessly, so the
+  // previous `provider !== 'mock'` check produced false positives.
+  const _meta = (_registryMod.PROVIDER_INFO || {})[cfg.provider] || {};
+  if (cfg.provider && _meta.requiresApiKey && !cfg['api-key']) {
     issues.push(`config['api-key'] is missing for provider "${cfg.provider}"`);
   }
   if (cfg.provider && !PROVIDERS_HAS(_registryMod.PROVIDERS, cfg.provider)) {
@@ -1315,15 +1346,23 @@ function _printChatBanner(activeProvName, activeModel, version) {
 async function _pickProviderInteractive() {
   const providers = Object.keys(_registryMod.PROVIDERS);
   if (!providers.length) return { provider: 'mock', model: null };
-  // Build the picker list: one row per provider, models surfaced inline
-  // when the provider exposes them via a `models` array (anthropic/openai/
-  // gemini/ollama do; mock doesn't).
+  const info = _registryMod.PROVIDER_INFO || {};
+  // Build one row per (provider, model) pair using the static
+  // PROVIDER_INFO.suggestedModels list (registry.mjs is the single
+  // source of truth). When a provider has no models (mock), we emit
+  // one row for the provider itself.
   const items = [];
   for (const name of providers) {
-    const p = _registryMod.PROVIDERS[name];
-    const ms = (p && Array.isArray(p.models) && p.models.length) ? p.models : [null];
-    for (const m of ms) {
-      items.push({ provider: name, model: m, label: m ? `${name}  ${m}` : name });
+    const meta = info[name] || {};
+    const models = (Array.isArray(meta.suggestedModels) && meta.suggestedModels.length)
+      ? meta.suggestedModels
+      : [null];
+    const keyTag = meta.requiresApiKey
+      ? '\x1b[38;5;245m[api key]\x1b[0m'
+      : (name === 'claude-cli' ? '\x1b[38;5;208m[subscription]\x1b[0m' : '\x1b[38;5;245m[no key]\x1b[0m');
+    for (const m of models) {
+      const label = m ? `${name.padEnd(11)}  ${m}` : `${name.padEnd(11)}  (no model)`;
+      items.push({ provider: name, model: m, label, keyTag });
     }
   }
   if (!process.stdout.isTTY || !process.stdin.isTTY) {
@@ -1339,21 +1378,35 @@ async function _pickProviderInteractive() {
     });
     return { provider: ans || providers[0], model: null };
   }
+  // Default cursor: prefer claude-cli (subscription, no key) so first-
+  // time users with Claude Code already installed don't have to scroll.
+  let idx = items.findIndex(it => it.provider === 'claude-cli');
+  if (idx < 0) idx = 0;
+
   const readline = await import('node:readline');
   readline.emitKeypressEvents(process.stdin);
   if (process.stdin.setRawMode) process.stdin.setRawMode(true);
-  let idx = 0;
+  // Long lists need scrolling so the picker fits the terminal height.
+  // Reserve 6 rows for header + footer + breathing room.
   const draw = () => {
-    // Move to top of picker block, redraw rows, leave cursor at the bottom.
-    process.stdout.write('\x1b[?25l'); // hide cursor
+    process.stdout.write('\x1b[?25l');     // hide cursor
     process.stdout.write('\x1b[2J\x1b[H'); // clear screen
     process.stdout.write('\x1b[38;5;208mLazyClaw — pick a provider/model\x1b[0m\n');
-    process.stdout.write('\x1b[2m↑/↓ to move · Enter to confirm · q to quit\x1b[0m\n\n');
-    items.forEach((it, i) => {
+    process.stdout.write('\x1b[2m↑/↓ to move · Enter to confirm · q to quit\x1b[0m\n');
+    process.stdout.write('\x1b[2m[subscription] = uses `claude` login (no key)  ·  [api key] = needs sk-... key  ·  [no key] = local\x1b[0m\n\n');
+    const rows = Math.max(6, (process.stdout.rows || 24) - 6);
+    let from = Math.max(0, idx - Math.floor(rows / 2));
+    if (from + rows > items.length) from = Math.max(0, items.length - rows);
+    const to = Math.min(items.length, from + rows);
+    for (let i = from; i < to; i++) {
+      const it = items[i];
       const marker = i === idx ? '\x1b[38;5;208m❯\x1b[0m ' : '  ';
       const text = i === idx ? `\x1b[1m${it.label}\x1b[0m` : it.label;
-      process.stdout.write(`${marker}${text}\n`);
-    });
+      process.stdout.write(`${marker}${text}  ${it.keyTag}\n`);
+    }
+    if (to < items.length) {
+      process.stdout.write(`\x1b[2m  …(${items.length - to} more)\x1b[0m\n`);
+    }
   };
   draw();
   return await new Promise((resolve) => {
@@ -1361,6 +1414,10 @@ async function _pickProviderInteractive() {
       if (!key) return;
       if (key.name === 'up')   { idx = (idx - 1 + items.length) % items.length; draw(); }
       else if (key.name === 'down') { idx = (idx + 1) % items.length; draw(); }
+      else if (key.name === 'pageup')   { idx = Math.max(0, idx - 10); draw(); }
+      else if (key.name === 'pagedown') { idx = Math.min(items.length - 1, idx + 10); draw(); }
+      else if (key.name === 'home') { idx = 0; draw(); }
+      else if (key.name === 'end')  { idx = items.length - 1; draw(); }
       else if (key.name === 'return') { cleanup(); resolve(items[idx]); }
       else if (key.ctrl && key.name === 'c') { cleanup(); process.exit(130); }
       else if (key.name === 'q' || key.name === 'escape') { cleanup(); resolve(items[idx]); }
@@ -1368,8 +1425,8 @@ async function _pickProviderInteractive() {
     const cleanup = () => {
       process.stdin.off('keypress', onKey);
       if (process.stdin.setRawMode) process.stdin.setRawMode(false);
-      process.stdout.write('\x1b[?25h'); // show cursor
-      process.stdout.write('\x1b[2J\x1b[H');
+      process.stdout.write('\x1b[?25h');     // show cursor
+      process.stdout.write('\x1b[2J\x1b[H'); // clear screen
     };
     process.stdin.on('keypress', onKey);
   });

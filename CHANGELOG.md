@@ -10,6 +10,89 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.91.0] — 2026-05-08  🆓 lazyclaw subscription mode + bigger model list
+
+User report: "api 키 안넣고 구독으로 할 수 있게끔 해줘. 그리고
+지금 onboard 하면 선택할 수 있는 모델이 너무 적어."
+
+### Subscription mode — `claude-cli` provider
+New `src/lazyclaw/providers/claude_cli.mjs`. Spawns the local
+`claude` binary with `-p <prompt> --output-format stream-json
+--include-partial-messages --verbose`, parses the JSON event
+stream for `content_block_delta` text events, and yields tokens
+back through the same `AsyncIterable<string>` shape as every
+other provider. Authentication = whatever the `claude` CLI is
+already logged in with (Pro / Max / Team). **No API key.**
+
+Why a separate provider from `anthropic`:
+- `anthropic.mjs` hits api.anthropic.com directly with `sk-ant-`
+  keys (pay-per-token).
+- `claude_cli.mjs` delegates auth + billing to the existing
+  `claude` CLI session (subscription quota).
+Both can coexist; users pick at onboard.
+
+The CLI maps full Anthropic model ids back to short aliases
+(`claude-opus-4-7` → `opus`) before passing `--model`, because
+the CLI hangs indefinitely on full ids — the same FF1 quirk the
+Python dashboard ran into.
+
+### Bigger / current model lists
+`PROVIDER_INFO.suggestedModels` was last touched when 1.5-pro and
+gpt-4o were the latest stable. Refreshed across the board:
+
+| Provider | Models (suggestedModels) |
+|---|---|
+| claude-cli | claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5, opus, sonnet, haiku |
+| anthropic  | claude-opus-4-7, opus-4-6, sonnet-4-6, sonnet-4-5, haiku-4-5, 3-5-sonnet, 3-5-haiku |
+| openai     | gpt-5, gpt-5-codex, gpt-4.1, gpt-4.1-mini, gpt-4o, gpt-4o-mini, o3-pro, o4-mini, o1, o1-mini |
+| gemini     | gemini-2.5-pro, 2.5-flash, 2.0-flash, 2.0-flash-thinking-exp, 1.5-pro, 1.5-flash |
+| ollama     | llama3.{1,2,3}, qwen2.5-coder, qwen3.5, mistral, mistral-nemo, codellama, deepseek-coder-v2, phi3, gemma2 |
+
+The picker (`_pickProviderInteractive`) now reads `PROVIDER_INFO.
+suggestedModels` instead of the never-existent `PROVIDERS[name].
+models`. The previous bug meant onboard always offered exactly
+one row per provider.
+
+### Onboarding UX
+- Picker default cursor lands on `claude-cli` so first-time
+  users with Claude Code already installed get the keyless
+  default.
+- Each row carries an auth label: `[subscription]` (claude-cli),
+  `[no key]` (ollama / mock), `[api key]` (anthropic / openai /
+  gemini).
+- `cmdOnboard` only prompts for an api-key when the picked
+  provider's `requiresApiKey` is true — subscription / local
+  providers never see the prompt.
+- `cmdDoctor` uses the same `requiresApiKey` flag instead of the
+  old `provider !== 'mock'` heuristic, so claude-cli + ollama
+  no longer report a phantom missing-key issue.
+- Picker scrolls when the model list exceeds the terminal
+  height; PageUp / PageDown / Home / End added.
+
+### Verified
+```
+LAZYCLAW_CONFIG_DIR=/tmp lazyclaw onboard \
+  --non-interactive --provider claude-cli --model claude-haiku-4-5
+# {"ok":true,"provider":"claude-cli","model":"claude-haiku-4-5","hasApiKey":false}
+
+LAZYCLAW_CONFIG_DIR=/tmp lazyclaw doctor    # ok:true, issues:[]
+
+echo 'reply ok' | LAZYCLAW_CONFIG_DIR=/tmp lazyclaw chat
+# ok    (real subscription-backed token stream)
+```
+
+### README (en/ko/zh)
+- npm install path updated with subscription / no-key / api-key
+  table
+- root README's onboarding section explains the three auth modes
+- src/lazyclaw/README.md gets a dedicated "Subscription mode (no
+  API key)" section
+
+### Auto-publish
+Bumping `src/lazyclaw/package.json` to `3.91.0` triggers the
+v3.90 publish workflow on push.
+
+---
 ## [3.90.0] — 2026-05-08  🤖 auto-publish lazyclaw on version bump
 
 User report: "오케이 올렸어. 이제 README 수정하고, 내가 매번

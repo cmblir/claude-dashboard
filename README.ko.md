@@ -12,7 +12,7 @@ _50+ 개 CLI 명령어 외우지 마세요. 그냥 클릭하세요._
 [![中文](https://img.shields.io/badge/🇨🇳_中文-red)](./README.zh.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v3.89.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.91.0-green.svg)](./CHANGELOG.md)
 [![npm](https://img.shields.io/npm/v/lazyclaw.svg?label=lazyclaw%20cli)](https://www.npmjs.com/package/lazyclaw)
 
 </div>
@@ -81,12 +81,22 @@ npm 에 게시되는 `lazyclaw` 는 [`src/lazyclaw/`](./src/lazyclaw) 의 스냅
 ### 첫 실행 — 인터랙티브 onboarding
 
 ```bash
-lazyclaw onboard               # 가이드: provider / model / api-key
+lazyclaw onboard               # 화살표 picker — 기본값은 claude-cli (키 불필요)
 lazyclaw status                # 현재 provider/model + 마스킹된 키
 lazyclaw doctor                # config 와 provider 레지스트리 검증
 ```
 
-`onboard` 는 `~/.lazyclaw/config.json` 을 작성합니다. `LAZYCLAW_CONFIG_DIR=/path/to/dir` 로 위치를 바꿀 수 있어요. 자동화는 `--non-interactive --provider X --model Y --api-key Z` 사용.
+picker 의 각 항목에는 인증 방식이 라벨로 표시됩니다:
+
+| 태그 | 의미 |
+|---|---|
+| `[subscription]` | 로컬 `claude` CLI 의 기존 로그인 사용 (Pro / Max / Team). API 키 불필요. |
+| `[no key]` | 로컬 전용 provider (`ollama`, `mock`). |
+| `[api key]` | provider API 직접 호출 (`anthropic`, `openai`, `gemini`) — `sk-...` 키 필요. |
+
+자동화 시: `lazyclaw onboard --non-interactive --provider X --model Y [--api-key Z]`. `--api-key` 는 provider 의 `requiresApiKey` 가 true 일 때만 요구되므로, 구독·로컬 provider 는 그대로 키 없이 사용됩니다.
+
+`onboard` 는 `~/.lazyclaw/config.json` 을 작성합니다. `LAZYCLAW_CONFIG_DIR=/path/to/dir` 로 위치를 바꿀 수 있어요.
 
 ### 인터랙티브 채팅 (배너 + 슬래시 ghost-text, v3.85+)
 
