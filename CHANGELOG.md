@@ -10,6 +10,59 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.4] — 2026-05-09  🚑 npm package — restore 6 missing modules
+
+User report: after the v3.99.3 publish finally succeeded,
+running `lazyclaw` from the npm install crashed with:
+
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module
+    '<prefix>/lib/node_modules/lazyclaw/sandbox.mjs'
+    imported from '<prefix>/lib/node_modules/lazyclaw/
+    providers/claude_cli.mjs'
+
+### Root cause
+`src/lazyclaw/package.json` ships an explicit `files`
+allowlist — only files listed there are bundled into the
+npm tarball. Six modules added in v3.93–v3.98 were never
+added to that list:
+
+- `config_features.mjs` (v3.93 — auth / pairing / nodes /
+  message)
+- `workspace.mjs`       (v3.94 — AGENTS / SOUL / TOOLS)
+- `browse.mjs`          (v3.95 — URL → markdown)
+- `sandbox.mjs`         (v3.96 — Docker wrapper)
+- `skills_install.mjs`  (v3.97 — GitHub registry)
+- `cron.mjs`            (v3.98 — launchd / crontab)
+
+The runtime imports look like
+`import('../sandbox.mjs')` (from `providers/claude_cli.mjs`)
+and `await import('./browse.mjs')` (from `cli.mjs`). These
+work in the monorepo but fail on a published install
+because the files weren't shipped. Effectively v3.91–v3.99.3
+have been broken on npm; the offline `npm pack` testing each
+commit didn't catch it because the in-repo install used `npm
+install --prefix` against a fresh tarball, but I verified
+binary launch + `lazyclaw version` (which doesn't import the
+new modules), not `lazyclaw doctor` / `chat` (which do).
+
+### Fix
+- `src/lazyclaw/package.json` `files` array gains all six
+  missing entries.
+- Verified end-to-end: `npm pack --dry-run` shows 31 files
+  (was 25). `npm install` of the 3.99.4 tarball into a
+  throwaway prefix → `lazyclaw` no-arg, `lazyclaw onboard
+  --non-interactive --provider claude-cli`, `lazyclaw
+  doctor` all run clean. No more module-not-found crash.
+
+### Sanity-check guard for the future
+This class of bug — adding a new `*.mjs` next to `cli.mjs`
+without updating `files` — should fail loud at publish
+time. Adding a CI step that diff's `ls src/lazyclaw/*.mjs`
+against the `files` allowlist is a follow-up; out of scope
+for this hotfix but worth doing before the next minor
+release.
+
+---
 ## [3.99.3] — 2026-05-09  🔍 publish workflow — diagnostics for E401
 
 User report: v3.99.2 trim worked — the
