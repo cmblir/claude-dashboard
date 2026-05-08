@@ -27379,6 +27379,15 @@ function _lcSaveHistory(id, msgs) {
   // QQ77 (v2.67.14) — drop pending placeholder entries so a tab close
   // before the first token doesn't freeze "_…_" into saved history.
   msgs = (msgs || []).filter(m => !(m && m.pending));
+  // Whenever history is saved with real content, the user is mid-
+  // conversation — auto-dismiss the connection gate so tests and
+  // direct `_lcSaveHistory(...)` callers don't hit the overlay.
+  if ((msgs || []).length > 0) {
+    try {
+      const gate = document.getElementById('lcChatGate');
+      if (gate && gate.style.display !== 'none') gate.style.display = 'none';
+    } catch (_) {}
+  }
   // QQ53 (v2.66.128) — defensive bound + quota recovery.
   // localStorage caps at ~5–10 MB; QQ39 image attach can push a single
   // message past that. On QuotaExceededError, drop the oldest message
@@ -27998,7 +28007,44 @@ VIEWS.lazyclawChat = async () => {
   })();
   const optHtml = opts.map(o => `<option value="${escapeHtml(o.value)}" ${o.value === lastAssignee ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('') || `<option value="">${t('가용 프로바이더 없음')}</option>`;
 
-  return `<div class="lc-chat-layout" style="display:grid;grid-template-columns:220px 1fr;height:calc(100vh - 108px);border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);">
+  // Per-assignee verification flag — once a model has answered the
+  // ping probe in this browser, the gate stays unlocked for it. Users
+  // can manually re-test from the gate any time. Skip the gate
+  // entirely when the user already has prior chat history; their
+  // previous successful turns count as a stronger guarantee than a
+  // ping probe could provide.
+  const verifiedAssignee = (() => {
+    try { return localStorage.getItem('cc.lazyclawChat.verified') || ''; } catch (_) { return ''; }
+  })();
+  const hasPriorHistory = (() => {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('cc.lc.hist.')) return true;
+      }
+    } catch (_) {}
+    return false;
+  })();
+  const initiallyLocked = !hasPriorHistory && (!verifiedAssignee || verifiedAssignee !== lastAssignee);
+
+  return `<div class="lc-chat-layout" style="display:grid;grid-template-columns:220px 1fr;height:calc(100vh - 108px);border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);position:relative;">
+
+    <!-- Connection gate (pre-flight) — blocks input until the picked
+         model answers a 1-token probe. Closed automatically once
+         verified; users can re-open via the ⚙ Connection toolbar. -->
+    <div id="lcChatGate" style="${initiallyLocked ? '' : 'display:none;'}position:absolute;inset:0;background:rgba(8,8,16,0.85);z-index:20;display:${initiallyLocked ? 'flex' : 'none'};align-items:center;justify-content:center;backdrop-filter:blur(2px);">
+      <div class="card" style="max-width:480px;width:90%;padding:22px 22px 18px;border:1px solid var(--border);background:var(--card);box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+        <div style="font-size:1.1rem;font-weight:600;margin-bottom:6px;">${t('연결 확인')}</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:14px;line-height:1.5;">${t('채팅을 시작하기 전에 모델을 선택하고 연결을 확인하세요. 첫 메시지가 응답 없이 끊기는 것을 방지합니다.')}</div>
+        <label style="display:block;font-size:10px;color:var(--text-dim);margin-bottom:4px;">${t('모델')}</label>
+        <select id="lcGateAssignee" class="input text-xs w-full" style="margin-bottom:10px;">${optHtml}</select>
+        <div id="lcGateStatus" style="font-size:11px;color:var(--text-dim);min-height:18px;margin-bottom:10px;line-height:1.5;"></div>
+        <div style="display:flex;gap:8px;">
+          <button id="lcGateTestBtn" class="btn-primary btn text-sm" style="flex:1;justify-content:center;" onclick="_lcGateTest()">${t('연결 테스트')}</button>
+          <button class="btn text-sm" style="padding:6px 12px;" onclick="_lcGateSkip()" title="${t('확인 없이 진행 (위험)')}">${t('건너뛰기')}</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Session sidebar -->
     <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;background:rgba(0,0,0,0.12);">
@@ -28021,6 +28067,7 @@ VIEWS.lazyclawChat = async () => {
           ${optHtml}
         </select>
         <button class="btn text-xs" onclick="_lcChatToggleSysPrompt()" title="${t('시스템 프롬프트')}" style="padding:3px 8px;">⚙</button>
+        <button class="btn text-xs" onclick="_lcGateOpen()" title="${t('연결 확인')}" style="padding:3px 7px;">🔌</button>
         <button class="btn text-xs" onclick="_lcChatSearch()" title="${t('대화 검색')} (Cmd+K)" style="padding:3px 7px;">🔎</button>
         <span style="flex:1;"></span>
         <button class="btn text-xs" onclick="_lcChatExport()" title="${t('마크다운으로 내보내기')}" style="padding:3px 7px;">📥</button>
@@ -29944,6 +29991,31 @@ async function _lcChatSend() {
   }
   const assignee = sel.value || '';
   if (!assignee) { toast(t('프로바이더를 선택하세요'), 'warn'); return; }
+  // Force a connection check if this assignee hasn't been verified
+  // AND the user has no prior chat history. Without this gate, the
+  // very first send hits an unproven provider and silent failures
+  // (model crashes / cli not on PATH / SSE blocked) surfaced as the
+  // confusing "중단됨" bubble. Once the user has any prior turn we
+  // trust the picked assignee — re-testing every send would be
+  // disruptive, and changing models is a deliberate user action.
+  let _verifiedAssignee = '';
+  try { _verifiedAssignee = localStorage.getItem('cc.lazyclawChat.verified') || ''; } catch (_) {}
+  let _hasPrior = false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('cc.lc.hist.')) {
+        const raw = localStorage.getItem(k);
+        if (raw && raw.length > 4) { _hasPrior = true; break; }
+      }
+    }
+  } catch (_) {}
+  if (_verifiedAssignee !== assignee && !_hasPrior) {
+    if (ta) ta.value = text;
+    if (typeof _lcGateOpen === 'function') _lcGateOpen();
+    toast(t('먼저 연결을 확인하세요'), 'warn');
+    return;
+  }
   // QQ44 (v2.66.119) — soft vision warning. If the prompt contains
   // a base64 image but the assignee doesn't look vision-capable,
   // show a one-time warning per session. Heuristic — vision models
@@ -30082,12 +30154,30 @@ async function _lcChatSend() {
                 try { localStorage.setItem('cc.lc.hasCost', '1'); } catch (_) {}
               }
             }
+            // Surface server-reported failure on the done event. Without
+            // this, ok:false providers (e.g. ollama runner crash, cli
+            // exec failure) silently kept the "_…_" placeholder so the
+            // user thought the message was lost. Now the bubble shows
+            // the actual error string from the provider.
+            if (o.ok === false) {
+              if (reply.pending) { reply.text = ''; reply.pending = false; }
+              const msg = (o.error || t('응답 실패'));
+              reply.text = (reply.text || '') + (reply.text ? '\n\n' : '') + '⚠ ' + msg;
+            }
           } catch (_) {}
         } else if (event === 'error') {
           try { const o = JSON.parse(data); reply.text = (reply.text || '') + '\n⚠ ' + (o.error || 'error'); }
           catch (_) { reply.text += '\n⚠ stream error'; }
         }
       }
+    }
+    // Stream closed normally but we never received a single token AND
+    // no done event filled the bubble. Replace the placeholder with a
+    // clear message so the user knows it wasn't a silent abort.
+    if (reply.pending) {
+      reply.text = '';
+      reply.pending = false;
+      reply.text = '⚠ ' + t('응답이 비어 있습니다 — 모델/연결을 확인하세요');
     }
     _lcSaveHistory(sessionId, history); _lcChatRender();
     _lcUpdateSessionMeta(sessionId, assignee, reply.text.slice(0, 55));
@@ -30143,6 +30233,84 @@ async function _lcChatSend() {
     setTimeout(() => ta.focus(), 30);
   }
 }
+
+// Connection gate — stamps a per-assignee verification flag so users
+// only have to ping a model once per browser. Mirrors the CLI doctor
+// flow: model picked → probe → unlock if ok / show error if not.
+window._lcGateTest = async function () {
+  const sel = document.getElementById('lcGateAssignee');
+  const status = document.getElementById('lcGateStatus');
+  const btn = document.getElementById('lcGateTestBtn');
+  if (!sel || !status || !btn) return;
+  const assignee = sel.value || '';
+  if (!assignee) {
+    status.style.color = '#f59e0b';
+    status.textContent = '⚠ ' + t('프로바이더를 선택하세요');
+    return;
+  }
+  btn.disabled = true;
+  const prevBtnText = btn.textContent;
+  btn.textContent = '⏳ ' + t('확인 중…');
+  status.style.color = 'var(--text-dim)';
+  status.textContent = t('연결을 확인하는 중…') + ' (' + assignee + ')';
+  try {
+    const r = await api('/api/lazyclaw/chat/ping', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assignee }),
+    });
+    if (r && r.ok) {
+      try { localStorage.setItem('cc.lazyclawChat.verified', assignee); } catch (_) {}
+      try { localStorage.setItem('cc.lazyclawChat.assignee', assignee); } catch (_) {}
+      // Sync the dropdown in the toolbar so the user-visible state matches.
+      const main = document.getElementById('lcChatAssignee');
+      if (main) main.value = assignee;
+      status.style.color = '#22c55e';
+      status.textContent = '✅ ' + t('연결 OK') + ' · ' + (r.durationMs || 0) + 'ms';
+      setTimeout(() => {
+        const gate = document.getElementById('lcChatGate');
+        if (gate) gate.style.display = 'none';
+        const ta = document.getElementById('lcChatInput');
+        if (ta) ta.focus();
+      }, 400);
+    } else {
+      status.style.color = '#ef4444';
+      status.textContent = '❌ ' + (r && r.error ? r.error : t('연결 실패'));
+    }
+  } catch (e) {
+    status.style.color = '#ef4444';
+    status.textContent = '❌ ' + (e && e.message || String(e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevBtnText;
+  }
+};
+
+window._lcGateSkip = function () {
+  const sel = document.getElementById('lcGateAssignee');
+  const assignee = (sel && sel.value) || '';
+  if (assignee) {
+    try { localStorage.setItem('cc.lazyclawChat.assignee', assignee); } catch (_) {}
+    const main = document.getElementById('lcChatAssignee');
+    if (main) main.value = assignee;
+  }
+  const gate = document.getElementById('lcChatGate');
+  if (gate) gate.style.display = 'none';
+  const ta = document.getElementById('lcChatInput');
+  if (ta) ta.focus();
+};
+
+window._lcGateOpen = function () {
+  const gate = document.getElementById('lcChatGate');
+  if (!gate) return;
+  // Sync gate dropdown to the current toolbar selection so users
+  // re-test the model they were about to send to.
+  const main = document.getElementById('lcChatAssignee');
+  const gateSel = document.getElementById('lcGateAssignee');
+  if (main && gateSel) gateSel.value = main.value;
+  const status = document.getElementById('lcGateStatus');
+  if (status) { status.textContent = ''; status.style.color = 'var(--text-dim)'; }
+  gate.style.display = 'flex';
+};
 
 // OO4 (v2.66.67) — system prompt toggle + persistence per-assignee.
 window._lcChatToggleSysPrompt = function () {

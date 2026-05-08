@@ -10,6 +10,48 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.84.0] — 2026-05-08  🔌 chat connection gate + ok-false surfacing
+
+**User report**: "/lazyclawChat 채팅을 처음 보내면 중단됨. 이라고
+나옴 — 처음부터 모델 선택 후 연결확인 후 사용할 수 있게 해줘."
+
+### Root cause
+The streaming chat had two failure paths that produced the same
+confusing "중단됨" bubble:
+
+1. The server emits `event: done` with `ok: false` + `error: "..."`
+   when a provider fails (ollama runner crash, claude-cli not on
+   PATH, etc.). The frontend's done handler only read `provider` /
+   `model` / `tokens` — `ok` was ignored, so the placeholder `_…_`
+   stayed and the user thought the message was lost.
+2. SSE connections occasionally drop before the first token (browser
+   extensions, service workers, antivirus). When `__lcUserAbort` was
+   stale-true from any prior keystroke, the catch branch labelled
+   the drop as "중단됨" instead of falling back to the non-stream
+   endpoint.
+
+### Fix
+- `event: done` now checks `ok === false` and surfaces the server's
+  `error` on the bubble.
+- Stream-closed-with-no-tokens replaces the placeholder with an
+  explicit "응답이 비어 있습니다 — 모델/연결을 확인하세요".
+- New `POST /api/lazyclaw/chat/ping` runs a 1-token probe against the
+  picked assignee with a 30 s timeout.
+- New connection-gate overlay on the chat tab. First visit (no prior
+  history) shows a model picker + Test Connection button; the input
+  area unlocks only after a successful probe. The 🔌 toolbar button
+  re-opens the gate any time. Existing users with prior history skip
+  the gate so it doesn't disrupt mid-conversation.
+- Sending while the gate is up re-opens it instead of producing the
+  silent "중단됨" bubble.
+
+### Test
+`scripts/e2e-chat-connection-gate.mjs` covers: gate visible on first
+visit, send-before-verify keeps the gate open, successful ping
+unlocks + stamps the verified flag, failing ping surfaces the server
+error and keeps the gate open.
+
+---
 ## [3.83.0] — 2026-05-06  🧯 background-worker lock-step spike eliminated
 
 **User report**: "Dashboard 작동 이후에 렉이 급격하게 걸리는 경우가

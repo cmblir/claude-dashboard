@@ -493,6 +493,44 @@ def api_lazyclaw_chat(body: dict) -> dict:
     }
 
 
+def api_lazyclaw_chat_ping(body: dict) -> dict:
+    """Connection check for the chat tab. Sends a 1-token "ok" probe to
+    the chosen assignee with a short timeout, so the UI can gate the
+    input area until the picked provider/model is verified reachable.
+
+    body: { assignee: "provider:model" }
+    returns: { ok, provider, model, durationMs, error? }
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    assignee = (body.get("assignee") or "").strip()
+    if not assignee:
+        return {"ok": False, "error": "assignee required"}
+    try:
+        from .ai_providers import execute_with_assignee
+        resp = execute_with_assignee(
+            assignee, "Reply with just: ok",
+            timeout=30, fallback=False,
+        )
+    except Exception as e:
+        return {"ok": False, "error": f"internal: {e}"}
+    if resp.status == "ok":
+        return {
+            "ok": True,
+            "provider": resp.provider or "",
+            "model": resp.model or "",
+            "durationMs": resp.duration_ms or 0,
+            "output": (resp.output or "").strip()[:80],
+        }
+    return {
+        "ok": False,
+        "error": resp.error or "unknown",
+        "provider": resp.provider or "",
+        "model": resp.model or "",
+        "durationMs": resp.duration_ms or 0,
+    }
+
+
 def api_chat(body: dict) -> dict:
     """챗봇 API — 사용자 질문을 받아 대시보드 안내 답변 반환."""
     from .errors import err, ERROR_MESSAGES
