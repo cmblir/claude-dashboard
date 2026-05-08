@@ -12,9 +12,9 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-PORT="${PORT:-8080}"
+PORT="${PORT:-19500}"
 
-# 이미 8080 포트가 점유 중이면 프로세스 정보 출력 후 종료 (안전 — 강제 kill 안 함)
+# 이미 해당 포트가 점유 중이면 프로세스 정보 출력 후 종료 (안전 — 강제 kill 안 함)
 if lsof -ti:"$PORT" >/dev/null 2>&1; then
   echo "⚠️  포트 $PORT 가 이미 사용 중입니다:"
   lsof -i:"$PORT"

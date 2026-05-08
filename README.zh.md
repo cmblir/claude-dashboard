@@ -29,7 +29,7 @@ LazyClaude 是一个**本地优先的指挥中心**，管理你的 `~/.claude/` 
 git clone https://github.com/cmblir/LazyClaude.git
 cd LazyClaude
 python3 server.py
-# → http://127.0.0.1:8080
+# → http://127.0.0.1:19500
 ```
 
 需要 Python 3.10+ 与 Anthropic 的 `claude` CLI（可选 — 仅 Claude 相关功能需要）。
@@ -277,7 +277,7 @@ POST /api/auto_resume/inject_live
 
 ```
 LazyClaude/
-├── server.py                  # 入口 — 绑定 127.0.0.1:8080
+├── server.py                  # 入口 — 绑定 127.0.0.1:19500（通过 PORT env 覆盖）
 ├── server/                    # ~25 个 Python stdlib 模块
 │   ├── routes.py              # 单一 dispatch table
 │   ├── workflows.py           # DAG 引擎 (ThreadPoolExecutor)
@@ -318,7 +318,9 @@ LazyClaude/
 
 ## 🛠️ 故障排查
 
-**"port 8080 already in use"** — `server.py` 在绑定前会自动 kill 之前的占用进程。如需其他端口：`PORT=19500 python3 server.py`。
+**"port 19500 already in use"** — `server.py` 在绑定前会自动 kill `$PORT` 的占用进程。如需切换端口：`PORT=8080 python3 server.py`。v3.99 起默认端口由 `8080 → 19500` 变更：8080 是非常常见的本地 dev 端口（Tomcat / http-server / 大量教程的默认值），同 origin 上其他项目安装的 PWA 会劫持仪表板的 "Open in app"。如有依赖 8080 的脚本 / 快捷方式，设置 `PORT=8080` 保持兼容。
+
+**"Open in app" 启动了别的应用** — Chrome PWA 按 origin (`http://127.0.0.1:<port>`) 注册，同一端口下你之前安装的其他 PWA 会拦截启动。打开 `chrome://apps`，移除指向该端口的非 LazyClaude 条目；再到 `chrome://settings/content/all` 搜索端口 → "Delete data" 清空缓存的安装状态。v3.99 的 manifest 设置了显式的 `id`，即使同 origin 还有其他 PWA，Chrome 也会把仪表板视作独立应用。
 
 **"command not found: claude"** — 安装 [Claude Code](https://claude.com/claude-code)。不依赖 `claude` 的标签（工作流编辑器、AI Providers、MCP 等）仍然可用。
 

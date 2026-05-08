@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build LazyClaude.app — a tiny macOS bundle that double-clicks into:
 #   1) python3 server.py  (started in the background, logs to ~/Library/Logs/LazyClaude/server.log)
-#   2) http://127.0.0.1:8080  opened in the user's default browser
+#   2) http://127.0.0.1:19500  opened in the user's default browser
 #   3) shuts the server down on Quit (or when /Applications stops the process)
 #
 # The bundle is just a shell launcher + Info.plist + .icns. No Python interpreter
@@ -112,7 +112,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-PORT="${PORT:-8080}"
+PORT="${PORT:-19500}"
 URL="http://127.0.0.1:$PORT"
 
 # Reuse an already-running server if there is one on PORT.

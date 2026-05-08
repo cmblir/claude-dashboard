@@ -93,7 +93,19 @@ _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 
 
 def get_bind() -> tuple[str, int]:
-    """HOST/PORT 환경 변수를 읽어 (host, port) 반환. 기본 127.0.0.1:8080."""
+    """HOST/PORT 환경 변수를 읽어 (host, port) 반환. 기본 127.0.0.1:19500.
+
+    Default port moved from 8080 → 19500 in v3.99 to dodge PWA-registry
+    collisions on shared origins. 8080 is one of the most common local
+    dev ports (Tomcat / http-server / dozens of tutorials) so other
+    projects' installed PWAs were getting wired to the same origin
+    on shared machines, surfacing as "open in app launches the wrong
+    thing". 19500 is uncommon enough that the collision class
+    effectively disappears.
+
+    Override via env: `PORT=8080 python3 server.py` keeps the old
+    behaviour for users with existing scripts / shortcuts.
+    """
     host = os.environ.get("HOST", "127.0.0.1")
-    port = int(os.environ.get("PORT", "8080"))
+    port = int(os.environ.get("PORT", "19500"))
     return host, port

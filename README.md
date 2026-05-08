@@ -29,7 +29,7 @@ LazyClaude is a **local-first command center** for your `~/.claude/` directory (
 git clone https://github.com/cmblir/LazyClaude.git
 cd LazyClaude
 python3 server.py
-# → http://127.0.0.1:8080
+# → http://127.0.0.1:19500
 ```
 
 Requires Python 3.10+ and Anthropic's `claude` CLI on `$PATH` (optional — the dashboard works without it; only Claude-bound features need it).
@@ -277,7 +277,7 @@ Time-based deadlines (`durationSec` / `deadlineMs`) replace the legacy `maxAttem
 
 ```
 LazyClaude/
-├── server.py                  # entry — binds 127.0.0.1:8080
+├── server.py                  # entry — binds 127.0.0.1:19500 (override via PORT env)
 ├── server/                    # ~25 stdlib-only Python modules
 │   ├── routes.py              # single dispatch table
 │   ├── workflows.py           # DAG engine (ThreadPoolExecutor)
@@ -318,7 +318,9 @@ Korean is the source language. Every user-visible string passes through `t('한�
 
 ## 🛠️ Troubleshooting
 
-**"port 8080 already in use"** — `server.py` auto-kills the prior occupant before binding. If you'd rather use a different port: `PORT=19500 python3 server.py`.
+**"port 19500 already in use"** — `server.py` auto-kills the prior occupant of `$PORT` before binding. If you'd rather pin a different port: `PORT=8080 python3 server.py`. The default moved from 8080 → 19500 in v3.99 because 8080 is a heavily-shared local-dev port (Tomcat / http-server / dozens of tutorials) and PWA install state from another project at that origin was hijacking the dashboard's "Open in app" button on shared machines. If you have existing scripts / shortcuts pointing at 8080, set `PORT=8080` to keep them working.
+
+**"Open in app" launches some other application** — Chrome PWAs are scoped per-origin (`http://127.0.0.1:<port>`) so any PWA you previously installed on the same port hijacks the launch. Visit `chrome://apps`, remove any non-LazyClaude entry pointing at that port, then `chrome://settings/content/all` → search the port → "Delete data" to wipe the cached install state. The v3.99 manifest also sets an explicit `id` so Chrome treats this dashboard as its own app even when you have other localhost PWAs installed at the same origin.
 
 **"command not found: claude"** — install [Claude Code](https://claude.com/claude-code). The dashboard's tabs that don't depend on `claude` (workflow editor, AI providers, MCP, etc.) work without it.
 

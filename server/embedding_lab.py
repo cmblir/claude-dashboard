@@ -57,7 +57,7 @@ EXAMPLES: list[dict] = [
         "description": "질문 → 가장 관련 있는 FAQ 항목 랭킹.",
         "query": "대시보드 서버를 어떻게 다시 시작하나요?",
         "docs": [
-            "서버 재시작: lsof -iTCP:8080 kill 후 python3 server.py 재실행",
+            "서버 재시작: lsof -iTCP:$PORT (default 19500) kill 후 python3 server.py 재실행",
             "Claude Code 플러그인 설치: 마켓플레이스 URL 추가 → toggle",
             "환경 변수 설정: envConfig 탭에서 ANTHROPIC_MODEL 등 수정",
             "API 키 저장: aiProviders 탭에서 저장-key 버튼",

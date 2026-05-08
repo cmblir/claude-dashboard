@@ -10,9 +10,9 @@ Pure-stdlib Python HTTP server + single-file HTML SPA. **No runtime build step**
 
 ```bash
 # Run
-make run                 # python3 server.py — binds 127.0.0.1:8080 by default
+make run                 # python3 server.py — binds 127.0.0.1:19500 by default (changed from 8080 in v3.99 to avoid PWA-registry collisions)
 make dev                 # same with LOG_LEVEL=DEBUG
-PORT=19500 python3 server.py    # different port (server.py auto-kills port 8080 occupants)
+PORT=8080 python3 server.py     # restore the legacy default (server.py auto-kills the port's prior occupant)
 ./start.sh               # one-liner with python3 + port pre-check
 
 # i18n (REQUIRED before committing any new t('한국어') strings — see "i18n pipeline")
@@ -36,7 +36,7 @@ There is **no test runner** for the Python side. The validation strategy is in-p
 
 ### Backend — `server/` (~20 modules, stdlib only)
 
-- `server.py` (root) — entry. Resolves port conflicts (kills existing 8080 occupant), initialises SQLite (`~/.claude-dashboard.db`), background-indexes Claude Code sessions, warms MCP cache, starts the workflow scheduler, auto-starts `ollama serve`, then `ThreadingHTTPServer(Handler)`.
+- `server.py` (root) — entry. Resolves port conflicts (kills the existing occupant of `$PORT`, default 19500), initialises SQLite (`~/.claude-dashboard.db`), background-indexes Claude Code sessions, warms MCP cache, starts the workflow scheduler, auto-starts `ollama serve`, then `ThreadingHTTPServer(Handler)`.
 - `server/routes.py` — single dispatch table. `ROUTES_GET` / `ROUTES_POST` / `ROUTES_PUT` map paths → handler functions in other modules. **Every new endpoint registers here.**
 - `server/config.py` — all paths come from `_env_path(KEY, default)` so users can override via env (see `env.example`). Read this first to find where any data file lives.
 - `server/workflows.py` — the workflow engine (~3000 lines). DAG topological-level execution via `ThreadPoolExecutor`; per-iteration repeat with feedback-note injection; SSE streaming. **Adding a node type requires four edits here**: `_NODE_TYPES` set, `_sanitize_node()` branch, `_execute_node()` dispatch, and a new `_execute_<type>_node()` helper. Then mirror in `dist/index.html` `WF_NODE_TYPES` array, `WF_NODE_CATEGORIES` mapping, and `_wfRenderInspector()` per-type form.

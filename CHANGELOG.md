@@ -10,6 +10,77 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.0] — 2026-05-09  🚪 default port 8080 → 19500 + explicit PWA id
+
+User report: "지금 lazyclaude가 다른 pc에서 앱으로 열기하면
+toastinvest라는 이상한걸로 열려." Macbook + Chrome.
+
+### Root cause
+Two compounding issues:
+
+1. **Port collision**: 8080 is one of the most common local-dev
+   ports (Tomcat / http-server / dozens of tutorials use it as
+   the default). On any machine where the user previously
+   installed *another* localhost project as a Chrome PWA at
+   `127.0.0.1:8080`, that PWA's registry entry hijacked the
+   "Open in app" launch — same origin, same scope, no `id`
+   to disambiguate.
+2. **Missing manifest `id`**: per the Web App Manifest spec,
+   when `id` is omitted Chrome derives the canonical app
+   identity from `start_url` resolved against the origin. With
+   our `start_url: "/"`, that came out to
+   `http://127.0.0.1:8080/`, which is identical to whatever
+   other PWA the user had at the same origin. Chrome therefore
+   treats the two installs as one app — keeping the older
+   manifest's name in its UI.
+
+### Fix
+- **Default port 8080 → 19500.** `server/config.py::get_bind`,
+  `start.sh`, `tools/build_macos_app.sh`, `Makefile` help, and
+  `env.example` all moved to 19500. 19500 is uncommon enough
+  that the collision class effectively disappears (it's also
+  the port the project's E2E tests already use, so we're
+  re-using a port that's known not to clash here).
+  Backwards-compat: the `PORT` env var still overrides, so
+  `PORT=8080 python3 server.py` keeps the legacy default for
+  users with existing scripts / shortcuts.
+- **Explicit manifest `id` + unique start_url.**
+  `dist/manifest.json` now sets:
+  - `"id": "/lazyclaude-dashboard"`
+  - `"start_url": "/?app=lazyclaude"` (the `?app=lazyclaude`
+    query param is benign — the dashboard only reads `?lang=`
+    via `URLSearchParams`)
+  Together these give the PWA a stable, unique identity even
+  when another localhost PWA happens to share the origin.
+- **README + CLAUDE.md docs** in en / ko / zh updated with the
+  new default port AND a "Open in app launches the wrong app"
+  troubleshooting block (`chrome://apps` removal +
+  `chrome://settings/content/all` data wipe) so future hits of
+  this footgun are self-serviceable.
+
+### Verified
+- `python3 server.py` (no env) → binds 127.0.0.1:**19500**,
+  log line `Serving http://127.0.0.1:19500` confirms.
+- `curl /manifest.json` returns the new `id` +
+  `start_url: "/?app=lazyclaude"`.
+- `PORT=8080 python3 server.py` still binds 8080 — the
+  override path is unchanged.
+
+### Migration for existing installs
+Users who already have a LazyClaude (or stale "Toastinvest"-
+style) PWA at `127.0.0.1:8080` should:
+1. `chrome://apps` → remove the old entry
+2. `chrome://settings/content/all` → search "127.0.0.1" →
+   "Delete data"
+3. Visit the dashboard at the new default port (19500) and
+   re-install via the address-bar ⊕
+
+The manifest `id` change means even a clean reinstall at the
+*old* port (8080) will now register as a fresh, distinct app
+in Chrome — but moving the default also avoids the visit
+needing manual port pin in the first place.
+
+---
 ## [3.98.0] — 2026-05-09  ⏰ cron — recurring agent runs
 
 OpenClaw lists `cron` as a first-class tool. We ship the same
