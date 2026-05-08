@@ -37,7 +37,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          registry-url: "https://registry.npmjs.org"
+          # registry-url intentionally omitted — we write ~/.npmrc
+          # manually below so we can trim secret whitespace before
+          # the token reaches the Authorization header.
 
       - name: Detect version change
         id: detect
@@ -71,11 +73,56 @@ jobs:
           fi
           echo "✓ lazyclaw@$NEW is unpublished — proceeding"
 
+      - name: Configure npm auth (trim, write .npmrc)
+        if: steps.detect.outputs.changed == 'true'
+        env:
+          RAW_NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -eu
+          # GitHub's secret-paste UI sometimes preserves a trailing
+          # newline / CR / spaces from the source. setup-node's
+          # `${NODE_AUTH_TOKEN}` substitution then writes that
+          # whitespace into ~/.npmrc verbatim, and npm later builds
+          # an Authorization header containing the whitespace, which
+          # the registry rejects with:
+          #
+          #   *** is not a legal HTTP header value
+          #
+          # (the *** is GitHub masking the secret value in logs).
+          # Strip it defensively so a slightly-dirty secret doesn't
+          # block the release. We mask the cleaned token so the trim
+          # output never appears in CI logs.
+          CLEAN=$(printf '%s' "$RAW_NPM_TOKEN" | tr -d '[:space:]')
+          if [ -z "$CLEAN" ]; then
+            echo "✗ NPM_TOKEN secret is empty — set it under Settings → Secrets → Actions"
+            exit 1
+          fi
+          echo "::add-mask::$CLEAN"
+          # Write the registry .npmrc directly so we don't rely on
+          # setup-node's env-substitution path. Quote-free, single
+          # line, terminating LF only.
+          printf '//registry.npmjs.org/:_authToken=%s\n' "$CLEAN" > "$HOME/.npmrc"
+          chmod 600 "$HOME/.npmrc"
+          # Sanity probe — `npm whoami` exits 0 and prints the
+          # account when auth is valid; otherwise it errors clearly.
+          npm whoami
+
       - name: Publish
         if: steps.detect.outputs.changed == 'true'
         working-directory: src/lazyclaw
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          npm publish --access public --provenance
+          set -eu
+          # --provenance requires the token to be a granular access
+          # token associated with this repo on npmjs.com. If the
+          # token doesn't support provenance, publish errors before
+          # the upload — set PROVENANCE=0 in repo Variables to
+          # disable. Defaults on so verifiable publishes are the
+          # norm rather than the exception.
+          if [ "${PROVENANCE:-1}" = "1" ]; then
+            npm publish --access public --provenance
+          else
+            npm publish --access public
+          fi
           echo "🚀 published lazyclaw@${{ steps.detect.outputs.new }}"
+        env:
+          PROVENANCE: ${{ vars.PROVENANCE }}

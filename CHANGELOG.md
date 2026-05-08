@@ -10,6 +10,57 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.2] — 2026-05-09  🛠 publish workflow — trim NPM_TOKEN whitespace
+
+User report: the v3.99.1 push triggered the publish workflow,
+which failed with:
+
+  npm error ***
+  npm error ***
+  npm error *** is not a legal HTTP header value
+
+(the `***` is GitHub Actions masking the secret in log output —
+the underlying message is "<token-value> is not a legal HTTP
+header value"). Root cause is a stray `\n` / CR / space in the
+`NPM_TOKEN` secret: when the secret is pasted into the GitHub
+Settings UI from some sources (browsers, password managers,
+`echo $TOKEN | pbcopy`), trailing whitespace can come along.
+`setup-node@v4`'s env-substitution path then writes that
+whitespace verbatim into `~/.npmrc`, and npm builds an
+`Authorization: Bearer <token>` header containing the newline,
+which violates RFC 7230 §3.2.
+
+### Fix
+- Drop `setup-node`'s `registry-url` (which auto-writes
+  `~/.npmrc`).
+- New "Configure npm auth" step writes `~/.npmrc` manually
+  after **stripping all whitespace** from the secret with
+  `tr -d '[:space:]'`, then masks the cleaned token with
+  `::add-mask::` so the trim output never leaks into logs,
+  then runs `npm whoami` as a fail-fast probe.
+- Publish step gates `--provenance` on a `PROVENANCE` repo
+  variable so a token without provenance support can opt out
+  by setting `PROVENANCE=0` under Settings → Variables (no
+  workflow edit needed).
+
+### What the user should do
+1. Push this commit — the workflow will re-fire on `src/
+   lazyclaw/` change and now survives a slightly-dirty
+   secret.
+2. **Optional but recommended** — re-paste `NPM_TOKEN` clean:
+   - GitHub repo → Settings → Secrets and variables →
+     Actions → Repository secrets → NPM_TOKEN → "Update"
+   - Click into the value field, paste only the token (no
+     trailing newline), Save.
+3. If publish still fails after this with a provenance
+   complaint, set repo Variable `PROVENANCE=0` under the
+   same Settings page (Variables tab, not Secrets).
+
+`src/lazyclaw/package.json` 3.99.1 → 3.99.2 + dashboard
+VERSION bumped so the path filter triggers the workflow.
+No CLI behaviour change — pure CI plumbing.
+
+---
 ## [3.99.1] — 2026-05-09  🎛 lazyclaw — interactive launcher on no-arg
 
 User report: "lazyclaw 를 누르면 여기서부터 마스코트랑 설정들이
