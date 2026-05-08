@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.86.0] — 2026-05-08  ✅ E2E for chat connection gate
+
+End-to-end Playwright coverage for the v3.84 connection-gate flow
+so future changes to the chat tab's first-visit path stay honest:
+
+- gate visible on first visit (no prior history)
+- model picker present in the gate
+- send-before-verify keeps the gate open instead of silently
+  producing a "중단됨" bubble
+- successful ping closes the gate and stamps the per-assignee
+  verified flag in localStorage
+- failing ping keeps the gate open and surfaces the server-reported
+  error verbatim
+
+The script wipes `cc.lc.*` and `cc.lazyclawChat.*` localStorage
+keys before each phase and stubs `/api/lazyclaw/chat/ping` via
+`page.route` so the test runs without depending on a real provider.
+
+---
 ## [3.85.0] — 2026-05-08  🦞 lazyclaw CLI banner + picker + slash ghost-text
 
 **User report**: "lazyclaw 설정 터미널 시작하면 openclaw처럼
