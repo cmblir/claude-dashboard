@@ -10,6 +10,44 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.13] — 2026-05-10  🚪 chat `/exit` — actually leave lazyclaw, not just the chat REPL
+
+User: "exit했는데 안꺼져. 이것도 고쳐."
+
+When `lazyclaw` was launched with no arguments, the interactive
+launcher (`cmdLauncher`) wrapped each menu pick in its own
+while-loop iteration. Picking **Chat** ran `cmdChat`, and typing
+`/exit` inside the chat REPL broke out of the for-await loop and
+returned cleanly. The launcher then redrew its menu — leaving the
+user "stuck" and forcing them to **also** pick **Quit** to actually
+leave the process. The mental model `/exit` → process gone was
+broken whenever the user came in via the launcher (which is the
+default no-arg entry point).
+
+### What changed
+
+  - `cmdChat` now tracks whether the for-await loop ended because
+    of `/exit` (vs. natural EOF / Ctrl-D piping case) via a local
+    `userRequestedExit` flag, and returns the sentinel string
+    `'LAZYCLAW_EXIT'` when set. EOF without `/exit` still returns
+    `undefined` so a piped script use case (`echo prompt |
+    lazyclaw chat`) keeps its existing semantics — the launcher
+    isn't involved there anyway.
+  - `cmdLauncher`'s dispatch loop captures the return value of
+    `_dispatchMenuChoice` and breaks the outer `while (true)` when
+    it sees `'LAZYCLAW_EXIT'`. The existing `finally` block then
+    tears down stdin (raw-mode off, pause + unref), so the Node
+    event loop empties and the process ends naturally.
+
+Direct `lazyclaw chat` + `/exit` (no launcher) was already
+exiting correctly; that path returns from `cmdChat`, falls through
+`main()`, and the same teardown happens — no regression there.
+
+### Migration
+
+None — purely a correctness fix.
+
+---
 ## [3.99.12] — 2026-05-10  🔌 setup picker — model search + custom OpenAI-compatible endpoints (NIM / OpenRouter / vLLM) + 📊 dashboard — workflows / rates / metrics / doctor / config tabs
 
 User: "현재 lazyclaw setup할 때, model 세팅할 때 모델 검색해서 사용할 수 있게 하는 기능도 추가해줘. 그리고 NIM이나 다른 모델들도 API로 등록할 수 있게 해줘."

@@ -2259,12 +2259,18 @@ async function cmdChat(flags = {}) {
     }
   };
 
+  // Tracks whether the loop ended because the user explicitly typed
+  // /exit (vs. natural EOF / Ctrl-D). When set, cmdChat returns the
+  // 'LAZYCLAW_EXIT' sentinel so cmdLauncher knows to break its outer
+  // menu loop instead of redrawing — /exit means "leave lazyclaw",
+  // not "leave just this chat REPL and bounce back to the menu."
+  let userRequestedExit = false;
   try { for await (const line of rl) {
     const text = line.trim();
     if (!text) { if (useTerminal) rl.prompt(); continue; }
     if (text.startsWith('/')) {
       const r = await handleSlash(text);
-      if (r === 'EXIT') break;
+      if (r === 'EXIT') { userRequestedExit = true; break; }
       if (useTerminal) rl.prompt();
       continue;
     }
@@ -2359,6 +2365,11 @@ async function cmdChat(flags = {}) {
     try { process.stdin.pause(); } catch (_) {}
     try { process.stdin.unref(); } catch (_) {}
   }
+  // Sentinel — picked up by cmdLauncher's dispatch loop. Returning
+  // anything else (undefined / EOF) leaves the launcher free to
+  // redraw its menu, which is the right behavior for natural stream
+  // exhaustion (e.g. a script piping prompts on stdin).
+  if (userRequestedExit) return 'LAZYCLAW_EXIT';
 }
 
 // Light wrapper around the daemon — meant for users who installed
@@ -4140,11 +4151,18 @@ async function cmdLauncher() {
     // Dispatch. Errors don't terminate the launcher — they're
     // surfaced as a stderr line and the menu redraws. Lets the
     // user recover from a transient API hiccup without a relaunch.
+    let dispatchResult;
     try {
-      await _dispatchMenuChoice(argv);
+      dispatchResult = await _dispatchMenuChoice(argv);
     } catch (e) {
       process.stderr.write(`\n  ${accent('✗')} ${e?.message || String(e)}\n`);
     }
+    // Subcommand asked for full lazyclaw exit (currently only chat's
+    // /exit). Break the launcher loop so the finally block tears
+    // down stdin and the process ends naturally — without this, the
+    // user has to /exit out of chat AND pick Quit from the menu to
+    // actually leave.
+    if (dispatchResult === 'LAZYCLAW_EXIT') return;
 
     // Pause before re-drawing so the user can read the subcommand's
     // output. `chat` is the special case: its REPL has already kept
