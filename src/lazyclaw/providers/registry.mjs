@@ -413,14 +413,26 @@ export function parseProviderModel(s) {
  * @param {string|undefined|null} key
  * @returns {string}
  */
-// Reserved provider names — built-in providers and meta-keywords the picker
-// uses internally. Custom registrations must not collide with these.
+// Reserved provider names — names whose factory is bespoke (not the
+// generic OpenAI-compat one) so a custom registration of the same name
+// would silently break the wire format. The OpenAI-compat builtins are
+// deliberately NOT listed: a user can register `nim` / `openrouter` /
+// etc. as a custom entry to override the baseUrl / api-key / headers,
+// because both the built-in and the custom go through
+// `makeOpenAICompatProvider` — overriding is well-defined.
 const RESERVED_PROVIDER_NAMES = new Set([
   'mock', 'claude-cli', 'anthropic', 'openai', 'gemini', 'ollama',
-  // OpenAI-compatible builtins (kept in lockstep with OPENAI_COMPAT_BUILTINS).
-  ...Object.keys(OPENAI_COMPAT_BUILTINS),
   '__add_custom__', '__custom_model__', '__fetch_models__',
 ]);
+
+/**
+ * Whether the supplied name belongs to one of the OpenAI-compatible
+ * builtins. Used by the custom-add interactive flow so it can warn the
+ * user that their custom entry will shadow the built-in registration.
+ */
+export function isBuiltinOpenAICompatName(name) {
+  return Object.prototype.hasOwnProperty.call(OPENAI_COMPAT_BUILTINS, String(name || '').trim().toLowerCase());
+}
 
 /**
  * Validate a custom provider name. Allowed: lowercase alnum + dash + dot.

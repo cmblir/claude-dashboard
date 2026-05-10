@@ -10,6 +10,41 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.15] — 2026-05-10  🪶 setup picker — declutter step 2 rows · 🔓 custom-add can override built-in OpenAI-compat names
+
+User: "name (short id, e.g. \"nim\", \"openrouter\"): nim → custom provider name \"nim\" is reserved (built-in) — try again. 그리고 처음 모델 고를 때 gemini 이런식으로만 나왔으면 좋겠어. 지금 gemini 밑에 gemini-flash .. 등등 너무 많이 표기되어서 불편해. gemini 선택 -> gemini-flash -> .. 이런식으로 되게끔 해줘."
+
+Two related polish items on top of v3.99.14.
+
+### 1. `nim` / `openrouter` / etc. are no longer "reserved" against the custom-add wizard
+
+v3.99.14 added eight built-in OpenAI-compatible vendors and (defensively) added all eight names to `RESERVED_PROVIDER_NAMES`. That made `+ Add a custom OpenAI-compatible endpoint…` reject `nim` with `custom provider name "nim" is reserved (built-in)` — even though the user's whole reason to register a custom `nim` is to point the alias at a different baseUrl/api-key (private NIM proxy, on-prem instance, …). Built-in and custom both go through `makeOpenAICompatProvider`, so a same-name override is well-defined.
+
+  - `RESERVED_PROVIDER_NAMES` now lists only the providers whose factory is bespoke (`mock`, `claude-cli`, `anthropic`, `openai`, `gemini`, `ollama`) plus the three picker sentinel keywords. The eight OpenAI-compat builtins (`nim`, `openrouter`, `groq`, `together`, `xai`, `deepseek`, `mistral`, `fireworks`) are no longer reserved.
+  - New helper `isBuiltinOpenAICompatName(name)` exposed from `providers/registry.mjs` so callers can detect the override case explicitly.
+  - `_addCustomProviderInteractive` now prints a one-line note when the user types a built-in name: "Note: 'nim' is a built-in OpenAI-compatible provider; your custom entry will override the built-in baseUrl/api-key for this install." Removing the custom entry (`lazyclaw providers remove nim`) restores the built-in.
+  - The "real" reserved names (`gemini`, `openai`, `claude-cli`, …) still reject as before — overriding those would silently break the wire format.
+
+### 2. Step 2 / Step 1 picker rows declutter
+
+`_pickProviderInteractive` step 2 used to render each provider as
+
+```
+gemini   models: gemini-2.5-pro · gemini-2.5-flash · gemini-2.0-flash · gemini-2.0-flash-thinking-exp   [api key]
+```
+
+The four-model preview is partly redundant (step 3 already shows the curated list in full and supports type-filter) and made each row dense enough that the user couldn't tell vendors apart at a glance. Now:
+
+  - Step 2 row desc is **vendor label or baseUrl only** (custom → `custom · <baseUrl>`, built-in OpenAI-compat → vendor display label, regular built-in → empty when label matches name). Tag (`[api key]` / `[no key]` / `[custom]`) is unchanged.
+  - Step 1 family row no longer joins **every** member name (the API-key family alone now has 12 vendors). Shows the first three plus `… (+N more)`.
+
+The drill-down `gemini → gemini-2.5-pro → …` flow stays exactly the same — only the per-row clutter is gone.
+
+### Migration
+
+None. No config / API surface change.
+
+---
 ## [3.99.14] — 2026-05-10  🔁 chat `/exit` — back to leaving only the chat REPL · ⌨️ launcher slash commands · 🧠 8 built-in OpenAI-compatible vendors (NIM / OpenRouter / Groq / Together / xAI / DeepSeek / Mistral / Fireworks) · 🎚 in-chat `/provider` + `/model` arrow picker
 
 User: "지금 채팅에서 /exit하면 꺼져서 문제 다시 원래대로 만들어주고, lazyclaw 처음 상태에서 /exit했을 때 안꺼지는 오류를 수정해줘. 그리고 opencode같이 여러 모델들을 사용할 수 있는 기능도 추가해줘. nim과 같은 nvidia 모델도."

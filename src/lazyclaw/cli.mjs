@@ -1731,12 +1731,19 @@ async function _pickProviderInteractive() {
   while (!family) {
     const familyItems = Object.entries(families)
       .filter(([, b]) => b.members.length > 0)
-      .map(([id, b]) => ({
-        id,
-        label: b.label,
-        desc: `${b.desc}  ·  ${b.members.join(' / ')}`,
-        tag: b.tag,
-      }));
+      .map(([id, b]) => {
+        // Show member count + a few names instead of the full list — the
+        // API-key family alone now has 12 vendors and joining all of them
+        // produced an unreadable line.
+        const preview = b.members.slice(0, 3).join(' / ');
+        const more = b.members.length > 3 ? ` … (+${b.members.length - 3} more)` : '';
+        return {
+          id,
+          label: b.label,
+          desc: `${b.desc}  ·  ${preview}${more}`,
+          tag: b.tag,
+        };
+      });
     const picked = await _arrowMenu({
       title: 'LazyClaw setup — Step 1 of 3:  pick how you want to auth',
       subtitle: 'API: bring your own key  ·  CLI/Local: use what\'s already on this machine  ·  Mock: offline test',
@@ -1752,14 +1759,21 @@ async function _pickProviderInteractive() {
     const memberNames = families[family.id].members;
     const provItems = memberNames.map((name) => {
       const meta = info[name] || {};
-      const models = (meta.suggestedModels || []).slice(0, 4).join(' · ') || '(default)';
       const isCustom = !!meta.custom;
+      const isBuiltinCompat = !!meta.builtinOpenAICompat;
+      // Step-2 desc used to preview four suggested model ids per provider.
+      // That made the row read like "gemini · models: gemini-2.5-pro ·
+      // gemini-2.5-flash · gemini-2.0-flash · gemini-2.0-flash-thinking-exp",
+      // which is too dense and partly redundant — step 3 already shows the
+      // full curated list. Keep the row to a vendor label + endpoint hint.
+      let desc = '';
+      if (isCustom) desc = `custom · ${meta.baseUrl || ''}`;
+      else if (isBuiltinCompat) desc = meta.label || meta.baseUrl || '';
+      else if (meta.label && meta.label !== name) desc = meta.label;
       return {
         id: name,
         label: name,
-        desc: isCustom
-          ? `custom · ${meta.baseUrl || ''}`
-          : `models: ${models}`,
+        desc,
         tag: isCustom
           ? '\x1b[38;5;213m[custom]\x1b[0m'
           : (meta.requiresApiKey ? '\x1b[38;5;245m[api key]\x1b[0m' : '\x1b[38;5;208m[no key]\x1b[0m'),
@@ -1970,7 +1984,7 @@ async function _addCustomProviderInteractive() {
   process.stdout.write(dim('  · Groq             https://api.groq.com/openai/v1') + '\n');
   process.stdout.write(dim('  · vLLM / LM Studio http://localhost:8000/v1') + '\n\n');
 
-  const { validateCustomProviderName, registerCustomProviders, fetchOpenAICompatModels } = _registryMod;
+  const { validateCustomProviderName, registerCustomProviders, fetchOpenAICompatModels, isBuiltinOpenAICompatName } = _registryMod;
   let name;
   while (true) {
     const raw = (await _quickPrompt(`  ${bold('name')} ${dim('(short id, e.g. "nim", "openrouter"):')} `)).trim();
@@ -1978,8 +1992,24 @@ async function _addCustomProviderInteractive() {
       process.stdout.write(dim('  cancelled — back to the picker.\n'));
       return null;
     }
-    try { name = validateCustomProviderName(raw); break; }
-    catch (e) { process.stdout.write(`  \x1b[33m${e.message}\x1b[0m — try again.\n`); }
+    try { name = validateCustomProviderName(raw); }
+    catch (e) {
+      process.stdout.write(`  \x1b[33m${e.message}\x1b[0m — try again.\n`);
+      continue;
+    }
+    // OpenAI-compat builtins (nim / openrouter / groq / …) can be overridden
+    // by a custom entry of the same name — both go through
+    // makeOpenAICompatProvider, so the wire format is identical and the
+    // user is just pointing the same alias at a different URL/key. Surface
+    // the override so it isn't a silent surprise.
+    if (typeof isBuiltinOpenAICompatName === 'function' && isBuiltinOpenAICompatName(name)) {
+      process.stdout.write(
+        `  \x1b[2mNote: "${name}" is a built-in OpenAI-compatible provider; ` +
+        `your custom entry will override the built-in baseUrl/api-key for this install. ` +
+        `Remove with: lazyclaw providers remove ${name}\x1b[0m\n`
+      );
+    }
+    break;
   }
   const baseUrlRaw = (await _quickPrompt(`  ${bold('baseUrl')} ${dim('(must end in /v1, no trailing slash needed):')} `)).trim();
   if (!baseUrlRaw) { process.stdout.write(dim('  cancelled — baseUrl is required.\n')); return null; }
