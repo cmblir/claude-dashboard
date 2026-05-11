@@ -10,6 +10,35 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.17] — 2026-05-11  🩹 dashboard fixes — chat assignee + EADDRINUSE crash
+
+User: "lazyclaw 상태에서 대시보드에 채팅보내면 No provider selected. Run `lazyclaw onboard` first. 에러가 나오고, onboard한 다음 대시보드열면 listen EADDRINUSE: address already in use 127.0.0.1:19600 에러가 나."
+
+Two regressions introduced by v3.99.16's rewrites.
+
+### 1. Chat tab — "No provider selected" even when one is configured
+
+`LOADERS.chat` read the providers list as `r.providers || []`. `GET /providers` returns a bare array (`writeJson(res, 200, out)` where `out` is the array). `r.providers` is therefore `undefined` and the fallback `[]` empties the `<select>` — every send hit the `if (!assignee)` guard with the misleading "Run `lazyclaw onboard` first" message.
+
+  - Now reads `Array.isArray(r) ? r : (r.providers || [])` so both shapes work (same defensive pattern `LOADERS.providers` already used).
+  - When the array is empty, the `<select>` shows a single explicit option `(no providers — run lazyclaw onboard)` instead of being silently empty.
+  - Preselects the configured default (`GET /status` → `provider` / `model`) when it's in the list, so users can send the first message without manually picking from the dropdown.
+
+### 2. `lazyclaw dashboard` crashed with EADDRINUSE when port 19600 was already bound
+
+`startDaemon` only resolved on the `listening` callback — it never wired the `error` event. When the OS rejected `listen()` with `EADDRINUSE` the error bubbled up as an **unhandled** `'error'` event on the `Server` instance and Node crashed with the trace the user saw. Common when a previous dashboard didn't shut down cleanly (force-close, IDE tab swap, …).
+
+  - `startDaemon` now wires `server.once('error', reject)` so the returned promise rejects on listen-time failures instead of crashing the process. Caller gets `err.code === 'EADDRINUSE'`.
+  - **`lazyclaw dashboard`** auto-recovers: catches `EADDRINUSE`, tries to free the port via `lsof -ti tcp:<port> | kill -TERM` (then `SIGKILL` 200 ms later for holdouts), and re-listens. If kill fails (or we're on Windows where `lsof` doesn't exist), falls back to a **random port** and prints the new URL. The user always gets a working dashboard; no more crash trace.
+  - **`lazyclaw daemon`** doesn't auto-kill — bare daemon callers are usually scripts with exact-port semantics, so we surface the failure with a readable message ("`port N is in use. Re-run with --port 0 for a random port, or free the port: lsof -ti tcp:<port> | xargs kill -9`") and exit 2.
+
+`_killPortOccupant(port)` is the new helper. macOS/Linux only — on Windows it returns false immediately and the random-port fallback kicks in.
+
+### Migration
+
+None. Pure bug fixes.
+
+---
 ## [3.99.16] — 2026-05-11  🐰 lazyclaude mascot lands in lazyclaw · 🛠 dashboard mutation: providers / rates / config edit · 🔍 single-provider live test
 
 User: "dashboard 미구현 항목이 지금 너무 많음. 수정필요. 그리고 lazyclaw 좌측 상단 캐릭터 lazyclaud의 캐릭터로 변경 필요함."

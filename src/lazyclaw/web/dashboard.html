@@ -523,9 +523,27 @@
     LOADERS.chat = async function loadChat() {
       try {
         const r = await api('/providers');
+        // GET /providers returns a bare array; older drafts wrapped it
+        // as { providers: [...] }. Accept both so the dashboard works
+        // against any daemon version users might happen to be running.
+        const arr = Array.isArray(r) ? r : (r.providers || []);
         const sel = document.getElementById('chat-assignee');
         sel.innerHTML = '';
-        for (const p of r.providers || []) {
+        if (arr.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = ''; opt.textContent = '(no providers — run lazyclaw onboard)';
+          sel.appendChild(opt);
+          return;
+        }
+        // Preselect the configured default when possible so the user
+        // doesn't have to scroll through the list before sending the
+        // first message.
+        let defaultStatus = null;
+        try { defaultStatus = await api('/status'); } catch { /* keep going */ }
+        const defaultProv = defaultStatus?.provider || null;
+        const defaultModel = defaultStatus?.model || null;
+        const defaultValue = defaultProv && defaultModel ? `${defaultProv}:${defaultModel}` : defaultProv;
+        for (const p of arr) {
           const ms = (p.suggestedModels || []);
           if (!ms.length) {
             const opt = document.createElement('option');
@@ -538,6 +556,18 @@
             opt.value = `${p.name}:${m}`;
             opt.textContent = `${p.name}  ·  ${m}`;
             sel.appendChild(opt);
+          }
+        }
+        if (defaultValue) {
+          // Try exact match first (provider:model); fall back to any
+          // option starting with `<provider>:` if the configured model
+          // isn't in the suggested list.
+          const exact = Array.from(sel.options).find((o) => o.value === defaultValue);
+          if (exact) sel.value = defaultValue;
+          else {
+            const prefix = (defaultProv || '') + ':';
+            const byProv = Array.from(sel.options).find((o) => o.value.startsWith(prefix) || o.value === defaultProv);
+            if (byProv) sel.value = byProv.value;
           }
         }
       } catch (e) {

@@ -2488,13 +2488,46 @@ async function cmdChat(flags = {}) {
 // `dashboard` is the discoverable name and it auto-opens the browser
 // (which the bare daemon doesn't, since most daemon callers are
 // scripts).
+// Best-effort port-occupant kill — macOS / Linux only. Returns true when
+// at least one PID was signalled. Used by cmdDashboard so a leftover
+// listener from a previous run doesn't crash the launch with EADDRINUSE.
+// Mirrors the Python server's auto-kill behaviour described in CLAUDE.md.
+async function _killPortOccupant(port) {
+  if (process.platform === 'win32') return false;
+  const { spawn } = await import('node:child_process');
+  return new Promise((resolve) => {
+    let lsof;
+    try {
+      lsof = spawn('lsof', ['-ti', `tcp:${port}`], { stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch (_) { return resolve(false); }
+    let buf = '';
+    lsof.stdout.on('data', (d) => { buf += d.toString('utf8'); });
+    lsof.on('error', () => resolve(false));
+    lsof.on('close', () => {
+      const pids = buf.trim().split(/\s+/).map((s) => parseInt(s, 10)).filter(Number.isFinite);
+      if (!pids.length) return resolve(false);
+      // SIGTERM first so node has a chance to clean up; SIGKILL the
+      // holdouts after a short grace window.
+      for (const pid of pids) {
+        try { process.kill(pid, 'SIGTERM'); } catch (_) { /* gone already */ }
+      }
+      setTimeout(() => {
+        for (const pid of pids) {
+          try { process.kill(pid, 'SIGKILL'); } catch (_) { /* gone */ }
+        }
+        resolve(true);
+      }, 200);
+    });
+  });
+}
+
 async function cmdDashboard(flags = {}) {
   await ensureRegistry();
   const sessionsMod = await import('./sessions.mjs');
   const { startDaemon } = await import('./daemon.mjs');
   const port = flags.port !== undefined ? parseInt(flags.port, 10) : 19600;
   const cfgDir = path.dirname(configPath());
-  const d = await startDaemon({
+  const daemonOpts = {
     port,
     once: false,
     readConfig,
@@ -2512,7 +2545,34 @@ async function cmdDashboard(flags = {}) {
     responseCache: null,
     logger: null,
     costCap: null,
-  });
+  };
+  let d;
+  try {
+    d = await startDaemon(daemonOpts);
+  } catch (err) {
+    if (err?.code !== 'EADDRINUSE') throw err;
+    // Port is held by a leftover dashboard / daemon. Try to free it
+    // (lsof + kill on macOS/Linux); on failure, fall back to a random
+    // port so the user always gets a working dashboard rather than a
+    // crash trace.
+    const portInUse = port;
+    process.stderr.write(`  ⚠ port ${portInUse} is in use — likely a previous dashboard didn't shut down.\n`);
+    const killed = await _killPortOccupant(portInUse);
+    if (killed) {
+      process.stderr.write(`  ✓ freed port ${portInUse} (killed prior listener) — retrying…\n`);
+      // Short pause so the OS releases the port before we re-listen.
+      await new Promise(r => setTimeout(r, 250));
+      try { d = await startDaemon(daemonOpts); }
+      catch (err2) {
+        if (err2?.code !== 'EADDRINUSE') throw err2;
+        process.stderr.write(`  ⚠ still in use — falling back to a random port.\n`);
+        d = await startDaemon({ ...daemonOpts, port: 0 });
+      }
+    } else {
+      process.stderr.write(`  ⚠ couldn't free port ${portInUse} automatically — falling back to a random port.\n`);
+      d = await startDaemon({ ...daemonOpts, port: 0 });
+    }
+  }
   const url = `http://127.0.0.1:${d.port}/dashboard`;
   process.stdout.write(`🦞 LazyClaw dashboard listening at ${url}\n`);
   if (!flags['no-open']) {
@@ -2600,27 +2660,46 @@ async function cmdDaemon(flags) {
     || process.env.LAZYCLAW_WORKFLOW_STATE_DIR
     || '.workflow-state';
   const cfgDir = path.dirname(configPath());
-  const d = await startDaemon({
-    port: Number.isFinite(port) ? port : 0,
-    once,
-    readConfig,
-    // `lazyclaw daemon` exposes mutation endpoints (POST /providers,
-    // PUT /rates/<key>, etc.) only when an auth token is configured
-    // — without one the daemon is loopback-only but still untrusted
-    // (any process on the box can hit it). dashboard subcommand sets
-    // writeConfig unconditionally because it always runs as the user.
-    writeConfig: authToken ? writeConfig : undefined,
-    sessionsDirGetter: () => cfgDir,
-    sessionsMod,
-    version: () => readVersionFromRepo(),
-    workflowStateDir: () => workflowStateDirValue,
-    authToken: authToken || undefined,
-    allowedOrigins,
-    rateLimit,
-    responseCache,
-    logger,
-    costCap: costCapOrNull,
-  });
+  let d;
+  try {
+    d = await startDaemon({
+      port: Number.isFinite(port) ? port : 0,
+      once,
+      readConfig,
+      // `lazyclaw daemon` exposes mutation endpoints (POST /providers,
+      // PUT /rates/<key>, etc.) only when an auth token is configured
+      // — without one the daemon is loopback-only but still untrusted
+      // (any process on the box can hit it). dashboard subcommand sets
+      // writeConfig unconditionally because it always runs as the user.
+      writeConfig: authToken ? writeConfig : undefined,
+      sessionsDirGetter: () => cfgDir,
+      sessionsMod,
+      version: () => readVersionFromRepo(),
+      workflowStateDir: () => workflowStateDirValue,
+      authToken: authToken || undefined,
+      allowedOrigins,
+      rateLimit,
+      responseCache,
+      logger,
+      costCap: costCapOrNull,
+    });
+  } catch (err) {
+    // `lazyclaw daemon` exits cleanly on EADDRINUSE with a readable
+    // message instead of the historical unhandled-error stack trace.
+    // Unlike `lazyclaw dashboard`, daemon doesn't auto-kill the prior
+    // listener — bare daemon callers are usually scripts that expect
+    // exact port semantics, so we surface the failure and let them
+    // choose (re-run with --port 0 for random, or kill the holdout).
+    if (err?.code === 'EADDRINUSE') {
+      process.stderr.write(
+        `lazyclaw daemon: port ${port} is in use.\n` +
+        `  Re-run with --port 0 for a random port, or free the port:\n` +
+        `    lsof -ti tcp:${port} | xargs kill -9\n`
+      );
+      process.exit(2);
+    }
+    throw err;
+  }
   // Print the bound port immediately so test/script callers can pick it up
   // even when we asked for port 0. Indicate auth presence (not the token)
   // and the allowed-origin count (not the values, just whether browser

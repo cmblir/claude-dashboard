@@ -1666,8 +1666,19 @@ export async function startDaemon(opts) {
       setImmediate(() => server.close());
     }
   });
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    // EADDRINUSE (and other listen-time errors) used to crash the
+    // process — listen() emits 'error' before the success callback
+    // fires, and we never wired that channel. Capture it once so
+    // callers (cmdDashboard / cmdDaemon) can choose to kill the
+    // occupant or fall back to a random port.
+    const onError = (err) => {
+      server.off('error', onError);
+      reject(err);
+    };
+    server.once('error', onError);
     server.listen(opts.port ?? 0, '127.0.0.1', () => {
+      server.off('error', onError);
       const addr = server.address();
       const port = typeof addr === 'object' && addr ? addr.port : 0;
       resolve({
