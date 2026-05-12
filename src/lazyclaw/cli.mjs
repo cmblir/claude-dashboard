@@ -707,6 +707,18 @@ async function ensureRegistry() {
       _registryMod.registerCustomProviders(readConfig());
     }
   } catch { /* never let a malformed cfg.customProviders block startup */ }
+  // Wire the orchestrator's live cfg + auth-key resolver. We do this on
+  // every ensureRegistry() call (cheap — just replaces the closure) so a
+  // mid-session config edit (custom provider added, env var exported)
+  // takes effect on the next orchestrator turn without a restart.
+  try {
+    if (typeof _registryMod.registerOrchestrator === 'function') {
+      _registryMod.registerOrchestrator({
+        cfgGetter: readConfig,
+        keyResolver: _resolveAuthKey,
+      });
+    }
+  } catch { /* defensive */ }
   return _registryMod;
 }
 

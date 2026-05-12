@@ -81,6 +81,36 @@ lazyclaw onboard --non-interactive --provider nim \
 
 Need a vendor that's **not** built-in? `+ Add a custom OpenAI-compatible endpoint…` inside the setup picker (or `lazyclaw providers add <name> --base-url <url>`) still works for vLLM / LM Studio / private gateways / anything else that speaks the OpenAI v1 wire format.
 
+### `orchestrator` — multi-agent dispatch as a provider
+
+`orchestrator` is a synthetic provider that composes the others. A chat message hitting `PROVIDERS.orchestrator` triggers a three-phase pipeline instead of a single 1:1 call:
+
+1. **PLAN** — the *planner* provider decomposes the request into 2–5 parallel subtasks (JSON-only system prompt; fences / prose tolerated).
+2. **EXECUTE** — each subtask is dispatched round-robin across the *workers*. Replies stream inline so you watch progress in real time.
+3. **SYNTHESIS** — the planner re-enters with every worker's output and writes the final user-facing answer.
+
+Configure in `~/.lazyclaw/config.json`:
+
+```json
+{
+  "provider": "orchestrator",
+  "orchestrator": {
+    "planner": "claude-cli:claude-opus-4-7",
+    "workers": [
+      "claude-cli:claude-sonnet-4-6",
+      "openai:gpt-4o",
+      "gemini:gemini-2.5-pro",
+      "nim:meta/llama-3.1-405b-instruct"
+    ],
+    "maxSubtasks": 5
+  }
+}
+```
+
+Then `lazyclaw chat` (or any other entry point that ends up calling a provider — `lazyclaw agent`, the daemon's `POST /agent` / `POST /chat`, the dashboard chat tab) routes through the orchestrator. Each worker's api-key is resolved through the same chain a direct chat would use (`authProfiles` → `customProviders` → built-in env var → legacy `cfg['api-key']`).
+
+Defaults fall back gracefully: `planner` defaults to `cfg.provider`/`cfg.model`, `workers` defaults to `[planner]` (single-agent chain, still benefits from plan + synthesis structure). Self-recursion (`planner: "orchestrator"`) is rejected up front.
+
 ## Launcher (no-arg `lazyclaw`)
 
 Running `lazyclaw` with no subcommand drops into an arrow-key launcher with every subcommand laid out as a menu. Navigation:

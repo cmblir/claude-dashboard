@@ -10,6 +10,78 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.21] — 2026-05-11  🦞🤝 `orchestrator` provider — multi-agent dispatch built into lazyclaw
+
+User: "프로바이더처럼 openclaw의 기능을 사용할 수 있게 해줘. 채팅으로 보내면 해당 메인 ai가 하위 에이전트들을 시켜야 업무를 자동으로 할 수 있게끔."
+
+A new built-in provider, `orchestrator`, that composes the providers you already have. Pick it like any other provider; a chat message hitting `PROVIDERS.orchestrator` triggers a three-phase pipeline instead of a single 1:1 call.
+
+### Pipeline
+
+1. **PLAN** — the configured *planner* provider decomposes the user request into 2–5 parallel-safe subtasks. The planner is bound to a strict JSON-only system prompt, so the response parses cleanly. Markdown fences and prose around the JSON are tolerated (`_bestPlanArray` strips them).
+2. **EXECUTE** — each subtask is dispatched to a *worker* provider in round-robin order. Workers stream their answers and the orchestrator surfaces them inline so the user watches the work in progress.
+3. **SYNTHESIS** — the planner re-enters with all worker outputs and writes a single coherent answer for the user.
+
+Self-recursion guard: a misconfigured `planner: "orchestrator"` (or worker referencing itself) is rejected up front rather than infinite-looping.
+
+### Configuration (`~/.lazyclaw/config.json`)
+
+```json
+{
+  "provider": "orchestrator",
+  "orchestrator": {
+    "planner": "claude-cli:claude-opus-4-7",
+    "workers": [
+      "claude-cli:claude-sonnet-4-6",
+      "openai:gpt-4o",
+      "gemini:gemini-2.5-pro",
+      "nim:meta/llama-3.1-405b-instruct"
+    ],
+    "maxSubtasks": 5
+  }
+}
+```
+
+Defaults fall back to `cfg.provider`/`cfg.model` when `planner` is unset, and `workers: [planner]` when the workers array is empty (degenerate to a single-agent chain that still runs plan + synthesis).
+
+### What's new in code
+
+- `src/lazyclaw/providers/orchestrator.mjs` — new module exporting `makeOrchestratorProvider({ cfgGetter, keyResolver })`. Returns the standard Provider shape (`name`, `sendMessage` async generator) so it slots into the chat REPL, `lazyclaw agent`, the daemon's `POST /agent` / `POST /chat`, and the dashboard chat tab without any other change.
+- `providers/registry.mjs` registers `PROVIDERS.orchestrator` at module load and exposes `registerOrchestrator({ cfgGetter, keyResolver })`. PROVIDER_INFO.orchestrator surfaces metadata to `lazyclaw providers list` / `... info orchestrator` and the setup picker (placed in the CLI/Local family — composes providers; carries no key of its own).
+- `cli.mjs::ensureRegistry` calls `registerOrchestrator(...)` with `readConfig` + `_resolveAuthKey`, so each worker call resolves its api-key through the same chain a direct chat would (`authProfiles` → `customProviders` → builtin env var → legacy `cfg['api-key']`).
+- `RESERVED_PROVIDER_NAMES` extended so a custom-add wizard can't shadow `orchestrator`.
+
+### Verified end-to-end
+
+Smoke harness with a mock planner returning a 2-subtask plan + mock worker that echoes the subtask + mock synthesizer:
+
+```
+### 1. Planning
+1. **List Korea capitals** _— factual lookup_
+2. **List Japan capitals** _— factual lookup_
+
+### 2. Executing 2 subtasks
+**Subtask 1** `fakeWorker:w` — List Korea capitals
+WORKER: List Korea capitals
+---
+**Subtask 2** `fakeWorker:w` — List Japan capitals
+WORKER: List Japan capitals
+---
+
+### 3. Synthesis
+SYNTH: combined answer
+```
+
+### Migration
+
+None. Pure additive — existing direct-provider configs keep working unchanged. To opt in:
+
+```bash
+lazyclaw config set provider orchestrator
+# or:  lazyclaw chat --provider orchestrator
+```
+
+---
 ## [3.99.20] — 2026-05-11  ⚡ launcher Quit / `/exit` exits instantly
 
 User: "exit 누르면 오래 걸리는 경우가 많아. exit하면 cntl+c로 바로 꺼지게끔 해줘."

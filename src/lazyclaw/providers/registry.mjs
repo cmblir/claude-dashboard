@@ -13,6 +13,7 @@ import { ollamaProvider } from './ollama.mjs';
 import { geminiProvider } from './gemini.mjs';
 import { claudeCliProvider } from './claude_cli.mjs';
 import { makeOpenAICompatProvider, fetchOpenAICompatModels } from './openai_compat.mjs';
+import { makeOrchestratorProvider } from './orchestrator.mjs';
 
 /**
  * @typedef {{ role: 'user'|'assistant'|'system', content: string }} ChatMessage
@@ -51,6 +52,7 @@ export const mockProvider = {
 
 export { anthropicProvider, openaiProvider, ollamaProvider, geminiProvider, claudeCliProvider };
 export { makeOpenAICompatProvider, fetchOpenAICompatModels };
+export { makeOrchestratorProvider };
 
 // Built-in OpenAI-compatible vendors. Same wire format → one factory call
 // each. The picker treats these like first-class providers so users don't
@@ -229,6 +231,13 @@ export const PROVIDERS = {
   mock: mockProvider,
 };
 
+// Orchestrator — multi-agent dispatcher that composes other providers.
+// Registered upfront with no cfg/keyResolver so a bare process can list
+// it via `lazyclaw providers list`; `registerOrchestrator(...)` from
+// cli.mjs::ensureRegistry wires in the live cfg + auth-key resolver so
+// sendMessage can reach env vars / authProfiles / customProviders.
+PROVIDERS.orchestrator = makeOrchestratorProvider();
+
 // Wire each OpenAI-compat builtin into PROVIDERS as a callable provider.
 // Insertion is between Tier 2 (anthropic) and Tier 4 (ollama) by reordering
 // the keys after the loop runs — JS objects honour insertion order and
@@ -348,6 +357,21 @@ export const PROVIDER_INFO = {
   },
 };
 
+// Orchestrator metadata. Composes other providers; the planner/workers
+// each carry their own keys (or none for claude-cli / ollama / mock),
+// so the orchestrator itself reports requiresApiKey: false. The setup
+// picker treats it as a CLI/Local-family entry — no api-key prompt.
+PROVIDER_INFO.orchestrator = {
+  name: 'orchestrator',
+  label: 'Orchestrator (multi-agent)',
+  requiresApiKey: false,
+  docs: 'Orchestrator — decomposes the user message into 2-5 parallel subtasks, dispatches each to a worker provider, then synthesizes the answers. Configure cfg.orchestrator = { planner: "provider:model", workers: ["provider:model", ...], maxSubtasks?: 5 }. Composes any registered provider — Claude / OpenAI / Gemini / NIM / Groq / local Ollama / custom OpenAI-compat endpoints.',
+  endpoint: '(composes other providers)',
+  defaultModel: 'orchestrator',
+  suggestedModels: ['orchestrator'],
+  composite: true,
+};
+
 // Mirror the OpenAI-compat builtins into PROVIDER_INFO so picker / docs /
 // `lazyclaw providers info` see them with the same shape as the hand-written
 // entries above.
@@ -368,6 +392,16 @@ for (const [name, def] of Object.entries(OPENAI_COMPAT_BUILTINS)) {
     baseUrl: def.baseUrl,
     headers: def.headers,
   };
+}
+
+/**
+ * Re-register PROVIDERS.orchestrator with a live config getter + auth-key
+ * resolver, so each phase's worker call can pick up env vars / authProfiles
+ * / customProviders. Called from cli.mjs::ensureRegistry on every entry
+ * — idempotent (overwrites the previous registration in place).
+ */
+export function registerOrchestrator({ cfgGetter, keyResolver } = {}) {
+  PROVIDERS.orchestrator = makeOrchestratorProvider({ cfgGetter, keyResolver });
 }
 
 /**
@@ -422,6 +456,7 @@ export function parseProviderModel(s) {
 // `makeOpenAICompatProvider` — overriding is well-defined.
 const RESERVED_PROVIDER_NAMES = new Set([
   'mock', 'claude-cli', 'anthropic', 'openai', 'gemini', 'ollama',
+  'orchestrator',
   '__add_custom__', '__custom_model__', '__fetch_models__',
 ]);
 
