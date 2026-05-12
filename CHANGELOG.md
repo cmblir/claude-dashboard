@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.27] — 2026-05-12  🪜 lazyclaw launcher menu — full 30-subcommand coverage
+
+User: "여기에는 왜 오케스트라등 없는게 왤캐 많아?? lazyclaw <A> < 여기서 A는 모두 lazyclaw 한 다음 선택지에 있어야해."
+
+The no-arg `lazyclaw` launcher (`cmdLauncher` in `src/lazyclaw/cli.mjs`) only listed 15 of the 30 top-level subcommands. The other 15 — `orchestrator`, `rates`, `auth`, `pairing`, `nodes`, `message`, `run`, `resume`, `inspect`, `clear`, `validate`, `graph`, `config`, `daemon`, `export`, `import`, `completion`, `version` — were reachable only by typing them, defeating the discovery purpose of the launcher.
+
+### Fix
+
+`items` table in `cmdLauncher` expanded to mirror every `lazyclaw <A>` subcommand. Ordering is now grouped semantically (Core interaction · UI · Auth/Config · Workspaces · Outbound · Schedule · Workflow runner · Devices · Process · Bundle · Tools · Diagnostics · Meta) so the user scans the categories instead of an alphabet soup.
+
+### Two dispatch patterns
+
+  - **Direct** for subcommands with a useful default — `orchestrator status`, `rates list`, `config list`, `inspect` (lists every persisted session), `export` (redacted bundle), `version`.
+  - **Usage panel** (`['help', '<cmd>']`) for subcommands that need real arguments — `run`, `resume`, `clear`, `validate`, `graph`, `daemon`, `import`, `completion`, `auth`. The menu pick prints the copy-pasteable usage and returns to the menu so the user can re-launch with proper flags. Avoids the launcher freezing on `daemon` (which would otherwise block forever) or erroring on `run` without `<session-id> <workflow.mjs>`.
+
+`_dispatchMenuChoice` gained `case` arms for the new subcommands (`orchestrator`, `rates`, `config`, `inspect`, `export`, `version`, plus `help <name>` for the usage-panel route). `HELP_SUMMARIES.orchestrator` filled in so `lazyclaw help` no longer shows a blank line.
+
+### Migration
+
+No config / state migration. The launcher's vertical scrolling (`fromIdx` / `toIdx`) was already in place from v3.92, so the longer list fits any terminal height.
+
+---
 ## [3.99.26] — 2026-05-12  🦞 lazyclaw CLI parity — 16 dashboard tabs + 4-state mascot
 
 User: "lazyclaw 대시보드에서 쓸 수 있어야해. 지금 lazyclaw에 있는 기능들은 모두."  + "lazyclaude랑 lazyclaw 마스코트 모두 변경해줘".

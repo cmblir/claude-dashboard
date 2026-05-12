@@ -1153,6 +1153,7 @@ const HELP_SUMMARIES = {
   clear:      'Delete a persisted workflow state file (idempotent)',
   validate:   'Static-check a workflow file: shape, deps, cycles, parallelism',
   graph:      'Emit workflow DAG as Mermaid syntax (paste-ready for docs)',
+  orchestrator: 'Multi-agent dispatch — planner decomposes, workers run, planner synthesises',
 };
 
 // Detailed usage per subcommand for `lazyclaw help <name>`. Kept as flat
@@ -4528,25 +4529,48 @@ async function _dispatchMenuChoice(argv) {
   process.exit = (code) => { throw new _DispatchExit(code); };
   try {
     switch (sub) {
-      case 'chat':       return await cmdChat({});
-      case 'agent':      return await cmdAgent(rest[0] || '-', {});
-      case 'onboard':    return await cmdOnboard({});
-      case 'setup':      return await cmdSetup(undefined, rest, {});
-      case 'workspace':  return await cmdWorkspace(rest[0], rest.slice(1), {});
-      case 'browse':     return await cmdBrowse(rest[0], {});
-      case 'skills':     return await cmdSkills(rest[0], rest.slice(1), {});
-      case 'sessions':   return await cmdSessions(rest[0], rest.slice(1), {});
-      case 'providers':  return await cmdProviders(rest[0], rest.slice(1), {});
-      case 'cron':       return await cmdCron(rest[0], rest.slice(1), {});
-      case 'auth':       return await cmdAuth(rest[0], rest.slice(1), {});
-      case 'pairing':    return await cmdPairing(rest[0], rest.slice(1), {});
-      case 'nodes':      return await cmdNodes(rest[0], rest.slice(1), {});
-      case 'message':    return await cmdMessage(rest[0], rest.slice(1), {});
-      case 'doctor':     return await cmdDoctor();
-      case 'status':     return await cmdStatus();
-      case 'help':       return cmdHelp();
-      case 'dashboard':  return await cmdDashboard({});
-      default:           throw new Error(`unknown menu choice: ${sub}`);
+      case 'chat':         return await cmdChat({});
+      case 'agent':        return await cmdAgent(rest[0] || '-', {});
+      case 'onboard':      return await cmdOnboard({});
+      case 'setup':        return await cmdSetup(undefined, rest, {});
+      case 'workspace':    return await cmdWorkspace(rest[0], rest.slice(1), {});
+      case 'browse':       return await cmdBrowse(rest[0], {});
+      case 'skills':       return await cmdSkills(rest[0], rest.slice(1), {});
+      case 'sessions':     return await cmdSessions(rest[0], rest.slice(1), {});
+      case 'providers':    return await cmdProviders(rest[0], rest.slice(1), {});
+      case 'cron':         return await cmdCron(rest[0], rest.slice(1), {});
+      case 'auth':         return await cmdAuth(rest[0], rest.slice(1), {});
+      case 'pairing':      return await cmdPairing(rest[0], rest.slice(1), {});
+      case 'nodes':        return await cmdNodes(rest[0], rest.slice(1), {});
+      case 'message':      return await cmdMessage(rest[0], rest.slice(1), {});
+      case 'doctor':       return await cmdDoctor();
+      case 'status':       return await cmdStatus();
+      // v3.99.27 — fill the rest of the lazyclaw <subcommand> surface
+      // so the no-arg launcher mirrors every entry in SUBCOMMANDS.
+      case 'orchestrator': return await cmdOrchestrator(rest[0], rest.slice(1), {});
+      case 'rates':        return await cmdRates(rest[0], rest.slice(1), {});
+      case 'config':       {
+        // Mirror the main switch's tiny dispatcher.
+        const csub = rest[0];
+        if (csub === 'list' || csub === undefined) return cmdConfigGet(undefined);
+        if (csub === 'get')   return cmdConfigGet(rest[1]);
+        if (csub === 'set')   return cmdConfigSet(rest[1], rest.slice(2).join(' '));
+        if (csub === 'path')  { process.stdout.write(configPath() + '\n'); return; }
+        if (csub === 'edit')  return await cmdConfigEdit();
+        if (csub === 'validate') return await cmdConfigValidate();
+        process.stderr.write('Usage: lazyclaw config <get|set|list|delete|path|edit|validate>\n');
+        return;
+      }
+      case 'inspect':      return await cmdInspect(rest[0], {});
+      case 'export':       return await cmdExport({});
+      case 'version':      return await cmdVersion();
+      // help <cmd> is the safe fallback for commands that need real
+      // arguments (run / resume / clear / validate / graph / daemon /
+      // import / completion). Print the usage so the user can re-launch
+      // with proper flags — the menu stays alive.
+      case 'help':         return cmdHelp(rest[0]);
+      case 'dashboard':    return await cmdDashboard({});
+      default:             throw new Error(`unknown menu choice: ${sub}`);
     }
   } catch (e) {
     if (e instanceof _DispatchExit) {
@@ -4568,22 +4592,57 @@ async function cmdLauncher() {
   await ensureRegistry();
   // Item table is fixed across iterations — only the dispatcher and
   // the per-iteration draw redraw on each loop tick.
+  // Mirror every top-level `lazyclaw <subcommand>` here so the no-arg
+  // launcher is a complete discovery surface. Commands that need
+  // arguments (workflow runner, daemon, completion, import) route
+  // through `help <cmd>` so the menu pick prints copy-pasteable usage
+  // instead of erroring or blocking. Commands with a sensible default
+  // ('list' / 'status') get dispatched directly.
   const items = [
-    { id: 'chat',      label: 'Chat',          desc: 'interactive REPL with the configured provider', argv: ['chat'] },
-    { id: 'agent',     label: 'Agent',         desc: 'one-shot prompt — read text and exit',           argv: ['agent'], promptForBody: true },
-    { id: 'dashboard', label: 'Dashboard',     desc: 'open the lazyclaw web UI in your browser',       argv: ['dashboard'] },
-    { id: 'setup',     label: 'Setup',         desc: 'multi-step provider / workspace / skill wizard', argv: ['setup'] },
-    { id: 'onboard',   label: 'Onboard',       desc: 'pick provider / model / api-key',                argv: ['onboard'] },
-    { id: 'workspace', label: 'Workspace',     desc: 'AGENTS.md / SOUL.md / TOOLS.md prompt bundles',  argv: ['workspace', 'list'] },
-    { id: 'browse',    label: 'Browse',        desc: 'fetch a URL → markdown',                         argv: ['browse'], promptForUrl: true },
-    { id: 'skills',    label: 'Skills',        desc: 'installed skill bundles',                        argv: ['skills', 'list'] },
-    { id: 'sessions',  label: 'Sessions',      desc: 'persisted chat sessions',                        argv: ['sessions', 'list'] },
-    { id: 'providers', label: 'Providers',     desc: 'registered providers + reachability',            argv: ['providers', 'list'] },
-    { id: 'cron',      label: 'Cron',          desc: 'recurring agent runs (launchd / crontab)',       argv: ['cron', 'list'] },
-    { id: 'doctor',    label: 'Doctor',        desc: 'diagnostic — config, providers, workflows',     argv: ['doctor'] },
-    { id: 'status',    label: 'Status',        desc: 'current provider / model / masked key',          argv: ['status'] },
-    { id: 'help',      label: 'Help',          desc: 'one-line summary of every subcommand',           argv: ['help'] },
-    { id: 'quit',      label: 'Quit',          desc: 'exit lazyclaw',                                  argv: null },
+    // Core interaction
+    { id: 'chat',         label: 'Chat',         desc: 'interactive REPL with the configured provider', argv: ['chat'] },
+    { id: 'agent',        label: 'Agent',        desc: 'one-shot prompt — read text and exit',          argv: ['agent'], promptForBody: true },
+    { id: 'orchestrator', label: 'Orchestrator', desc: 'multi-agent dispatch — planner + workers',      argv: ['orchestrator', 'status'] },
+    // UI & onboarding
+    { id: 'dashboard',    label: 'Dashboard',    desc: 'open the lazyclaw web UI in your browser',      argv: ['dashboard'] },
+    { id: 'setup',        label: 'Setup',        desc: 'multi-step provider / workspace / skill wizard',argv: ['setup'] },
+    { id: 'onboard',      label: 'Onboard',      desc: 'pick provider / model / api-key',               argv: ['onboard'] },
+    // Auth & config
+    { id: 'providers',    label: 'Providers',    desc: 'registered providers + reachability',           argv: ['providers', 'list'] },
+    { id: 'auth',         label: 'Auth',         desc: 'multi-key rotation per provider',               argv: ['help', 'auth'] },
+    { id: 'config',       label: 'Config',       desc: 'cfg.json get/set/list/delete/path/edit',        argv: ['config', 'list'] },
+    { id: 'rates',        label: 'Rates',        desc: 'per-model input/output pricing cards',          argv: ['rates', 'list'] },
+    // Workspaces & assets
+    { id: 'workspace',    label: 'Workspace',    desc: 'AGENTS.md / SOUL.md / TOOLS.md prompt bundles', argv: ['workspace', 'list'] },
+    { id: 'skills',       label: 'Skills',       desc: 'installed skill bundles',                       argv: ['skills', 'list'] },
+    { id: 'sessions',     label: 'Sessions',     desc: 'persisted chat sessions',                       argv: ['sessions', 'list'] },
+    // Outbound & schedule
+    { id: 'browse',       label: 'Browse',       desc: 'fetch a URL → markdown',                        argv: ['browse'], promptForUrl: true },
+    { id: 'message',      label: 'Message',      desc: 'outbound webhook (Slack / Discord / generic)',  argv: ['message', 'list'] },
+    { id: 'cron',         label: 'Cron',         desc: 'recurring agent runs (launchd / crontab)',      argv: ['cron', 'list'] },
+    // Workflow runner (.mjs)
+    { id: 'run',          label: 'Run',          desc: '.mjs workflow runner (needs session + file)',   argv: ['help', 'run'] },
+    { id: 'resume',       label: 'Resume',       desc: 're-enter a persisted workflow run',             argv: ['help', 'resume'] },
+    { id: 'inspect',      label: 'Inspect',      desc: 'list / drill into persisted workflow sessions', argv: ['inspect'] },
+    { id: 'clear',        label: 'Clear',        desc: 'delete the state file for a session',           argv: ['help', 'clear'] },
+    { id: 'validate',     label: 'Validate',     desc: 'static-check a workflow.mjs (shape + deps)',    argv: ['help', 'validate'] },
+    { id: 'graph',        label: 'Graph',        desc: 'emit Mermaid graph TD / LR from a workflow',    argv: ['help', 'graph'] },
+    // Devices & process
+    { id: 'pairing',      label: 'Pairing',      desc: 'sender allowlist for the messaging surface',    argv: ['pairing', 'list'] },
+    { id: 'nodes',        label: 'Nodes',        desc: 'companion device registry',                     argv: ['nodes', 'list'] },
+    { id: 'daemon',       label: 'Daemon',       desc: 'localhost HTTP daemon (blocking — see usage)',  argv: ['help', 'daemon'] },
+    // Bundle
+    { id: 'export',       label: 'Export',       desc: 'redacted config bundle → stdout',               argv: ['export'] },
+    { id: 'import',       label: 'Import',       desc: 'restore from a bundle on stdin',                argv: ['help', 'import'] },
+    // Tools
+    { id: 'completion',   label: 'Completion',   desc: 'shell completion (bash | zsh)',                 argv: ['help', 'completion'] },
+    { id: 'version',      label: 'Version',      desc: 'lazyclaw version + Node + platform',            argv: ['version'] },
+    // Diagnostics
+    { id: 'doctor',       label: 'Doctor',       desc: 'diagnostic — config, providers, workflows',    argv: ['doctor'] },
+    { id: 'status',       label: 'Status',       desc: 'current provider / model / masked key',         argv: ['status'] },
+    // Meta
+    { id: 'help',         label: 'Help',         desc: 'one-line summary of every subcommand',          argv: ['help'] },
+    { id: 'quit',         label: 'Quit',         desc: 'exit lazyclaw',                                 argv: null },
   ];
 
   const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
