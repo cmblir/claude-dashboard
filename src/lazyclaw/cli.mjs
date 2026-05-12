@@ -4444,6 +4444,14 @@ async function cmdLauncher() {
     try { process.stdin.pause(); } catch (_) {}
     try { process.stdin.unref(); } catch (_) {}
   }
+  // User reached the end of the launcher session — Quit / Esc / q /
+  // /exit / /quit / Ctrl-C, or a failed first-run setup. Skip the
+  // natural-exit wait and terminate now: a previously imported
+  // subcommand (ollama auto-start probe, registry caches, retry timers,
+  // etc.) may have registered an interval or socket that keeps the
+  // event loop alive for several seconds. Ctrl-C exits immediately;
+  // /exit and Quit should feel the same.
+  process.exit(0);
 }
 
 async function _quickPrompt(label) {

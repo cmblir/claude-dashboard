@@ -10,6 +10,21 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.20] — 2026-05-11  ⚡ launcher Quit / `/exit` exits instantly
+
+User: "exit 누르면 오래 걸리는 경우가 많아. exit하면 cntl+c로 바로 꺼지게끔 해줘."
+
+The arrow-key launcher's Quit path (also reached via `Esc`, `q`, slash-`/exit`, slash-`/quit`) used to return naturally and rely on Node's "event loop is empty → process ends" semantics. That works when the user only touched the menu, but every subcommand the launcher might dispatch (`ensureRegistry`, the ollama auto-start probe, registry caches, retry timers, the workflow scheduler import) sometimes leaves an interval / socket / unref'd timer alive. Those linger for several seconds before the loop drains, so Quit/`/exit` felt slow when Ctrl-C felt instant.
+
+  - `cmdLauncher` now ends with an explicit `process.exit(0)` immediately after its `finally` cleanup (raw-mode off + cursor restore + stdin pause/unref). Same behaviour as Ctrl-C from the user's perspective; just routed through the cleanup so the terminal isn't left in raw mode.
+  - Triggered by every launcher-quit path: `q`, `Esc`, `Ctrl-C`, picking **Quit** from the menu, typing `/exit` or `/quit` in the slash buffer, and the failed-first-run-setup branch that already printed "Setup not completed — exiting."
+  - Chat REPL `/exit` is unchanged — it still drops back to the launcher menu (the v3.99.14 behaviour).
+
+### Migration
+
+None.
+
+---
 ## [3.99.19] — 2026-05-11  ✂️ 💥 BREAKING — lazyclaude SPA drops all in-SPA lazyclaw surface
 
 User: "지금 대시보드 lazyclaude에서 make run하면 나오는 대시보드에서 lazyclaw관련된 거는 모두 없애줘. 필요없어. lazyclaw는 오직 lazyclaw npm으로만 할 수 있게 해야해."
