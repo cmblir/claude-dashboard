@@ -124,6 +124,14 @@ export function makeOrchestratorProvider(opts = {}) {
       const fallbackSpec = cfg.provider && cfg.provider !== 'orchestrator'
         ? `${cfg.provider}${cfg.model ? ':' + cfg.model : ''}`
         : 'claude-cli';
+      // First-run hint when cfg.orchestrator is missing entirely. The
+      // fallback path below still works (planner = cfg.provider, single
+      // worker = same), but the user almost certainly meant to opt in
+      // explicitly — surface the shortest valid CLI to set it up.
+      if (!cfg.orchestrator) {
+        yield `> orchestrator: \`cfg.orchestrator\` is not set. Defaulting to a single-agent chain on \`${fallbackSpec}\`.\n` +
+          `> Configure properly:  \`lazyclaw orchestrator set-planner ${fallbackSpec}\` then  \`lazyclaw orchestrator workers add <provider:model>\` (one per agent).\n\n`;
+      }
       const plannerSpec = String(o.planner || fallbackSpec);
       const workerSpecs = Array.isArray(o.workers) && o.workers.length
         ? o.workers.map(String)

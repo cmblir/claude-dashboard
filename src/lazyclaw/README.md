@@ -111,6 +111,19 @@ Then `lazyclaw chat` (or any other entry point that ends up calling a provider â
 
 Defaults fall back gracefully: `planner` defaults to `cfg.provider`/`cfg.model`, `workers` defaults to `[planner]` (single-agent chain, still benefits from plan + synthesis structure). Self-recursion (`planner: "orchestrator"`) is rejected up front.
 
+You can skip the JSON entirely and configure via `lazyclaw onboard` / `lazyclaw setup` (the picker lands on the orchestrator and walks you through a planner + workers wizard) **or** via the dedicated CLI:
+
+```bash
+lazyclaw orchestrator status
+lazyclaw orchestrator set-planner claude-cli:claude-opus-4-7
+lazyclaw orchestrator workers add openai:gpt-4o
+lazyclaw orchestrator workers add gemini:gemini-2.5-pro
+lazyclaw orchestrator workers set claude-cli:claude-sonnet-4-6,nim:meta/llama-3.1-405b-instruct   # bulk replace
+lazyclaw orchestrator set-max-subtasks 5
+lazyclaw orchestrator clear                                                                       # wipe cfg.orchestrator
+lazyclaw config set provider orchestrator                                                          # route chats through it
+```
+
 ## Launcher (no-arg `lazyclaw`)
 
 Running `lazyclaw` with no subcommand drops into an arrow-key launcher with every subcommand laid out as a menu. Navigation:

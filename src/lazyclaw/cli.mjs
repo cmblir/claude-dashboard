@@ -914,6 +914,8 @@ const SUBCOMMANDS = [
   'auth', 'pairing', 'nodes', 'message', 'workspace', 'browse', 'cron',
   // v3.99.6 — multi-step setup wizard + lazyclaw-only dashboard
   'setup', 'dashboard',
+  // v3.99.22 — multi-agent orchestrator config
+  'orchestrator',
 ];
 
 const SUBCOMMAND_SUBS = {
@@ -929,6 +931,7 @@ const SUBCOMMAND_SUBS = {
   message:   ['list', 'add', 'remove', 'send'],
   workspace: ['list', 'init', 'show', 'remove', 'path'],
   cron:      ['list', 'add', 'remove', 'show', 'sync', 'run'],
+  orchestrator: ['status', 'set-planner', 'workers', 'set-max-subtasks', 'clear'],
 };
 
 function bashCompletion() {
@@ -1185,6 +1188,7 @@ const HELP_DETAILS = {
   cron: 'Usage: lazyclaw cron <list | add <name> "<cron-spec>" -- <cmd> ... | remove <name> | show <name> | sync | run <name>>\n  Schedule recurring agent runs. macOS uses launchd (~/Library/LaunchAgents/com.lazyclaw.<name>.plist); Linux / WSL uses the user crontab.\n  Cron spec is the standard 5-field form (minute hour dom month dow). Supports *, range a-b, list a,b,c, step */N.\n  add: pass the command after `--`. Typical use:\n      lazyclaw cron add daily-summary "0 9 * * 1-5" -- lazyclaw agent "Summarise today\'s TODOs"\n  list / show: read from cfg.cron[name] (config is the source of truth).\n  sync: re-installs every job in cfg.cron into the system scheduler — handy after a reinstall.\n  run: one-shot in-process execution of the named job; the OS scheduler does the same thing on its trigger.\n  Logs: ~/.lazyclaw/logs/cron-<name>.{out,err}.log (macOS launchd path).',
   setup: 'Usage: lazyclaw setup [--skip-test]\n  OpenClaw-style multi-step first-run wizard. Walks through:\n    1. Provider + model + api-key (delegates to onboard --pick)\n    2. Optional workspace init  (AGENTS.md / SOUL.md / TOOLS.md)\n    3. Optional skill bundle install from GitHub\n    4. Optional outbound webhook (Slack / Discord)\n    5. Reachability test against the picked provider\n  Each optional step takes Enter or "skip" to bypass. Re-runnable safely.\n  Also fires automatically on first run when `lazyclaw` is invoked with no config.',
   dashboard: 'Usage: lazyclaw dashboard [--port <N>] [--no-open]\n  Launches the lazyclaw-only web UI on http://127.0.0.1:<port> (default 19600) and opens it in the default browser.\n  Wraps `lazyclaw daemon` + a static HTML; no Python / lazyclaude dashboard required.\n  Tabs: Chat · Sessions · Skills · Workspace · Providers · Status. Each tab calls existing daemon endpoints.\n  --no-open keeps the browser closed (handy for SSH / headless / dev). The bound URL is always printed to stdout.',
+  orchestrator: 'Usage: lazyclaw orchestrator <status | set-planner <provider[:model]> | workers add <spec> | workers remove <spec> | workers set <spec,spec,...> | workers clear | set-max-subtasks <N> | clear>\n  Read/write cfg.orchestrator without editing config.json by hand.\n  status               — print {planner, workers, maxSubtasks} as JSON; lists registered providers for reference.\n  set-planner          — replace the planner spec ("provider" or "provider:model"). "orchestrator" itself is rejected (self-recursion).\n  workers add          — append a worker (idempotent — duplicates skipped).\n  workers remove       — drop a worker by exact match. Idempotent.\n  workers set          — replace the whole list (comma-separated specs).\n  workers clear        — empty the workers list.\n  set-max-subtasks <N> — cap subtasks per request, clamped 1..10 (default 5).\n  clear                — delete the cfg.orchestrator block entirely.\n  Pair with: `lazyclaw config set provider orchestrator` to route chats through it.',
 };
 
 function cmdHelp(name) {
@@ -1835,7 +1839,17 @@ async function _pickProviderInteractive() {
     provider = picked;
   }
 
-  // ── Step 3 — model ────────────────────────────────────────────
+  // ── Step 3 — model (or, for composite providers, a config wizard) ───
+  // The orchestrator (and any future composite provider) has no model
+  // of its own — it dispatches to other providers. Step 3 routes
+  // through a custom wizard instead of the standard model picker.
+  const providerMeta = (_registryMod.PROVIDER_INFO || {})[provider.id] || {};
+  if (providerMeta.composite || provider.id === 'orchestrator') {
+    const result = await _setupOrchestratorInteractive();
+    if (result === 'CANCEL') return null;
+    if (result === 'BACK')   return _pickProviderInteractive();
+    return { provider: provider.id, model: 'orchestrator' };
+  }
   const picked = await _pickModelInteractive(provider.id, {
     titlePrefix: 'LazyClaw setup — Step 3 of 3:',
     onBack: 'restart',
@@ -1843,6 +1857,125 @@ async function _pickProviderInteractive() {
   if (picked === 'CANCEL') return null;
   if (picked === 'BACK')   return _pickProviderInteractive();
   return { provider: provider.id, model: picked };
+}
+
+// Step-3 alternative for composite providers (currently only the
+// orchestrator). Builds `cfg.orchestrator = { planner, workers,
+// maxSubtasks }` interactively and persists it before returning.
+//
+// planner: single picker over registered non-composite providers.
+// workers: multi-select with a running list + add/remove/done loop.
+// maxSubtasks: typed integer, default 5.
+async function _setupOrchestratorInteractive() {
+  const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
+  const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
+  const bold   = (s) => `\x1b[1m${s}\x1b[0m`;
+  const ok     = (s) => `\x1b[32m${s}\x1b[0m`;
+  const info = _registryMod.PROVIDER_INFO || {};
+  const eligibleNames = Object.keys(_registryMod.PROVIDERS).filter((n) => n !== 'orchestrator' && n !== 'mock');
+  if (eligibleNames.length === 0) {
+    process.stdout.write('\n' + accent('orchestrator setup') + ': no eligible workers — register a real provider first.\n');
+    await _quickPrompt('  press Enter to continue ');
+    return 'CANCEL';
+  }
+  const cfg = readConfig();
+  const existing = cfg.orchestrator && typeof cfg.orchestrator === 'object' ? cfg.orchestrator : {};
+
+  // ── Pick planner ─────────────────────────────────────────────────
+  const plannerItems = eligibleNames.map((name) => {
+    const m = info[name] || {};
+    const defaultModel = m.defaultModel || '';
+    return {
+      id: `${name}${defaultModel ? ':' + defaultModel : ''}`,
+      label: m.label && m.label !== name ? `${name} — ${m.label}` : name,
+      desc: defaultModel ? `default model: ${defaultModel}` : '',
+    };
+  });
+  const plannerPick = await _arrowMenu({
+    title: 'LazyClaw setup — Step 3 of 3:  orchestrator — pick the planner',
+    subtitle: 'The planner decomposes the user request into subtasks and writes the final synthesis. Strong reasoning models work best here.',
+    items: plannerItems,
+    searchable: true,
+    defaultIdx: Math.max(0, plannerItems.findIndex((p) => p.id === existing.planner)),
+  });
+  if (plannerPick === 'CANCEL') return 'CANCEL';
+  if (plannerPick === 'BACK')   return 'BACK';
+  const planner = plannerPick.id;
+
+  // ── Pick workers (iterative add/remove) ──────────────────────────
+  const workers = Array.isArray(existing.workers) ? existing.workers.slice() : [];
+  while (true) {
+    process.stdout.write('\x1b[2J\x1b[H');
+    process.stdout.write(accent('Orchestrator workers') + '\n');
+    process.stdout.write(dim('Subtasks are dispatched round-robin across this list.') + '\n\n');
+    if (workers.length === 0) {
+      process.stdout.write('  ' + dim('(none yet — add at least one)') + '\n\n');
+    } else {
+      workers.forEach((w, i) => {
+        process.stdout.write(`  ${i + 1}. ${ok(w)}\n`);
+      });
+      process.stdout.write('\n');
+    }
+    const items = [
+      { id: '__add__',    label: '+ Add a worker',     desc: 'pick from registered providers' },
+      { id: '__remove__', label: '- Remove a worker',  desc: workers.length ? 'pick which entry to drop' : '(nothing to remove)' },
+      { id: '__done__',   label: `Done${workers.length ? ` (${workers.length} worker${workers.length === 1 ? '' : 's'})` : ' — at least one worker required'}`, desc: workers.length ? 'save cfg.orchestrator and finish' : 'add one worker first' },
+    ];
+    const action = await _arrowMenu({
+      title: 'LazyClaw setup — orchestrator workers',
+      subtitle: `Planner: ${planner}`,
+      items,
+    });
+    if (action === 'CANCEL') return 'CANCEL';
+    if (action === 'BACK')   return 'BACK';
+    if (action.id === '__add__') {
+      const wPick = await _arrowMenu({
+        title: 'Add worker',
+        subtitle: 'Picked entries are appended to the workers list.',
+        items: plannerItems.filter((p) => !workers.includes(p.id)),
+        searchable: true,
+      });
+      if (wPick === 'CANCEL' || wPick === 'BACK') continue;
+      workers.push(wPick.id);
+      continue;
+    }
+    if (action.id === '__remove__') {
+      if (!workers.length) continue;
+      const rPick = await _arrowMenu({
+        title: 'Remove worker',
+        subtitle: 'Highlighted entry is removed from the list.',
+        items: workers.map((w) => ({ id: w, label: w })),
+      });
+      if (rPick === 'CANCEL' || rPick === 'BACK') continue;
+      const idx = workers.indexOf(rPick.id);
+      if (idx >= 0) workers.splice(idx, 1);
+      continue;
+    }
+    if (action.id === '__done__') {
+      if (workers.length === 0) continue;
+      break;
+    }
+  }
+
+  // ── maxSubtasks ──────────────────────────────────────────────────
+  const defaultMax = Number.isFinite(existing.maxSubtasks) && existing.maxSubtasks > 0
+    ? Math.min(10, existing.maxSubtasks)
+    : 5;
+  const rawMax = (await _quickPrompt(`  ${bold('maxSubtasks')} ${dim(`(2..10, blank → ${defaultMax}):`)} `)).trim();
+  let maxSubtasks = defaultMax;
+  if (rawMax) {
+    const n = parseInt(rawMax, 10);
+    if (Number.isFinite(n) && n >= 1) maxSubtasks = Math.min(10, Math.max(1, n));
+  }
+
+  // ── Persist ──────────────────────────────────────────────────────
+  cfg.orchestrator = { planner, workers, maxSubtasks };
+  writeConfig(cfg);
+  process.stdout.write('\n');
+  process.stdout.write(`  ${ok('✓ orchestrator saved')}  ${dim('→')} ` +
+    `planner ${ok(planner)}  ·  ${workers.length} worker${workers.length === 1 ? '' : 's'}  ·  maxSubtasks ${maxSubtasks}\n`);
+  await _quickPrompt('  press Enter to continue ');
+  return { ok: true };
 }
 
 // Pause the chat REPL's readline + ghost-autocomplete while a sub-picker
@@ -3722,6 +3855,126 @@ async function cmdProviders(sub, positional, flags = {}) {
   }
 }
 
+// `lazyclaw orchestrator` — read/write the cfg.orchestrator section
+// without editing config.json by hand. Mirrors the shape `lazyclaw
+// providers` / `lazyclaw rates` already use.
+//
+// Subcommands:
+//   status                        Print current planner / workers / maxSubtasks as JSON.
+//   set-planner <provider[:model]>  Replace the planner spec.
+//   workers add <provider[:model]>  Append a worker (idempotent — duplicates skipped).
+//   workers remove <provider[:model]>  Drop a worker by exact match. Idempotent.
+//   workers clear                 Empty the workers list.
+//   workers set <provider[:model],...>  Replace the whole list (comma-separated).
+//   set-max-subtasks <N>          Cap the number of subtasks (clamped 1..10).
+//   clear                         Delete the entire cfg.orchestrator block.
+async function cmdOrchestrator(sub, positional, _flags = {}) {
+  await ensureRegistry();
+  const cfg = readConfig();
+  const orch = cfg.orchestrator && typeof cfg.orchestrator === 'object' ? cfg.orchestrator : {};
+  const known = Object.keys(_registryMod.PROVIDERS);
+  const validateSpec = (spec) => {
+    if (!spec) throw new Error('provider spec required (e.g. "claude-cli" or "openai:gpt-4o")');
+    const colon = spec.indexOf(':');
+    const provName = colon > 0 ? spec.slice(0, colon) : spec;
+    if (provName === 'orchestrator') throw new Error('"orchestrator" cannot reference itself — pick a real provider');
+    if (!known.includes(provName)) {
+      throw new Error(`unknown provider "${provName}" — registered: ${known.join(', ')}`);
+    }
+    return spec;
+  };
+  const saveAndPrint = (next) => {
+    if (next === null) delete cfg.orchestrator;
+    else cfg.orchestrator = next;
+    writeConfig(cfg);
+    console.log(JSON.stringify(cfg.orchestrator || null, null, 2));
+  };
+  switch (sub) {
+    case undefined:
+    case 'status': {
+      console.log(JSON.stringify({
+        ok: true,
+        configured: !!cfg.orchestrator,
+        planner: orch.planner || null,
+        workers: Array.isArray(orch.workers) ? orch.workers : [],
+        maxSubtasks: Number.isFinite(orch.maxSubtasks) ? orch.maxSubtasks : null,
+        knownProviders: known,
+      }, null, 2));
+      return;
+    }
+    case 'set-planner': {
+      try {
+        const spec = validateSpec(positional[0]);
+        saveAndPrint({ ...orch, planner: spec });
+      } catch (e) { console.error(`orchestrator: ${e.message}`); process.exit(2); }
+      return;
+    }
+    case 'workers': {
+      const wsub = positional[0];
+      const workers = Array.isArray(orch.workers) ? orch.workers.slice() : [];
+      switch (wsub) {
+        case 'add': {
+          try {
+            const spec = validateSpec(positional[1]);
+            if (!workers.includes(spec)) workers.push(spec);
+            saveAndPrint({ ...orch, workers });
+          } catch (e) { console.error(`orchestrator: ${e.message}`); process.exit(2); }
+          return;
+        }
+        case 'remove': {
+          const spec = positional[1];
+          if (!spec) { console.error('orchestrator: workers remove <provider[:model]>'); process.exit(2); }
+          const idx = workers.indexOf(spec);
+          if (idx >= 0) workers.splice(idx, 1);
+          saveAndPrint({ ...orch, workers });
+          return;
+        }
+        case 'clear': {
+          saveAndPrint({ ...orch, workers: [] });
+          return;
+        }
+        case 'set': {
+          const raw = positional[1] || '';
+          const specs = raw.split(',').map((s) => s.trim()).filter(Boolean);
+          try {
+            specs.forEach(validateSpec);
+            saveAndPrint({ ...orch, workers: specs });
+          } catch (e) { console.error(`orchestrator: ${e.message}`); process.exit(2); }
+          return;
+        }
+        default: {
+          console.error('Usage: lazyclaw orchestrator workers <add <spec> | remove <spec> | clear | set <spec,spec,...>>');
+          process.exit(2);
+        }
+      }
+    }
+    case 'set-max-subtasks': {
+      const n = parseInt(positional[0], 10);
+      if (!Number.isFinite(n) || n < 1) { console.error('orchestrator: set-max-subtasks <N>  (1..10)'); process.exit(2); }
+      saveAndPrint({ ...orch, maxSubtasks: Math.min(10, Math.max(1, n)) });
+      return;
+    }
+    case 'clear': {
+      saveAndPrint(null);
+      return;
+    }
+    default: {
+      console.error(
+        'Usage:\n' +
+        '  lazyclaw orchestrator status\n' +
+        '  lazyclaw orchestrator set-planner <provider[:model]>\n' +
+        '  lazyclaw orchestrator workers add <provider[:model]>\n' +
+        '  lazyclaw orchestrator workers remove <provider[:model]>\n' +
+        '  lazyclaw orchestrator workers set <provider[:model],...>\n' +
+        '  lazyclaw orchestrator workers clear\n' +
+        '  lazyclaw orchestrator set-max-subtasks <N>\n' +
+        '  lazyclaw orchestrator clear'
+      );
+      process.exit(2);
+    }
+  }
+}
+
 async function cmdSessions(sub, positional, flags = {}) {
   const sessionsMod = await import('./sessions.mjs');
   const cfgDir = path.dirname(configPath());
@@ -4612,6 +4865,11 @@ async function main() {
     case 'providers': {
       const sub = rest.positional[0];
       await cmdProviders(sub, rest.positional.slice(1), rest.flags);
+      break;
+    }
+    case 'orchestrator': {
+      const sub = rest.positional[0];
+      await cmdOrchestrator(sub, rest.positional.slice(1), rest.flags);
       break;
     }
     case 'skills': {

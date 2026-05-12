@@ -10,6 +10,75 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.22] — 2026-05-11  🛠 orchestrator — setup wizard + `lazyclaw orchestrator` CLI
+
+User re-asserted the v3.99.21 goal: "프로바이더처럼 openclaw의 기능을 사용할 수 있게 해줘. 채팅으로 보내면 해당 메인 ai가 하위 에이전트들을 시켜야 업무를 자동으로 할 수 있게끔."
+
+v3.99.21 shipped the engine but the surface around it was minimal — the picker landed on the orchestrator and then asked the user to hand-edit `~/.lazyclaw/config.json`. v3.99.22 closes that gap with a setup wizard, a dedicated CLI subcommand, and a first-run hint at chat time.
+
+### Setup picker — composite-provider branch
+
+`_pickProviderInteractive` step 3 now checks `PROVIDER_INFO[name].composite`. When it's set (currently only `orchestrator`) we skip the model picker and route through `_setupOrchestratorInteractive`:
+
+  - **Planner** — arrow-key picker over registered non-composite providers (mock excluded). Default is each provider's `defaultModel`.
+  - **Workers** — iterative add/remove loop. Shows the running list, lets the user add (single picker, filtered to entries not already in the list) or remove (picker over current list). "Done" only enables once at least one worker is chosen.
+  - **maxSubtasks** — typed integer, clamped 1..10, defaults to 5 or the existing value if reconfiguring.
+  - Persists `cfg.orchestrator = { planner, workers, maxSubtasks }` and prints a confirmation row.
+
+The same wizard re-runs cleanly on `lazyclaw onboard --pick` / `lazyclaw setup` for users who want to swap providers later.
+
+### `lazyclaw orchestrator <subcommand>` CLI
+
+New top-level subcommand. Mirrors `lazyclaw providers` / `lazyclaw rates` shape — read JSON for inspection, mutate via positional flags.
+
+| Command | Effect |
+|---|---|
+| `lazyclaw orchestrator status` | prints `{ planner, workers, maxSubtasks }` plus `knownProviders` for reference |
+| `lazyclaw orchestrator set-planner <provider[:model]>` | replace the planner spec; `orchestrator` self-reference + unknown providers rejected |
+| `lazyclaw orchestrator workers add <provider[:model]>` | append a worker (idempotent — duplicates skipped) |
+| `lazyclaw orchestrator workers remove <provider[:model]>` | drop a worker by exact match. Idempotent |
+| `lazyclaw orchestrator workers set <a,b,c>` | replace the whole list with a comma-separated spec list |
+| `lazyclaw orchestrator workers clear` | empty the workers list |
+| `lazyclaw orchestrator set-max-subtasks <N>` | clamp 1..10 |
+| `lazyclaw orchestrator clear` | delete the whole `cfg.orchestrator` block |
+
+Validation: every spec is checked against `PROVIDERS`; `orchestrator` itself is blocked (would infinite-loop). `SUBCOMMAND_SUBS.orchestrator` extends bash/zsh completion so `<Tab>` works.
+
+### First-run hint at chat time
+
+`orchestrator.mjs::sendMessage` now prints a single-line nudge when `cfg.orchestrator` is missing:
+
+```
+> orchestrator: `cfg.orchestrator` is not set. Defaulting to a single-agent chain on `claude-cli`.
+> Configure properly:  `lazyclaw orchestrator set-planner claude-cli` then  `lazyclaw orchestrator workers add <provider:model>` (one per agent).
+```
+
+The fallback chain still runs (planner = `cfg.provider`/`cfg.model`, single worker = same), so chat keeps working — the hint just tells the user the shortest path to a proper multi-agent setup.
+
+### Verified
+
+```
+$ lazyclaw orchestrator status
+{ "ok": true, "configured": false, "planner": null, "workers": [], ... }
+
+$ lazyclaw orchestrator set-planner claude-cli:claude-opus-4-7
+$ lazyclaw orchestrator workers add openai:gpt-4o
+$ lazyclaw orchestrator workers add gemini:gemini-2.5-pro
+$ lazyclaw orchestrator status
+{ "planner": "claude-cli:claude-opus-4-7", "workers": ["openai:gpt-4o","gemini:gemini-2.5-pro"], ... }
+
+$ lazyclaw orchestrator set-planner orchestrator
+orchestrator: "orchestrator" cannot reference itself — pick a real provider
+
+$ lazyclaw orchestrator workers add bogus:foo
+orchestrator: unknown provider "bogus" — registered: gemini, openai, claude-cli, anthropic, ...
+```
+
+### Migration
+
+None. Existing `cfg.orchestrator` entries from v3.99.21 keep working unchanged. The new wizard / CLI both no-op-overwrite when called with the same values.
+
+---
 ## [3.99.21] — 2026-05-11  🦞🤝 `orchestrator` provider — multi-agent dispatch built into lazyclaw
 
 User: "프로바이더처럼 openclaw의 기능을 사용할 수 있게 해줘. 채팅으로 보내면 해당 메인 ai가 하위 에이전트들을 시켜야 업무를 자동으로 할 수 있게끔."
