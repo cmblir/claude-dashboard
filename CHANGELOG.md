@@ -10,6 +10,56 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.25] — 2026-05-12  🎼 orchestrator-as-provider — dashboard side + sidebar chat toggle
+
+User: "프로바이더처럼 openclaw의 기능을 사용할 수 있게 해줘. 채팅으로 보내면 해당 메인 ai가 하위 에이전트들을 시켜야 업무를 자동으로 할 수 있게끔."
+
+v3.99.21–22 shipped the orchestrator-as-provider on the npm `lazyclaw` side (`providers/orchestrator.mjs`, registered in `PROVIDERS`, picker integration, `lazyclaw orchestrator` CLI). The Python dashboard side never got the same treatment — `server/orchestrator.py` was reachable only through `/api/orchestrator/dispatch`, the dedicated tab's "live dispatch test" form, or a Slack/Telegram/Discord binding. Workflow nodes, the sidebar chat, and anything else that picks an assignee couldn't say `orchestrator:default` and get multi-agent dispatch. v3.99.25 closes that gap.
+
+### `OrchestratorProvider` — new built-in in `server/ai_providers.py`
+
+A composite `BaseProvider` that wraps `server.orchestrator.dispatch`:
+
+  - `provider_id = "orchestrator"`, `provider_type = "composite"`, `icon = "🎼"`.
+  - Three preset models — `default` (4 sub-agents), `fast` (2), `deep` (8). Picking a preset temporarily overrides `cfg.maxParallel` for that turn; the original value is restored in a `finally` so a crash mid-dispatch can't leave the config mutated.
+  - `is_available()` checks that the configured planner resolves to a real, available provider — and refuses to report available if the planner is itself `orchestrator:*` (self-recursion guard at the registry level).
+  - `execute()` calls `dispatch(prompt, kind="http", channel=…)` and returns an `AIResponse` whose `raw` carries `{runId, plan, results, via}` so callers (workflows, chat, history viewers) can drill into the per-sub-agent breakdown.
+
+Registered in `get_registry()` next to the other built-ins. `resolve_assignee` learns three new aliases — `orchestrator` / `orch` / `openclaw` — so any of the following work as an assignee anywhere assignees are accepted:
+
+```
+orchestrator              → ("orchestrator", "")
+orchestrator:default      → ("orchestrator", "default")
+orchestrator:fast         → ("orchestrator", "fast")
+orch                      → ("orchestrator", "")
+openclaw:deep             → ("orchestrator", "deep")
+```
+
+### Self-recursion guard in `dispatch`
+
+A misconfigured `cfg.orchestrator.planner = "orchestrator:default"` would otherwise recurse forever, with each dispatch calling the orchestrator provider, which calls dispatch, which calls the orchestrator provider… `server/orchestrator.py::dispatch` now strips any `orchestrator` / `orch` / `openclaw` reference from `override_planner`, `override_aggregator`, `override_assignees`, and the loaded `cfg` (planner/aggregator/defaults), substituting `_DEFAULT_PLANNER` when needed. Tested by setting *every* assignee field to `orchestrator:default` — dispatch falls back to `claude:sonnet` and completes a normal turn.
+
+### Sidebar chat — `🎼 멀티 에이전트 모드` toggle
+
+The sidebar chat panel has historically been a navigation help-bot (haiku → `{answer, navigate}` for tab routing). v3.99.25 keeps that as the default and adds a second mode:
+
+  - A new chip button next to the input — `💬 도우미 모드` ↔ `🎼 오케스트레이터 모드`. Click to toggle; state persists in `localStorage` under `chatMode`.
+  - In orchestrator mode the input placeholder changes to a multi-agent example, a `<select>` for the preset appears (`default` / `fast` / `deep`), and `sendChat` POSTs to a new `/api/chat/orchestrator` endpoint instead of `/api/chat/stream`.
+  - The reply renders the synthesised answer at the top, then a collapsed `📋 plan (N)` `<details>` with each sub-agent's outputHead and status, and a footer line with `runId` / duration / cost.
+
+### New endpoint — `/api/chat/orchestrator`
+
+`server/actions.py::api_chat_orchestrator` is a non-streaming POST handler:
+
+  - Body: `{ message, history?, preset?, planner?, aggregator?, assignees?, channel? }`. `message` is required; `history` (last 6 turns) gets prepended to the planner prompt as conversation context (workers see only the planner's decomposed sub-tasks).
+  - Resolves to `execute_with_assignee("orchestrator:<preset>", full_prompt, extra={…}, timeout=600, fallback=False)`.
+  - Returns `{ answer, preset, runId, plan, results[], via, durationMs, cost_usd }`. Each `results[]` entry is trimmed to a 280-char `outputHead` so a long sub-agent reply doesn't bloat the response payload — full output is still in the orchestrator's run history (`/api/orchestrator/history/get?id=…`).
+
+### Migration
+
+None. Existing chat behaviour (help-bot) is the default. Workflow nodes that already specify a non-`orchestrator` assignee are unaffected. Tabs and other surfaces that pick assignees automatically gain the new option once the registry is rebuilt at startup.
+
+---
 ## [3.99.24] — 2026-05-12  🩹 dashboard chat — read `r.reply` (was always `(empty)`)
 
 User: "대시보드 채팅으로 hi라고 보내면 (empty) 라고 나와."

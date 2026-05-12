@@ -1443,6 +1443,20 @@ window._loadVendor = (() => {
         <div class="chat-bubble-bot">안녕하세요! 대시보드 기능에 대해 무엇이든 물어보세요.<br>해당 탭으로 바로 안내해 드릴게요.</div>
       </div>
     </div>
+    <div style="border-top:1px solid var(--border);padding:8px 10px 0 10px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;">
+      <button id="chatModeToggle" type="button" onclick="toggleChatMode()"
+              class="chip" style="font-size:0.7rem;padding:2px 8px;cursor:pointer;"
+              title="네비게이션 도우미 ↔ 멀티 에이전트 오케스트레이터 전환">
+        💬 도우미 모드
+      </button>
+      <select id="chatOrchPreset" class="input"
+              style="font-size:0.68rem;padding:2px 4px;width:auto;display:none;"
+              title="오케스트레이터 프리셋">
+        <option value="default">default — 4 sub-agents</option>
+        <option value="fast">fast — 2 sub-agents</option>
+        <option value="deep">deep — 8 sub-agents</option>
+      </select>
+    </div>
     <div style="border-top:1px solid var(--border);padding:10px;display:flex;gap:8px;flex-shrink:0;">
       <input id="chatInput" class="input" style="flex:1;font-size:0.82rem;" placeholder="예: MCP 어디서 설정해?" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}">
       <button onclick="sendChat()" class="btn-primary btn" style="padding:6px 14px;font-size:0.82rem;" aria-label="채팅 전송">전송</button>

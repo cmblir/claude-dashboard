@@ -26204,6 +26204,8 @@ function toggleChat() {
     win.classList.remove('chat-win-exit');
     win.classList.add('chat-win-enter');
     _chatOpen = true;
+    // v3.99.25 — sync mode toggle UI now that elements are visible.
+    try { if (typeof _applyChatModeUI === 'function') _applyChatModeUI(); } catch {}
     // iOS 자동 줌/포커스 화면 튐 방지를 위해 모바일은 포커스 지연 길게 + 조건부
     const focusDelay = isMobile ? 350 : 100;
     setTimeout(() => {
@@ -26286,6 +26288,58 @@ function _chatStopWaitBubble() {
   }
 }
 
+// v3.99.25 — chat panel can run in two modes:
+//   "help"  — the legacy navigation help-bot (haiku → JSON {answer,
+//             navigate}). Cheap + fast; can route to a tab.
+//   "orch"  — orchestrator multi-agent dispatch. Slower (plan → parallel
+//             sub-agents → synthesis) but answers free-form work.
+// State lives in localStorage so the toggle survives page reloads.
+window._chatMode = (() => {
+  try { return localStorage.getItem('chatMode') === 'orch' ? 'orch' : 'help'; }
+  catch { return 'help'; }
+})();
+
+function _applyChatModeUI() {
+  const btn = document.getElementById('chatModeToggle');
+  const preset = document.getElementById('chatOrchPreset');
+  const input = document.getElementById('chatInput');
+  if (!btn) return;
+  if (window._chatMode === 'orch') {
+    btn.innerHTML = '🎼 오케스트레이터 모드';
+    btn.style.background = 'rgba(167,139,250,0.18)';
+    btn.style.borderColor = 'rgba(167,139,250,0.4)';
+    if (preset) preset.style.display = '';
+    if (input) input.placeholder = '예: 우주 관련 사실 3개 정리해줘 (멀티 에이전트가 분담 실행)';
+  } else {
+    btn.innerHTML = '💬 도우미 모드';
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    if (preset) preset.style.display = 'none';
+    if (input) input.placeholder = '예: MCP 어디서 설정해?';
+  }
+}
+
+function toggleChatMode() {
+  window._chatMode = (window._chatMode === 'orch') ? 'help' : 'orch';
+  try { localStorage.setItem('chatMode', window._chatMode); } catch {}
+  _applyChatModeUI();
+  // Re-greet to clarify the active mode.
+  const msgs = document.getElementById('chatMessages');
+  if (msgs) {
+    const note = window._chatMode === 'orch'
+      ? '🎼 멀티 에이전트 모드로 전환했어. 입력한 작업을 플래너가 분해 → 서브 에이전트들이 병렬 실행 → 결과를 합쳐 답변해.'
+      : '💬 도우미 모드로 돌아왔어. 대시보드 사용법을 물어봐.';
+    const div = document.createElement('div');
+    div.className = 'chat-msg chat-bot';
+    div.innerHTML = `<div class="chat-bubble-bot">${note}</div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+}
+
+// Apply on first load (after DOM is parsed). Safe to call multiple times.
+try { setTimeout(_applyChatModeUI, 0); } catch {}
+
 async function sendChat() {
   const input = document.getElementById('chatInput');
   const msg = input.value.trim();
@@ -26294,6 +26348,48 @@ async function sendChat() {
   _chatStreaming = true;
   _appendChatMsg('user', escapeHtml(msg));
   _chatHistory.push({ role: 'user', text: msg });
+
+  // v3.99.25 — orchestrator branch. Non-streaming POST to
+  // /api/chat/orchestrator returns a synthesised answer + plan + results.
+  if (window._chatMode === 'orch') {
+    const botDiv = _appendChatMsg('bot', '🎼 <em>플래너가 작업을 분해 중…</em>');
+    const bubble = botDiv.querySelector('.chat-bubble-bot');
+    _chatStartWaitBubble();
+    try {
+      const preset = (document.getElementById('chatOrchPreset') || {}).value || 'default';
+      const r = await api('/api/chat/orchestrator', {
+        method: 'POST',
+        body: { message: msg, history: _chatHistory.slice(-6), preset },
+      });
+      _chatStopWaitBubble();
+      if (r.error) {
+        bubble.innerHTML = `<span style="color:var(--err);">${escapeHtml(r.error)}</span>`;
+      } else {
+        const plan = (r.plan || []).map((s, i) =>
+          `<div class="text-[10px] mono" style="color:var(--text-dim)">${i + 1}. ${escapeHtml((s.assignee || '?') + ' — ' + (s.task || ''))}</div>`
+        ).join('');
+        const results = (r.results || []).map((res, i) => `
+          <details class="mt-1">
+            <summary class="text-[10px] mono" style="cursor:pointer;color:${res.ok ? 'var(--success)' : '#fca5a5'}">
+              #${i + 1} ${escapeHtml(res.assignee || '?')} · ${res.ok ? 'ok' : 'err'} · ${res.durationMs || 0}ms
+            </summary>
+            <div class="text-[10px] mt-1" style="white-space:pre-wrap;color:var(--text-dim)">${escapeHtml(res.outputHead || res.error || '(no output)')}</div>
+          </details>`).join('');
+        bubble.innerHTML = `
+          <div>${escapeHtml(r.answer || '').replace(/\n/g, '<br>')}</div>
+          ${plan ? `<details class="mt-2"><summary class="text-[10px]" style="cursor:pointer;color:var(--text-dim)">📋 plan (${(r.plan || []).length})</summary>${plan}${results}</details>` : ''}
+          <div class="text-[10px] mt-1 mono" style="color:var(--text-dim)">runId: ${escapeHtml(r.runId || '')} · ${r.durationMs || 0}ms · $${(r.cost_usd || 0).toFixed(4)}</div>`;
+        _chatHistory.push({ role: 'assistant', text: r.answer || '' });
+      }
+    } catch (e) {
+      _chatStopWaitBubble();
+      bubble.innerHTML = `<span style="color:var(--err);">오케스트레이터 호출 실패: ${escapeHtml(e.message || String(e))}</span>`;
+    } finally {
+      _chatStopWaitBubble();
+      _chatStreaming = false;
+    }
+    return;
+  }
 
   // 스트리밍 버블 생성 + 마스코트 대기 말풍선 시작
   const botDiv = _appendChatMsg('bot', '<span class="streaming-cursor"></span>');

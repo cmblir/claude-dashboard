@@ -2312,6 +2312,179 @@ class OllamaApiProvider(BaseProvider):
 
 
 # ═══════════════════════════════════════════
+#  Composite provider — Orchestrator
+# ═══════════════════════════════════════════
+
+class OrchestratorProvider(BaseProvider):
+    """Exposes ``server.orchestrator.dispatch`` as a regular provider.
+
+    Calling ``execute_with_assignee("orchestrator:default", prompt)`` triggers
+    the full plan → parallel sub-agents → synthesis loop instead of a 1:1
+    LLM call. The actual planner / aggregator / default-assignee list comes
+    from the orchestrator config (``~/.claude-dashboard-orchestrator.json``)
+    — this class is only the thin adapter that lets the orchestrator look
+    like any other ``provider:model`` to workflows, chat, and the registry.
+
+    The ``model`` portion of the assignee selects a *preset* — ``default``
+    runs the orchestrator's saved planner+assignees as-is, while
+    ``deep`` / ``fast`` are minor variants (parallel cap = 8 vs 2). Custom
+    presets are configured in orchestrator config.
+    """
+
+    provider_id = "orchestrator"
+    provider_name = "Orchestrator (multi-agent)"
+    provider_type = "composite"
+    homepage = ""
+    icon = "🎼"
+    capabilities = [CAP_CHAT]
+
+    _MODELS = [
+        ModelInfo(
+            "default", "Auto plan → parallel sub-agents → synthesis",
+            1_000_000, 0.0, 0.0, 0.0, 0.0,
+            note="planner + assignees from orchestrator config",
+        ),
+        ModelInfo(
+            "fast", "2 sub-agents, low debounce",
+            1_000_000, 0.0, 0.0, 0.0, 0.0,
+            note="cap parallel=2, single-pass synthesis",
+        ),
+        ModelInfo(
+            "deep", "Up to 8 sub-agents, longer timeout",
+            1_000_000, 0.0, 0.0, 0.0, 0.0,
+            note="cap parallel=8, all defaults",
+        ),
+    ]
+
+    def is_available(self) -> bool:
+        """Available iff the configured planner resolves to an available
+        underlying provider. Avoids self-recursion: if the planner spec is
+        ``orchestrator:...`` we treat ourselves as unavailable.
+        """
+        try:
+            from .orchestrator import load_config
+            cfg = load_config()
+            planner = (cfg.get("plannerAssignee") or "").strip()
+            if not planner:
+                return False
+            if planner.split(":", 1)[0].strip().lower() in ("orchestrator", self.provider_id):
+                return False
+            # Resolve without recursing into ourselves.
+            reg = get_registry()
+            pid, _model = reg.resolve_assignee(planner)
+            if pid == self.provider_id:
+                return False
+            p = reg.get(pid)
+            return bool(p and p.is_available())
+        except Exception:
+            return False
+
+    def list_models(self) -> list[ModelInfo]:
+        return self._MODELS
+
+    def execute(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str = "",
+        model: str = "",
+        cwd: str = "",
+        timeout: int = 300,
+        extra: dict | None = None,
+    ) -> AIResponse:
+        """Run a full orchestrator turn synchronously and return the synthesised
+        reply. ``model`` selects a preset (``default`` / ``fast`` / ``deep``);
+        ``extra`` may carry ``channel`` / ``user`` / ``override_assignees``
+        forwarded to ``dispatch``.
+        """
+        from . import orchestrator
+
+        preset = (model or "default").strip().lower()
+        extra = extra or {}
+        channel = str(extra.get("channel") or "dashboard-chat")
+        user = str(extra.get("user") or "")
+        override_planner = str(extra.get("planner") or "")
+        override_aggregator = str(extra.get("aggregator") or "")
+        override_assignees = extra.get("assignees")
+        if isinstance(override_assignees, str):
+            override_assignees = [a.strip() for a in override_assignees.split(",") if a.strip()]
+        if not isinstance(override_assignees, list):
+            override_assignees = None
+
+        # Combine system_prompt + user prompt the same way every other
+        # provider does — the planner sees the whole thing as a single
+        # "User request:" payload.
+        full = prompt if not system_prompt else f"{system_prompt}\n\n{prompt}"
+
+        # Preset hook: deep / fast override maxParallel at runtime by
+        # temporarily mutating the config, then restoring it. Cheap because
+        # config is JSON on disk; we don't actually persist.
+        cfg = orchestrator.load_config()
+        original_parallel = cfg.get("maxParallel", 4)
+        try:
+            if preset == "fast":
+                cfg["maxParallel"] = 2
+                orchestrator.save_config(cfg)
+            elif preset == "deep":
+                cfg["maxParallel"] = 8
+                orchestrator.save_config(cfg)
+
+            t0 = time.time()
+            result = orchestrator.dispatch(
+                full,
+                kind="http",
+                channel=channel,
+                user=user,
+                override_planner=override_planner,
+                override_aggregator=override_aggregator,
+                override_assignees=override_assignees,
+            )
+            duration = int((time.time() - t0) * 1000)
+        finally:
+            if preset in ("fast", "deep"):
+                cfg["maxParallel"] = original_parallel
+                orchestrator.save_config(cfg)
+
+        if not result.get("ok"):
+            return AIResponse(
+                status="err",
+                error=str(result.get("error") or "orchestrator dispatch failed"),
+                provider=self.provider_id,
+                model=preset,
+                duration_ms=duration,
+                raw={"runId": result.get("runId")},
+            )
+
+        results = result.get("results") or []
+        # Sum sub-agent costs/tokens so the dashboard cost panel sees the
+        # orchestrator turn as the rollup of its workers.
+        tokens_total = 0
+        cost = 0.0
+        for r in results:
+            tokens_total += int((r or {}).get("tokens") or 0)
+            try:
+                cost += float((r or {}).get("cost_usd") or 0.0)
+            except (TypeError, ValueError):
+                pass
+
+        return AIResponse(
+            status="ok",
+            output=result.get("final") or "",
+            provider=self.provider_id,
+            model=preset,
+            tokens_total=tokens_total,
+            duration_ms=duration,
+            cost_usd=cost,
+            raw={
+                "runId": result.get("runId"),
+                "plan": result.get("plan") or [],
+                "results": results,
+                "via": result.get("via") or "ad-hoc",
+            },
+        )
+
+
+# ═══════════════════════════════════════════
 #  프로바이더 레지스트리 (싱글턴)
 # ═══════════════════════════════════════════
 
@@ -2387,6 +2560,11 @@ class ProviderRegistry:
                 "codestral": "mistral-api",
                 "xai": "xai-api",
                 "grok": "xai-api",
+                # v3.99.25 — composite orchestrator provider. "orch" and
+                # "openclaw" are user-friendly aliases for the same thing.
+                "orchestrator": "orchestrator",
+                "orch": "orchestrator",
+                "openclaw": "orchestrator",
             }
             pid = PROVIDER_ALIASES.get(provider_hint, provider_hint)
 
@@ -2411,6 +2589,14 @@ class ProviderRegistry:
         # 알려진 프로바이더 id 인지 확인
         if assignee in self._providers:
             return (assignee, "")
+
+        # v3.99.25 — composite-provider shortcuts ("orch", "openclaw")
+        # without a colon. Same alias table as the colon path; lets the
+        # picker accept the short form without forcing the user to type
+        # "orchestrator:default" every time.
+        _short = assignee.strip().lower()
+        if _short in ("orchestrator", "orch", "openclaw"):
+            return ("orchestrator", "")
 
         # 기본: Claude CLI 에 모델명으로 전달
         return ("claude-cli", assignee)
@@ -2645,6 +2831,13 @@ def get_registry() -> ProviderRegistry:
     reg.register(DeepSeekApiProvider())
     reg.register(MistralApiProvider())
     reg.register(XAIApiProvider())
+
+    # v3.99.25 — composite "orchestrator" provider. Wraps
+    # server.orchestrator.dispatch so any code path that talks to the
+    # provider registry (workflows, chat, picker UI) can pick
+    # "orchestrator:default" and get the multi-agent plan→dispatch→
+    # synthesis loop for free.
+    reg.register(OrchestratorProvider())
 
     # 사용자 정의 프로바이더 로드 (ai_keys.py 에서 설정 파일 읽기)
     try:

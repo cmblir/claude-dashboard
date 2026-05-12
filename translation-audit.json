@@ -1,6 +1,6 @@
 {
   "source": "dist/index.html",
-  "total": 209,
+  "total": 212,
   "items": [
     {
       "text": "'{name}' 가 {mcp_file} 에 없음",
@@ -551,6 +551,14 @@
       "in_existing_en_dict": false
     },
     {
+      "text": "네비게이션 도우미 ↔ 멀티 에이전트 오케스트레이터 전환",
+      "count": 1,
+      "sample_lines": [
+        247
+      ],
+      "in_existing_en_dict": false
+    },
+    {
       "text": "다크",
       "count": 1,
       "sample_lines": [
@@ -949,7 +957,15 @@
       "text": "예: MCP 어디서 설정해?",
       "count": 1,
       "sample_lines": [
-        245
+        259
+      ],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "오케스트레이터 프리셋",
+      "count": 1,
+      "sample_lines": [
+        252
       ],
       "in_existing_en_dict": false
     },
@@ -1013,7 +1029,7 @@
       "text": "전송",
       "count": 1,
       "sample_lines": [
-        246
+        260
       ],
       "in_existing_en_dict": false
     },
@@ -1033,7 +1049,7 @@
       "text": "채팅 전송",
       "count": 1,
       "sample_lines": [
-        246
+        260
       ],
       "in_existing_en_dict": false
     },
@@ -1268,6 +1284,14 @@
       "text": "🏥 헬스케어",
       "count": 0,
       "sample_lines": [],
+      "in_existing_en_dict": false
+    },
+    {
+      "text": "💬 도우미 모드",
+      "count": 1,
+      "sample_lines": [
+        248
+      ],
       "in_existing_en_dict": false
     },
     {

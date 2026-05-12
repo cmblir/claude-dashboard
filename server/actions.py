@@ -506,3 +506,116 @@ end tell
         "fallbackReason": resolved.get("fallback_reason", ""),
     }
 
+
+# ─────────────────────────────────────────────────────────────────────
+# Orchestrator chat — v3.99.25
+#
+# The sidebar chat panel in the dashboard has historically been a
+# navigation help-bot (haiku → JSON {answer, navigate}). v3.99.25 adds
+# a second mode that routes the same input through the multi-agent
+# orchestrator: the chat panel POSTs ``{message, history?}`` to
+# ``/api/chat/orchestrator`` and renders the synthesised reply alongside
+# the plan + per-sub-agent breakdown.
+#
+# Why a separate endpoint instead of overloading ``/api/chat``? The
+# help-bot path is synchronous + cheap (single haiku call, ~1 s);
+# orchestrator can take 30 s+ and produces a much richer response shape
+# (plan / results / runId). Splitting the routes keeps each side's
+# error handling readable.
+# ─────────────────────────────────────────────────────────────────────
+
+def api_chat_orchestrator(body: dict) -> dict:
+    """Dispatch the user's chat message through the orchestrator and return
+    the synthesised reply + plan/results.
+
+    Body fields (all optional except ``message``):
+      message           — the user's prompt (required)
+      history           — last N turns (used as preamble context)
+      preset            — "default" | "fast" | "deep" (model id)
+      planner           — assignee override for this turn (no persistence)
+      aggregator        — assignee override for this turn
+      assignees         — list[str] override for default-assignee chain
+      channel           — routing key for budget / history (default: "dashboard-chat")
+    """
+    from .errors import ERROR_MESSAGES
+
+    if not isinstance(body, dict):
+        return {"error": ERROR_MESSAGES.get("bad_body", "bad body"),
+                "error_key": "err_bad_body"}
+    user_msg = (body.get("message") or "").strip()
+    if not user_msg:
+        return {"error": ERROR_MESSAGES.get("msg_empty", "message empty"),
+                "error_key": "err_msg_empty"}
+
+    # Compose a single prompt that includes the last few chat turns so the
+    # planner sees conversation context. Workers see only the planner's
+    # decomposed sub-tasks; the history rides with the planner phase only.
+    history = body.get("history") or []
+    conv_lines = []
+    for h in history[-6:]:
+        if not isinstance(h, dict):
+            continue
+        role = (h.get("role") or "").strip()
+        text = (h.get("text") or "").strip()
+        if not text:
+            continue
+        prefix = "User" if role == "user" else "Assistant"
+        conv_lines.append(f"{prefix}: {text}")
+    if conv_lines:
+        full_prompt = "## Conversation so far\n" + "\n".join(conv_lines) + \
+                      "\n\n## Current request\n" + user_msg
+    else:
+        full_prompt = user_msg
+
+    preset = (body.get("preset") or "default").strip().lower()
+    if preset not in ("default", "fast", "deep"):
+        preset = "default"
+
+    extra: dict = {
+        "channel": str(body.get("channel") or "dashboard-chat"),
+    }
+    if body.get("planner"):
+        extra["planner"] = str(body["planner"])
+    if body.get("aggregator"):
+        extra["aggregator"] = str(body["aggregator"])
+    if isinstance(body.get("assignees"), list):
+        extra["assignees"] = [str(a) for a in body["assignees"] if str(a).strip()]
+
+    from .ai_providers import execute_with_assignee
+    resp = execute_with_assignee(
+        f"orchestrator:{preset}", full_prompt,
+        extra=extra, timeout=600, fallback=False,
+    )
+
+    if resp.status != "ok":
+        return {
+            "error": resp.error or "orchestrator dispatch failed",
+            "error_key": "err_orch_dispatch",
+            "provider": resp.provider,
+            "model": resp.model,
+            "raw": resp.raw,
+        }
+
+    raw = resp.raw or {}
+    return {
+        "answer": resp.output or "(empty)",
+        "preset": preset,
+        "runId": raw.get("runId") or "",
+        "plan": raw.get("plan") or [],
+        "results": [
+            {
+                "assignee": (r or {}).get("assignee", ""),
+                "task": (r or {}).get("task", ""),
+                "ok": bool((r or {}).get("ok")),
+                "outputHead": ((r or {}).get("output") or "")[:280],
+                "error": (r or {}).get("error", ""),
+                "tokens": (r or {}).get("tokens", 0),
+                "cost_usd": (r or {}).get("cost_usd", 0.0),
+                "durationMs": (r or {}).get("durationMs", 0),
+            } for r in (raw.get("results") or [])
+        ],
+        "via": raw.get("via", "ad-hoc"),
+        "durationMs": resp.duration_ms,
+        "cost_usd": resp.cost_usd,
+    }
+

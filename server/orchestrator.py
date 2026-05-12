@@ -982,6 +982,27 @@ def dispatch(text: str, *, kind: str = "http", channel: str = "",
     binding = find_binding(kind, channel) if channel else None
     run_id = _new_run_id()
 
+    # v3.99.25 — self-recursion guard. The OrchestratorProvider in
+    # ai_providers.py makes "orchestrator" selectable from any assignee
+    # picker; if a user accidentally sets the planner / aggregator / a
+    # default-assignee to "orchestrator:..." the dispatch would call back
+    # into itself forever. Strip out any "orchestrator" reference up front.
+    def _is_orch(a: str) -> bool:
+        head = (a or "").split(":", 1)[0].strip().lower()
+        return head in ("orchestrator", "orch", "openclaw")
+    if _is_orch(override_planner):
+        override_planner = ""
+    if _is_orch(override_aggregator):
+        override_aggregator = ""
+    if override_assignees:
+        override_assignees = [a for a in override_assignees if not _is_orch(str(a))]
+    if _is_orch(cfg.get("plannerAssignee", "")):
+        cfg["plannerAssignee"] = _DEFAULT_PLANNER
+    if _is_orch(cfg.get("aggregatorAssignee", "")):
+        cfg["aggregatorAssignee"] = _DEFAULT_AGGREGATOR
+    cfg["defaultAssignees"] = [a for a in cfg.get("defaultAssignees", [])
+                               if not _is_orch(str(a))] or [_DEFAULT_PLANNER]
+
     # ── Per-binding daily budget cap (D6) ───────────────────────────────
     # If the binding declared a USD/day cap, refuse new dispatches once
     # today's spend (sum of orch_runs.cost where channel matches) is over.
