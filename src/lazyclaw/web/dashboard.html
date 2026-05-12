@@ -1405,7 +1405,13 @@
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(body),
         });
-        const reply = r.text || r.output || '(empty)';
+        // Daemon's POST /agent returns { reply, usage?, cost? }. Older
+        // drafts used { text } / { output }; accept any of them so a
+        // dashboard hitting an older or newer daemon both work.
+        const reply = (typeof r.reply === 'string' ? r.reply : '')
+          || (typeof r.text === 'string' ? r.text : '')
+          || (typeof r.output === 'string' ? r.output : '')
+          || '(empty)';
         appendMsg('assistant', reply);
         chatHistory.push({ role: 'assistant', text: reply });
         const dur = ((Date.now() - t0) / 1000).toFixed(1);

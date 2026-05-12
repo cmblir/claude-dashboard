@@ -10,6 +10,19 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.24] — 2026-05-12  🩹 dashboard chat — read `r.reply` (was always `(empty)`)
+
+User: "대시보드 채팅으로 hi라고 보내면 (empty) 라고 나와."
+
+The daemon's `POST /agent` returns `{ reply, usage?, cost? }` (see `daemon.mjs:1595`). The dashboard's `sendChat` was reading `r.text || r.output || '(empty)'` — neither field exists, so every reply collapsed to the `(empty)` fallback regardless of what the model actually said.
+
+  - `sendChat` now reads `r.reply` first, then falls back to `r.text` / `r.output` for forward/back compatibility with older or newer daemons. Types are guarded (`typeof === 'string'`) so a missing field never coerces to the literal string `"undefined"`.
+
+### Migration
+
+None. Pure bug fix.
+
+---
 ## [3.99.23] — 2026-05-12  🎨 mascot — rebuilt from Claude Design handoff (crab-helmet asterisk star)
 
 User: "터미널이랑 lazyclaw [Claude Design handoff URL] 로고 이거 참고해서 다시 만들어줘."
