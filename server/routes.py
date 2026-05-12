@@ -12,9 +12,7 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .actions import (
-    api_chat, api_lazyclaw_chat, api_lazyclaw_chat_ping, api_lazyclaw_term,
-    api_session_spawn, handle_chat_stream,
-    handle_lazyclaw_chat_stream,
+    api_chat, api_session_spawn, handle_chat_stream,
     open_folder_action, open_session_action,
 )
 from .agents import (
@@ -544,9 +542,6 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/marketplaces/add": api_marketplace_add,
     "/api/marketplaces/remove": api_marketplace_remove,
     "/api/chat": api_chat,
-    "/api/lazyclaw/chat": api_lazyclaw_chat,
-    "/api/lazyclaw/chat/ping": api_lazyclaw_chat_ping,
-    "/api/lazyclaw/term": api_lazyclaw_term,
     "/api/workflows/save": api_workflow_save,
     "/api/workflows/patch": api_workflow_patch,
     "/api/workflows/delete": api_workflow_delete,
@@ -955,9 +950,6 @@ class Handler(BaseHTTPRequestHandler):
         # chat/stream 은 SSE 응답 — dict 외 Handler 를 직접 받음
         if path == "/api/chat/stream":
             handle_chat_stream(self, self._read_body())
-            return
-        if path == "/api/lazyclaw/chat/stream":
-            handle_lazyclaw_chat_stream(self, self._read_body())
             return
         # Slack Events — needs raw body for HMAC signature verification.
         if path == "/api/slack/events":

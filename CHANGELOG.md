@@ -10,6 +10,59 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.19] — 2026-05-11  ✂️ 💥 BREAKING — lazyclaude SPA drops all in-SPA lazyclaw surface
+
+User: "지금 대시보드 lazyclaude에서 make run하면 나오는 대시보드에서 lazyclaw관련된 거는 모두 없애줘. 필요없어. lazyclaw는 오직 lazyclaw npm으로만 할 수 있게 해야해."
+
+The lazyclaude SPA used to embed a mini "LazyClaw" surface (a mode toggle, a dashboard tab, an AI chat tab, a read-only settings terminal, plus daemon-passthrough endpoints) that duplicated functionality already provided by the standalone `lazyclaw` npm package. v3.99.19 deletes the duplicate so there's exactly one place to use lazyclaw — `npm i -g lazyclaw`.
+
+### Removed surfaces
+
+**Frontend (`dist/app.js`, `dist/index.html`, `dist/locales/*.json`)**
+
+  - `lazyclaw` mode dropdown option (header mode selector) and the `body[data-mode="lazyclaw"]` accent CSS.
+  - NAV entries: `lazyclawDashboard`, `lazyclawChat`, `lazyclawTerm`.
+  - `MODE_TABS.lazyclaw` set, `MODE_DEFAULT_TAB.lazyclaw`, the `'lazyclaw'` entry in every mode-validation list.
+  - `setMode('lazyclaw')` path, the 'L'/LazyClaw badge tag in 'all' mode, the 'lazyclaw' column in the mode-usage modal.
+  - `VIEWS.lazyclawDashboard`, `VIEWS.lazyclawChat`, `AFTER.lazyclawChat`, `VIEWS.lazyclawTerm`, `AFTER.lazyclawTerm` + every `_lcChat*` / `_lcTerm*` helper (~4.6k lines).
+  - Provider-card `💬 채팅` button (`_providerOpenChat`) that jumped to the in-SPA chat with the provider preselected.
+  - Two i18n keys (`"LazyClaw 설정 터미널"` and the terminal long-desc) from `dist/locales/{ko,en,zh}.json`.
+
+**Backend (`server/`)**
+
+  - `POST /api/lazyclaw/chat`, `POST /api/lazyclaw/chat/ping`, `POST /api/lazyclaw/term`, and the streaming `POST /api/lazyclaw/chat/stream` route.
+  - `handle_lazyclaw_chat_stream`, `api_lazyclaw_chat`, `api_lazyclaw_chat_ping`, `api_lazyclaw_term` functions in `server/actions.py` (~413 lines).
+  - `lazyclawDashboard` entry from `server/nav_catalog.py`; `lazyclaw` / `nanoclaw` keywords from the `orchestrator` tab's keyword list.
+
+### One-shot localStorage migration
+
+A migration block runs on first load and silently:
+
+  - Resets `cc.mode` to `'all'` when the previous value was `'lazyclaw'` (or the even-older `'openclaw'`).
+  - Removes `cc.mode.lazyclaw.lastTab`, `cc.mode.lazyclaw.counts`, and the matching `openclaw` keys.
+
+Other lazyclaw-specific localStorage entries (`cc.lazyclawChat.*`, `cc.lazyclawTerm.*`) are left alone — they're now dead bytes that don't affect anything, and we don't want to surprise users who might have valuable chat history archived under those keys.
+
+### Migration / what to do instead
+
+The standalone `lazyclaw` npm package is the only supported way going forward. It's actually richer than the in-SPA surface ever was — pixel-art mascot, 8 OpenAI-compat builtins, in-chat picker, etc.
+
+```bash
+npm install -g lazyclaw
+lazyclaw onboard            # one-time
+lazyclaw dashboard          # opens the lazyclaw-only web UI
+lazyclaw chat               # interactive REPL
+```
+
+The lazyclaude SPA continues to focus on what it's actually good at: Claude Code configuration, workflows, providers, agents, observability — none of which was lazyclaw-specific.
+
+### Sanity
+
+  - `dist/app.js`: 32003 → 27371 lines (-4632), `node --check` passes.
+  - `server/actions.py`: 921 → 508 lines (-413), `from server import routes, actions, nav_catalog` clean.
+  - `nav_catalog.TAB_CATALOG`: 67 → 66 tabs.
+
+---
 ## [3.99.18] — 2026-05-11  🛂 dashboard — accept its own loopback origin (no more `403 forbidden origin` on chat send)
 
 User: "⚠ 403 Forbidden — {\"error\":\"forbidden origin\"} 대시보드에서 hi라고 보냈는데 에러가 나와."
