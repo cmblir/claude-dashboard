@@ -1469,105 +1469,107 @@ function _attachGhostAutocomplete(rl) {
 // border off the box (which is exactly the bug v3.99.5 shipped:
 // two of the inner lines were 33 cols vs the others' 32, so the
 // ╮ rendered into the next line).
-// v3.99.28 — Big ASCII mascot, rebuilt on a strict 17-wide canvas so
-// every row aligns (the v3.99.26 port copied the design handoff's
-// mixed 15/16/17 widths which made the helmet drift left of the
-// body in any monospace font). Layout: pincers ◂▸ at cols 2-3 and
-// 13-14, stems │ at cols 2 and 14, helmet box from col 1 to col 15
-// (13-wide interior), body box same width directly below, legs ┃ at
-// cols 4 and 12 — symmetric on the central axis (col 8).
+// v3.99.29 — 8-bit crab mascot (Claude Design crab sheet). Strict
+// 17-wide canvas, 12 rows, so every row aligns in any monospace font.
+// Layout: short eye-stalks (●) at cols 4 & 12, a red carapace dome
+// (╭──╮ … ╰──╯) worn like a hood, an orange face box at cols 4-12
+// with two dot-eyes + a mouth, two yellow legs (┃) below. State →
+// expression: idle 기본 · working 화남(연기) focused+smoke · done
+// 미소 smile+sparkle · error 경고/놀람 shocked+alert. Colour is
+// two-tone (red shell / orange face / yellow legs) — NOT white — so
+// it reads like the pixel sprite even in a plain terminal.
 const _MASCOT_W = 17;
 const _MASCOT_BIG = {
   idle: [
-    '  ◂▸         ◂▸  ',
+    '    ╷       ╷    ',
+    '    ●       ●    ',
+    '  ╭───────────╮  ',
     '  │           │  ',
     '  │           │  ',
-    ' ╔═════════════╗ ',
-    ' ║             ║ ',
-    ' ╚═════════════╝ ',
-    ' ┌─────────────┐ ',
-    ' │  │       │  │ ',
-    ' ┤  │       │  ├ ',
-    ' └─────────────┘ ',
-    '    ┃       ┃    ',
-    '    ┃       ┃    ',
+    '  ╰───────────╯  ',
+    '    ╭───────╮    ',
+    '    │ ●   ● │    ',
+    '    │  ───  │    ',
+    '    ╰───────╯    ',
+    '     ┃     ┃     ',
+    '     ┗┛   ┗┛     ',
   ],
   working: [
-    '  ◂▸         ◂▸  ',
-    '  │  ···      │  ',
+    ' °  ╷       ╷  ° ',
+    '    ●       ●    ',
+    '  ╭───────────╮  ',
+    ' ╱╲│         │╱╲ ',
     '  │           │  ',
-    ' ╔═════════════╗ ',
-    ' ║      *      ║ ',
-    ' ╚═════════════╝ ',
-    ' ┌─────────────┐ ',
-    ' │  ·       ·  │ ',
-    ' ┤             ├ ',
-    ' └─────────────┘ ',
-    '    ┃       ┃    ',
-    '    ┃       ┃    ',
+    '  ╰───────────╯  ',
+    '    ╭───────╮    ',
+    '    │ ─   ─ │    ',
+    '    │  ═══  │    ',
+    '    ╰───────╯    ',
+    '     ┃     ┃     ',
+    '     ┗┛   ┗┛     ',
   ],
   done: [
-    '✦ ◂▸         ◂▸ ✦',
+    ' ✦  ╷       ╷  ✦ ',
+    '    ●       ●    ',
+    '  ╭───────────╮  ',
     '  │           │  ',
     '  │           │  ',
-    ' ╔═════════════╗ ',
-    ' ║             ║ ',
-    ' ╚═════════════╝ ',
-    ' ┌─────────────┐ ',
-    ' │  ^       ^  │ ',
-    ' ┤    ‿‿‿‿‿    ├ ',
-    ' └─────────────┘ ',
-    '    ┃       ┃    ',
-    '    ┃       ┃    ',
+    '  ╰───────────╯  ',
+    '    ╭───────╮    ',
+    '    │ ^   ^ │    ',
+    '    │  ‿‿‿  │    ',
+    '    ╰───────╯    ',
+    '     ┃     ┃     ',
+    '     ┗┛   ┗┛     ',
   ],
   error: [
-    '   ▾         ▾   ',
+    ' \\   ╷     ╷   / ',
+    '  !  ●     ●  !  ',
+    '  ╭───────────╮  ',
     '  │           │  ',
     '  │           │  ',
-    ' ╔═════════════╗ ',
-    ' ║      ~      ║ ',
-    ' ╚═════════════╝ ',
-    ' ┌─────────────┐ ',
-    ' │  ×       ×  │ ',
-    ' ┤    ⏜⏜⏜⏜⏜    ├ ',
-    ' └─────────────┘ ',
-    '    ┃       ┃    ',
-    '    ┃       ┃    ',
+    '  ╰───────────╯  ',
+    '    ╭───────╮    ',
+    '    │ O   O │    ',
+    '    │  ╭─╮  │    ',
+    '    ╰───────╯    ',
+    '     ┃     ┃     ',
+    '     ┗┛   ┗┛     ',
   ],
 };
 const _MASCOT_TINY = {
-  idle:    '◂▸  ◂▸\n[│  │]\n ┃  ┃ ',
-  working: '◂▸  ◂▸\n[·  ·] ···\n ┃  ┃ ',
-  done:    '◂▸  ◂▸\n[^  ^] ✓\n ┃  ┃ ',
-  error:   '▾   ▾ \n[×  ×] !\n ┃  ┃ ',
+  idle:    ' ●   ● \n(│ ─ │)\n  ┃ ┃  ',
+  working: ' ●   ● \n(│ ═ │)°\n  ┃ ┃  ',
+  done:    ' ^   ^ \n(│ ‿ │)✦\n  ┃ ┃  ',
+  error:   ' O   O \n(│╭╮│)!\n  ┃ ┃  ',
 };
 
-// Ink helpers. State picks a primary colour; the banner caller layers
-// a secondary "wordmark" right column.
-function _mascotInkers(state) {
-  const helmet = (s) => `\x1b[38;2;195;61;42m${s}\x1b[0m`;
-  const helmetDim = (s) => `\x1b[38;2;122;31;21m${s}\x1b[0m`;
-  const star = (s) => `\x1b[38;2;217;119;87m${s}\x1b[0m`;
-  const ok = (s) => `\x1b[38;2;111;185;143m${s}\x1b[0m`;
-  const err = (s) => `\x1b[38;2;230;57;70m${s}\x1b[0m`;
-  if (state === 'done') return (s) => ok(s);
-  if (state === 'error') return (s) => err(s);
-  if (state === 'working') return (s) => helmet(s);
-  return (s) => helmet(s);
-}
+// Crab palette — true colour. Shell red, face orange, legs yellow.
+// Kept as wrappers so the banner caller can compose rows freely.
+const _MC_RED = (s) => `\x1b[38;2;219;59;43m${s}\x1b[0m`;
+const _MC_ORG = (s) => `\x1b[38;2;239;131;48m${s}\x1b[0m`;
+const _MC_YEL = (s) => `\x1b[38;2;242;169;59m${s}\x1b[0m`;
 
+// Two-tone renderer: rows 6-9 are the orange face box (interior cols
+// 4-12 inked orange, the rest of the row red); rows 10-11 are the
+// yellow legs; everything else is the red carapace. Box-drawing and
+// the accent glyphs are all single BMP code points, so slice() index
+// == visual column and the alignment survives the colour wrap.
 function _renderMascot(state) {
   const rows = _MASCOT_BIG[state] || _MASCOT_BIG.idle;
-  const ink = _mascotInkers(state);
-  return rows.map((r) => ink(r));
+  return rows.map((r, i) => {
+    if (i >= 6 && i <= 9) return _MC_RED(r.slice(0, 4)) + _MC_ORG(r.slice(4, 13)) + _MC_RED(r.slice(13));
+    if (i >= 10) return _MC_YEL(r);
+    return _MC_RED(r);
+  });
 }
 
 // Tiny inline mascot — picked up by chat/agent helpers when they want
 // to flash a one-line status without re-rendering the whole banner.
-// Returns a string; callers add their own newline.
+// Returns a string; callers add their own newline. Inked crab-red so
+// it stays on-brand wherever it's spliced in.
 function _renderMascotTiny(state) {
-  const ink = _mascotInkers(state);
-  return ink((_MASCOT_TINY[state] || _MASCOT_TINY.idle));
+  return _MC_RED(_MASCOT_TINY[state] || _MASCOT_TINY.idle);
 }
 
 function _renderBanner(version) {

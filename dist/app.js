@@ -26060,47 +26060,46 @@ function _mascotWanderStep() {
 // Design handoff v0.1). The old `jumping` / `speaking` modes are kept
 // as alias shims so existing call sites keep working: speaking → done
 // pose for a brief moment, then back to idle.
+// v3.99.29 — 8-bit crab mascot. A red crab carapace worn like a hood,
+// short eye-stalks poking up top (white sclera + black pupil), an
+// orange face peeking out below with two black dot-eyes, tiny yellow
+// legs. State → expression map (see the Claude Design crab sheet):
+//   idle    → 기본 (neutral)
+//   working → 화남(연기): focused squint + smoke puffs
+//   done    → 미소 (smile arc + sparkle)
+//   error   → 경고/놀람 (wide shocked eyes + alert marks)
 const _MASCOT_W = 16;
 const _MASCOT_BASE = [
-  '..pp........pp..', '.p.p........p.p.', '.pp..........pp.', '..p..........p..',
-  '..pp........pp..', '..HHHHHHHHHHHH..', '.HHiHHHHHHHHiHH.', '.HHHHHHHHHHHHHH.',
-  '..HHHHHHHHHHHH..', '..BBBBBBBBBBBB..', '..BBBBBBBBBBBB..', '..BBBBBBBBBBBB..',
-  'BBBBBBBBBBBBBBBB', '..BBBBBBBBBBBB..', '..BB........BB..', '..BB........BB..',
+  '...WW......WW...', '...We......eW...', '...rR......Rr...', '....RRRRRRRR....',
+  '...RRRRRRRRRR...', '..RrRRRRRRRRrR..', '.RRRRRRRRRRRRRR.', '.RRRRRRRRRRRRRR.',
+  '.Rr.OOOOOOOO.rR.', '....OoOOOOoO....', '....OeOOOOeO....', '....OOOOOOOO....',
+  '....OooooooO....', '...rROOOOOORr...', '...L..L..L..L...', '..LL........LL..',
 ];
 const _MASCOT_FACES = {
-  idle: {
-    10: '..BBeBBBBBBeBB..',
-    11: '..BBeBBBBBBeBB..',
-  },
+  idle: {},
   working: {
-    4:  '..ppw.......pp..',
-    6:  '.HHwHHHHHHHHwHH.',
-    10: '..BBBBBBBBBBBB..',
-    11: '..BBeBBBBBBeBB..',
+    0:  's..WW......WW..s',
+    3:  '.s..RRRRRRRR..s.',
+    10: '....OeeOOeeO....',
+    12: '....OeeeeeeO....',
   },
   done: {
-    0:  'w.pp........pp.w',
-    10: '..BBeBBeeBBeBB..',
-    11: '..BBBeBBBBeBBB..',
+    0:  'S..WW......WW..S',
+    12: '....OOOOOOOO....',
+    13: '...rReeeeeeRr...',
   },
   error: {
-    0:  '................',
-    1:  '..pp........pp..',
-    2:  '.pp..........pp.',
-    3:  '..pp........pp..',
-    4:  '................',
-    5:  '..hhhhhhhhhhhh..',
-    6:  '.hhHHHHHHHHHHhh.',
-    7:  '.hHHHHHHHHHHHHh.',
-    8:  '..hHHHHHHHHHHh..',
-    10: '..BBeBeBBeBeBB..',
-    11: '..BBBeBBBBeBBB..',
+    0:  '.S.WW......WW.S.',
+    1:  '.S.We......eW.S.',
+    10: '....OWeeeeWO....',
+    12: '....OOeeeeOO....',
   },
 };
 const _MASCOT_PALETTE = {
-  H: '#c33d2a', h: '#7a1f15', i: '#ff8a6a',
-  p: '#a02b1c', B: '#d97757',
-  e: '#1a1410', w: '#fff7e6',
+  R: '#db3b2b', r: '#9c2417',
+  O: '#ef8330', o: '#c5611c',
+  e: '#1a1410', W: '#fff5e8', L: '#f2a93b',
+  s: '#cdbfac', S: '#ffd27a',
 };
 function _mascotSpriteRows(state) {
   const ovr = _MASCOT_FACES[state] || _MASCOT_FACES.idle;
@@ -26114,7 +26113,7 @@ function _mascotBuildSvg(state, animate) {
     for (let x = 0; x < row.length; x++) {
       const ch = row[x];
       if (ch === '.') continue;
-      const fill = _MASCOT_PALETTE[ch] || '#d97757';
+      const fill = _MASCOT_PALETTE[ch] || '#db3b2b';
       cells.push(`<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${fill}"/>`);
     }
   }
