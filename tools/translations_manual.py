@@ -253,13 +253,6 @@ try:
 except Exception:
     _NEW_EN_42, _NEW_ZH_42 = {}, {}
 
-# v2.71.4 — QQ114 nav-tile chat/terminal descriptions (two-sentence Korean
-# strings that previously leaked partial Chinese in the title attribute).
-try:
-    from translations_manual_43 import NEW_EN as _NEW_EN_43, NEW_ZH as _NEW_ZH_43
-except Exception:
-    _NEW_EN_43, _NEW_ZH_43 = {}, {}
-
 # Chat connection-gate overlay strings — model verification flow that
 # replaces the silent "중단됨" first-send failure path.
 try:
@@ -866,10 +859,6 @@ for _k, _v in _NEW_ZH_41.items():
 for _k, _v in _NEW_EN_42.items():
     MANUAL_EN[_k] = _v  # override — fixes prior Korean-residue placeholders
 for _k, _v in _NEW_ZH_42.items():
-    MANUAL_ZH[_k] = _v
-for _k, _v in _NEW_EN_43.items():
-    MANUAL_EN[_k] = _v  # QQ114 nav-tile descriptions
-for _k, _v in _NEW_ZH_43.items():
     MANUAL_ZH[_k] = _v
 for _k, _v in _NEW_EN_44.items():
     MANUAL_EN.setdefault(_k, _v)

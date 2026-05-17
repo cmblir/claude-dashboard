@@ -10,6 +10,43 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.29] — 2026-05-18  ✂️ lazyclaw split out into its own repository
+
+`lazyclaw` (the standalone terminal CLI) is now developed and published
+from its own repository — https://github.com/cmblir/lazyclaw — instead of
+living inside this dashboard repo and being mirrored as 16 dashboard tabs.
+This reverses the v3.99.26 "CLI parity" integration; the two products are
+now fully decoupled.
+
+### Removed from lazyclaude
+
+- `src/lazyclaw/` (npm package source) and `dist-lazyclaw/` (web demo)
+- `server/lazyclaw_proxy.py` and every `/api/lc/*` route (read + write)
+- The 16 `lc*` dashboard tabs and the `lazyclaw` nav group in `dist/app.js`
+- `.github/workflows/publish-lazyclaw.yml` (moved to the new repo)
+- `tests/phase1-6*.spec.ts` plus 56 `scripts/e2e-chat-*` / `e2e-terminal-*`
+  and lazyclaw-only perf/bench scripts; 6 cross-cutting scripts were
+  trimmed to drop only their lazyclaw legs (no coverage of surviving
+  features lost)
+- `make lazyclaw-pack|publish-dry|publish` and `bench-providers` targets
+- Orphaned lazyclaw i18n: `translations_manual_43` plus the two lazyclaw
+  keys in `_42`. `_44`'s connection-gate strings stay — they are still
+  used by the dashboard chat, not lazyclaw-exclusive
+
+### Kept (intentionally)
+
+- The Claude mascot: it is general dashboard chrome (workflow/modal/chat
+  state feed), not a lazyclaw feature — only its `lazyclaw` comment
+  labels were de-branded
+- The one-shot localStorage migration that retires a stale `lazyclaw`
+  mode/tab for returning users
+- One provenance line in `README*.md` pointing at the new repo
+
+No behaviour change for any surviving dashboard surface. The router
+falls back to `overview` for a stale persisted `lc*` tab, so returning
+users never hit a blank view. `make i18n-verify` stays green.
+
+---
 ## [3.99.28] — 2026-05-12  🩹 launcher Quit actually quits + mascot ASCII aligned
 
 User: "터미널에서 quit 누르면 [...] 사진처럼 되고 quit이 안되고 있어." + "마스코트도 확인해주고".

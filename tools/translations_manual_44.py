@@ -1,6 +1,6 @@
 """Chat connection-gate strings.
 
-Translations for the lazyclawChat connection-verification overlay
+Translations for the chat connection-verification overlay
 (model picker + Test Connection) introduced to stop the silent
 "중단됨" bubble that users were hitting on first send.
 

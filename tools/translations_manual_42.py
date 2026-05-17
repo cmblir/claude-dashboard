@@ -180,8 +180,6 @@ NEW_EN: dict[str, str] = {
     "이 목록": "This help",
     # QQ2
     "터미널": "Terminal",
-    "lazyclaw 설정·CLI 상태를 화이트리스트된 read-only 명령으로 즉시 점검 (claude --version, ollama list 등).": "Inspect lazyclaw / CLI state with whitelisted read-only commands (claude --version, ollama list, etc).",
-    "LazyClaw 설정 터미널": "LazyClaw settings terminal",
     "화이트리스트 read-only 명령만 실행됩니다": "Whitelisted read-only commands only",
     "출력 비우기": "Clear output",
     "가능한 명령": "Available commands",
@@ -476,8 +474,6 @@ NEW_ZH: dict[str, str] = {
     "이 목록": "此帮助",
     # QQ2
     "터미널": "终端",
-    "lazyclaw 설정·CLI 상태를 화이트리스트된 read-only 명령으로 즉시 점검 (claude --version, ollama list 등).": "用白名单只读命令检查 lazyclaw / CLI 状态（如 claude --version、ollama list）",
-    "LazyClaw 설정 터미널": "LazyClaw 设置终端",
     "화이트리스트 read-only 명령만 실행됩니다": "仅允许白名单只读命令",
     "출력 비우기": "清空输出",
     "가능한 명령": "可用命令",

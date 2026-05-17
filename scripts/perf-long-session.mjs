@@ -2,8 +2,8 @@
 /**
  * Long-session leak probe.
  *
- * Walks through 67 tabs once, then ping-pongs between 5 heavy tabs
- * (workflows, agents, sessions, lazyclawDashboard, lazyclawChat) for
+ * Walks through every tab once, then ping-pongs between 5 heavy tabs
+ * (workflows, agents, sessions, projects, aiProviders) for
  * another 50 navigations. Reports JS heap before/after + total
  * scripting time accumulated. A clean session sees roughly flat heap;
  * a leaky AFTER hook shows monotonic growth.
@@ -44,16 +44,16 @@ async function snapshot(label) {
 
 const before = await snapshot('boot');
 
-// Phase 1 — sweep all 67 tabs once.
+// Phase 1 — sweep every tab once.
 for (const tab of tabs) {
   await page.evaluate(t => location.hash = '#/' + t, tab);
   await page.waitForFunction(t => state && state.view === t, tab, { timeout: 6000 }).catch(() => {});
   await page.waitForTimeout(120);
 }
-const afterSweep = await snapshot('after 67-tab sweep');
+const afterSweep = await snapshot(`after ${tabs.length}-tab sweep`);
 
 // Phase 2 — ping-pong 50 navigations across the heavy tabs.
-const heavy = ['workflows', 'agents', 'sessions', 'lazyclawDashboard', 'lazyclawChat'];
+const heavy = ['workflows', 'agents', 'sessions', 'projects', 'aiProviders'];
 for (let i = 0; i < 50; i++) {
   const tab = heavy[i % heavy.length];
   await page.evaluate(t => location.hash = '#/' + t, tab);

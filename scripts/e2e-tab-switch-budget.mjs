@@ -38,7 +38,7 @@ await page.waitForTimeout(1500);
 // QQ154 — sessions tab now hits the auto_resume/status memo so it
 // joins the budget too.
 const tabs = ['aiProviders', 'team', 'memoryManager', 'openPorts',
-              'workflows', 'lazyclawChat', 'lazyclawTerm', 'overview',
+              'workflows', 'overview',
               'projects', 'sessions'];
 // Per-tab: warm THIS tab (so its caches are hot RIGHT before we
 // measure), hop to overview, then measure the warm switch back. This

@@ -79,5 +79,7 @@ _missing.json
 test-results/
 playwright-report/
 playwright/.cache/
+.playwright-mcp/
+qa-lazyclaw-removal-*.png
 node_modules/
 scripts/_flyout-debug-*

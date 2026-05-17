@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 /**
- * QQ167 — verify QQ164 (chat Cmd+Shift+N) and QQ165 (workflow
- * Cmd+Shift+N) don't bleed into each other. Each handler must
- * gate on `state.view` so pressing the shortcut on the wrong tab
- * is a no-op.
+ * QQ167 — verify the workflow Cmd+Shift+N shortcut (QQ165) is gated on
+ * `state.view`. The handler must only fire on the workflows tab; pressing
+ * the shortcut on any other tab is a no-op.
  */
 import { chromium } from 'playwright';
 
@@ -11,7 +10,7 @@ const PORT = process.env.PORT || '19500';
 const URL  = `http://127.0.0.1:${PORT}/`;
 
 function check(label, ok, detail) {
-  const tag = ok ? '[32m✅[0m' : '[31m❌[0m';
+  const tag = ok ? '\x1b[32m✅\x1b[0m' : '\x1b[31m❌\x1b[0m';
   console.log(`${tag} ${label}${detail ? ' — ' + detail : ''}`);
   if (!ok) process.exitCode = 1;
 }
@@ -22,15 +21,12 @@ page.on('pageerror', e => console.error('[pageerror]', e.message));
 
 await page.goto(URL, { waitUntil: 'networkidle' });
 
-// Workflows tab: press Cmd+Shift+N → only _wfCreateNew should fire.
+// Workflows tab: press Cmd+Shift+N → _wfCreateNew should fire once.
 await page.evaluate(() => window.go('workflows'));
 await page.waitForSelector('.wf-canvas, #wfCanvas');
 await page.evaluate(() => {
-  window.__cnWf = 0; window.__cnLc = 0;
-  const oWf = window._wfCreateNew;
-  const oLc = window._lcNewSession;
+  window.__cnWf = 0;
   window._wfCreateNew = () => { window.__cnWf++; };
-  window._lcNewSession = (...a) => { window.__cnLc++; return oLc && oLc(...a); };
 });
 await page.evaluate(() => {
   document.dispatchEvent(new KeyboardEvent('keydown', {
@@ -38,40 +34,23 @@ await page.evaluate(() => {
   }));
 });
 await page.waitForTimeout(150);
-const r1 = await page.evaluate(() => ({ wf: window.__cnWf, lc: window.__cnLc }));
-check('on workflows: only _wfCreateNew fires', r1.wf === 1 && r1.lc === 0,
+const r1 = await page.evaluate(() => ({ wf: window.__cnWf }));
+check('on workflows: _wfCreateNew fires once', r1.wf === 1,
   JSON.stringify(r1));
 
-// Chat tab: press Cmd+Shift+N → only _lcNewSession should fire.
-await page.evaluate(() => window.go('lazyclawChat'));
-await page.waitForSelector('#lcChatInput');
-await page.evaluate(() => {
-  window.__cnWf = 0; window.__cnLc = 0;
-  document.getElementById('lcChatLog')?.click();
-});
-await page.evaluate(() => {
-  document.dispatchEvent(new KeyboardEvent('keydown', {
-    key: 'N', code: 'KeyN', metaKey: true, shiftKey: true, bubbles: true,
-  }));
-});
-await page.waitForTimeout(150);
-const r2 = await page.evaluate(() => ({ wf: window.__cnWf, lc: window.__cnLc }));
-check('on chat: only _lcNewSession fires', r2.wf === 0 && r2.lc === 1,
-  JSON.stringify(r2));
-
-// Overview tab: neither should fire.
+// Overview tab: the workflow handler must NOT fire (gated on state.view).
 await page.evaluate(() => window.go('overview'));
 await page.waitForTimeout(300);
-await page.evaluate(() => { window.__cnWf = 0; window.__cnLc = 0; });
+await page.evaluate(() => { window.__cnWf = 0; });
 await page.evaluate(() => {
   document.dispatchEvent(new KeyboardEvent('keydown', {
     key: 'N', code: 'KeyN', metaKey: true, shiftKey: true, bubbles: true,
   }));
 });
 await page.waitForTimeout(150);
-const r3 = await page.evaluate(() => ({ wf: window.__cnWf, lc: window.__cnLc }));
-check('on overview: neither handler fires', r3.wf === 0 && r3.lc === 0,
-  JSON.stringify(r3));
+const r2 = await page.evaluate(() => ({ wf: window.__cnWf }));
+check('on overview: _wfCreateNew does not fire', r2.wf === 0,
+  JSON.stringify(r2));
 
 await browser.close();
 console.log(process.exitCode ? '\nFAILED' : '\nOK');

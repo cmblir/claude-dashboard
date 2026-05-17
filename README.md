@@ -13,11 +13,12 @@ _Don't memorize 50+ CLI commands. Just click._
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Version](https://img.shields.io/badge/version-v3.91.0-green.svg)](./CHANGELOG.md)
-[![npm](https://img.shields.io/npm/v/lazyclaw.svg?label=lazyclaw%20cli)](https://www.npmjs.com/package/lazyclaw)
 
 </div>
 
-LazyClaude is a **local-first command center** for your `~/.claude/` directory (agents, skills, hooks, plugins, MCP, sessions, projects) plus an n8n-style workflow engine and a standalone CLI (`lazyclaw`). Everything ships behind one `python3 server.py` — Python stdlib, single-file HTML, no install step.
+LazyClaude is a **local-first command center** for your `~/.claude/` directory (agents, skills, hooks, plugins, MCP, sessions, projects) plus an n8n-style workflow engine. Everything ships behind one `python3 server.py` — Python stdlib, single-file HTML, no install step.
+
+> ℹ️ The standalone terminal CLI `lazyclaw` now lives in its own repository: <https://github.com/cmblir/lazyclaw> (`npm i -g lazyclaw`).
 
 **No cloud. No telemetry. No package to install.**
 
@@ -40,218 +41,6 @@ PORT=19500 python3 server.py
 LOG_LEVEL=DEBUG python3 server.py
 CLAUDE_HOME=/path/to/.claude python3 server.py
 ```
-
----
-
-## 🐚 LazyClaw CLI
-
-A standalone Node CLI (separate from the dashboard) that exposes the same providers, sessions, skills, workflows, and rate-card surface over a fast terminal interface.
-
-### Install
-
-```bash
-npm install -g lazyclaw
-lazyclaw version
-```
-
-Requirements: **Node 18+**. Works on macOS / Linux / WSL. Windows native PowerShell mostly works but the ghost-text + ANSI banner are TTY-gated and may fall back to plain prompts.
-
-<details>
-<summary>From source (for contributors)</summary>
-
-```bash
-git clone https://github.com/cmblir/LazyClaude.git
-cd LazyClaude
-
-# Run directly (no install)
-node src/lazyclaw/cli.mjs <subcommand>
-
-# Or symlink the bin into $PATH
-sudo ln -s "$PWD/src/lazyclaw/cli.mjs" /usr/local/bin/lazyclaw
-sudo chmod +x /usr/local/bin/lazyclaw
-
-# Or alias in your shell profile (~/.zshrc / ~/.bashrc)
-alias lazyclaw="node $HOME/path/to/LazyClaude/src/lazyclaw/cli.mjs"
-```
-
-The npm-published `lazyclaw` is a snapshot of [`src/lazyclaw/`](./src/lazyclaw) — every commit on `main` that bumps `src/lazyclaw/package.json#version` triggers `.github/workflows/publish-lazyclaw.yml` and lands on npmjs.org automatically.
-
-</details>
-
-### First run — interactive onboarding
-
-```bash
-lazyclaw onboard               # arrow-key picker — claude-cli (no key) is the default
-lazyclaw status                # show current provider/model + masked key
-lazyclaw doctor                # validate config + provider registry
-```
-
-The picker labels each row so the auth model is obvious:
-
-| Tag | Meaning |
-|---|---|
-| `[subscription]` | Uses the local `claude` CLI's existing login (Pro / Max / Team). No API key needed. |
-| `[no key]` | Local-only providers (`ollama`, `mock`). |
-| `[api key]` | Direct provider API (`anthropic`, `openai`, `gemini`) — needs an `sk-...` key. |
-
-For automation: `lazyclaw onboard --non-interactive --provider X --model Y [--api-key Z]`. The `--api-key` flag is only consulted when the chosen provider's `requiresApiKey` is true, so subscription / local providers stay keyless.
-
-`onboard` writes `~/.lazyclaw/config.json`. Override the location with `LAZYCLAW_CONFIG_DIR=/path/to/dir`.
-
-### Interactive chat (banner + slash ghost-text, v3.85+)
-
-```bash
-lazyclaw chat                  # opens the REPL; banner + active provider/model
-lazyclaw chat --pick           # arrow-key picker before the prompt
-lazyclaw chat --session daily  # persist turns to ~/.lazyclaw/sessions/daily.jsonl
-lazyclaw chat --skill review,style  # compose named skills as the system prompt
-```
-
-What you see on launch (TTY only):
-
-```text
-  ╭──────────────────────────────╮
-  │   _                          │
-  │  | |__ _ _____  _ _          │
-  │  | / _` |_ / || | '_|         │
-  │  |_\__,_/__\_, |_|            │
-  │  LazyClaw  |__/  3.86.0      │
-  ╰──────────────────────────────╯
-
-  provider · anthropic
-  model    · claude-opus-4-7
-  slash    · /help · /model · /provider · /exit
-  hint     · → to accept the suggested command, Tab to cycle
-
-›
-```
-
-Inside the REPL:
-
-| Slash | What it does |
-|---|---|
-| `/help`        | List slash commands |
-| `/status`      | Print provider + model + masked key |
-| `/provider X`  | Switch active provider mid-session (history kept) |
-| `/model X`     | Switch model. Accepts unified `provider/model` form |
-| `/skill a,b`   | Replace the system prompt with a composition of named skills |
-| `/usage`       | Message count + chars + cumulative token totals (when the provider reports them) |
-| `/new` / `/reset` | Wipe history and start over |
-| `/exit`        | Quit |
-
-Cursor-style ghost-text autocomplete: type `/` and the rest of the longest matching slash command appears in dim grey after the cursor. **`→`** accepts; **`Tab`** still cycles. **Ctrl-C** during a streaming reply aborts that turn (not the whole process); **Ctrl-C** at an empty prompt exits cleanly.
-
-### One-shot calls (no REPL)
-
-```bash
-lazyclaw agent "summarize: $(cat file.md)"
-lazyclaw agent - < prompt.txt                    # read from stdin
-lazyclaw agent "..." --provider openai --model gpt-4.1
-lazyclaw agent "..." --skill review              # compose a system prompt
-lazyclaw agent "..." --usage                     # print token counts on stderr
-lazyclaw agent "..." --cost                      # print $ when rates are configured
-```
-
-### Providers, sessions, skills
-
-```bash
-lazyclaw providers list                          # all registered providers
-lazyclaw providers info anthropic                # detailed info for one
-lazyclaw providers test anthropic                # 1-token reachability probe
-
-lazyclaw sessions list                           # persisted chats
-lazyclaw sessions show daily                     # dump a session's turns
-lazyclaw sessions search "deploy"                # full-text search
-lazyclaw sessions export daily > daily.md
-lazyclaw sessions clear daily                    # wipe one session
-
-lazyclaw skills list                             # installed markdown skill bundles
-lazyclaw skills show review                      # print skill body
-lazyclaw skills install ./my-skill.md            # add a skill
-lazyclaw skills remove review
-```
-
-### Workflows (DAG / sequential / persistent)
-
-```bash
-# Sequential, resumable (default). State at ./.workflow-state/<id>/
-lazyclaw run my-job ./flow.mjs
-
-# Topological-level DAG, in-memory only (faster, NOT resumable)
-lazyclaw run my-job ./flow.mjs --parallel --concurrency 4
-
-# DAG + checkpointing + resume
-lazyclaw run my-job ./flow.mjs --parallel-persistent
-
-# Resume a previously interrupted run
-lazyclaw resume my-job ./flow.mjs
-
-# Inspect persisted state (no execution)
-lazyclaw inspect                                 # list every session
-lazyclaw inspect my-job --summary
-lazyclaw inspect my-job --critical-path ./flow.mjs
-lazyclaw inspect my-job --slowest 5
-```
-
-### Local HTTP gateway
-
-```bash
-lazyclaw daemon                                  # bind a free port; prints { port, url }
-lazyclaw daemon --port 19600
-lazyclaw daemon --auth-token $(openssl rand -hex 16)
-lazyclaw daemon --rate-limit 60 --log info       # 60 req/min/IP, JSON access logs
-lazyclaw daemon --once                           # serve a single request, then exit
-```
-
-The daemon shares config and rate cards with the CLI, so `lazyclaw agent` and a `POST /agent` request to the daemon produce byte-identical responses.
-
-### Cost rate cards
-
-```bash
-lazyclaw rates list                              # current cards from config
-lazyclaw rates set anthropic/claude-opus-4-7 \
-  --in 15 --out 75 --cache-read 1.5 --cache-create 18.75
-lazyclaw rates copy anthropic/claude-opus-4-7 \
-  anthropic/claude-opus-4-6                       # duplicate a card
-lazyclaw rates delete openai/gpt-3.5-turbo
-lazyclaw rates validate                          # schema + sanity check
-```
-
-`/usage` and `--cost` use these to compute USD totals locally — no provider call.
-
-### Config + bundles
-
-```bash
-lazyclaw config path                             # → ~/.lazyclaw/config.json
-lazyclaw config get provider
-lazyclaw config set provider openai
-lazyclaw config list
-lazyclaw config edit                             # opens $EDITOR
-lazyclaw config validate
-
-lazyclaw export > backup.json                    # config + skills (+ optional sessions)
-lazyclaw import --from backup.json
-```
-
-### Shell completion
-
-```bash
-lazyclaw completion bash >> ~/.bashrc
-lazyclaw completion zsh  >> ~/.zshrc
-```
-
-### File locations
-
-| Path | Purpose |
-|---|---|
-| `~/.lazyclaw/config.json` | provider, model, api-key, skills, rates |
-| `~/.lazyclaw/sessions/*.jsonl` | persisted chat sessions |
-| `~/.lazyclaw/skills/*.md` | installed skill bundles |
-| `./.workflow-state/<id>/` | per-session workflow checkpoints (cwd-relative) |
-
-`LAZYCLAW_CONFIG_DIR=/elsewhere` moves the first three; `LAZYCLAW_WORKFLOW_STATE_DIR=...` moves the last.
-
-`lazyclaw help` lists every subcommand. The CLI and daemon share validators (`config-validate.mjs`, `rates-validate.mjs`) and analytics (`workflow/summary.mjs`) so output shape is bit-for-bit identical across both surfaces.
 
 ---
 
@@ -285,15 +74,8 @@ LazyClaude/
 │   ├── auto_resume.py         # rate-limit retry loop with deadlineMs
 │   ├── auto_resume_inject.py  # macOS live TTY injection (v3.65)
 │   └── ...
-├── src/lazyclaw/              # Node CLI + daemon (separate from dashboard)
-│   ├── cli.mjs                # entry
-│   ├── daemon.mjs             # HTTP gateway
-│   ├── workflow/              # engines: sequential, parallel, persistent
-│   ├── providers/             # anthropic / openai / ollama / gemini / mock
-│   ├── config-validate.mjs    # shared with daemon
-│   └── rates-validate.mjs     # shared with daemon
 ├── dist/                      # single-file SPA (HTML + app.js + locales)
-└── tests/                     # 491 pytest specs + 393 Playwright specs
+└── tests/  # pytest unit specs + Playwright E2E
 ```
 
 ### Data stores
